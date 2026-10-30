@@ -7,6 +7,7 @@ use Modules\Inventory\Constants\InventoryPermission;
 use Modules\Inventory\Http\Controllers\AdjustmentController;
 use Modules\Inventory\Http\Controllers\AllocationController;
 use Modules\Inventory\Http\Controllers\BatchController;
+use Modules\Inventory\Http\Controllers\ConsumableUsageController;
 use Modules\Inventory\Http\Controllers\OpeningStockImportController;
 use Modules\Inventory\Http\Controllers\ReservationController;
 use Modules\Inventory\Http\Controllers\StockCardController;
@@ -27,6 +28,22 @@ $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
 
 Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.inventory.')->group(function () use ($requires): void {
+    Route::get('consumable-usage/items', [ConsumableUsageController::class, 'items'])
+        ->middleware($requires(InventoryPermission::CONSUMABLE_USAGE_VIEW))
+        ->name('consumable-usage.items');
+    Route::get('consumable-usage', [ConsumableUsageController::class, 'index'])
+        ->middleware($requires(InventoryPermission::CONSUMABLE_USAGE_VIEW))
+        ->name('consumable-usage.index');
+    Route::get('consumable-usage/availability', [StockController::class, 'availability'])
+        ->middleware($requires(InventoryPermission::CONSUMABLE_USAGE_VIEW))
+        ->name('consumable-usage.availability');
+    Route::post('consumable-usage', [ConsumableUsageController::class, 'store'])
+        ->middleware($requires(InventoryPermission::CONSUMABLE_USAGE_POST))
+        ->name('consumable-usage.store');
+    Route::post('consumable-usage/{usage}/reverse', [ConsumableUsageController::class, 'reverse'])
+        ->whereNumber('usage')
+        ->middleware($requires(InventoryPermission::CONSUMABLE_USAGE_REVERSE))
+        ->name('consumable-usage.reverse');
     Route::get('stock-card', [StockCardController::class, 'show'])
         ->middleware($requires(InventoryPermission::STOCK_VIEW))
         ->name('stock-card.show');

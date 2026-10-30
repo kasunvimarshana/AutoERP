@@ -755,7 +755,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         label: "All Expenses",
                         to: "/expenses",
                         match: ["/expenses"],
-                        exclude: ["/expenses/create", "/expenses/types"],
+                        exclude: ["/expenses/create", "/expenses/types", "/expenses/consumable-usage"],
                         access: {
                             ...operationalAccess(["finance"]),
                             permissions: [expensePermissions.view],
@@ -770,6 +770,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         access: {
                             ...operationalAccess(["finance"]),
                             permissions: [expensePermissions.create],
+                        },
+                    },
+                    {
+                        id: "consumable-usage",
+                        type: "link",
+                        label: "Consumable Usage",
+                        to: "/expenses/consumable-usage",
+                        match: ["/expenses/consumable-usage"],
+                        access: {
+                            ...operationalAccess(["finance", "inventory"]),
+                            permissions: [inventoryPermissions.consumableUsageView],
                         },
                     },
                     {
@@ -1010,6 +1021,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         access: {
                             ...operationalAccess(["reporting"]),
                             permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "consumable-usage-report",
+                        type: "link",
+                        label: "Consumable Usage Report",
+                        to: "/reports/consumable-usage",
+                        match: ["/reports/consumable-usage"],
+                        access: {
+                            ...operationalAccess(["reporting", "finance", "inventory"]),
+                            permissions: [reportingPermissions.view, inventoryPermissions.consumableUsageView],
                         },
                     },
                     {

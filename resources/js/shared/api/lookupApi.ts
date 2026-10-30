@@ -86,8 +86,13 @@ export const lookupApi = {
         key: 'lookup:items:stock',
         load: (params) => itemLookup(`${endpoints.items}/lookup/stock`, params),
     }),
+    purchaseStockItems: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:items:purchase-stock',
+        load: (params) => itemLookup(`${endpoints.items}/lookup/purchase-stock`, params),
+    }),
     // Stock quantities are live transactional data and must not be served from the lookup cache.
     stockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/stockable`, params),
+    consumableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.inventory}/consumable-usage/items`, params),
     sellingStockableItems: (params: LookupLoadParams, warehouseId: number | null, saleDate: string, warehouseLocationId: number | null) => itemLookup(
         `${endpoints.selling}/items/lookup`,
         params,

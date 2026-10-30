@@ -61,6 +61,15 @@ final class FinancePostingFixture
         ]);
     }
 
+    public static function seedConsumableUsageProfile(int $tenantId, ?int $organizationUnitId = null): void
+    {
+        $accounts = self::accounts($tenantId, $organizationUnitId);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::InternalConsumption->value, [
+            FinanceAccountRoleCode::OperatingExpense->value => $accounts[FinanceAccountRoleCode::OperatingExpense->value],
+            FinanceAccountRoleCode::Inventory->value => $accounts[FinanceAccountRoleCode::Inventory->value],
+        ]);
+    }
+
     public static function seedCustomerPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
         self::seedCustomerInvoiceProfiles($tenantId, $organizationUnitId);

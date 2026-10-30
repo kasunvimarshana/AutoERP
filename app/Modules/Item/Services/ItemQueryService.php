@@ -85,7 +85,9 @@ final class ItemQueryService
         $criteria['is_active'] = true;
         match ($kind) {
             'stock' => [$criteria['item_type'] = ItemType::Stock->value, $criteria['is_stockable'] = true],
+            'purchase-stock' => [$criteria['item_types'] = [ItemType::Stock->value, ItemType::Consumable->value], $criteria['is_stockable'] = true],
             'stockable' => $criteria['is_stockable'] = true,
+            'consumable' => [$criteria['item_type'] = ItemType::Consumable->value, $criteria['is_stockable'] = true],
             'untracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_type'] = TrackingType::None->value],
             'batch-tracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_types'] = [TrackingType::Batch->value, TrackingType::Lot->value]],
             'bundle-child' => $criteria['bundle_child'] = true,
@@ -221,6 +223,9 @@ final class ItemQueryService
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
             }
+        }
+        if (! empty($criteria['item_types'])) {
+            $query->whereIn('item_type', $criteria['item_types']);
         }
         if (! empty($criteria['bundle_child'])) {
             $query->where(function (Builder $items): void {

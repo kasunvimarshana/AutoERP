@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { financePermissions } from '@/modules/finance/financePermissions';
+import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -17,6 +18,9 @@ export default function ReportListPage() {
     const sections = Object.entries(grouped);
     if (!grouped.Finance) sections.push(['Finance', []]);
     const canViewCustomerOutstanding = hasPermission(auth, financePermissions.reportsView);
+    const canViewConsumableUsage = hasPermission(auth, inventoryPermissions.consumableUsageView)
+        && auth.enabledModules?.includes('finance')
+        && auth.enabledModules?.includes('inventory');
 
     return (
         <>
@@ -31,6 +35,10 @@ export default function ReportListPage() {
                                 {group === 'Finance' && canViewCustomerOutstanding && <Link to="/reports/customer-outstanding" className="block px-1 py-3 hover:bg-slate-50">
                                     <div className="font-semibold text-slate-900">Customer Outstanding</div>
                                     <div className="text-sm text-slate-500">Customer balances by currency, aging, and invoice</div>
+                                </Link>}
+                                {group === 'Finance' && canViewConsumableUsage && <Link to="/reports/consumable-usage" className="block px-1 py-3 hover:bg-slate-50">
+                                    <div className="font-semibold text-slate-900">Consumable Usage</div>
+                                    <div className="text-sm text-slate-500">Quantity used and inventory cost by item and date</div>
                                 </Link>}
                                 {rows.map((report) => (
                                     <Link key={report.key} to={reportPath(report.key)} className="block px-1 py-3 hover:bg-slate-50">

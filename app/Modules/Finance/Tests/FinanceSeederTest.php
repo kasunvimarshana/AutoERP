@@ -41,6 +41,7 @@ final class FinanceSeederTest extends TestCase
 
         foreach ([
             FinancePostingProfileCode::InventoryReceipt->value,
+            FinancePostingProfileCode::InternalConsumption->value,
             FinancePostingProfileCode::CustomerReceipt->value,
             FinancePostingProfileCode::SupplierPayment->value,
             FinancePostingProfileCode::CustomerAdvance->value,

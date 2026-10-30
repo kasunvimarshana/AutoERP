@@ -365,6 +365,13 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Inventory->value => self::ACCOUNT_INVENTORY,
                 ],
             ],
+            FinancePostingProfileCode::InternalConsumption->value => [
+                'name' => 'Consumable Usage',
+                'rules' => [
+                    FinanceAccountRoleCode::OperatingExpense->value => self::ACCOUNT_OPERATING_EXPENSE,
+                    FinanceAccountRoleCode::Inventory->value => self::ACCOUNT_INVENTORY,
+                ],
+            ],
             FinancePostingProfileCode::VehicleServiceInvoice->value => [
                 'name' => 'Vehicle Service Invoice',
                 'rules' => [

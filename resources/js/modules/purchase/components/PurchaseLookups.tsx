@@ -37,7 +37,7 @@ export function ItemLookupSelect({ stockOnly = false, ...props }: LookupProps & 
     return (
         <LookupSelect
             label="Item"
-            search={stockOnly ? lookupApi.stockItems : lookupApi.items}
+            search={stockOnly ? lookupApi.purchaseStockItems : lookupApi.items}
             formatLabel={stockOnly ? (item) => item.name : undefined}
             placeholder="Search items..."
             {...props}

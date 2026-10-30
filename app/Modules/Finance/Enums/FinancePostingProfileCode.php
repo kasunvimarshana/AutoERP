@@ -19,6 +19,7 @@ enum FinancePostingProfileCode: string
     case ExpensePayment = 'expense_payment';
     case InventoryReceipt = 'inventory_receipt';
     case InventoryIssue = 'inventory_issue';
+    case InternalConsumption = 'internal_consumption';
     case SalesReturn = 'sales_return';
     case PurchaseReturn = 'purchase_return';
 }

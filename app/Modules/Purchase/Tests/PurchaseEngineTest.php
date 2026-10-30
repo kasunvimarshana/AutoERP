@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Purchase\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -28,6 +30,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Item\Services\ItemQueryService;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
@@ -95,6 +98,52 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('10000.000000', (string) $order->charge_total);
         $this->assertSame('123000.000000', (string) $order->grand_total);
         $this->assertCount(2, $order->adjustments);
+    }
+
+    public function test_stockable_consumable_can_be_selected_for_purchase_order_and_received(): void
+    {
+        $route = Route::getRoutes()->match(Request::create('/api/v1/items/lookup/purchase-stock', 'GET'));
+        $this->assertSame('api.v1.items.lookup', $route->getName());
+
+        [$tenantId, $warehouseId, , $supplierId, $uomId] = $this->purchaseContext();
+        $consumable = $this->createItem($tenantId, 'CONSUMABLE-'.Str::upper(Str::random(4)), ItemType::Consumable, true, $uomId);
+        $lookup = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ItemQueryService::class)->lookup(['search' => $consumable->code], $tenantId, null, 20, 'purchase-stock'),
+        );
+        $this->assertSame([(int) $consumable->getKey()], $lookup->getCollection()->modelKeys());
+
+        $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
+            tenantId: $tenantId,
+            purchaseOrderDate: '2026-06-06',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            warehouseId: $warehouseId,
+            lines: [new PurchaseOrderLineData((int) $consumable->getKey(), '2.000000', '100.000000', uomId: $uomId)],
+        ));
+        $order = $this->approveOrder($order);
+
+        $grn = $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
+            tenantId: $tenantId,
+            receivedDate: '2026-06-06',
+            warehouseId: $warehouseId,
+            purchaseOrderId: (int) $order->getKey(),
+            lines: [new GoodsReceiptNoteLineData(
+                (int) $consumable->getKey(),
+                '2.000000',
+                '2.000000',
+                '100.000000',
+                purchaseOrderLineId: (int) $order->lines->first()->getKey(),
+                orderedQuantity: '2.000000',
+            )],
+        ));
+        $this->postGoodsReceiptNote($grn);
+
+        $availability = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $consumable->getKey(), $warehouseId)),
+        );
+        $this->assertSame('2.000000', $availability->quantityOnHand);
     }
 
     public function test_purchase_permission_descriptions_exclude_unsupported_workflows(): void

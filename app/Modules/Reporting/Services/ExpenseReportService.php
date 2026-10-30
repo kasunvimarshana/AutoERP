@@ -9,7 +9,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Expense\Enums\ExpenseStatus;
-use Modules\Expense\Models\Expense;
+use Modules\Finance\Enums\JournalType;
+use Modules\Finance\Enums\NormalBalance;
+use Modules\Finance\Enums\StatementType;
+use Modules\Finance\Models\FinanceLedgerEntry;
+use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
 
@@ -20,6 +24,18 @@ final class ExpenseReportService
     private const EVENT_POSTED = 'posted';
 
     private const EVENT_REVERSAL = 'reversal';
+
+    private const SOURCE_PAID = 'paid';
+
+    private const SOURCE_CONSUMABLE = 'consumable';
+
+    private const SOURCE_OTHER = 'other';
+
+    private const EXPENSE_MODULE = 'expense';
+
+    private const CONSUMABLE_MODULE = 'inventory';
+
+    private const CONSUMABLE_TYPE = 'internal_consumption';
 
     private const ZERO = '0.000000';
 
@@ -59,14 +75,17 @@ final class ExpenseReportService
             ],
             'by_expense_type' => $overview['by_expense_type'],
             'by_payment_method' => $overview['by_payment_method'],
+            'by_source' => $overview['by_source'],
+            'by_consumable_item' => $overview['by_consumable_item'],
+            'by_other_account' => $overview['by_other_account'],
             'trend' => $overview['trend'],
             'filter_options' => $this->filterOptions((int) $params['tenant_id'], $organizationUnitId),
-            'basis' => 'Posting events use the expense date. Reversal events use the reversal date, so net expense reconciles with the General Ledger for the selected period.',
+            'basis' => 'Amounts come from posted Finance ledger entries in Profit and Loss expense accounts. Reversals affect the date they were posted. Expense types and payment methods apply only to paid expenses; consumables are grouped by item.',
         ];
     }
 
     /**
-     * @return array{summary: array<string, int|string>, by_expense_type: list<array<string, int|string>>, by_payment_method: list<array<string, int|string>>, trend: list<array<string, int|string>>}
+     * @return array<string, mixed>
      */
     public function overview(
         int $tenantId,
@@ -98,23 +117,24 @@ final class ExpenseReportService
     {
         return new ReportDefinition(
             key: self::REPORT_KEY,
-            title: 'Expense Report',
+            title: 'Overall Expense Report',
             group: 'Finance',
-            model: Expense::class,
+            model: FinanceLedgerEntry::class,
             columns: [
                 new ReportColumn('event_date', 'Date', sortBy: 'event_date', format: 'date'),
                 new ReportColumn('event_type', 'Activity', sortBy: 'event_type', format: 'enum'),
-                new ReportColumn('expense_number', 'Expense', sortBy: 'expense_number'),
-                new ReportColumn('expense_type', 'Type', sortBy: 'expense_type'),
+                new ReportColumn('source', 'Source', sortBy: 'source'),
+                new ReportColumn('document', 'Document', sortBy: 'document'),
+                new ReportColumn('detail', 'Type / item / account', sortBy: 'detail'),
                 new ReportColumn('paid_through', 'Paid through', sortBy: 'paid_through'),
                 new ReportColumn('reference', 'Reference'),
-                new ReportColumn('finance_reference', 'Finance reference'),
+                new ReportColumn('finance_reference', 'Finance reference', format: 'link', hrefPath: 'finance_reference_url'),
                 new ReportColumn('net_amount', 'Net amount', sortBy: 'net_amount', format: 'money', summarize: true),
             ],
             dateColumn: 'event_date',
             defaultSort: 'event_date',
             defaultDirection: 'desc',
-            description: 'Posted operating expenses and dated reversals reconciled to the General Ledger.',
+            description: 'All Profit and Loss expense postings, including paid expenses, consumable usage, and other Finance entries.',
             orientation: 'landscape',
         );
     }
@@ -124,67 +144,94 @@ final class ExpenseReportService
      */
     private function events(array $params): Builder
     {
-        $postings = $this->baseExpenses($params)
+        $ledger = DB::table('finance_ledger_entries as ledger')
+            ->join('finance_journal_entries as journals', function ($join): void {
+                $join->on('journals.id', '=', 'ledger.journal_entry_id')
+                    ->on('journals.tenant_id', '=', 'ledger.tenant_id');
+            })
+            ->join('finance_accounts as accounts', function ($join): void {
+                $join->on('accounts.id', '=', 'ledger.account_id')
+                    ->on('accounts.tenant_id', '=', 'ledger.tenant_id');
+            })
+            ->join('finance_account_types as account_types', function ($join): void {
+                $join->on('account_types.id', '=', 'accounts.account_type_id')
+                    ->on('account_types.tenant_id', '=', 'ledger.tenant_id');
+            })
+            ->leftJoin('expenses', function ($join): void {
+                $join->on('expenses.id', '=', 'ledger.source_id')
+                    ->on('expenses.tenant_id', '=', 'ledger.tenant_id')
+                    ->where('ledger.source_module', self::EXPENSE_MODULE)
+                    ->where('ledger.source_type', self::EXPENSE_MODULE);
+            })
+            ->leftJoin('inventory_movements as movements', function ($join): void {
+                $join->on('movements.id', '=', 'ledger.source_id')
+                    ->on('movements.tenant_id', '=', 'ledger.tenant_id')
+                    ->where('ledger.source_module', self::CONSUMABLE_MODULE)
+                    ->where('ledger.source_type', self::CONSUMABLE_TYPE);
+            })
+            ->leftJoin('items', function ($join): void {
+                $join->on('items.id', '=', 'movements.item_id')
+                    ->on('items.tenant_id', '=', 'ledger.tenant_id');
+            })
+            ->where('ledger.tenant_id', (int) $params['tenant_id'])
+            ->where('account_types.statement_type', StatementType::IncomeStatement->value)
+            ->where('accounts.normal_balance', NormalBalance::Debit->value)
+            ->whereNull('accounts.deleted_at')
             ->select([
-                'expenses.id',
-                'expenses.expense_number',
-                'expenses.expense_date',
-                'expenses.reversal_date',
+                'ledger.id',
+                'ledger.entry_date as event_date',
+                'ledger.source_number as document',
+                'journals.id as journal_id',
+                'journals.journal_number as finance_reference',
                 'expenses.expense_type_id',
                 'expenses.expense_type_code_snapshot',
                 'expenses.expense_type_name_snapshot',
                 'expenses.payment_method_id_snapshot',
                 'expenses.payment_method_code_snapshot',
                 'expenses.payment_method_name_snapshot',
-                'expenses.payment_method_type_snapshot',
                 'expenses.reference_number',
-                'expenses.status',
+                'movements.item_id',
+                'items.code as item_code',
+                'items.name as item_name',
+                'accounts.id as account_id',
+                'accounts.code as account_code',
+                'accounts.name as account_name',
             ])
-            ->selectRaw('? as event_type', [self::EVENT_POSTED])
-            ->selectRaw('expenses.expense_date as event_date')
-            ->selectRaw('expenses.amount as posted_amount')
-            ->selectRaw('0 as reversed_amount')
-            ->selectRaw('expenses.amount as net_amount')
-            ->selectRaw('expenses.finance_posting_reference as finance_reference');
+            ->selectRaw(
+                'CASE WHEN ledger.source_module = ? AND ledger.source_type = ? THEN ? '
+                .'WHEN ledger.source_module = ? AND ledger.source_type = ? THEN ? ELSE ? END as source',
+                [self::EXPENSE_MODULE, self::EXPENSE_MODULE, self::SOURCE_PAID, self::CONSUMABLE_MODULE, self::CONSUMABLE_TYPE, self::SOURCE_CONSUMABLE, self::SOURCE_OTHER],
+            )
+            ->selectRaw('CASE WHEN journals.journal_type = ? THEN ? ELSE ? END as event_type', [JournalType::Reversal->value, self::EVENT_REVERSAL, self::EVENT_POSTED])
+            ->selectRaw('CASE WHEN journals.journal_type = ? THEN 0 ELSE ledger.debit - ledger.credit END as posted_amount', [JournalType::Reversal->value])
+            ->selectRaw('CASE WHEN journals.journal_type = ? THEN ledger.credit - ledger.debit ELSE 0 END as reversed_amount', [JournalType::Reversal->value])
+            ->selectRaw('ledger.debit - ledger.credit as net_amount')
+            ->selectRaw('CASE WHEN journals.journal_type = ? THEN 0 - movements.quantity ELSE movements.quantity END as quantity', [JournalType::Reversal->value]);
 
-        $reversals = $this->baseExpenses($params)
-            ->where('expenses.status', ExpenseStatus::Reversed->value)
-            ->whereNotNull('expenses.reversal_date')
-            ->select([
-                'expenses.id',
-                'expenses.expense_number',
-                'expenses.expense_date',
-                'expenses.reversal_date',
-                'expenses.expense_type_id',
-                'expenses.expense_type_code_snapshot',
-                'expenses.expense_type_name_snapshot',
-                'expenses.payment_method_id_snapshot',
-                'expenses.payment_method_code_snapshot',
-                'expenses.payment_method_name_snapshot',
-                'expenses.payment_method_type_snapshot',
-                'expenses.reference_number',
-                'expenses.status',
-            ])
-            ->selectRaw('? as event_type', [self::EVENT_REVERSAL])
-            ->selectRaw('expenses.reversal_date as event_date')
-            ->selectRaw('0 as posted_amount')
-            ->selectRaw('expenses.amount as reversed_amount')
-            ->selectRaw('0 - expenses.amount as net_amount')
-            ->selectRaw('expenses.finance_reversal_reference as finance_reference');
+        $organizationUnitId = $this->organizationUnitId($params);
+        $organizationUnitId === null
+            ? $ledger->whereNull('ledger.organization_unit_id')->whereNull('accounts.organization_unit_id')
+            : $ledger->where('ledger.organization_unit_id', $organizationUnitId)->where('accounts.organization_unit_id', $organizationUnitId);
 
-        $events = DB::query()->fromSub($postings->unionAll($reversals), 'expense_events');
+        $events = DB::query()->fromSub($ledger, 'expense_events');
 
         if (($params['date_from'] ?? null) !== null) {
-            $events->where('event_date', '>=', (string) $params['date_from']);
+            $events->whereDate('event_date', '>=', (string) $params['date_from']);
         }
         if (($params['date_to'] ?? null) !== null) {
-            $events->where('event_date', '<=', (string) $params['date_to']);
+            $events->whereDate('event_date', '<=', (string) $params['date_to']);
         }
         if (($params['expense_type_id'] ?? null) !== null) {
             $events->where('expense_type_id', (int) $params['expense_type_id']);
         }
         if (($params['payment_method_id'] ?? null) !== null) {
             $events->where('payment_method_id_snapshot', (int) $params['payment_method_id']);
+        }
+        if (($params['item_id'] ?? null) !== null) {
+            $events->where('item_id', (int) $params['item_id']);
+        }
+        if (($params['source'] ?? null) !== null) {
+            $events->where('source', (string) $params['source']);
         }
         if (($params['event_type'] ?? null) !== null) {
             $events->where('event_type', (string) $params['event_type']);
@@ -194,33 +241,23 @@ final class ExpenseReportService
         if ($search !== '') {
             $like = '%'.$search.'%';
             $events->where(function (Builder $query) use ($like): void {
-                $query->where('expense_number', 'like', $like)
+                $query->where('document', 'like', $like)
                     ->orWhere('expense_type_name_snapshot', 'like', $like)
                     ->orWhere('payment_method_name_snapshot', 'like', $like)
-                    ->orWhere('reference_number', 'like', $like);
+                    ->orWhere('reference_number', 'like', $like)
+                    ->orWhere('item_name', 'like', $like)
+                    ->orWhere('item_code', 'like', $like)
+                    ->orWhere('account_name', 'like', $like)
+                    ->orWhere('account_code', 'like', $like)
+                    ->orWhere('finance_reference', 'like', $like);
             });
         }
 
         return $events;
     }
 
-    /** @param array<string, mixed> $params */
-    private function baseExpenses(array $params): Builder
-    {
-        $query = DB::table('expenses')
-            ->where('expenses.tenant_id', (int) $params['tenant_id'])
-            ->whereIn('expenses.status', [ExpenseStatus::Posted->value, ExpenseStatus::Reversed->value]);
-
-        $organizationUnitId = $this->organizationUnitId($params);
-        $organizationUnitId === null
-            ? $query->whereNull('expenses.organization_unit_id')
-            : $query->where('expenses.organization_unit_id', $organizationUnitId);
-
-        return $query;
-    }
-
     /**
-     * @return array{summary: array<string, int|string>, by_expense_type: list<array<string, int|string>>, by_payment_method: list<array<string, int|string>>, trend: list<array<string, int|string>>}
+     * @return array<string, mixed>
      */
     private function analytics(Builder $events): array
     {
@@ -244,16 +281,45 @@ final class ExpenseReportService
                 'net_amount' => $this->decimal($totals->net_amount ?? 0),
             ],
             'by_expense_type' => $this->breakdown(
-                clone $events,
+                (clone $events)->where('source', self::SOURCE_PAID),
                 'expense_type_id',
                 'expense_type_code_snapshot',
                 'expense_type_name_snapshot',
             ),
             'by_payment_method' => $this->breakdown(
-                clone $events,
+                (clone $events)->where('source', self::SOURCE_PAID),
                 'payment_method_id_snapshot',
                 'payment_method_code_snapshot',
                 'payment_method_name_snapshot',
+            ),
+            'by_source' => DB::query()->fromSub(clone $events, 'events')
+                ->select('source')
+                ->selectRaw('COALESCE(SUM(net_amount), 0) as net_amount')
+                ->groupBy('source')
+                ->get()
+                ->map(fn (object $row): array => [
+                    'source' => (string) $row->source,
+                    'net_amount' => $this->decimal($row->net_amount),
+                ])->values()->all(),
+            'by_consumable_item' => DB::query()->fromSub((clone $events)->where('source', self::SOURCE_CONSUMABLE), 'events')
+                ->select(['item_id', 'item_code', 'item_name'])
+                ->selectRaw('COALESCE(SUM(quantity), 0) as quantity')
+                ->selectRaw('COALESCE(SUM(net_amount), 0) as net_amount')
+                ->groupBy(['item_id', 'item_code', 'item_name'])
+                ->orderByDesc('net_amount')
+                ->get()
+                ->map(fn (object $row): array => [
+                    'id' => (int) $row->item_id,
+                    'code' => (string) $row->item_code,
+                    'name' => (string) $row->item_name,
+                    'quantity' => $this->decimal($row->quantity),
+                    'net_amount' => $this->decimal($row->net_amount),
+                ])->values()->all(),
+            'by_other_account' => $this->breakdown(
+                (clone $events)->where('source', self::SOURCE_OTHER),
+                'account_id',
+                'account_code',
+                'account_name',
             ),
             'trend' => DB::query()->fromSub(clone $events, 'events')
                 ->select('event_date')
@@ -264,7 +330,7 @@ final class ExpenseReportService
                 ->orderBy('event_date')
                 ->get()
                 ->map(fn (object $row): array => [
-                    'date' => (string) $row->event_date,
+                    'date' => substr((string) $row->event_date, 0, 10),
                     'posted_amount' => $this->decimal($row->posted_amount),
                     'reversed_amount' => $this->decimal($row->reversed_amount),
                     'net_amount' => $this->decimal($row->net_amount),
@@ -298,7 +364,7 @@ final class ExpenseReportService
     }
 
     /**
-     * @return array{expense_types: list<array{id:int, name:string}>, payment_methods: list<array{id:int, name:string}>}
+     * @return array<string, list<array{id:int, name:string}>>
      */
     private function filterOptions(int $tenantId, ?int $organizationUnitId): array
     {
@@ -324,7 +390,26 @@ final class ExpenseReportService
             ->map(fn (object $row): array => ['id' => (int) $row->id, 'name' => (string) $row->name])
             ->values()->all();
 
-        return ['expense_types' => $types, 'payment_methods' => $methods];
+        $items = DB::table('inventory_movements as movements')
+            ->join('items', function ($join): void {
+                $join->on('items.id', '=', 'movements.item_id')
+                    ->on('items.tenant_id', '=', 'movements.tenant_id');
+            })
+            ->where('movements.tenant_id', $tenantId)
+            ->where('movements.movement_type', InventoryMovementType::InternalConsumption->value)
+            ->when(
+                $organizationUnitId === null,
+                fn (Builder $builder) => $builder->whereNull('movements.organization_unit_id'),
+                fn (Builder $builder) => $builder->where('movements.organization_unit_id', $organizationUnitId),
+            )
+            ->select(['items.id', 'items.name'])
+            ->distinct()
+            ->orderBy('items.name')
+            ->get()
+            ->map(fn (object $row): array => ['id' => (int) $row->id, 'name' => (string) $row->name])
+            ->values()->all();
+
+        return ['expense_types' => $types, 'payment_methods' => $methods, 'items' => $items];
     }
 
     /** @param array<string, mixed> $params */
@@ -333,7 +418,9 @@ final class ExpenseReportService
         $columns = [
             'event_date' => 'event_date',
             'event_type' => 'event_type',
-            'expense_number' => 'expense_number',
+            'source' => 'source',
+            'document' => 'document',
+            'detail' => 'account_name',
             'expense_type' => 'expense_type_name_snapshot',
             'paid_through' => 'payment_method_name_snapshot',
             'net_amount' => 'net_amount',
@@ -347,14 +434,24 @@ final class ExpenseReportService
     private function row(object $row): array
     {
         return [
-            'id' => (string) $row->event_type.'-'.(int) $row->id,
-            'event_date' => (string) $row->event_date,
+            'id' => (string) $row->id,
+            'event_date' => substr((string) $row->event_date, 0, 10),
             'event_type' => (string) $row->event_type,
-            'expense_number' => (string) $row->expense_number,
-            'expense_type' => (string) $row->expense_type_name_snapshot,
-            'paid_through' => (string) $row->payment_method_name_snapshot,
+            'source' => match ((string) $row->source) {
+                self::SOURCE_PAID => 'Paid expense',
+                self::SOURCE_CONSUMABLE => 'Consumable usage',
+                default => 'Other P&L expense',
+            },
+            'document' => (string) ($row->document ?? $row->finance_reference ?? ''),
+            'detail' => match ((string) $row->source) {
+                self::SOURCE_PAID => (string) ($row->expense_type_name_snapshot ?? $row->account_name),
+                self::SOURCE_CONSUMABLE => (string) ($row->item_name ?? $row->account_name),
+                default => (string) $row->account_name,
+            },
+            'paid_through' => (string) ($row->payment_method_name_snapshot ?? ''),
             'reference' => (string) ($row->reference_number ?? ''),
             'finance_reference' => (string) ($row->finance_reference ?? ''),
+            'finance_reference_url' => '/finance/journals/'.(int) $row->journal_id,
             'net_amount' => $this->decimal($row->net_amount),
         ];
     }

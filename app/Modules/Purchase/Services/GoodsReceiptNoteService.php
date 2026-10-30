@@ -114,7 +114,7 @@ final class GoodsReceiptNoteService
                 $this->assertSourceLineMatchesPayload($poLine, $line);
                 $this->validator->assertReceiptWithinOrder($poLine, $line->receivedQuantity);
                 $sourceItem = $this->validator->item($data->tenantId, $data->organizationUnitId, (int) $poLine->item_id, "lines.{$index}.item_id");
-                $this->validator->assertStockItem($sourceItem, "lines.{$index}.item_id");
+                $this->validator->assertPurchasableStockItem($sourceItem, "lines.{$index}.item_id");
                 $this->batchAllocations->assertValid($sourceItem, $line->acceptedQuantity, $line->batchAllocations, "lines.{$index}.batch_allocations");
                 $sourceLines[$sourceKey] = $poLine;
 
@@ -126,7 +126,7 @@ final class GoodsReceiptNoteService
             }
 
             $item = $this->validator->item($data->tenantId, $data->organizationUnitId, $line->itemId, "lines.{$index}.item_id");
-            $this->validator->assertStockItem($item, "lines.{$index}.item_id");
+            $this->validator->assertPurchasableStockItem($item, "lines.{$index}.item_id");
             $uomId = $line->orderedUomId ?? $line->uomId;
             if ($uomId === null) {
                 throw new InvalidArgumentException('GRN line UOM is required.');
@@ -285,7 +285,7 @@ final class GoodsReceiptNoteService
                     (int) $line->item_id,
                     'lines.item_id',
                 );
-                $this->validator->assertStockItem($item, 'lines.item_id');
+                $this->validator->assertPurchasableStockItem($item, 'lines.item_id');
 
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
                     $sourceLine = $line->purchaseOrderLine;

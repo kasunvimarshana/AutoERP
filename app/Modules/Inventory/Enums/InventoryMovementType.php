@@ -8,6 +8,7 @@ enum InventoryMovementType: string
 {
     case Receipt = 'receipt';
     case Issue = 'issue';
+    case InternalConsumption = 'internal_consumption';
     case TransferIn = 'transfer_in';
     case TransferOut = 'transfer_out';
     case AdjustmentIn = 'adjustment_in';

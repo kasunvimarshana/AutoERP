@@ -1,11 +1,13 @@
 import { expensePermissions } from '@/modules/expense/expensePermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
+import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { taxPermissions } from '@/modules/tax/taxPermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 
 export const financeRouteEntitlements: readonly EntitlementRule[] = [
+    operational('/expenses/consumable-usage', ['finance', 'inventory'], [inventoryPermissions.consumableUsageView]),
     operational('/expenses/create', ['finance'], [expensePermissions.create]),
     operational('/expenses/types', ['finance'], [expensePermissions.typesView]),
     operational('/expenses', ['finance'], [expensePermissions.view]),
@@ -36,6 +38,7 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     operational('/finance/reversals', ['finance'], [financePermissions.journalsView]),
     operational('/finance/reports', ['finance'], [financePermissions.reportsView]),
     operational('/reports/customer-outstanding', ['reporting', 'finance'], [reportingPermissions.view, financePermissions.reportsView]),
+    operational('/reports/consumable-usage', ['reporting', 'finance', 'inventory'], [reportingPermissions.view, inventoryPermissions.consumableUsageView]),
     operational('/finance/bank-reconciliations', ['finance'], [financePermissions.bankReconciliationsView]),
     operational('/finance/budgets', ['finance'], [financePermissions.budgetsView]),
 

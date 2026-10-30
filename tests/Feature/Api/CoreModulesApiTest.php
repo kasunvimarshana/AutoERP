@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Finance\Constants\FinancePermission;
+use Modules\Finance\Services\FinanceStatementService;
+use Modules\Inventory\DTOs\StockMovementData;
+use Modules\Inventory\Enums\InventoryDirection;
+use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Services\ConsumableUsageService;
+use Modules\Inventory\Services\StockMovementService;
 use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Models\Invoice;
 use Modules\Item\DTOs\CreateItemData;
@@ -25,6 +31,7 @@ use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseOrderService;
+use Modules\Reporting\Services\ExpenseReportService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
@@ -302,6 +309,90 @@ final class CoreModulesApiTest extends TestCase
             ->assertJsonPath('data.totalDebit', '1000.000000')
             ->assertJsonPath('data.totalCredit', '1000.000000')
             ->assertJsonPath('data.ledgerEntryCount', 2);
+    }
+
+    public function test_consumable_usage_posts_once_and_reverses_stock_and_finance_together(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [], 'Inventory');
+        $warehouseId = $this->warehouse($tenantId, $organizationUnitId);
+        $uomId = $this->uom($tenantId, $organizationUnitId);
+        $actorId = (int) auth()->id();
+        FinancePostingFixture::seedConsumableUsageProfile($tenantId, $organizationUnitId);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $organizationUnitId, $warehouseId, $uomId, $actorId): void {
+            $item = app(ItemCreationService::class)->create(new CreateItemData(
+                tenantId: $tenantId,
+                code: 'CONSUMABLE-TEST',
+                name: 'Test shampoo',
+                itemType: ItemType::Consumable,
+                trackingType: TrackingType::None,
+                costingMethod: CostingMethod::Fifo,
+                baseUomId: $uomId,
+                organizationUnitId: $organizationUnitId,
+                isStockable: true,
+            ));
+            $this->tenantGetJson($tenantId, '/api/v1/inventory/consumable-usage/items?'.http_build_query([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+            ]))->assertSuccessful()->assertJsonPath('data.0.name', 'Test shampoo');
+            app(StockMovementService::class)->record(new StockMovementData(
+                tenantId: $tenantId,
+                movementDate: now()->toDateString(),
+                movementType: InventoryMovementType::Receipt,
+                direction: InventoryDirection::In,
+                itemId: (int) $item->getKey(),
+                warehouseId: $warehouseId,
+                quantity: '5.000000',
+                organizationUnitId: $organizationUnitId,
+                unitCost: '10.000000',
+            ), $actorId);
+
+            $data = [
+                'usage_date' => now()->toDateString(),
+                'item_id' => (int) $item->getKey(),
+                'warehouse_id' => $warehouseId,
+                'quantity' => '2.000000',
+            ];
+            $service = app(ConsumableUsageService::class);
+            $usage = $service->post($data, $tenantId, $organizationUnitId, $actorId, 'test-usage-key');
+            self::assertSame('20.000000', (string) $usage->total_cost);
+            self::assertSame((int) $usage->getKey(), (int) $service->post($data, $tenantId, $organizationUnitId, $actorId, 'test-usage-key')->getKey());
+            self::assertEquals(3, (float) DB::table('inventory_stock_balances')->where('item_id', $item->getKey())->value('quantity_available'));
+            self::assertSame(1, DB::table('finance_journal_entries')->where('source_type', 'internal_consumption')->where('source_id', $usage->getKey())->count());
+            $reportParams = [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'date_from' => now()->startOfMonth()->toDateString(),
+                'date_to' => now()->toDateString(),
+            ];
+            $report = app(ExpenseReportService::class)->run($reportParams);
+            self::assertSame('20.000000', $report['summary']['net_amount']);
+            self::assertSame('consumable', $report['by_source'][0]['source']);
+            self::assertSame('Test shampoo', $report['by_consumable_item'][0]['name']);
+            self::assertSame('2.000000', $report['by_consumable_item'][0]['quantity']);
+            self::assertSame([], $report['by_expense_type']);
+            self::assertSame([], $report['by_payment_method']);
+            self::assertSame('20.000000', app(FinanceStatementService::class)->profitAndLoss(
+                $tenantId, $organizationUnitId, $reportParams['date_from'], $reportParams['date_to'],
+            )['total_expenses']);
+            self::assertSame('20.000000', app(ExpenseReportService::class)->exportRows($reportParams)->first()['net_amount']);
+            $history = $this->tenantGetJson($tenantId, '/api/v1/inventory/consumable-usage?'.http_build_query([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'from' => now()->startOfMonth()->toDateString(),
+                'to' => now()->toDateString(),
+            ]))->assertSuccessful();
+            $history->assertJsonPath('summary.items.0.quantity', '2');
+
+            $service->reverse($tenantId, $organizationUnitId, (int) $usage->getKey(), $actorId, 'Entered twice');
+            self::assertEquals(5, (float) DB::table('inventory_stock_balances')->where('item_id', $item->getKey())->value('quantity_available'));
+            self::assertSame('reversed', (string) DB::table('inventory_movements')->where('id', $usage->getKey())->value('status'));
+            self::assertSame(1, DB::table('finance_journal_entries')->where('source_type', 'internal_consumption')->whereNotNull('reversal_of_id')->count());
+            $reversedReport = app(ExpenseReportService::class)->run($reportParams);
+            self::assertSame('0.000000', $reversedReport['summary']['net_amount']);
+            self::assertSame('0.000000', $reversedReport['by_consumable_item'][0]['quantity']);
+        });
     }
 
     private function scope(): array

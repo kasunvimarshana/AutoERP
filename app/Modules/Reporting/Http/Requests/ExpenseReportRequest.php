@@ -24,6 +24,8 @@ final class ExpenseReportRequest extends TenantScopedRequest
             'date_to' => ['required', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'expense_type_id' => ['nullable', 'integer', 'min:1'],
             'payment_method_id' => ['nullable', 'integer', 'min:1'],
+            'item_id' => ['nullable', 'integer', 'min:1'],
+            'source' => ['nullable', Rule::in(['paid', 'consumable', 'other'])],
             'event_type' => ['nullable', Rule::in(['posted', 'reversal'])],
         ];
     }

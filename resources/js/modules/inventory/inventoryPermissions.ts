@@ -1,5 +1,8 @@
 export const inventoryPermissions = {
     stockView: 'inventory.stock.view',
+    consumableUsageView: 'inventory.consumable_usage.view',
+    consumableUsagePost: 'inventory.consumable_usage.post',
+    consumableUsageReverse: 'inventory.consumable_usage.reverse',
     auditView: 'inventory.audit.view',
     reservationsView: 'inventory.reservations.view',
     reservationsManage: 'inventory.reservations.manage',

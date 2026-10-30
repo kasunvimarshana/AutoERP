@@ -8,6 +8,12 @@ final class InventoryPermission
 {
     public const STOCK_VIEW = 'inventory.stock.view';
 
+    public const CONSUMABLE_USAGE_VIEW = 'inventory.consumable_usage.view';
+
+    public const CONSUMABLE_USAGE_POST = 'inventory.consumable_usage.post';
+
+    public const CONSUMABLE_USAGE_REVERSE = 'inventory.consumable_usage.reverse';
+
     public const AUDIT_VIEW = 'inventory.audit.view';
 
     public const RESERVATIONS_VIEW = 'inventory.reservations.view';
@@ -59,6 +65,9 @@ final class InventoryPermission
     {
         return [
             self::STOCK_VIEW => 'View inventory stock balances and availability.',
+            self::CONSUMABLE_USAGE_VIEW => 'View consumable usage history and totals.',
+            self::CONSUMABLE_USAGE_POST => 'Record and post consumable stock usage to operating expenses.',
+            self::CONSUMABLE_USAGE_REVERSE => 'Reverse consumable usage and its Finance journal.',
             self::AUDIT_VIEW => 'View inventory state-change audit history.',
             self::RESERVATIONS_VIEW => 'View inventory reservations.',
             self::RESERVATIONS_MANAGE => 'Create and release inventory reservations.',

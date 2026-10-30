@@ -249,6 +249,9 @@ const ExpenseCreatePage = lazy(
 const ExpenseTypesPage = lazy(
     () => import("@/modules/expense/pages/ExpenseTypesPage"),
 );
+const ConsumableUsagePage = lazy(
+    () => import("@/modules/expense/pages/ConsumableUsagePage"),
+);
 const ChequeTemplateListPage = lazy(
     () => import("@/modules/payment/cheque-print/ChequeTemplateListPage"),
 );
@@ -341,6 +344,9 @@ const PaymentMethodWiseSummaryReportPage = lazy(
 );
 const ExpenseReportPage = lazy(
     () => import("@/modules/reporting/pages/ExpenseReportPage"),
+);
+const ConsumableUsageReportPage = lazy(
+    () => import("@/modules/expense/pages/ConsumableUsageReportPage"),
 );
 const GrnPayablesReportPage = lazy(
     () => import("@/modules/reporting/pages/GrnPayablesReportPage"),
@@ -838,6 +844,10 @@ const appRouter = createBrowserRouter(
                             path="/expenses/types"
                             element={<PermissionRoute permission={expensePermissions.typesView}><ExpenseTypesPage /></PermissionRoute>}
                         />
+                        <Route
+                            path="/expenses/consumable-usage"
+                            element={<PermissionRoute permission={inventoryPermissions.consumableUsageView}><ConsumableUsagePage /></PermissionRoute>}
+                        />
                         <Route path="/vouchers" element={<VoucherListPage />} />
                         <Route
                             path="/vouchers/:voucherType/:sourceId"
@@ -946,6 +956,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/expenses"
                             element={<ExpenseReportPage />}
+                        />
+                        <Route
+                            path="/reports/consumable-usage"
+                            element={<PermissionRoute permission={inventoryPermissions.consumableUsageView}><ConsumableUsageReportPage /></PermissionRoute>}
                         />
                         <Route
                             path="/reports/purchase/detailed"

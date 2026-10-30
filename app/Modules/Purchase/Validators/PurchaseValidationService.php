@@ -60,11 +60,11 @@ final class PurchaseValidationService
         return $item;
     }
 
-    public function assertStockItem(Item $item, string $field): void
+    public function assertPurchasableStockItem(Item $item, string $field): void
     {
-        if ($item->item_type !== ItemType::Stock || ! $item->is_stockable) {
+        if (! in_array($item->item_type, [ItemType::Stock, ItemType::Consumable], true) || ! $item->is_stockable) {
             throw ValidationException::withMessages([
-                $field => ['Only stockable stock items can be added to purchase orders and goods receipts.'],
+                $field => ['Only stockable stock or consumable items can be added to purchase orders and goods receipts.'],
             ]);
         }
     }
