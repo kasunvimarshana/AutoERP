@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Inventory\Services\BatchNumberService;
@@ -89,8 +90,12 @@ final class GoodsReceiptNoteController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE);
 
-        $grn = $service->create($request->toData())->load($this->relations());
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_CREATED, 'goods_receipt_note', $grn);
+        $grn = DB::transaction(function () use ($request, $service): GoodsReceiptNote {
+            $grn = $service->create($request->toData())->load($this->relations());
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_CREATED, 'goods_receipt_note', $grn);
+
+            return $grn;
+        });
 
         return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($grn, includeRelatedInvoices: true));
     }
@@ -112,12 +117,16 @@ final class GoodsReceiptNoteController
 
         $model = $this->scope(GoodsReceiptNote::query(), $request)->with('lines')->findOrFail($grn);
         $before = $model->attributesToArray();
-        $updated = $coordinator->post(
-            $model,
-            $request->currentUserId(),
-            $request->expectedVersion(),
-        )->load($this->relations());
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_POSTED, 'goods_receipt_note', $updated, $before);
+        $updated = DB::transaction(function () use ($model, $request, $coordinator, $before): GoodsReceiptNote {
+            $updated = $coordinator->post(
+                $model,
+                $request->currentUserId(),
+                $request->expectedVersion(),
+            )->load($this->relations());
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_POSTED, 'goods_receipt_note', $updated, $before);
+
+            return $updated;
+        });
 
         return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated, includeRelatedInvoices: true));
     }
@@ -128,14 +137,18 @@ final class GoodsReceiptNoteController
 
         $model = $this->scope(GoodsReceiptNote::query(), $request)->findOrFail($grn);
         $before = $model->attributesToArray();
-        $updated = $coordinator->reverse(
-            $model,
-            $request->reversalDate(),
-            $request->reversalReason(),
-            $request->currentUserId(),
-            $request->expectedVersion(),
-        );
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_REVERSED, 'goods_receipt_note', $updated, $before);
+        $updated = DB::transaction(function () use ($model, $request, $coordinator, $before): GoodsReceiptNote {
+            $updated = $coordinator->reverse(
+                $model,
+                $request->reversalDate(),
+                $request->reversalReason(),
+                $request->currentUserId(),
+                $request->expectedVersion(),
+            );
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_REVERSED, 'goods_receipt_note', $updated, $before);
+
+            return $updated;
+        });
 
         return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated, includeRelatedInvoices: true));
     }
