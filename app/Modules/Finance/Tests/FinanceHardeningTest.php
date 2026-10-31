@@ -158,6 +158,48 @@ final class FinanceHardeningTest extends TestCase
         });
     }
 
+    public function test_posted_replay_is_idempotent_but_reversed_finance_journal_cannot_post_again(): void
+    {
+        [$tenantId] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $posting = app(FinancePostingInterface::class);
+            $request = $this->directRequest($tenantId, '2026-06-30');
+            $posted = $posting->post($request);
+
+            $same = $posting->post($request);
+            $this->assertSame($posted->journalId, $same->journalId);
+            $this->assertSame('posted', $same->status);
+            $this->assertDatabaseCount('finance_ledger_entries', 2);
+
+            $posting->reverseJournal($posted->journalId, '2026-07-01', reason: 'Correct source document');
+            $this->assertDatabaseCount('finance_ledger_entries', 4);
+
+            foreach ([
+                fn () => $posting->postJournal($posted->journalId),
+                fn () => $posting->post($request),
+                fn () => app(\\Modules\\Finance\\Services\\JournalPostingService::class)->post(
+                    FinanceJournalEntry::query()->findOrFail($posted->journalId),
+                ),
+            ] as $repost) {
+                try {
+                    $repost();
+                    $this->fail('Reversed source was reported as a successful posting replay.');
+                } catch (InvalidArgumentException $exception) {
+                    $this->assertSame(
+                        'Only draft journals can be posted. Reversed journals cannot be reposted.',
+                        $exception->getMessage(),
+                    );
+                }
+            }
+
+            $this->assertDatabaseHas('finance_journal_entries', [
+                'id' => $posted->journalId,
+                'status' => 'reversed',
+            ]);
+            $this->assertDatabaseCount('finance_ledger_entries', 4);
+        });
+    }
+
     public function test_source_owned_journal_cannot_be_reversed_directly_from_finance(): void
     {
         [$tenantId] = $this->context();
