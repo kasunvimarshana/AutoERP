@@ -150,7 +150,12 @@ final class FinanceValidationService
         if ($this->math->compare((string) $journal->total_debit, (string) $journal->total_credit) !== 0) {
             throw new InvalidArgumentException('Unbalanced journal cannot be posted.');
         }
+        if ($journal->lines->isEmpty()) {
+            throw new InvalidArgumentException('Journal cannot be posted without lines.');
+        }
 
+        $lineDebit = '0.000000';
+        $lineCredit = '0.000000';
         foreach ($journal->lines as $line) {
             $this->validateJournalLine(new JournalLineData(
                 accountId: (int) $line->account_id,
@@ -174,6 +179,14 @@ final class FinanceValidationService
                 (int) $account->tenant_id,
                 $account->organization_unit_id,
             );
+
+            $lineDebit = $this->math->add($lineDebit, (string) $line->debit);
+            $lineCredit = $this->math->add($lineCredit, (string) $line->credit);
+        }
+        if ($this->math->compare($lineDebit, (string) $journal->total_debit) !== 0
+            || $this->math->compare($lineCredit, (string) $journal->total_credit) !== 0
+        ) {
+            throw new InvalidArgumentException('Journal header totals do not match its lines.');
         }
     }
 
