@@ -174,11 +174,26 @@ final class InvoiceBalanceUpdater
             $lockedInvoice = $this->lockInvoice($invoice);
             $this->statuses->assertCanSettle($lockedInvoice);
             $balance = $lockedInvoice->balance()->lockForUpdate()->firstOrFail();
+            $this->assertBalanceConservation($balance);
 
             $mutation($lockedInvoice, $balance);
 
             return $this->syncBalance($lockedInvoice, $balance);
         });
+    }
+
+    private function assertBalanceConservation(InvoiceBalance $balance): void
+    {
+        $expected = $this->calculator->remainingAmount(
+            (string) $balance->invoice_total,
+            (string) $balance->paid_amount,
+            (string) $balance->credit_allocated_amount,
+        );
+        if ($this->math->compare($expected, (string) $balance->remaining_amount) !== 0) {
+            throw new InvalidArgumentException(
+                'Invoice balance is inconsistent with its persisted settlements.',
+            );
+        }
     }
 
     private function syncBalance(Invoice $invoice, InvoiceBalance $balance): InvoiceBalance
