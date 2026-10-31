@@ -137,11 +137,11 @@ final class FinancePostingService implements FinancePostingInterface
     {
         $journal = FinanceJournalEntry::query()->lockForUpdate()->findOrFail($journalId);
         $status = $this->statusOf($journal);
-        if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
+        if ($status === JournalStatus::Posted) {
             return $this->resultFromJournal($journal);
         }
         if ($status !== JournalStatus::Draft) {
-            throw new InvalidArgumentException('Only draft journals can be posted.');
+            throw new InvalidArgumentException('Only draft journals can be posted. Reversed journals cannot be reposted.');
         }
 
         $result = $this->posting->post($journal, $postedBy);
