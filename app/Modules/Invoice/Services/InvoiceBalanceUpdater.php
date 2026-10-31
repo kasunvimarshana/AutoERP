@@ -27,7 +27,7 @@ final class InvoiceBalanceUpdater
         string $amount,
         bool $allowOverpayment = false,
     ): InvoiceBalance {
-        $this->assertPositive($amount, 'Payment amount');
+        $amount = $this->assertPositive($amount, 'Payment amount');
 
         return $this->mutateBalance(
             $invoice,
@@ -51,7 +51,7 @@ final class InvoiceBalanceUpdater
 
     public function reversePayment(Invoice $invoice, string $amount): InvoiceBalance
     {
-        $this->assertPositive($amount, 'Payment reversal amount');
+        $amount = $this->assertPositive($amount, 'Payment reversal amount');
 
         return $this->mutateBalance(
             $invoice,
@@ -77,7 +77,7 @@ final class InvoiceBalanceUpdater
         string $amount,
         bool $allowOverAllocation = false,
     ): InvoiceBalance {
-        $this->assertPositive($amount, 'Credit allocation amount');
+        $amount = $this->assertPositive($amount, 'Credit allocation amount');
 
         return $this->mutateBalance(
             $invoice,
@@ -230,11 +230,15 @@ final class InvoiceBalanceUpdater
         int $creditSourceId,
         string $amount,
     ): void {
-        $previouslyAllocated = $this->math->normalize((string) InvoiceCreditAllocation::query()
+        // Preserve the exact persisted decimal values. Database SUM aggregates
+        // can be coerced to a PHP float before returning to the application.
+        $previouslyAllocated = $this->math->sum(InvoiceCreditAllocation::query()
             ->where('tenant_id', $invoice->tenant_id)
             ->where('credit_source_type', $creditSourceType)
             ->where('credit_source_id', $creditSourceId)
-            ->sum('allocated_amount'));
+            ->select('allocated_amount')
+            ->cursor()
+            ->map(static fn (InvoiceCreditAllocation $row): string => (string) $row->allocated_amount));
 
         InvoiceCreditAllocation::query()->create([
             'tenant_id' => $invoice->tenant_id,
@@ -257,10 +261,13 @@ final class InvoiceBalanceUpdater
         return Invoice::query()->lockForUpdate()->findOrFail($invoice->getKey());
     }
 
-    private function assertPositive(string $amount, string $label): void
+    private function assertPositive(string $amount, string $label): string
     {
+        $amount = $this->math->normalize($amount);
         if ($this->math->isNegative($amount) || $this->math->isZero($amount)) {
             throw new InvalidArgumentException($label.' must be greater than zero.');
         }
+
+        return $amount;
     }
 }
