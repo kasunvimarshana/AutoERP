@@ -84,6 +84,16 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
             );
         }
 
+        $contract = $this->source('../Services/FinancePostingService.php');
+        self::assertStringContainsString(
+            'Reversed Finance posting sources cannot be replayed.',
+            $contract,
+        );
+        self::assertStringContainsString(
+            '$this->statusOf($journal) === JournalStatus::Reversed',
+            $contract,
+        );
+
         $ledger = $this->source('../Services/JournalPostingService.php');
         self::assertLessThan(
             strpos($ledger, '$ledgerCount = $this->ledger->post($journal);'),
