@@ -43,6 +43,47 @@ final class PurchaseReleaseVerificationTest extends TestCase
         $this->assertSame(1, (int) DB::table('purchase_debit_notes')->where('id', $second)->value('row_version'));
     }
 
+    public function test_repeated_micro_credit_allocations_preserve_exact_previous_amounts(): void
+    {
+        [$tenant, $invoiceId, $noteId] = $this->fixture();
+
+        $this->withTenantExecutionContext($tenant, function () use ($invoiceId, $noteId): void {
+            $service = app(PurchaseDebitNoteService::class);
+            foreach ([1, 2, 3] as $expectedVersion) {
+                $service->allocate(
+                    PurchaseDebitNote::query()->findOrFail($noteId),
+                    Invoice::query()->findOrFail($invoiceId),
+                    '0.000001',
+                    $expectedVersion,
+                );
+            }
+        });
+
+        $allocations = DB::table('invoice_credit_allocations')
+            ->where('tenant_id', $tenant)
+            ->where('credit_source_type', 'purchase_debit_note')
+            ->where('credit_source_id', $noteId)
+            ->orderBy('id')->get();
+
+        $this->assertCount(3, $allocations);
+        $this->assertSame(
+            ['0.000000', '0.000001', '0.000002'],
+            $allocations->pluck('previously_allocated_amount')->all(),
+        );
+        $this->assertSame(
+            ['9.999999', '9.999998', '9.999997'],
+            $allocations->pluck('remaining_invoice_balance')->all(),
+        );
+        $this->assertSame('0.000003', DB::table('purchase_debit_notes')
+            ->where('id', $noteId)->value('allocated_amount'));
+        $this->assertSame('9.999997', DB::table('purchase_debit_notes')
+            ->where('id', $noteId)->value('remaining_amount'));
+        $this->assertSame('0.000003', DB::table('invoice_balances')
+            ->where('invoice_id', $invoiceId)->value('credit_allocated_amount'));
+        $this->assertSame('9.999997', DB::table('invoice_balances')
+            ->where('invoice_id', $invoiceId)->value('remaining_amount'));
+    }
+
     public function test_populated_currency_upgrade_preserves_amounts_and_does_not_guess_historical_currency(): void
     {
         [$tenant, $invoice, $note] = $this->fixture();
