@@ -29,6 +29,8 @@ final class JournalPostingService
             $status = $this->statusOf($journal);
 
             if ($status === JournalStatus::Posted) {
+                $this->validator->assertPostedLedgerIntegrity($journal);
+
                 return $this->resultFromJournal($journal, $status);
             }
             if ($status !== JournalStatus::Draft) {
