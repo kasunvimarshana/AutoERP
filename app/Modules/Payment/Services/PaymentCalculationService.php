@@ -39,15 +39,25 @@ final class PaymentCalculationService
 
     public function recalculate(Payment $payment): PaymentCalculationResult
     {
-        $totalAmount = $this->math->normalize((string) $payment->lines()->sum('amount'));
-        $allocatedAmount = $this->math->normalize((string) $payment->allocations()
+        // Database SUM may return a binary float on SQLite, causing silent
+        // precision loss or scientific notation for six-place money values.
+        // Stream the exact persisted DECIMAL strings across all drivers.
+        $totalAmount = $this->math->sum($payment->lines()
+            ->select('amount')
+            ->cursor()
+            ->map(static fn ($line): string => (string) $line->amount));
+        $allocatedAmount = $this->math->sum($payment->allocations()
             ->where('status', 'active')
-            ->sum('allocated_amount'));
-        $refundedAmount = $this->math->normalize((string) $payment->refunds()
+            ->select('allocated_amount')
+            ->cursor()
+            ->map(static fn ($allocation): string => (string) $allocation->allocated_amount));
+        $refundedAmount = $this->math->sum($payment->refunds()
             ->whereHas('refundPayment', fn (Builder $query): Builder => $query
                 ->where('document_status', PaymentDocumentStatus::Approved->value)
                 ->where('posting_status', PaymentPostingStatus::Posted->value))
-            ->sum('amount'));
+            ->select('amount')
+            ->cursor()
+            ->map(static fn ($refund): string => (string) $refund->amount));
         $unappliedAmount = $this->math->sub($this->math->sub($totalAmount, $allocatedAmount), $refundedAmount);
         if ($this->math->isNegative($unappliedAmount)) {
             throw new InvalidArgumentException('Payment unapplied amount cannot be negative.');
