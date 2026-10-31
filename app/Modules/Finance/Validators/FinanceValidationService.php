@@ -15,6 +15,7 @@ use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceDimension;
 use Modules\Finance\Models\FinanceJournalEntry;
+use Modules\Finance\Models\FinanceJournalLine;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Models\TenantModel;
@@ -84,7 +85,7 @@ final class FinanceValidationService
         $this->validateJournalCurrency($data->tenantId, $data->currencyId, $data->exchangeRate);
 
         foreach ($data->lines as $line) {
-            if (! $line instanceof JournalLineData) {
+            if (! $line instanceof FinanceJournalLine
                 throw new InvalidArgumentException('Journal lines must be JournalLineData instances.');
             }
 
