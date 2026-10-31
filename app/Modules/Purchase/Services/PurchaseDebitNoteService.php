@@ -209,6 +209,8 @@ final class PurchaseDebitNoteService
         string $amount,
         ?int $expectedVersion = null,
     ): PurchaseDebitNote {
+        $amount = $this->math->normalize($amount);
+
         return DB::transaction(function () use ($note, $invoice, $amount, $expectedVersion): PurchaseDebitNote {
             $lockedInvoice = Invoice::query()
                 ->lockForUpdate()
