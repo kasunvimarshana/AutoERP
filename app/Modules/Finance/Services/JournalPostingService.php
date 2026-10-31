@@ -28,11 +28,11 @@ final class JournalPostingService
                 ->findOrFail($journal->getKey());
             $status = $this->statusOf($journal);
 
-            if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
+            if ($status === JournalStatus::Posted) {
                 return $this->resultFromJournal($journal, $status);
             }
             if ($status !== JournalStatus::Draft) {
-                throw new InvalidArgumentException('Only draft journals can be posted.');
+                throw new InvalidArgumentException('Only draft journals can be posted. Reversed journals cannot be reposted.');
             }
 
             $this->periods->assertPostingDateAllowed(
