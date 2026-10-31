@@ -22,7 +22,8 @@ GROUP BY r.tenant_id
 ORDER BY r.tenant_id;
 
 -- 3. Historical debit-note credit allocations with missing references, currency,
--- supplier, invoice direction, or organization agreement. All amounts are untouched.
+-- supplier, invoice direction, positive allocation amounts or organization
+-- agreement. All amounts are untouched.
 SELECT c.id AS allocation_id,
        c.tenant_id,
        c.credit_source_id AS purchase_debit_note_id,
@@ -43,6 +44,8 @@ SELECT c.id AS allocation_id,
                THEN 'supplier_mismatch'
            WHEN i.direction IS NULL OR i.direction <> 'inbound'
                THEN 'invoice_direction_mismatch'
+           WHEN c.allocated_amount IS NULL OR c.allocated_amount <= 0
+               THEN 'invalid_allocation_amount'
            WHEN n.currency_id IS NULL OR i.currency_id IS NULL THEN 'unresolved_currency'
            WHEN n.currency_id <> i.currency_id THEN 'currency_mismatch'
            WHEN ((n.organization_unit_id <> i.organization_unit_id
@@ -66,6 +69,7 @@ WHERE c.credit_source_type = 'purchase_debit_note'
        OR n.supplier_id <> i.party_id OR n.supplier_type <> i.party_type
              OR n.supplier_type <> 'supplier' OR i.party_type <> 'supplier'
        OR i.direction IS NULL OR i.direction <> 'inbound'
+       OR c.allocated_amount IS NULL OR c.allocated_amount <= 0
        OR n.currency_id IS NULL OR i.currency_id IS NULL
        OR n.currency_id <> i.currency_id
        OR ((n.organization_unit_id <> i.organization_unit_id
@@ -78,6 +82,8 @@ WHERE c.credit_source_type = 'purchase_debit_note'
 ORDER BY c.tenant_id, c.id;
 
 -- 4. Debit-note amount conservation versus Invoice-owned credit allocations.
+-- Detect nonpositive face value and negative or NULL stored balances even when
+-- they algebraically cancel and pass a naïve equality test.
 -- Differences require reconciliation, NOT automatic ledger/balance correction.
 SELECT n.id AS purchase_debit_note_id,
        n.tenant_id,
@@ -93,7 +99,10 @@ LEFT JOIN invoice_credit_allocations AS c
    AND c.tenant_id = n.tenant_id
 GROUP BY n.id, n.tenant_id, n.currency_id,
          n.amount, n.allocated_amount, n.remaining_amount
-HAVING n.amount <> n.allocated_amount + n.remaining_amount
+HAVING n.amount IS NULL OR n.amount <= 0
+    OR n.allocated_amount IS NULL OR n.allocated_amount < 0
+    OR n.remaining_amount IS NULL OR n.remaining_amount < 0
+    OR n.amount <> n.allocated_amount + n.remaining_amount
     OR n.allocated_amount <> COALESCE(SUM(c.allocated_amount), 0)
 ORDER BY n.tenant_id, n.id;
 
