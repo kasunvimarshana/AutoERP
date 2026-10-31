@@ -175,20 +175,21 @@ final class FinanceHardeningTest extends TestCase
             $this->assertDatabaseCount('finance_ledger_entries', 4);
 
             foreach ([
-                fn () => $posting->postJournal($posted->journalId),
-                fn () => $posting->post($request),
-                fn () => app(\\Modules\\Finance\\Services\\JournalPostingService::class)->post(
+                [fn () => $posting->postJournal($posted->journalId),
+                    'Only draft journals can be posted. Reversed journals cannot be reposted.'],
+                [fn () => $posting->createDraftJournal($request),
+                    'Reversed Finance posting sources cannot be replayed.'],
+                [fn () => $posting->post($request),
+                    'Reversed Finance posting sources cannot be replayed.'],
+                [fn () => app(\\Modules\\Finance\\Services\\JournalPostingService::class)->post(
                     FinanceJournalEntry::query()->findOrFail($posted->journalId),
-                ),
-            ] as $repost) {
+                ), 'Only draft journals can be posted. Reversed journals cannot be reposted.'],
+            ] as [$repost, $expectedMessage]) {
                 try {
                     $repost();
                     $this->fail('Reversed source was reported as a successful posting replay.');
                 } catch (InvalidArgumentException $exception) {
-                    $this->assertSame(
-                        'Only draft journals can be posted. Reversed journals cannot be reposted.',
-                        $exception->getMessage(),
-                    );
+                    $this->assertSame($expectedMessage, $exception->getMessage());
                 }
             }
 
