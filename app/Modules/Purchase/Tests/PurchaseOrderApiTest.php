@@ -419,6 +419,92 @@ final class PurchaseOrderApiTest extends TestCase
         self::assertSame((int) $approved['row_version'], (int) $persisted->row_version);
     }
 
+    public function test_grn_creation_rolls_back_when_audit_persistence_fails(): void
+    {
+        $context = $this->context('AUDITGRN');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+
+        $this->mock(AuditRecorderInterface::class, function ($mock): void {
+            $mock->shouldReceive('record')->once()
+                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'received_date' => '2026-06-18',
+                'warehouse_id' => $context['warehouse_id'],
+                'purchase_order_id' => $order['id'],
+                'lines' => [[
+                    'item_id' => $context['item_id'],
+                    'uom_id' => $context['uom_id'],
+                    'purchase_order_line_id' => $order['lines'][0]['id'],
+                    'ordered_quantity' => '10.000000',
+                    'received_quantity' => '1.000000',
+                    'accepted_quantity' => '1.000000',
+                    'unit_price' => '10.000000',
+                ]],
+            ]);
+            self::fail('GRN creation without its audit event must roll back.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        }
+
+        self::assertSame(0, DB::table('goods_receipt_notes')
+            ->where('tenant_id', $context['tenant_id'])->count());
+    }
+
+    public function test_purchase_return_post_rolls_back_stock_and_note_when_audit_fails(): void
+    {
+        $context = $this->context('AUDITRETURN');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+        $grn = $this->createPostedHttpGrn($context, (int) $order['id'], (int) $order['lines'][0]['id'], '10.000000');
+        $return = $this->withAuth($context)->postJson('/api/v1/purchase/returns', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'return_date' => '2026-06-19',
+            'return_type' => 'referenced',
+            'source_id' => $grn['id'],
+            'lines' => [[
+                'source_line_type' => 'goods_receipt_note_line',
+                'source_line_id' => $grn['lines'][0]['id'],
+                'returned_quantity' => '1.000000',
+            ]],
+        ])->assertCreated()->json('data');
+
+        $beforeStockMovements = DB::table('inventory_movements')
+            ->where('tenant_id', $context['tenant_id'])->count();
+        $beforeNotes = DB::table('purchase_debit_notes')
+            ->where('tenant_id', $context['tenant_id'])->count();
+
+        $this->mock(AuditRecorderInterface::class, function ($mock): void {
+            $mock->shouldReceive('record')->once()
+                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->withAuth($context)->patchJson('/api/v1/purchase/returns/'.$return['id'].'/post', [
+                'tenant_id' => $context['tenant_id'],
+                'expected_version' => $return['row_version'],
+            ]);
+            self::fail('Purchase return posting without audit must roll back.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        }
+
+        $persisted = DB::table('purchase_returns')->where('tenant_id', $context['tenant_id'])
+            ->where('id', $return['id'])->first();
+        self::assertSame('draft', $persisted->status);
+        self::assertSame((int) $return['row_version'], (int) $persisted->row_version);
+        self::assertSame($beforeStockMovements, DB::table('inventory_movements')
+            ->where('tenant_id', $context['tenant_id'])->count());
+        self::assertSame($beforeNotes, DB::table('purchase_debit_notes')
+            ->where('tenant_id', $context['tenant_id'])->count());
+    }
+
     public function test_approve_cancel_and_close_purchase_orders(): void
     {
         $context = $this->context();
