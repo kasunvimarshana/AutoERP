@@ -17,7 +17,7 @@ This is owned by Tenant's private file storage service, not by Rental's incident
 ## Verification actually performed
 
 - Read the exact source implementation and the Tenant storage path policy, existing PrivateObject tests, and Rental incident attachment integration tests before changing code.
-- Executed PHP 8.4.24 standalone normalization cases against the same expression and inputs: **5/5 passed**, with `php -l` passing for the standalone check script.
+- Executed a standalone PHP 8.4.24 smoke check for the **changed path/control-character normalization portion**: **5/5 inputs passed**, and `php -l` passed on the standalone smoke script. The container lacks PHP `mbstring`; the first attempt to execute the full expression stopped at `mb_substr()`, so the passing smoke deliberately excluded the pre-existing final `mb_substr()` call. The uploaded PDF fixture was also confirmed to sniff as `application/pdf` using PHP `mime_content_type()`.
 - The repository's PHP dependencies, source checkout and disposable database are unavailable to this execution environment; the newly added Laravel test, full backend/frontend suites, SQLite/MySQL migrations, UAT and production smoke were **not executed** here. They must be run on this changed branch/commit before integration or release.
 - Published to isolated `fix/tenant-private-upload-filenames-20261031` instead of updating PR #127 or `worktree-0.0.8`, because those routes trigger GitHub Actions, which the user prohibits. No Actions runs, paid services or production mutations were used.
 
