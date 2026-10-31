@@ -224,16 +224,17 @@ final class FastPurchaseTest extends TestCase
         });
     }
 
-    public function test_mixed_adjustment_residual_is_recognized_once_across_grn_and_invoice(): void
+    public function test_multi_stock_adjustment_is_recognized_once_across_grn_and_invoice(): void
     {
         $context = $this->context();
+        $secondStock = $this->item($context['tenant_id'], 'ITEM-STOCK-ALT', ItemType::Stock, true, $context['uom_id']);
 
         $this->createFastPurchase($this->payload($context, [
             'supplier_reference' => 'FP-MIXED-ADJ',
             'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
             'lines' => [
                 ['item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '6.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
-                ['item_id' => $context['expense_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '4.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+                ['item_id' => (int) $secondStock->getKey(), 'uom_id' => $context['uom_id'], 'quantity' => '4.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
             ],
             'adjustments' => [[
                 'name' => 'Freight',
@@ -251,15 +252,15 @@ final class FastPurchaseTest extends TestCase
         $this->withinTenant($context, function () use ($context): void {
             $this->assertSame('200.000000', (string) Invoice::query()->firstOrFail()->grand_total);
             $this->assertSame('0.000000', (string) Invoice::query()->firstOrFail()->balance_due);
-            $this->assertSame('120.000000', $this->accountDebit($context['inventory_account_id']));
-            $this->assertSame('80.000000', $this->accountDebit($context['purchase_expense_account_id']));
+            $this->assertSame('200.000000', $this->accountDebit($context['inventory_account_id']));
+            $this->assertSame('0.000000', $this->accountDebit($context['purchase_expense_account_id']));
             $this->assertSame('200.000000', $this->accountCredit($context['payable_account_id']));
             $this->assertSame('200.000000', $this->accountDebit($context['payable_account_id']));
             $this->assertSame('0.000000', $this->accountNetDebit($context['payable_account_id']));
             $this->assertSame('100.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('signed_amount')));
-            $this->assertSame('60.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_grn_amount')));
-            $this->assertSame('40.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_invoice_amount')));
-            $this->assertSame(2, DB::table('invoice_adjustments')->count());
+            $this->assertSame('100.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_grn_amount')));
+            $this->assertSame('0.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_invoice_amount')));
+            $this->assertSame(1, DB::table('invoice_adjustments')->count());
         });
     }
 
@@ -416,13 +417,14 @@ final class FastPurchaseTest extends TestCase
     {
         foreach (['first_invoice' => 'FP-FIRST-INVOICE', 'last_invoice' => 'FP-LAST-INVOICE'] as $method => $reference) {
             $context = $this->context();
+        $secondStock = $this->item($context['tenant_id'], 'ITEM-STOCK-ALT', ItemType::Stock, true, $context['uom_id']);
 
             $this->createFastPurchase($this->payload($context, [
                 'supplier_reference' => $reference,
                 'options' => ['receive_stock_now' => true, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
                 'lines' => [
                     ['item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '6.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
-                    ['item_id' => $context['expense_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '4.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
+                    ['item_id' => (int) $secondStock->getKey(), 'uom_id' => $context['uom_id'], 'quantity' => '4.000000', 'unit_cost' => '10.000000', 'discount_amount' => '0.000000'],
                 ],
                 'adjustments' => [[
                     'name' => 'Freight',
@@ -446,11 +448,10 @@ final class FastPurchaseTest extends TestCase
         }
     }
 
-    public function test_direct_non_stock_purchase_has_invoice_payment_and_no_inventory(): void
+    public function test_direct_non_stock_lines_are_rejected_without_effects(): void
     {
         $context = $this->context();
-
-        $result = $this->createFastPurchase($this->payload($context, [
+        $payload = $this->payload($context, [
             'supplier_reference' => 'FP-DIRECT',
             'options' => ['receive_stock_now' => false, 'create_supplier_invoice_now' => true, 'record_payment_now' => true],
             'lines' => [[
@@ -464,17 +465,22 @@ final class FastPurchaseTest extends TestCase
                 'amount' => '150.000000',
                 'payment_method_id' => $context['cash_method_id'],
             ],
-        ]));
-
-        $this->assertNotNull($result['documents']['purchase_order']);
-        $this->assertNull($result['documents']['goods_receipt']);
-        $this->assertNotNull($result['documents']['supplier_invoice']);
-        $this->assertNotNull($result['documents']['supplier_payment']);
+        ]);
+        foreach (['previewFastPurchase', 'createFastPurchase'] as $operation) {
+            try {
+                $this->$operation($payload);
+                $this->fail('Non-stock items must be rejected before any document is created.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('lines.0.item_id', $exception->errors());
+            }
+        }
         $this->withinTenant($context, function (): void {
+            $this->assertSame(0, PurchaseOrder::query()->count());
+            $this->assertSame(0, GoodsReceiptNote::query()->count());
+            $this->assertSame(0, Invoice::query()->count());
+            $this->assertSame(0, Payment::query()->count());
             $this->assertSame(0, InventoryMovement::query()->count());
-            $this->assertSame(1, PurchaseOrder::query()->count());
-            $this->assertSame(1, Invoice::query()->count());
-            $this->assertSame(1, Payment::query()->count());
+            $this->assertSame(0, FinanceJournalEntry::query()->count());
         });
     }
 
@@ -521,33 +527,35 @@ final class FastPurchaseTest extends TestCase
             ]));
             $this->fail('Expected receive-only mixed adjustment validation to fail.');
         } catch (ValidationException $exception) {
-            $this->assertSame(
-                'Receive-only Fast Purchase cannot include header adjustments when non-stock lines are present because no invoice exists to recognize the residual.',
-                $exception->errors()['adjustments.0.adjustment_type'][0] ?? null,
-            );
+            $this->assertArrayHasKey('lines.1.item_id', $exception->errors());
         }
     }
 
-    public function test_mixed_lines_receive_only_stock_and_invoice_all_lines(): void
+    public function test_mixed_non_stock_lines_are_rejected_without_effects(): void
     {
         $context = $this->context();
-
-        $this->createFastPurchase($this->payload($context, [
+        $payload = $this->payload($context, [
             'supplier_reference' => 'FP-MIXED',
             'lines' => [
                 ['item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '3.000000', 'unit_cost' => '100.000000', 'discount_amount' => '0.000000'],
                 ['item_id' => $context['expense_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '1.000000', 'unit_cost' => '40.000000', 'discount_amount' => '0.000000'],
             ],
-        ]));
-
+        ]);
+        foreach (['previewFastPurchase', 'createFastPurchase'] as $operation) {
+            try {
+                $this->$operation($payload);
+                $this->fail('Non-stock items must be rejected before any document is created.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('lines.1.item_id', $exception->errors());
+            }
+        }
         $this->withinTenant($context, function (): void {
-            $this->assertSame(1, GoodsReceiptNote::query()->firstOrFail()->lines()->count());
-            $this->assertSame(1, InventoryMovement::query()->count());
-            $this->assertSame(2, Invoice::query()->firstOrFail()->lines()->count());
-            $this->assertSame(
-                ['goods_receipt_note_line', 'purchase_order_line'],
-                DB::table('invoice_source_lines')->orderBy('source_line_type')->pluck('source_line_type')->all(),
-            );
+            $this->assertSame(0, PurchaseOrder::query()->count());
+            $this->assertSame(0, GoodsReceiptNote::query()->count());
+            $this->assertSame(0, Invoice::query()->count());
+            $this->assertSame(0, Payment::query()->count());
+            $this->assertSame(0, InventoryMovement::query()->count());
+            $this->assertSame(0, FinanceJournalEntry::query()->count());
         });
     }
 

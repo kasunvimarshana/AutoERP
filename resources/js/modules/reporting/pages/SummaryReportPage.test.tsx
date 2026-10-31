@@ -116,8 +116,8 @@ describe('SummaryReportPage', () => {
         expect(screen.getByRole('heading', { name: 'On credit' })).toBeInTheDocument();
         expect(screen.getAllByText(/376,270\.00/)).toHaveLength(2);
         expect(screen.getByRole('heading', { name: 'Payments received' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Operating expenses' })).toBeInTheDocument();
-        expect(screen.getByText(/Rent was the largest category at 100%/)).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Total expenses' })).toBeInTheDocument();
+        expect(screen.getByText(/Rent was the largest paid expense type at 100%/)).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Not connected yet' })).toBeInTheDocument();
 
         const from = screen.getByLabelText('From');

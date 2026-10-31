@@ -97,6 +97,8 @@ final class ExpensePostingTest extends TestCase
         self::assertSame('125.500000', $expenseReport['summary']['posted_amount']);
         self::assertSame('125.500000', $expenseReport['summary']['net_amount']);
         self::assertSame('Rent', $expenseReport['by_expense_type'][0]['name']);
+        self::assertSame('paid', $expenseReport['by_source'][0]['source']);
+        self::assertSame('125.500000', $expenseReport['by_payment_method'][0]['net_amount']);
 
         $reversed = $this->withTenantExecutionContext(
             $tenantId,

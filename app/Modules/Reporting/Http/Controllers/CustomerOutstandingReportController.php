@@ -11,6 +11,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class CustomerOutstandingReportController
 {
+    public function locations(CustomerOutstandingReportRequest $request, CustomerOutstandingReportService $report): JsonResponse
+    {
+        return response()->json(['data' => $report->locations($request)]);
+    }
+
     public function index(CustomerOutstandingReportRequest $request, CustomerOutstandingReportService $report): JsonResponse
     {
         return response()->json($report->page($request));
@@ -40,28 +45,24 @@ final class CustomerOutstandingReportController
 
             fwrite($output, "\xEF\xBB\xBF");
             fputcsv($output, [
-                'Customer', 'Customer code', 'Customer number', 'Currency', 'Open invoices',
-                'Current', '1-30 days', '31-60 days', '61-90 days', '90+ days', 'Outstanding total',
+                'Location', 'Customer', 'Invoice', 'Invoice date', 'No. of days', 'Due days', 'Currency', 'Balance',
             ], ',', '"', '');
 
             foreach ($rows as $row) {
                 fputcsv($output, [
-                    self::safeCsvText((string) $row->customer_name),
-                    self::safeCsvText((string) $row->customer_code),
-                    self::safeCsvText((string) $row->customer_number),
-                    self::safeCsvText((string) $row->currency_code),
-                    (int) $row->invoice_count,
-                    (string) $row->current_amount,
-                    (string) $row->days_1_30_amount,
-                    (string) $row->days_31_60_amount,
-                    (string) $row->days_61_90_amount,
-                    (string) $row->over_90_amount,
-                    (string) $row->outstanding_total,
+                    self::safeCsvText($row['location']),
+                    self::safeCsvText($row['customer']),
+                    self::safeCsvText($row['invoice']),
+                    $row['invoice_date'],
+                    $row['invoice_age_days'],
+                    $row['due_days'],
+                    self::safeCsvText($row['currency']),
+                    $row['balance'],
                 ], ',', '"', '');
             }
 
             fclose($output);
-        }, 'customer-outstanding-'.($request->input('date_from') ?? 'all').'-to-'.$request->input('date_to', now()->toDateString()).'.csv', [
+        }, 'customer-outstanding-as-at-'.$request->input('as_of_date', $request->reportToday()).'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }

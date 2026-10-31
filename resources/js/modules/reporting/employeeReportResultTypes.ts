@@ -84,6 +84,23 @@ export interface EmployeeCommissionGroup {
     total_commission: string;
 }
 
+export interface EmployeeCommissionJobRow {
+    job: { id: number; number: string };
+    job_date: string;
+    last_earned_at: string | null;
+    customer_name: string;
+    vehicle_label: string;
+    entry_count: number;
+    earned_commission: string;
+    pending_commission: string;
+    total_commission: string;
+}
+
+export interface EmployeeCommissionJobsResult {
+    data: EmployeeCommissionJobRow[];
+    meta: ApiCollection<EmployeeCommissionJobRow>['meta'];
+}
+
 export type EmployeeCommissionReportResult = ApiCollection<EmployeeCommissionReportRow> & {
     report: ReportDefinition;
     summary: EmployeeCommissionSummary;

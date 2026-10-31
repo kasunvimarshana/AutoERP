@@ -4,7 +4,7 @@ import { ApiError } from '@/shared/api/apiError';
 import IncidentRegisterPage from './IncidentRegisterPage';
 import { IncidentStatus, IncidentType, IncidentReviewAction, type RentalIncident } from './incidentEvidence';
 import { RunningChartStatus } from './runningCharts';
-import { incidentHistory, listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
+import { attachIncidentFile, downloadIncidentFile, incidentHistory, listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({
@@ -20,7 +20,7 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
 vi.mock('./incidentEvidenceApi', () => ({
     listIncidentVehicleUseOptions: vi.fn(),
     listIncidentRunningCharts: vi.fn(),
-    incidentHistory: vi.fn(),
+    incidentHistory: vi.fn(), attachIncidentFile: vi.fn(), downloadIncidentFile: vi.fn(),
     listRentalIncidents: vi.fn(),
     recordRentalIncident: vi.fn(),
     reviewRentalIncident: vi.fn(),
@@ -32,7 +32,7 @@ const assignment = {
     customer_party_name: 'Example Customer',
 };
 const incident: RentalIncident = {
-    id: 12, reference: 'RIN-TEST-12', row_version: 1,
+    attachments: [], id: 12, reference: 'RIN-TEST-12', row_version: 1,
     status: IncidentStatus.Recorded, incident_type: IncidentType.Fuel,
     occurred_on: '2026-09-07', vehicle_use_id: 27,
     running_chart_id: null, running_chart: null,
@@ -158,4 +158,25 @@ describe('Rental incident evidence register', () => {
         ));
         expect(recordRentalIncident).not.toHaveBeenCalled();
     });
+});
+
+it('uploads proof against the displayed revision and refreshes the register', async () => {
+    vi.mocked(attachIncidentFile).mockResolvedValue();
+    render(<IncidentRegisterPage />);
+    await screen.findByText('Receipt supplied by driver');
+    const file = new File(['proof'], 'receipt.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText('Add evidence file'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Attach file', hidden: true }));
+    await waitFor(() => expect(attachIncidentFile).toHaveBeenCalledWith(incident, file));
+    await waitFor(() => expect(listRentalIncidents).toHaveBeenCalledTimes(2));
+});
+
+it('allows private proof download after review without an upload control', async () => {
+    const attachment = { id: 3, original_filename: 'receipt.pdf', mime_type: 'application/pdf', size_bytes: 5, checksum_sha256: 'hash', recorded_at: '2026-10-31T00:00:00Z' };
+    vi.mocked(listRentalIncidents).mockResolvedValue({ data: [{ ...incident, status: IncidentStatus.Confirmed, attachments: [attachment] }] });
+    render(<IncidentRegisterPage />);
+    await screen.findByText('Receipt supplied by driver');
+    expect(screen.queryByLabelText('Add evidence file')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Download receipt.pdf', hidden: true }));
+    await waitFor(() => expect(downloadIncidentFile).toHaveBeenCalledWith(incident.id, attachment));
 });

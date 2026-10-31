@@ -6,6 +6,10 @@ namespace Modules\VehicleRental\Constants;
 
 final class IncidentFields
 {
+    public const ATTACHMENT_MAX_KB = 10240;
+    public const ATTACHMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+    public const ATTACHMENT_ADDED = 'attachment_added';
+
     public const REFERENCE_PREFIX = 'RIN-';
     public const TYPE_LENGTH = 40;
     public const STATUS_LENGTH = 30;

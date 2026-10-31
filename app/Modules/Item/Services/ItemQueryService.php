@@ -9,10 +9,12 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 
@@ -34,6 +36,23 @@ final class ItemQueryService
     {
         $query = $this->baseQuery($tenantId, $organizationUnitId)->with($this->summaryRelations());
         $this->applyCriteria($query, $criteria);
+        if (! empty($criteria['require_available_stock'])) {
+            $query->whereIn('items.id', function (QueryBuilder $balances) use ($tenantId, $organizationUnitId): void {
+                $balances->from('inventory_stock_balances')
+                    ->select('item_id')
+                    ->where('tenant_id', $tenantId);
+                if ($organizationUnitId === null) {
+                    $balances->whereNull('organization_unit_id');
+                } else {
+                    $balances->where(function (QueryBuilder $scope) use ($organizationUnitId): void {
+                        $scope->whereNull('organization_unit_id')
+                            ->orWhere('organization_unit_id', $organizationUnitId);
+                    });
+                }
+                $balances->groupBy('item_id')
+                    ->havingRaw('SUM(quantity_available) > 0');
+            });
+        }
 
         if ($relevanceSearch !== null && trim($relevanceSearch) !== '') {
             $this->applySearchRelevance($query, $relevanceSearch);
@@ -60,17 +79,24 @@ final class ItemQueryService
         string $kind,
         bool $prioritizeSearch = false,
         ?int $page = null,
+        bool $requireAvailableStock = false,
     ): LengthAwarePaginator
     {
         $criteria['is_active'] = true;
         match ($kind) {
+            'stock' => [$criteria['item_type'] = ItemType::Stock->value, $criteria['is_stockable'] = true],
+            'purchase-stock' => [$criteria['item_types'] = [ItemType::Stock->value, ItemType::Consumable->value], $criteria['is_stockable'] = true],
             'stockable' => $criteria['is_stockable'] = true,
+            'consumable' => [$criteria['item_type'] = ItemType::Consumable->value, $criteria['is_stockable'] = true],
             'untracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_type'] = TrackingType::None->value],
             'batch-tracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_types'] = [TrackingType::Batch->value, TrackingType::Lot->value]],
             'bundle-child' => $criteria['bundle_child'] = true,
             'service', 'labour', 'combo', 'package' => $criteria['item_type'] = $kind,
             default => null,
         };
+        if ($requireAvailableStock) {
+            $criteria['require_available_stock'] = true;
+        }
 
         $paginator = $this->paginate(
             $criteria,
@@ -197,6 +223,9 @@ final class ItemQueryService
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
             }
+        }
+        if (! empty($criteria['item_types'])) {
+            $query->whereIn('item_type', $criteria['item_types']);
         }
         if (! empty($criteria['bundle_child'])) {
             $query->where(function (Builder $items): void {

@@ -64,6 +64,7 @@ final class CustomerCodeGenerationTest extends TestCase
         return array_merge([
             'tenant_id' => $tenantId,
             'name' => 'Customer',
+            'phone' => '+9477'.str_pad((string) (DB::table('customers')->count() + 1), 7, '0', STR_PAD_LEFT),
             'customer_type' => 'individual',
             'status' => 'active',
             'is_tax_exempt' => false,

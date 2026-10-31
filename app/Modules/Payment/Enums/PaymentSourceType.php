@@ -11,6 +11,7 @@ enum PaymentSourceType: string
     case PaymentRefund = 'payment_refund';
     case PaymentRefundFx = 'payment_refund_fx';
     case PaymentAllocation = 'payment_allocation';
+    case SaleReturn = 'sale_return';
     case PaymentAllocationFx = 'payment_allocation_fx';
 
     public function isRentalDeposit(): bool

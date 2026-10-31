@@ -101,11 +101,14 @@ describe('VehicleServiceJobForm', () => {
         ].forEach((label) => {
             expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
         });
+        expect(screen.getByLabelText('Type')).toHaveValue('');
+        expect(screen.getByLabelText('Odometer')).toBeDisabled();
+        await user.selectOptions(screen.getByLabelText('Type'), 'full_service');
         expect(screen.getByLabelText('Odometer')).toBeRequired();
         expect(screen.getByLabelText('Odometer')).toBeEnabled();
         expect(screen.getByLabelText('Next Service Mileage')).toBeEnabled();
         expect(screen.getByLabelText('Next Service Mileage')).not.toBeRequired();
-        expect(screen.getByLabelText('Manual Job Card')).not.toBeRequired();
+        expect(screen.getByLabelText('Manual Job Card')).toBeRequired();
         expect(screen.getByRole('option', { name: 'Oil Change' })).toHaveValue('oil_change');
         expect(screen.getByRole('option', { name: 'Accessories' })).toHaveValue('accessories');
         expect(apiMocks.getVehicleServiceJobCreateDefaults).not.toHaveBeenCalled();
@@ -144,6 +147,7 @@ describe('VehicleServiceJobForm', () => {
             </TestRouter>,
         );
 
+        await user.selectOptions(screen.getByLabelText('Type'), 'full_service');
         await user.type(screen.getByLabelText('Odometer'), '3000');
         expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('8000.00');
 
@@ -227,6 +231,7 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByLabelText('Odometer')).toBeRequired();
         expect(screen.getByLabelText('Odometer')).toHaveValue('');
 
+        await user.type(screen.getByLabelText('Manual Job Card'), 'MJC-EDIT');
         await user.type(screen.getByLabelText('Odometer'), '4000');
         expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('9000.00');
         await user.clear(screen.getByLabelText('Next Service Mileage'));

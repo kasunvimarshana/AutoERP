@@ -33,8 +33,16 @@ export function SupplierLookupSelect(props: LookupProps) {
     return <LookupSelect label="Supplier" search={lookupApi.suppliers} placeholder="Search suppliers..." {...props} />;
 }
 
-export function ItemLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Item" search={lookupApi.items} placeholder="Search items..." {...props} />;
+export function ItemLookupSelect({ stockOnly = false, ...props }: LookupProps & { stockOnly?: boolean }) {
+    return (
+        <LookupSelect
+            label="Item"
+            search={stockOnly ? lookupApi.purchaseStockItems : lookupApi.items}
+            formatLabel={stockOnly ? (item) => item.name : undefined}
+            placeholder="Search items..."
+            {...props}
+        />
+    );
 }
 
 export function UomLookupSelect(props: LookupProps) {

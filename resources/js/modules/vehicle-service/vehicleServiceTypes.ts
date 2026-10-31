@@ -10,7 +10,16 @@ export type VehicleServiceJobStatus =
     | 'paid'
     | 'cancelled';
 
-export type VehicleServiceJobType = 'full_service' | 'body_wash' | 'oil_change' | 'accessories';
+export type VehicleServiceJobType = 'full_service' | 'body_wash' | 'oil_change' | 'wheel_alignment' | 'accessories';
+
+const MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES: readonly VehicleServiceJobType[] = [
+    'full_service',
+    'oil_change',
+    'wheel_alignment',
+];
+
+export const tracksVehicleServiceMileage = (jobType: VehicleServiceJobType | ''): boolean =>
+    jobType !== '' && MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES.includes(jobType);
 
 export type VehicleServiceLineSourceType =
     | 'inventory_item'

@@ -20,7 +20,6 @@ import type {
 } from '../reportingTypes';
 
 const REPORT_KEY = 'expenses';
-const TYPE_COLORS = ['bg-sky-600', 'bg-blue-400', 'bg-cyan-400', 'bg-slate-400', 'bg-indigo-300'];
 const INITIAL_PARAMS: ExpenseReportParams = { ...currentMonthRange(), page: 1, per_page: 25 };
 
 export default function ExpenseReportPage() {
@@ -79,15 +78,15 @@ export default function ExpenseReportPage() {
     return (
         <>
             <ContentHeader
-                title="Expense report"
-                description="See where operating money went and how reversals changed the ledger result."
+                title="Overall expense report"
+                description="See every Profit and Loss expense in one place, including paid expenses and consumable usage."
                 actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} />
 
             <form onSubmit={apply}>
                 <Panel title="Report scope">
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-3">
                         <Input
                             label="From"
                             type="date"
@@ -104,34 +103,59 @@ export default function ExpenseReportPage() {
                             min={draft.date_from}
                             onChange={(event) => setDraft((current) => ({ ...current, date_to: event.target.value }))}
                         />
+                        <Select
+                            label="Source"
+                            placeholder="All expense sources"
+                            value={draft.source ?? ''}
+                            options={[{ value: 'paid', label: 'Paid expenses' }, { value: 'consumable', label: 'Consumable usage' }, { value: 'other', label: 'Other P&L expenses' }]}
+                            onChange={(event) => setDraft((current) => ({
+                                ...current,
+                                source: event.target.value as ExpenseReportParams['source'] || undefined,
+                                expense_type_id: event.target.value === 'consumable' || event.target.value === 'other' ? undefined : current.expense_type_id,
+                                payment_method_id: event.target.value === 'consumable' || event.target.value === 'other' ? undefined : current.payment_method_id,
+                                item_id: event.target.value === 'paid' || event.target.value === 'other' ? undefined : current.item_id,
+                            }))}
+                        />
+                    </div>
+                    <details className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <summary className="cursor-pointer text-sm font-medium text-slate-700">More filters</summary>
+                        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <Input
                             label="Search"
-                            placeholder="Expense, type, method, or reference"
+                            placeholder="Document, type, item, account, or reference"
                             value={draft.search ?? ''}
                             onChange={(event) => setDraft((current) => ({ ...current, search: event.target.value || undefined }))}
                         />
                         <Select
-                            label="Expense type"
+                            label="Expense type (paid only)"
                             placeholder="All expense types"
                             value={draft.expense_type_id ?? ''}
                             options={(result?.filter_options.expense_types ?? []).map((option) => ({ value: option.id, label: option.name }))}
-                            onChange={(event) => setDraft((current) => ({ ...current, expense_type_id: event.target.value ? Number(event.target.value) : undefined }))}
+                            onChange={(event) => setDraft((current) => ({ ...current, expense_type_id: event.target.value ? Number(event.target.value) : undefined, source: event.target.value ? 'paid' : current.source, item_id: event.target.value ? undefined : current.item_id }))}
                         />
                         <Select
-                            label="Paid through"
+                            label="Paid through (paid only)"
                             placeholder="All payment methods"
                             value={draft.payment_method_id ?? ''}
                             options={(result?.filter_options.payment_methods ?? []).map((option) => ({ value: option.id, label: option.name }))}
-                            onChange={(event) => setDraft((current) => ({ ...current, payment_method_id: event.target.value ? Number(event.target.value) : undefined }))}
+                            onChange={(event) => setDraft((current) => ({ ...current, payment_method_id: event.target.value ? Number(event.target.value) : undefined, source: event.target.value ? 'paid' : current.source, item_id: event.target.value ? undefined : current.item_id }))}
+                        />
+                        <Select
+                            label="Consumable item"
+                            placeholder="All consumable items"
+                            value={draft.item_id ?? ''}
+                            options={(result?.filter_options.items ?? []).map((option) => ({ value: option.id, label: option.name }))}
+                            onChange={(event) => setDraft((current) => ({ ...current, item_id: event.target.value ? Number(event.target.value) : undefined, source: event.target.value ? 'consumable' : current.source, expense_type_id: event.target.value ? undefined : current.expense_type_id, payment_method_id: event.target.value ? undefined : current.payment_method_id }))}
                         />
                         <Select
                             label="Activity"
                             placeholder="Postings and reversals"
                             value={draft.event_type ?? ''}
-                            options={[{ value: 'posted', label: 'Posted expenses' }, { value: 'reversal', label: 'Reversals' }]}
+                            options={[{ value: 'posted', label: 'Postings' }, { value: 'reversal', label: 'Reversals' }]}
                             onChange={(event) => setDraft((current) => ({ ...current, event_type: event.target.value as ExpenseReportParams['event_type'] || undefined }))}
                         />
-                    </div>
+                        </div>
+                    </details>
                     <div className="mt-4 flex flex-wrap gap-2">
                         <Button type="submit" loading={loading}>Apply filters</Button>
                         <Button type="button" variant="secondary" onClick={reset}>Reset</Button>
@@ -143,6 +167,12 @@ export default function ExpenseReportPage() {
                 <div className="mt-5 space-y-5">
                     <ExpenseStory result={result} currency={currency} />
 
+                    <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+                        <BreakdownPanel title="Paid expense types" description="Saved expense type on each paid expense." rows={result.by_expense_type} currency={currency} empty="No paid expense types in this period." />
+                        <ConsumableBreakdown rows={result.by_consumable_item} currency={currency} />
+                        <BreakdownPanel title="Other expense accounts" description="Other P&L entries, including cost of goods sold." rows={result.by_other_account} currency={currency} empty="No other P&L expenses in this period." />
+                    </section>
+
                     <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
                         <TrendPanel rows={result.trend} currency={currency} />
                         <PaymentBreakdown rows={result.by_payment_method} currency={currency} />
@@ -153,7 +183,7 @@ export default function ExpenseReportPage() {
                             <div>
                                 <h2 className="text-lg font-bold text-slate-950">Expense activity</h2>
                                 <p className="mt-1 text-sm text-slate-500">
-                                    {loading ? 'Refreshing...' : `${result.meta?.total ?? 0} posting and reversal events match the current filters.`}
+                                    {loading ? 'Refreshing...' : `${result.meta?.total ?? 0} ledger entries match the current filters.`}
                                 </p>
                             </div>
                             <ExportActions reportKey={REPORT_KEY} params={params} />
@@ -179,78 +209,78 @@ export default function ExpenseReportPage() {
 
 function ExpenseStory({ result, currency }: { result: ExpenseReportResult; currency: string }) {
     const summary = result.summary;
-    const topType = result.by_expense_type.find((row) => Number(row.net_amount) > 0);
-    const positiveTotal = result.by_expense_type.reduce((total, row) => total + Math.max(0, Number(row.net_amount)), 0);
-    const topShare = topType && positiveTotal > 0 ? Math.round((Number(topType.net_amount) / positiveTotal) * 100) : 0;
+    const sourceAmount = (source: string) => result.by_source.find((row) => row.source === source)?.net_amount ?? '0';
 
     return (
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="grid bg-slate-950 text-white lg:grid-cols-[1.25fr_0.75fr]">
                 <div className="px-6 py-7 sm:px-8">
-                    <p className="text-sm font-medium text-sky-300">Net operating expense</p>
+                    <p className="text-sm font-medium text-sky-300">Net expense · Profit and Loss</p>
                     <p className={`mt-2 text-4xl font-bold tracking-tight sm:text-5xl ${Number(summary.net_amount) < 0 ? 'text-emerald-300' : 'text-white'}`}>
                         {formatMoney(summary.net_amount, currency)}
                     </p>
                     <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
                         {summary.event_count === 0
-                            ? 'No operating expense activity was posted in this period.'
-                            : topType
-                                ? `${summary.posted_count} expenses were posted. ${topType.name} was the largest category at ${topShare}%.`
-                                : `${summary.posted_count} expenses and ${summary.reversal_count} reversals were recorded in this period.`}
+                            ? 'No expense entries were posted in this period.'
+                            : `${summary.posted_count} expense entries and ${summary.reversal_count} reversals affected this period.`}
                     </p>
                 </div>
                 <dl className="grid grid-cols-2 border-t border-white/10 lg:border-l lg:border-t-0">
                     <StoryMetric label="Posted" value={formatMoney(summary.posted_amount, currency)} />
                     <StoryMetric label="Reversed" value={formatMoney(summary.reversed_amount, currency)} />
-                    <StoryMetric label="Expenses" value={String(summary.posted_count)} />
+                    <StoryMetric label="Postings" value={String(summary.posted_count)} />
                     <StoryMetric label="Reversals" value={String(summary.reversal_count)} />
                 </dl>
             </div>
-            <div className="px-6 py-6 sm:px-8">
-                <div className="mb-4 flex items-end justify-between gap-4">
-                    <div>
-                        <h2 className="font-bold text-slate-950">Where the money went</h2>
-                        <p className="mt-1 text-sm text-slate-500">Net expense by category after dated reversals.</p>
-                    </div>
-                    <LinkButton to="/expenses" variant="secondary">Open expenses</LinkButton>
-                </div>
-                <CompositionRail rows={result.by_expense_type} currency={currency} />
+            <div className="grid gap-px bg-slate-200 sm:grid-cols-3">
+                <SourceMetric label="Paid expenses" value={sourceAmount('paid')} currency={currency} />
+                <SourceMetric label="Consumable usage" value={sourceAmount('consumable')} currency={currency} />
+                <SourceMetric label="Other P&L expenses" value={sourceAmount('other')} currency={currency} />
             </div>
         </section>
     );
 }
 
-function CompositionRail({ rows, currency }: { rows: ExpenseBreakdownRow[]; currency: string }) {
-    const positiveRows = rows.filter((row) => Number(row.net_amount) > 0);
-    const total = positiveRows.reduce((sum, row) => sum + Number(row.net_amount), 0);
-    if (positiveRows.length === 0 || total <= 0) {
-        return <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No positive expense categories in this period.</p>;
-    }
-
+function SourceMetric({ label, value, currency }: { label: string; value: string; currency: string }) {
     return (
-        <div>
-            <div className="flex h-4 overflow-hidden rounded-full bg-slate-100" aria-label="Expense category distribution">
-                {positiveRows.slice(0, 5).map((row, index) => (
-                    <div
-                        key={row.id}
-                        className={TYPE_COLORS[index]}
-                        style={{ width: `${Math.max(2, (Number(row.net_amount) / total) * 100)}%` }}
-                        title={`${row.name}: ${formatMoney(row.net_amount, currency)}`}
-                    />
-                ))}
-            </div>
-            <div className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
-                {positiveRows.slice(0, 5).map((row, index) => (
-                    <div key={row.id} className="flex items-center justify-between gap-4 text-sm">
-                        <span className="flex min-w-0 items-center gap-2 text-slate-600">
-                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TYPE_COLORS[index]}`} />
-                            <span className="truncate">{row.name}</span>
-                        </span>
+        <div className="bg-white px-6 py-5">
+            <p className="text-sm text-slate-500">{label}</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{formatMoney(value, currency)}</p>
+        </div>
+    );
+}
+
+function BreakdownPanel({ title, description, rows, currency, empty }: { title: string; description: string; rows: ExpenseBreakdownRow[]; currency: string; empty: string }) {
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="font-bold text-slate-950">{title}</h2>
+            <p className="mt-1 text-sm text-slate-500">{description}</p>
+            <div className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
+                {rows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">{empty}</p> : rows.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                        <span className="min-w-0 truncate text-slate-700">{row.name}</span>
                         <span className="shrink-0 font-semibold tabular-nums text-slate-900">{formatMoney(row.net_amount, currency)}</span>
                     </div>
                 ))}
             </div>
-        </div>
+        </section>
+    );
+}
+
+function ConsumableBreakdown({ rows, currency }: { rows: ExpenseReportResult['by_consumable_item']; currency: string }) {
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="font-bold text-slate-950">Consumables by item</h2>
+            <p className="mt-1 text-sm text-slate-500">Used quantity and inventory cost recognized as expense.</p>
+            <div className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
+                {rows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No valued consumable usage in this period.</p> : rows.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                        <span className="min-w-0 truncate text-slate-700">{row.name} <span className="text-slate-400">· {Number(row.quantity)} used</span></span>
+                        <span className="shrink-0 font-semibold tabular-nums text-slate-900">{formatMoney(row.net_amount, currency)}</span>
+                    </div>
+                ))}
+            </div>
+        </section>
     );
 }
 
@@ -286,10 +316,10 @@ function TrendPanel({ rows, currency }: { rows: ExpenseTrendRow[]; currency: str
 function PaymentBreakdown({ rows, currency }: { rows: ExpenseBreakdownRow[]; currency: string }) {
     return (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="font-bold text-slate-950">How expenses were paid</h2>
-            <p className="mt-1 text-sm text-slate-500">Payment-method snapshots from the original expense.</p>
+            <h2 className="font-bold text-slate-950">How paid expenses were paid</h2>
+            <p className="mt-1 text-sm text-slate-500">Paid expenses only. Consumable usage has no payment method.</p>
             <div className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
-                {rows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No payment activity in this period.</p> : rows.map((row) => (
+                {rows.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No paid expenses in this period.</p> : rows.map((row) => (
                     <div key={row.id} className="flex items-center justify-between gap-4 py-3 text-sm">
                         <div className="min-w-0">
                             <p className="truncate font-medium text-slate-800">{row.name}</p>

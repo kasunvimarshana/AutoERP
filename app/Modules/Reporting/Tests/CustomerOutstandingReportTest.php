@@ -38,9 +38,9 @@ final class CustomerOutstandingReportTest extends TestCase
         $this->assertEquals(125, $rows['LKR']['outstanding_total']);
         $this->assertEquals(20, $rows['USD']['outstanding_total']);
 
-        $exports = collect($service->exportRows($request));
+        $exports = collect($service->exportRows($request))->filter(fn (array $row): bool => ($row['row_type'] ?? '') === 'invoice')->values();
         $this->assertCount(2, $exports);
-        $this->assertSame(['Display Customer'], $exports->pluck('customer_name')->unique()->values()->all());
+        $this->assertSame(['Display Customer'], $exports->pluck('customer')->unique()->values()->all());
     }
 
     public function test_invoice_drilldown_normalizes_currency_and_preserves_customer_identity(): void
@@ -76,7 +76,7 @@ final class CustomerOutstandingReportTest extends TestCase
     private function request(int $tenantId, array $filters = []): CustomerOutstandingReportRequest
     {
         $request = CustomerOutstandingReportRequest::create('/', 'GET', array_merge([
-            'date_to' => '2026-06-30', 'per_page' => 25,
+            'as_of_date' => '2026-06-30', 'per_page' => 25,
         ], $filters));
         $request->attributes->set('current_tenant_id', $tenantId);
 

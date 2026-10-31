@@ -17,7 +17,9 @@ final readonly class ReportDefinition
      * @param  array<int, string>  $relations
      * @param  array<int, ReportFilter>  $filters
      * @param  array<string, mixed>  $constraints
+     * @param  array<int, string>  $excludedFilterKeys
      * @param  Closure(Builder): Builder|null  $scope
+     * @param  Closure(array<int, Model>): void|null  $prepareRows
      */
     public function __construct(
         public string $key,
@@ -36,6 +38,10 @@ final readonly class ReportDefinition
         public ?Closure $scope = null,
         public string $description = '',
         public ?string $orientation = null,
+        public string $searchLabel = 'Search',
+        public ?string $dateFilterHint = null,
+        public ?Closure $prepareRows = null,
+        public array $excludedFilterKeys = [],
     ) {}
 
     public function column(string $key): ?ReportColumn
@@ -70,6 +76,8 @@ final readonly class ReportDefinition
             'title' => $this->title,
             'group' => $this->group,
             'description' => $this->description,
+            'search_label' => $this->searchLabel,
+            'date_filter_hint' => $this->dateFilterHint,
             'columns' => array_map(fn (ReportColumn $column): array => $column->toArray(), $this->columns),
             'filters' => array_map(fn (ReportFilter $filter): array => $filter->toArray(), $this->filters),
             'supports_date_range' => $this->dateColumn !== null,

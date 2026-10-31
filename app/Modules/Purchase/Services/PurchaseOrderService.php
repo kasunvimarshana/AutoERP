@@ -44,9 +44,9 @@ final class PurchaseOrderService
         return $this->loadOrder($this->statuses->approve($order, $approvedBy, $expectedVersion));
     }
 
-    public function cancel(PurchaseOrder $order, ?int $expectedVersion = null): PurchaseOrder
+    public function cancel(PurchaseOrder $order, int $cancelledBy, ?int $expectedVersion = null): PurchaseOrder
     {
-        return $this->loadOrder($this->statuses->cancel($order, $expectedVersion));
+        return $this->loadOrder($this->statuses->cancel($order, $cancelledBy, $expectedVersion));
     }
 
     public function close(PurchaseOrder $order, ?int $closedBy = null, ?int $expectedVersion = null): PurchaseOrder
@@ -82,7 +82,9 @@ final class PurchaseOrderService
             'warehouseLocation',
             'currency',
             'createdBy',
+            'submittedBy',
             'approvedBy',
+            'cancelledBy',
             'closedBy',
             'lines.item',
             'lines.variant',

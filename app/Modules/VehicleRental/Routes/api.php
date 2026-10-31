@@ -15,6 +15,7 @@ use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
 use Modules\VehicleRental\Http\Controllers\DriverDirectoryController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentController;
+use Modules\VehicleRental\Http\Controllers\RentalIncidentAttachmentController;
 use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
 
@@ -25,6 +26,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
 ])->group(function (): void {
     Route::get('driver-employees', [DriverDirectoryController::class, 'index']);
     Route::prefix('incidents')->group(function (): void {
+        Route::post('{incident}/attachments', [RentalIncidentAttachmentController::class, 'store'])->whereNumber('incident');
+        Route::get('{incident}/attachments/{attachment}', [RentalIncidentAttachmentController::class, 'download'])->whereNumber(['incident', 'attachment']);
         Route::get('vehicle-use-options', [RentalIncidentController::class, 'vehicleUseOptions']);
         Route::get('vehicle-uses/{use}/running-chart-options', [RentalIncidentController::class, 'runningChartOptions'])->whereNumber('use');
         Route::get('/', [RentalIncidentController::class, 'index']);

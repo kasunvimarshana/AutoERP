@@ -567,6 +567,12 @@ An incident recorder can select the related vehicle assignment and, optionally, 
 
 ---
 
+### 17.2 Private incident file proofs (2026-10-31)
+
+Incident recorders can add PDF, JPEG or PNG proofs up to 10 MB while evidence remains recorded. Uploads require the displayed incident revision, advance it once, and append an actor/time/checksum audit event. Identical content cannot be attached twice to one incident. Files and metadata cannot be replaced or deleted, and factual review locks further uploads. Downloads require incident-view permission and the same tenant/organization scope; storage keys are not exposed. Files use private tenant storage, forced download and no-store headers. A failed database transaction discards the new unreferenced object through Core's cleanup service.
+
+The expandable File proofs panel uses original filenames and refreshes the incident revision and history after upload. Uploading or reviewing a file creates no invoice, payment, journal or liability decision. Commercial allocation, dispute resolution and financial adjustment lifecycles remain separate open release requirements.
+
 ## 18. Tax, withholding and Finance
 
 - Tax percentages are not hardcoded in Rental.

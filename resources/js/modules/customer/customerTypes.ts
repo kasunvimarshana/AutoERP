@@ -79,6 +79,7 @@ export interface CustomerPayload {
 
 export interface CustomerContact {
     id: number;
+    row_version: number;
     contact_name: string;
     designation?: string | null;
     department?: string | null;
@@ -90,7 +91,7 @@ export interface CustomerContact {
     notes?: string | null;
 }
 
-export type CustomerContactPayload = Omit<CustomerContact, 'id'>;
+export type CustomerContactPayload = Omit<CustomerContact, 'id' | 'row_version'> & { row_version?: number };
 
 export interface CustomerAddress {
     id: number;

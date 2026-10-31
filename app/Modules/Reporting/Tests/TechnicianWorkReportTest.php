@@ -469,6 +469,70 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertSee('EMP-COM-FILT');
     }
 
+    public function test_incentive_period_uses_completion_dates_and_groups_employee_jobs(): void
+    {
+        $context = $this->context('EOM');
+        $this->authorize($context);
+        $earnedJob = $this->createJob($context, date: '2026-09-20');
+        $firstLine = $this->line($earnedJob, $context['labour'], '1.000000', '100.000000', 'First earned work');
+        $first = $this->assignment($earnedJob, $firstLine, $context['employee_id'], '1.000000', '100.000000', VehicleServiceCommissionType::Fixed, '10.000000');
+        $this->withTenantExecutionContext((int) $context['tenant_id'], fn () => $first->forceFill(['completed_at' => '2026-10-07 12:00:00'])->save());
+        $secondLine = $this->line($earnedJob, $context['labour'], '1.000000', '100.000000', 'Second earned work');
+        $second = $this->assignment($earnedJob, $secondLine, $context['employee_id'], '1.000000', '100.000000', VehicleServiceCommissionType::Fixed, '20.000000');
+        $this->withTenantExecutionContext((int) $context['tenant_id'], fn () => $second->forceFill(['completed_at' => '2026-10-08 12:00:00'])->save());
+
+        $pendingJob = $this->createJob($context, date: '2026-10-10');
+        $pendingLine = $this->line($pendingJob, $context['labour'], '1.000000', '100.000000', 'Pending work');
+        $this->assignment($pendingJob, $pendingLine, $context['employee_id'], '1.000000', '100.000000', VehicleServiceCommissionType::Fixed, '5.000000');
+
+        $earlierPendingJob = $this->createJob($context, date: '2026-09-25');
+        $earlierPendingLine = $this->line($earlierPendingJob, $context['labour'], '1.000000', '100.000000', 'Earlier pending work');
+        $this->assignment($earlierPendingJob, $earlierPendingLine, $context['employee_id'], '1.000000', '100.000000', VehicleServiceCommissionType::Fixed, '9.000000');
+
+        $olderJob = $this->createJob($context, date: '2026-09-10');
+        $olderLine = $this->line($olderJob, $context['labour'], '1.000000', '100.000000', 'Earlier completed work');
+        $older = $this->assignment($olderJob, $olderLine, $context['employee_id'], '1.000000', '100.000000', VehicleServiceCommissionType::Fixed, '7.000000');
+        $this->withTenantExecutionContext((int) $context['tenant_id'], fn () => $older->forceFill(['completed_at' => '2026-09-11 12:00:00'])->save());
+
+        $params = [
+            ...$this->scope($context),
+            'period_view' => 1,
+            'date_from' => '2026-10-01',
+            'date_to' => '2026-10-31',
+            'group_by' => 'employee',
+        ];
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($params))
+            ->assertOk()
+            ->assertJsonPath('summary.total_jobs', 2)
+            ->assertJsonPath('summary.earned_commission', '30.000000')
+            ->assertJsonPath('summary.pending_commission', '5.000000')
+            ->assertJsonPath('summary.total_commission', '35.000000')
+            ->assertJsonPath('groups.0.total_jobs', 2)
+            ->assertJsonPath('groups.0.total_commission', '35.000000');
+
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions/employees/'.$context['employee_id'].'/jobs?'.http_build_query($params))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('data.1.job.number', $earnedJob->job_number)
+            ->assertJsonPath('data.1.entry_count', 2)
+            ->assertJsonPath('data.1.last_earned_at', '2026-10-08 12:00:00')
+            ->assertJsonPath('data.1.earned_commission', '30.000000')
+            ->assertJsonPath('data.1.pending_commission', '0.000000');
+
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            ...$params,
+            'period_view' => 0,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('summary.total_jobs', 1)
+            ->assertJsonPath('summary.earned_commission', '0.000000');
+
+        $export = $this->reportGet($context, '/api/v1/reports/vehicle-service/employee-commissions/incentive-summary/export/csv?'.http_build_query($params))
+            ->assertOk();
+        $this->assertStringContainsString('EOM eligible (earned)', $export->getContent());
+        $this->assertStringContainsString('35.000000', $export->getContent());
+    }
+
     public function test_employee_commission_report_excludes_cancelled_work_by_default(): void
     {
         $context = $this->context('COM-CANCEL');

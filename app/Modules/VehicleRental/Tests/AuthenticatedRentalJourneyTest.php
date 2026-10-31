@@ -542,6 +542,44 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->getJson(self::ROOT.'/customer/agreements')->assertForbidden();
     }
 
+    public function test_authenticated_incident_file_proofs_are_private_versioned_and_permission_scoped(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('tenant_private');
+        $this->getJson(self::ROOT.'/incidents/1/attachments/1')->assertUnauthorized();
+        [$context, $customerInput, $ownerInput] = $this->loginFixture();
+        $customer = $this->activate('customer', $customerInput);
+        $owner = $this->activate('owner', $ownerInput);
+        $use = $this->postJson(self::ROOT.'/customer/agreements/'.$customer['id'].'/vehicles', [
+            'expected_version' => $customer['row_version'], 'vehicle_id' => $ownerInput['vehicle_id'], 'owner_agreement_id' => $owner['id'],
+            'starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '2026-09-08T09:00:00+05:30',
+        ])->assertCreated()->json('data');
+        $incident = $this->postJson(self::ROOT.'/incidents', [
+            'vehicle_use_id' => $use['id'], 'expected_use_version' => $use['row_version'],
+            'incident_type' => 'fuel', 'occurred_on' => '2026-09-07',
+            'evidence_reference' => 'RECEIPT-HTTP', 'description' => 'Receipt from driver',
+        ])->assertCreated()->json('data');
+        $path = self::ROOT.'/incidents/'.$incident['id'];
+        $content = "%PDF-1.4\nFuel receipt\n%%EOF";
+        $file = fn () => \Illuminate\Http\UploadedFile::fake()->createWithContent('receipt.pdf', $content);
+        $this->post($path.'/attachments', ['expected_version' => 1, 'file' => $file()], ['Accept' => 'application/json'])->assertCreated();
+        $updated = $this->getJson($path)->assertOk()->assertJsonPath('data.row_version', 2)
+            ->assertJsonMissingPath('data.attachments.0.object_key')->json('data');
+        $download = $path.'/attachments/'.$updated['attachments'][0]['id'];
+        $response = $this->get($download)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('Content-Type', 'application/octet-stream');
+        self::assertSame($content, $response->streamedContent());
+        self::assertStringContainsString('attachment;', $response->headers->get('Content-Disposition'));
+        self::assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $this->post($path.'/attachments', ['expected_version' => 1, 'file' => $file()], ['Accept' => 'application/json'])->assertConflict();
+        $this->getJson(self::ROOT.'/incidents/999999/attachments/'.$updated['attachments'][0]['id'])->assertNotFound();
+        $this->assertDatabaseCount('invoices', 0);
+        $this->loginFixture(permissions: [\Modules\VehicleRental\Enums\IncidentPermission::View->value]);
+        $this->getJson($download)->assertNotFound();
+        $this->post($path.'/attachments', ['expected_version' => 2, 'file' => $file()], ['Accept' => 'application/json'])->assertForbidden();
+        $this->loginFixture();
+        $this->post($path.'/attachments', ['expected_version' => 2, 'file' => $file()], ['Accept' => 'application/json'])->assertNotFound();
+    }
+
     private function assertFinanceLine(
         int $journalId,
         string $accountCode,

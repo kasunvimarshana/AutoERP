@@ -1,42 +1,44 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
-import { getCustomerOutstanding } from '@/modules/finance/financeApi';
-import type { CustomerOutstandingReportResult } from '@/modules/finance/financeTypes';
+import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { TestRouter } from '@/test/TestRouter';
+import { configureBusinessTimeZone } from '@/shared/utils/businessDate';
 import CustomerOutstandingReportPage from './CustomerOutstandingReportPage';
 
-vi.mock('@/modules/finance/financeApi', () => ({
-    getCustomerOutstanding: vi.fn(), getCustomerOutstandingInvoices: vi.fn(), downloadCustomerOutstandingCsv: vi.fn(),
+const financeApi = vi.hoisted(() => ({
+    getCustomerOutstanding: vi.fn(),
+    getCustomerOutstandingLocations: vi.fn(),
+    getCustomerOutstandingInvoices: vi.fn(),
+    downloadCustomerOutstandingCsv: vi.fn(),
 }));
-vi.mock('@/modules/customer/components/CustomerLookupSelect', () => ({ CustomerLookupSelect: () => null }));
+vi.mock('@/modules/finance/financeApi', () => financeApi);
+vi.mock('@/modules/customer/components/CustomerLookupSelect', () => ({ CustomerLookupSelect: () => <div>Customer search</div> }));
 
-function result(name: string): CustomerOutstandingReportResult {
-    return {
-        as_of_date: '2026-06-30',
-        summary: { customer_count: 1, overdue_invoice_count: 0, totals_by_currency: [] },
-        data: [{
-            customer: { id: 1, name, code: 'CUSTOMER', customer_number: 'CUS-001' },
-            currency: { code: 'LKR' }, invoice_count: 1, current: '100', days_1_30: '0',
-            days_31_60: '0', days_61_90: '0', over_90: '0', outstanding_total: '100',
-        }],
-        meta: { current_page: 1, from: 1, to: 1, last_page: 1, per_page: 25, total: 1 },
-    };
-}
+afterEach(() => {
+    configureBusinessTimeZone(null);
+    vi.useRealTimers();
+    vi.clearAllMocks();
+});
 
-describe('Customer outstanding request ownership', () => {
-    it('keeps the current filter result when a previous request finishes late', async () => {
-        let completePrevious!: (value: CustomerOutstandingReportResult) => void;
-        vi.mocked(getCustomerOutstanding)
-            .mockReturnValueOnce(new Promise(resolve => { completePrevious = resolve; }))
-            .mockResolvedValueOnce(result('Current customer'));
-        render(<MemoryRouter><CustomerOutstandingReportPage /></MemoryRouter>);
-        await waitFor(() => expect(getCustomerOutstanding).toHaveBeenCalledOnce());
-        fireEvent.change(screen.getByLabelText('Invoice date to'), { target: { value: '2026-06-30' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
-        await screen.findAllByRole('button', { name: /Current customer/ });
-        await act(async () => completePrevious(result('Previous customer')));
+describe('CustomerOutstandingReportPage', () => {
+    it('sends the displayed business date and timezone together at the UTC date boundary', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-28T23:34:48Z'));
+        configureBusinessTimeZone('Asia/Colombo');
+        financeApi.getCustomerOutstandingLocations.mockResolvedValue([]);
+        financeApi.getCustomerOutstanding.mockResolvedValue({
+            as_of_date: '2026-10-29',
+            summary: { customer_count: 0, overdue_invoice_count: 0, totals_by_currency: [], totals_by_location: [] },
+            data: [],
+            meta: { current_page: 1, from: null, last_page: 1, per_page: 25, to: null, total: 0 },
+        });
 
-        expect(screen.getAllByRole('button', { name: /Current customer/ }).length).toBeGreaterThan(0);
-        expect(screen.queryAllByRole('button', { name: /Previous customer/ })).toHaveLength(0);
+        render(<TestRouter><CustomerOutstandingReportPage /></TestRouter>);
+
+        expect(screen.getByLabelText('As at date')).toHaveValue('2026-10-29');
+        expect(screen.getByLabelText('As at date')).toHaveAttribute('max', '2026-10-29');
+        await waitFor(() => expect(financeApi.getCustomerOutstanding).toHaveBeenCalledWith(
+            expect.objectContaining({ as_of_date: '2026-10-29', timezone: 'Asia/Colombo' }),
+            expect.any(AbortSignal),
+        ));
     });
 });

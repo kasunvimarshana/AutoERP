@@ -123,7 +123,7 @@ final class PaymentCreationService
                     'returned_date' => $line->returnedDate,
                     'cancellation_reason' => $line->cancellationReason,
                     'notes' => $line->notes,
-                    'metadata' => $line->metadata,
+                    'metadata' => $this->lineMetadata($line),
                 ]);
                 $paymentLine->save();
             }
@@ -145,6 +145,17 @@ final class PaymentCreationService
 
             return $payment;
         });
+    }
+
+    private function lineMetadata(PaymentLineData $line): ?array
+    {
+        $metadata = $line->metadata ?? [];
+        if (isset($metadata['cash_received_amount'])) {
+            $metadata['cash_received_amount'] = $this->math->normalize($metadata['cash_received_amount']);
+            $metadata['cash_change_amount'] = $this->math->sub($metadata['cash_received_amount'], $line->amount);
+        }
+
+        return $metadata === [] ? null : $metadata;
     }
 
     private function acquireIdempotency(CreatePaymentData $data): ?IdempotencyRecord

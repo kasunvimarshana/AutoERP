@@ -2,6 +2,7 @@ import type { ApiCollection } from '@/shared/types/api';
 import type { ReportDefinition, ReportRow } from './genericReportTypes';
 
 export type ExpenseEventType = 'posted' | 'reversal';
+export type ExpenseSource = 'paid' | 'consumable' | 'other';
 
 export interface ExpenseReportParams {
     page?: number;
@@ -13,6 +14,8 @@ export interface ExpenseReportParams {
     date_to: string;
     expense_type_id?: number;
     payment_method_id?: number;
+    item_id?: number;
+    source?: ExpenseSource;
     event_type?: ExpenseEventType;
 }
 
@@ -42,6 +45,19 @@ export interface ExpenseTrendRow {
     net_amount: string;
 }
 
+export interface ExpenseSourceRow {
+    source: ExpenseSource;
+    net_amount: string;
+}
+
+export interface ConsumableItemRow {
+    id: number;
+    code: string;
+    name: string;
+    quantity: string;
+    net_amount: string;
+}
+
 export interface ExpenseFilterOption {
     id: number;
     name: string;
@@ -51,6 +67,9 @@ export interface ExpenseReportOverview {
     summary: ExpenseReportSummary;
     by_expense_type: ExpenseBreakdownRow[];
     by_payment_method: ExpenseBreakdownRow[];
+    by_source: ExpenseSourceRow[];
+    by_consumable_item: ConsumableItemRow[];
+    by_other_account: ExpenseBreakdownRow[];
     trend: ExpenseTrendRow[];
 }
 
@@ -64,6 +83,7 @@ export interface ExpenseReportResult extends ApiCollection<ReportRow>, ExpenseRe
     filter_options: {
         expense_types: ExpenseFilterOption[];
         payment_methods: ExpenseFilterOption[];
+        items: ExpenseFilterOption[];
     };
     basis: string;
 }

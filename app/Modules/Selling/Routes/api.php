@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Selling\Http\Controllers\SaleController;
+use Modules\Selling\Http\Controllers\SellingPaymentController;
+use Modules\Payment\Constants\PaymentPermission;
 use Modules\Selling\Services\SellingAuthorizationService;
 
 $middleware = [
@@ -27,4 +29,13 @@ Route::prefix('api/v1/selling')->middleware($middleware)->name('api.v1.selling.'
     Route::post('sales', [SaleController::class, 'store'])->middleware($requires(SellingAuthorizationService::SALES_CREATE))->name('sales.store');
     Route::get('sales/{sale}', [SaleController::class, 'show'])->whereNumber('sale')->middleware($requires(SellingAuthorizationService::SALES_VIEW))->name('sales.show');
     Route::post('sales/{sale}/returns', [SaleController::class, 'storeReturn'])->whereNumber('sale')->middleware($requires(SellingAuthorizationService::RETURNS_CREATE))->name('sales.returns.store');
+    Route::post('returns/{return}/refunds', [SaleController::class, 'refundReturn'])->whereNumber('return')->middleware([
+        'tenant.feature:payment',
+        $requires(SellingAuthorizationService::RETURNS_VIEW),
+        $requires('payments.refund'),
+    ])->name('returns.refunds.store');
 });
+
+Route::post('api/v1/payments/selling-settlement', [SellingPaymentController::class, 'store'])
+    ->middleware([...$middleware, 'tenant.feature:payment', $requires(PaymentPermission::PAYMENTS_CREATE), $requires(SellingAuthorizationService::SALES_CREATE)])
+    ->name('api.v1.payments.selling-settlement.store');

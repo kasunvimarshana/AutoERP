@@ -14,6 +14,7 @@ import type {
     EmployeeCommissionReportParams,
     EmployeeCommissionReportRow,
 } from '../reportingTypes';
+import { EmployeeCommissionJobList } from './EmployeeCommissionJobList';
 
 export function EmployeeCommissionEmployeeList({ groups, params }: {
     groups: EmployeeCommissionGroup[];
@@ -40,42 +41,41 @@ export function EmployeeCommissionEmployeeList({ groups, params }: {
                     <section key={group.key} className="border-b border-slate-200 last:border-b-0">
                         <button
                             type="button"
-                            className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 p-4 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:grid-cols-[minmax(0,1.4fr)_minmax(10rem,1fr)_auto_auto] sm:px-5"
+                            className="relative grid w-full grid-cols-2 items-center gap-3 p-4 pr-8 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:grid-cols-[minmax(11rem,1.5fr)_repeat(3,minmax(7rem,1fr))] sm:gap-4 sm:px-5 sm:pr-9"
                             aria-expanded={expanded}
-                            aria-controls={detailsId}
+                            aria-controls={expanded ? detailsId : undefined}
                             disabled={!employeeId}
                             onClick={() => employeeId && setExpandedGroup(expanded ? null : group.key)}
                         >
-                            <span className="min-w-0">
+                            <span className="col-span-2 min-w-0 sm:col-span-1">
                                 <strong className="block break-words font-semibold text-slate-900">{group.label}</strong>
                                 {group.resource?.code && <span className="mt-0.5 block text-sm text-slate-500">{group.resource.code}</span>}
+                                <span className="mt-0.5 block text-xs text-slate-500">{group.designation_name || 'No designation'} · {group.total_jobs} {group.total_jobs === 1 ? 'job' : 'jobs'}</span>
                             </span>
-                            <span className="min-w-0 text-sm text-slate-700 sm:col-start-2 sm:row-start-1">
-                                <span className="block text-xs font-medium text-slate-500">Designation</span>
-                                <span className="mt-0.5 block break-words">{group.designation_name || '—'}</span>
+                            <span className="min-w-0 text-sm text-slate-700">
+                                <span className="block text-xs font-medium text-slate-500">{params.period_view ? 'EOM eligible (earned)' : 'Earned'}</span>
+                                <strong className="mt-0.5 block tabular-nums text-slate-900">{formatMoney(group.earned_commission ?? '0')}</strong>
                             </span>
-                            <span className="text-right sm:col-start-3 sm:row-start-1">
+                            <span className="min-w-0 text-sm text-slate-700">
+                                <span className="block text-xs font-medium text-slate-500">Pending</span>
+                                <strong className="mt-0.5 block tabular-nums text-slate-900">{formatMoney(group.pending_commission ?? '0')}</strong>
+                            </span>
+                            <span className="col-span-2 border-t border-slate-100 pt-2 text-sm sm:col-span-1 sm:border-0 sm:pt-0">
                                 <span className="block text-xs font-medium text-slate-500">Total incentive</span>
                                 <strong className="mt-0.5 block tabular-nums text-slate-950">{formatMoney(group.total_commission)}</strong>
                             </span>
-                            <span className="col-span-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-xs text-slate-500 sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:flex-col sm:items-end sm:justify-center sm:border-0 sm:pt-0">
-                                <span>{group.total_jobs} {group.total_jobs === 1 ? 'job' : 'jobs'}</span>
-                                <span className="inline-flex items-center gap-2">
-                                    <span>Earned {formatMoney(group.earned_commission ?? '0')}</span>
-                                    <span aria-hidden="true">·</span>
-                                    <span>Pending {formatMoney(group.pending_commission ?? '0')}</span>
-                                </span>
+                            <span className="absolute right-3 top-4 text-xs text-slate-500">
                                 <span className="sr-only">{expanded ? 'Hide job details' : employeeId ? 'Show job details' : 'No employee details available'}</span>
-                                <span className={`text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
+                                <span className={`inline-block text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
                             </span>
                         </button>
                         {expanded && employeeId && (
                             <div id={detailsId} className="border-t border-slate-200 bg-slate-50/70 p-3 sm:p-4">
-                                <EmployeeCommissionDetails
+                                {params.period_view ? <EmployeeCommissionPeriodDetails key={`${employeeId}-${JSON.stringify(params)}`} employeeId={employeeId} params={params} /> : <EmployeeCommissionDetails
                                     key={`${employeeId}-${JSON.stringify(params)}`}
                                     employeeId={employeeId}
                                     params={params}
-                                />
+                                />}
                             </div>
                         )}
                     </section>
@@ -83,6 +83,20 @@ export function EmployeeCommissionEmployeeList({ groups, params }: {
             })}
         </div>
     );
+}
+
+function EmployeeCommissionPeriodDetails({ employeeId, params }: { employeeId: number; params: EmployeeCommissionReportParams }) {
+    const [showEntries, setShowEntries] = useState(false);
+
+    return <div className="space-y-4">
+        <EmployeeCommissionJobList employeeId={employeeId} params={params} />
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <button type="button" className="text-sm font-medium text-sky-700 hover:underline" aria-expanded={showEntries} onClick={() => setShowEntries((current) => !current)}>
+                {showEntries ? 'Hide commission entries' : 'View commission entries'}
+            </button>
+            {showEntries && <div className="mt-3"><EmployeeCommissionDetails employeeId={employeeId} params={params} /></div>}
+        </div>
+    </div>;
 }
 
 function EmployeeCommissionDetails({ employeeId, params }: {

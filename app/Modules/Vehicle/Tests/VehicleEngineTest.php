@@ -637,6 +637,7 @@ final class VehicleEngineTest extends TestCase
             name: 'Customer '.$code,
             customerType: CustomerType::Company,
             status: CustomerStatus::Active,
+            mobile: sprintf('077%07d', abs(crc32($code)) % 10000000),
         )));
     }
 

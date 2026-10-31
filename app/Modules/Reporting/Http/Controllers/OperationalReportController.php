@@ -62,16 +62,8 @@ final class OperationalReportController
     public function exportDetailedPurchase(OperationalReportRequest $request, string $format): Response
     {
         $this->assertExport($request);
-        $input = $this->input($request);
 
-        return $this->export->export(
-            $format,
-            $this->purchase->definition(),
-            $this->purchase->exportRows($input)->all(),
-            $request->tenantId(),
-            $request->organizationUnitId(),
-            $input,
-        );
+        return $this->export->response($format, $this->purchase->exportData($this->input($request)));
     }
 
     public function grnPayables(GrnPayablesReportRequest $request): JsonResponse

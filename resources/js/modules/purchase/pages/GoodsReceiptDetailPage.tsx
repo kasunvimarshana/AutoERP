@@ -39,6 +39,7 @@ export default function GoodsReceiptDetailPage() {
     const capabilities = grn.capabilities ?? {};
     const reverseBlocker = capabilityDetail(capabilities, 'can_reverse');
     const can = (permission: string) => hasPurchasePermission(auth, permission);
+    const canCreateInvoice = capabilities.can_invoice && can(purchasePermissions.supplierInvoicesCreate);
 
     const post = async () => {
         if (!await confirm({
@@ -91,7 +92,7 @@ export default function GoodsReceiptDetailPage() {
                     title={grn.grn_number ?? 'Goods receipt'}
                     description={formatDate(grn.received_date)}
                     actions={<div className="flex flex-wrap justify-end gap-2">
-                        {capabilities.can_invoice && can(purchasePermissions.supplierInvoicesCreate) && <LinkButton to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`} variant="secondary">Create invoice</LinkButton>}
+                        {canCreateInvoice && <LinkButton to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`} variant="secondary">Create invoice</LinkButton>}
                         {capabilities.can_return && can(purchasePermissions.returnsCreate) && <LinkButton to={`/purchase/returns/create?goods_receipt_id=${grn.id}`} variant="secondary">Create return</LinkButton>}
                         {capabilities.can_post && can(purchasePermissions.goodsReceiptsPost) && <Button loading={busy} onClick={() => void post()}>Post</Button>}
                         {capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && <Button disabled={busy} variant="secondary" onClick={() => setReversalOpen(true)}>Reverse</Button>}
@@ -124,7 +125,13 @@ export default function GoodsReceiptDetailPage() {
                         {tab === 'linked' && <DetailGrid items={[
                             { label: 'Purchase order', value: grn.purchase_order?.id ? <Link className="text-sky-700 hover:underline" to={`/purchase/orders/${grn.purchase_order.id}`}>{grn.purchase_order.purchase_order_number ?? grn.purchase_order.name}</Link> : '-' },
                             { label: 'Returns', value: capabilities.can_return && can(purchasePermissions.returnsCreate) ? <Link className="text-sky-700 hover:underline" to={`/purchase/returns/create?goods_receipt_id=${grn.id}`}>Create referenced return</Link> : '-' },
-                            { label: 'Invoices', value: capabilities.can_invoice && can(purchasePermissions.supplierInvoicesCreate) ? <Link className="text-sky-700 hover:underline" to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`}>Create supplier invoice</Link> : '-' },
+                            { label: 'Invoices', value: (grn.linked_invoices?.length || canCreateInvoice) ? <div className="space-y-2">
+                                {grn.linked_invoices?.map((invoice) => <div key={invoice.id}>
+                                    <Link className="font-medium text-sky-700 hover:underline" to={invoice.url}>{invoice.number}</Link>
+                                    <span className="ml-2 text-xs text-slate-500">{invoice.status.replaceAll('_', ' ')}</span>
+                                </div>)}
+                                {canCreateInvoice && <Link className="text-sky-700 hover:underline" to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`}>Create supplier invoice</Link>}
+                            </div> : '-' },
                         ]} />}
                     </div>
                 </Panel>

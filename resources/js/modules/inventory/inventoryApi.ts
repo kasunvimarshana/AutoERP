@@ -37,6 +37,46 @@ export type {
 
 export type StockBalanceCollection = ApiCollection<StockBalance> & { summary: StockBalanceSummary };
 
+export interface StockCardFilters {
+    item_id: number;
+    warehouse_id: number;
+    warehouse_location_id?: number;
+    date_from: string;
+    date_to: string;
+    timezone: string;
+}
+
+export interface StockCardResult {
+    item: { name: string; code: string; uom: string | null };
+    warehouse: { name: string; code: string };
+    location: { name: string; code: string } | null;
+    date_from: string;
+    date_to: string;
+    timezone: string;
+    snapshot_at: string;
+    opening: string;
+    total_in: string;
+    total_out: string;
+    closing: string;
+    rows: Array<{
+        posted_at: string;
+        document_date: string | null;
+        movement_number: string;
+        description: string | null;
+        type: string;
+        document: { label: string; url: string | null } | null;
+        quantity_in: string;
+        quantity_out: string;
+        balance: string;
+    }>;
+}
+
+export const getStockCard = (filters: StockCardFilters, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<StockCardResult>>(`${endpoints.inventory}/stock-card`, { params: filters, signal }).then((response) => response.data.data);
+
+export const downloadStockCard = (filters: StockCardFilters, format: 'csv' | 'xls' | 'pdf') =>
+    apiClient.get<Blob>(`${endpoints.inventory}/stock-card/export`, { params: { ...filters, format }, responseType: 'blob' }).then((response) => response.data);
+
 export const listStockBalances = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<StockBalanceCollection>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
 

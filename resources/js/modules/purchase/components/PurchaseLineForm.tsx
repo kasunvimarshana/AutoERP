@@ -154,6 +154,7 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <ItemLookupSelect
+                        stockOnly={config.stockItemsOnly}
                         value={draft.item}
                         autoFocus={mode === 'create' && Boolean(config.continuousCreate)}
                         onChange={(item) => {

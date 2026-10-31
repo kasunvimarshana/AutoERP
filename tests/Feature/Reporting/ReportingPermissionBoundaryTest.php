@@ -39,6 +39,7 @@ final class ReportingPermissionBoundaryTest extends TestCase
             'api.v1.reports.vehicle-service.employee-incentives.export' => ReportingAuthorizationService::REPORTS_EXPORT,
             'api.v1.reports.vehicle-service.technician-work.export' => ReportingAuthorizationService::REPORTS_EXPORT,
             'api.v1.reports.vehicle-service.employee-commissions.export' => ReportingAuthorizationService::REPORTS_EXPORT,
+            'api.v1.reports.vehicle-service.sales-summary.export' => ReportingAuthorizationService::REPORTS_EXPORT,
             'api.v1.reports.export' => ReportingAuthorizationService::REPORTS_EXPORT,
         ];
 

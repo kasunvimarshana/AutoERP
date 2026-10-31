@@ -49,6 +49,11 @@ final class RentalIncident extends TenantOwnedModel
         return $this->belongsTo(RunningChart::class, 'running_chart_id');
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(RentalIncidentAttachment::class, 'incident_id')->orderBy('id');
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(RentalIncidentEvent::class, 'incident_id')->orderBy('id');

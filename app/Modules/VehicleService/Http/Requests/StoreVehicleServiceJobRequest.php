@@ -58,7 +58,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
                 'decimal:0,6',
                 'min:0',
             ],
-            'manual_job_card' => ['nullable', 'string', 'max:100'],
+            'manual_job_card' => ['required', 'string', 'max:100'],
             'fuel_level' => ['nullable', 'string', 'max:100'],
             'priority' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string'],

@@ -36,7 +36,17 @@ export interface IncidentHistoryEvent {
     actor: { name: string };
 }
 
+export interface IncidentAttachment {
+    id: number;
+    original_filename: string;
+    mime_type: string;
+    size_bytes: number;
+    checksum_sha256: string;
+    recorded_at: string;
+}
+
 export interface RentalIncident {
+    attachments: IncidentAttachment[];
     id: number;
     reference: string;
     row_version: number;

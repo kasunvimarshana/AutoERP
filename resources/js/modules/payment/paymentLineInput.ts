@@ -1,5 +1,6 @@
 import type { PaymentLinePayload, PaymentMethod } from './paymentApi';
 import type { PaymentLineDraft } from './components/PaymentLineTable';
+import { CARD_BRANDS } from './paymentCardBrands';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 const PAYMENT_DIRECTION_OUTBOUND = 'outbound';
 
@@ -10,11 +11,14 @@ export function paymentMethodKind(method?: PaymentMethod): string {
     return type || 'other';
 }
 
-export function linePayload(line: PaymentLineDraft, method: PaymentMethod, direction: string): PaymentLinePayload {
+export function linePayload(line: PaymentLineDraft & { cashReceivedAmount?: string }, method: PaymentMethod, direction: string): PaymentLinePayload {
     const kind = paymentMethodKind(method);
     const payload: PaymentLinePayload = {
         payment_method_id: method.id,
         amount: line.amount,
+        cash_received_amount: kind === 'cash' ? line.cashReceivedAmount : undefined,
+        card_brand: kind === 'card' && CARD_BRANDS.some((brand) => brand.value === line.metadata.card_brand)
+            ? line.metadata.card_brand as PaymentLinePayload['card_brand'] : undefined,
         reference_number: line.reference.trim() || undefined,
         instrument_direction: direction === PAYMENT_DIRECTION_OUTBOUND ? 'issued' : 'received',
     };
@@ -25,12 +29,12 @@ export function linePayload(line: PaymentLineDraft, method: PaymentMethod, direc
         payload.external_bank_name = line.metadata.bank_account?.trim() || undefined;
     }
     if (kind === 'bank_transfer') {
-        payload.instrument_number = line.metadata.transfer_reference?.trim() || undefined;
+        payload.instrument_number = line.metadata.transfer_reference?.trim() || line.reference.trim() || undefined;
         payload.instrument_date = line.metadata.transfer_date || undefined;
         payload.external_bank_name = line.metadata.bank_account?.trim() || undefined;
     }
     if (kind === 'card') {
-        payload.instrument_number = line.metadata.card_reference?.trim() || line.metadata.authorization_code?.trim() || undefined;
+        payload.instrument_number = line.metadata.card_reference?.trim() || line.metadata.authorization_code?.trim() || line.reference.trim() || undefined;
         payload.external_bank_name = line.metadata.terminal?.trim() || undefined;
     }
     if (kind === 'wallet') {

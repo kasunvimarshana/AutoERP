@@ -36,6 +36,7 @@ final class PaymentCapabilityService
         $posted = $document === PaymentDocumentStatus::Approved && $posting === PaymentPostingStatus::Posted;
         $hasPostingReference = trim((string) $payment->finance_posting_reference) !== '';
         $terminal = in_array($document, [PaymentDocumentStatus::Voided, PaymentDocumentStatus::Reversed], true);
+        $isRefund = $payment->payment_type === PaymentType::Refund;
         $hasActiveAllocations = $payment->relationLoaded('allocations')
             ? $payment->allocations->contains(fn ($row): bool => $this->stateValue($row->status) === AllocationStatus::Active->value)
             : $payment->allocations()->where('status', AllocationStatus::Active->value)->exists();
@@ -62,6 +63,7 @@ final class PaymentCapabilityService
                 $payment->lines()->count() < 1 ? 'Payment requires at least one line.' : null,
             ])),
             'can_allocate' => array_values(array_filter([
+                $isRefund ? 'Refund payments cannot be allocated to invoices.' : null,
                 ! $posted ? 'Only posted payments can be allocated to invoices.' : null,
                 $this->math->compare($availableUnapplied, '0.000000') <= 0 ? 'Payment has no unreserved unapplied amount.' : null,
             ])),
@@ -70,6 +72,7 @@ final class PaymentCapabilityService
                 ! $hasActiveAllocations ? 'Payment has no active allocation to reverse.' : null,
             ])),
             'can_refund' => array_values(array_filter([
+                $isRefund ? 'A refund payment cannot be refunded again.' : null,
                 ! $posted ? 'Only posted payments can be refunded.' : null,
                 $paymentType === PaymentType::Refund ? 'Refund payments cannot be refunded again.' : null,
                 $this->math->compare($availableUnapplied, '0.000000') <= 0 ? 'Payment has no refundable unreserved amount.' : null,

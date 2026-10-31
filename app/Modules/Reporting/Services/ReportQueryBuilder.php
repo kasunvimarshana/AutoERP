@@ -94,6 +94,9 @@ final class ReportQueryBuilder
 
         foreach ($definition->columns as $column) {
             $values[$column->key] = $this->format($this->value($row, $column), $column->format);
+            if ($column->hrefPath !== null) {
+                $values[$column->key.'_url'] = data_get($row, $column->hrefPath);
+            }
         }
 
         return $values;

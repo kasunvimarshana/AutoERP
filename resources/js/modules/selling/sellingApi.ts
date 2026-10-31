@@ -32,7 +32,7 @@ export interface SaleDocument {
     warehouse_location: NamedResource | null;
     lines: SaleLine[];
     invoice: { id: number; number: string; status: string; grand_total: string; balance_due: string } | null;
-    returns?: Array<{ id: number; number: string; date: string; reason: string; credit_amount: string; credit_allocated_amount: string; credit_available_amount: string; lines: Array<{ sale_line_id: number; quantity: string; credit_amount: string }> }>;
+    returns?: Array<{ id: number; number: string; date: string; reason: string; credit_amount: string; credit_allocated_amount: string; credit_available_amount: string; refunded_amount: string; refundable_amount: string; lines: Array<{ sale_line_id: number; quantity: string; credit_amount: string }> }>;
 }
 
 export interface SaleReturnDocument {
@@ -43,6 +43,8 @@ export interface SaleReturnDocument {
     credit_amount: string;
     credit_allocated_amount: string;
     credit_available_amount: string;
+    refunded_amount: string;
+    refundable_amount: string;
     sale: { id: number; sale_number: string; customer: string | null; invoice: { id: number; number: string; balance_due: string } | null };
     lines: Array<{ item: string; quantity: string; credit_amount: string }>;
 }
@@ -83,6 +85,26 @@ export async function createSaleReturn(sale: SaleDocument, payload: { return_dat
         ...payload,
         expected_version: sale.row_version,
     }, { headers: { 'Idempotency-Key': crypto.randomUUID() } });
+    return response.data.data;
+}
+
+export async function refundSaleReturn(returnId: number, payload: {
+    refund_date: string;
+    amount: string;
+    expected_refundable_amount: string;
+    payment_method_id: number;
+    reference_number?: string;
+    external_bank_name?: string;
+    instrument_number?: string;
+    instrument_date?: string;
+    reason: string;
+}): Promise<{ id: number; payment_number: string }> {
+    const response = await apiClient.post<ApiResource<{ id: number; payment_number: string }>>(
+        `/api/v1/selling/returns/${returnId}/refunds`,
+        payload,
+        { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+    );
+
     return response.data.data;
 }
 

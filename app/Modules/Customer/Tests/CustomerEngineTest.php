@@ -175,6 +175,9 @@ final class CustomerEngineTest extends TestCase
         CustomerCreditProfileData $creditProfile,
         string $code = 'CUS-TEST',
     ): CreateCustomerData {
+        static $phoneSequence = 0;
+        $phoneSequence++;
+
         return new CreateCustomerData(
             tenantId: $tenantId,
             customerNumber: 'NUM-'.$code,
@@ -182,6 +185,7 @@ final class CustomerEngineTest extends TestCase
             name: 'Customer '.$code,
             customerType: CustomerType::Company,
             status: CustomerStatus::Active,
+            mobile: sprintf('077%07d', $phoneSequence),
             creditProfile: $creditProfile,
         );
     }

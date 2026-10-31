@@ -28,6 +28,7 @@ final class RentalIncidentResource extends JsonResource
                 'owner_agreement' => $this->vehicleUse->ownerAgreement?->reference,
             ]),
             'running_chart' => $this->whenLoaded('runningChart', fn () => $this->runningChart?->reference),
+            'attachments' => RentalIncidentAttachmentResource::collection($this->whenLoaded('attachments')),
             'reviewed_at' => $this->reviewed_at?->toISOString(),
         ];
     }

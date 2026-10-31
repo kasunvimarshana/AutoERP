@@ -51,7 +51,7 @@ final class PurchaseOrderController
         $query = $this->scope(PurchaseOrder::query(), $request)
             ->select('purchase_orders.*')
             ->with([
-                'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy',
+                'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'submittedBy', 'approvedBy', 'cancelledBy', 'closedBy',
                 'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
             ])
             ->withSum('lines as received_quantity', 'received_quantity')
@@ -126,7 +126,7 @@ final class PurchaseOrderController
 
         $order = $this->scope(PurchaseOrder::query(), $request)
             ->with([
-                'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy', 'closedBy',
+                'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'submittedBy', 'approvedBy', 'cancelledBy', 'closedBy',
                 'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
             ])
             ->withSum('lines as received_quantity', 'received_quantity')
@@ -301,6 +301,7 @@ final class PurchaseOrderController
             $before = $model->attributesToArray();
             $updated = $service->cancel(
                 $model,
+                $request->currentUserId(),
                 $request->expectedVersion(),
             );
             $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_CANCELLED, 'purchase_order', $updated, $before);

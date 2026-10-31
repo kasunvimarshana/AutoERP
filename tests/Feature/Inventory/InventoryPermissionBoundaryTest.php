@@ -27,6 +27,11 @@ final class InventoryPermissionBoundaryTest extends TestCase
         $expected = [
             'api.v1.inventory.stock-balances.index' => InventoryPermission::STOCK_VIEW,
             'api.v1.inventory.availability' => InventoryPermission::STOCK_VIEW,
+            'api.v1.inventory.consumable-usage.index' => InventoryPermission::CONSUMABLE_USAGE_VIEW,
+            'api.v1.inventory.consumable-usage.items' => InventoryPermission::CONSUMABLE_USAGE_VIEW,
+            'api.v1.inventory.consumable-usage.availability' => InventoryPermission::CONSUMABLE_USAGE_VIEW,
+            'api.v1.inventory.consumable-usage.store' => InventoryPermission::CONSUMABLE_USAGE_POST,
+            'api.v1.inventory.consumable-usage.reverse' => InventoryPermission::CONSUMABLE_USAGE_REVERSE,
             'api.v1.inventory.state-changes.index' => InventoryPermission::AUDIT_VIEW,
             'api.v1.inventory.reservations.index' => InventoryPermission::RESERVATIONS_VIEW,
             'api.v1.inventory.reservations.store' => InventoryPermission::RESERVATIONS_MANAGE,

@@ -64,7 +64,7 @@ final class RentalIncidentService
     {
         $this->authorization->assertIncident($context, IncidentPermission::View);
         return RentalIncident::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart'])
+            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart', 'attachments'])
             ->orderByDesc('occurred_on')->orderByDesc('id')->paginate($perPage);
     }
 
@@ -72,7 +72,7 @@ final class RentalIncidentService
     {
         $this->authorization->assertIncident($context, IncidentPermission::View);
         return RentalIncident::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart'])
+            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart', 'attachments'])
             ->findOrFail($id);
     }
 
@@ -168,7 +168,7 @@ final class RentalIncidentService
     {
         return $incident->refresh()->load([
             'vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement',
-            'vehicleUse.vehicle', 'runningChart',
+            'vehicleUse.vehicle', 'runningChart', 'attachments',
         ]);
     }
 

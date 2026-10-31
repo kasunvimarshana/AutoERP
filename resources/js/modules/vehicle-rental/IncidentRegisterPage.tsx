@@ -18,6 +18,7 @@ import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { CHART_LABELS } from './runningCharts';
 import { IncidentReviewAction, IncidentStatus, IncidentType, INCIDENT_PERMISSION, INCIDENT_TYPE_LABELS, type RentalIncident } from './incidentEvidence';
 import { listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
+import { IncidentAttachmentsPanel } from './IncidentAttachmentsPanel';
 import { IncidentHistoryPanel } from './IncidentHistoryPanel';
 
 export default function IncidentRegisterPage() {
@@ -159,13 +160,15 @@ export default function IncidentRegisterPage() {
                     <p className="text-sm">Evidence: {incident.evidence_reference}</p>
                     {incident.running_chart && <p className="text-sm">Running Chart: {incident.running_chart}</p>}
                     <p>{incident.description}</p>
+                    <IncidentAttachmentsPanel key={`attachments-${incident.id}-${incident.row_version}`} incident={incident} canRecord={canRecord} busy={busy} setBusy={setBusy}
+                        onUpdated={() => { setReviewing(null); reload(); }} />
                     {canReview && incident.status === IncidentStatus.Recorded &&
                         <Button type="button" variant="secondary" disabled={busy} onClick={() => { setReviewing(incident); setReviewReason(''); }}>Review evidence</Button>}
                     <Button type="button" variant="secondary" aria-expanded={historyId === incident.id}
                         onClick={() => setHistoryId(historyId === incident.id ? null : incident.id)}>
                         {historyId === incident.id ? 'Hide evidence history' : 'View evidence history'}
                     </Button>
-                    {historyId === incident.id && <IncidentHistoryPanel key={incident.id} id={incident.id} />}
+                    {historyId === incident.id && <IncidentHistoryPanel key={`history-${incident.id}-${incident.row_version}`} id={incident.id} />}
                     {reviewing?.id === incident.id && <div className="space-y-2 rounded-lg border bg-slate-50 p-3">
                         <Textarea label="Review reason (required)" required value={reviewReason} onChange={event => setReviewReason(event.target.value)} error={error?.fields.reason?.[0]} />
                         <p className="text-sm">Confirming factual evidence does not approve a customer charge or owner deduction.</p>

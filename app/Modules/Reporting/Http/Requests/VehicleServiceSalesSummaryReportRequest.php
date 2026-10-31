@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Http\Requests;
 
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Reporting\Enums\VehicleServiceSalesSummaryExportSection;
 
 final class VehicleServiceSalesSummaryReportRequest extends TenantScopedRequest
 {
@@ -14,6 +16,7 @@ final class VehicleServiceSalesSummaryReportRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'item_id' => ['nullable', 'integer', 'min:1'],
+            'export_section' => ['nullable', Rule::enum(VehicleServiceSalesSummaryExportSection::class)],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ];

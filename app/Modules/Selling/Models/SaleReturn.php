@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Invoice\Models\Invoice;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentSourceType;
+use Modules\Payment\Enums\PaymentType;
+use Modules\Payment\Models\Payment;
 use Modules\Tenant\Models\TenantModel;
 use Modules\User\Models\User;
 
@@ -47,6 +52,15 @@ final class SaleReturn extends TenantOwnedModel
     public function lines(): HasMany
     {
         return $this->hasMany(SaleReturnLine::class, 'sale_return_id');
+    }
+
+    public function postedRefundPayments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'source_id')
+            ->where('source_type', PaymentSourceType::SaleReturn->value)
+            ->where('payment_type', PaymentType::Refund->value)
+            ->where('document_status', PaymentDocumentStatus::Approved->value)
+            ->where('posting_status', PaymentPostingStatus::Posted->value);
     }
 
     public function organizationUnit(): BelongsTo

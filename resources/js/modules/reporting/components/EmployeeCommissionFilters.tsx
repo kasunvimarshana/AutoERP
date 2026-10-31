@@ -85,6 +85,15 @@ export function EmployeeCommissionFilters({
                 />
                 <Select label="Commission status" value={value.commission_status ?? ''} options={enumOptions(commissionStatuses)} onChange={(event) => onChange({ commission_status: event.target.value as EmployeeCommissionReportParams['commission_status'] })} />
             </div>
+            <Select
+                label="Date basis"
+                value={value.period_view ? 'incentive_period' : 'job_date'}
+                options={[
+                    { value: 'incentive_period', label: 'Incentive period (completion date)' },
+                    { value: 'job_date', label: 'Job date (existing detail view)' },
+                ]}
+                onChange={(event) => onChange({ period_view: event.target.value === 'incentive_period' })}
+            />
             <div>
                 <Button type="button" variant="secondary" onClick={() => setShowMore((current) => !current)}>
                     {showMore ? 'Hide more filters' : 'More filters'}

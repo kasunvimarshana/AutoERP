@@ -114,6 +114,93 @@ final class EmployeeCommissionReportService
         );
     }
 
+    public function incentiveSummaryDefinition(): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: 'vehicle-service/employee-commissions/incentive-summary',
+            title: 'Incentive Summary Report',
+            group: 'Vehicle Service',
+            model: VehicleServiceLineEmployee::class,
+            description: 'Employee incentive totals for the selected period. Eligible amounts use completion dates; pending amounts use job dates.',
+            columns: [
+                new ReportColumn('employee_code', 'Employee number'),
+                new ReportColumn('employee_name', 'Employee'),
+                new ReportColumn('designation_name', 'Designation'),
+                new ReportColumn('total_jobs', 'Jobs', format: 'integer'),
+                new ReportColumn('earned_commission', 'EOM eligible (earned)', format: 'money', summarize: true),
+                new ReportColumn('pending_commission', 'Pending', format: 'money', summarize: true),
+                new ReportColumn('total_commission', 'Total incentive', format: 'money', summarize: true),
+            ],
+            defaultSort: 'employee_name',
+            defaultDirection: 'asc',
+        );
+    }
+
+    /** @param array<string, mixed> $params */
+    public function exportIncentiveSummaryRows(array $params): Collection
+    {
+        return collect($this->groups($this->query([...$params, 'period_view' => true]), 'employee'))
+            ->map(static fn (array $group): array => [
+                'employee_code' => (string) ($group['resource']['code'] ?? ''),
+                'employee_name' => $group['label'],
+                'designation_name' => $group['designation_name'] ?? '',
+                'total_jobs' => $group['total_jobs'],
+                'earned_commission' => $group['earned_commission'],
+                'pending_commission' => $group['pending_commission'],
+                'total_commission' => $group['total_commission'],
+            ]);
+    }
+
+    /** @param array<string, mixed> $params */
+    public function employeeJobs(array $params, int $employeeId): array
+    {
+        $query = $this->query([
+            ...$params,
+            'employee_id' => $employeeId,
+            'period_view' => true,
+        ]);
+        $jobs = $query->select([])->selectRaw(
+            'commission_rows.job_id, MAX(commission_rows.job_number) as job_number, '
+            .'MAX(commission_rows.job_date) as job_date, '
+            ."MAX(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.completed_at END) as last_earned_at, "
+            .'MAX(commission_rows.customer_name) as customer_name, '
+            .'MAX(commission_rows.vehicle_label) as vehicle_label, '
+            .'COUNT(*) as entry_count, '
+            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.commission_amount ELSE 0 END), 0) as earned_commission, "
+            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'pending' THEN commission_rows.commission_amount ELSE 0 END), 0) as pending_commission, "
+            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
+        )
+            ->groupBy('commission_rows.job_id')
+            ->orderByDesc('job_date')
+            ->orderByDesc('commission_rows.job_id');
+
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = min(100, max(1, (int) ($params['per_page'] ?? 25)));
+        $result = $jobs->paginate($perPage, ['*'], 'page', $page);
+
+        return [
+            'data' => $result->getCollection()->map(fn (object $row): array => [
+                'job' => ['id' => (int) $row->job_id, 'number' => (string) $row->job_number],
+                'job_date' => (string) $row->job_date,
+                'last_earned_at' => $row->last_earned_at === null ? null : (string) $row->last_earned_at,
+                'customer_name' => (string) ($row->customer_name ?? ''),
+                'vehicle_label' => (string) ($row->vehicle_label ?? ''),
+                'entry_count' => (int) $row->entry_count,
+                'earned_commission' => $this->decimal($row->earned_commission),
+                'pending_commission' => $this->decimal($row->pending_commission),
+                'total_commission' => $this->decimal($row->total_commission),
+            ])->all(),
+            'meta' => [
+                'current_page' => $result->currentPage(),
+                'from' => $result->firstItem(),
+                'last_page' => $result->lastPage(),
+                'per_page' => $result->perPage(),
+                'to' => $result->lastItem(),
+                'total' => $result->total(),
+            ],
+        ];
+    }
+
     public function definition(): ReportDefinition
     {
         return new ReportDefinition(
@@ -342,11 +429,15 @@ final class EmployeeCommissionReportService
      */
     private function applyFilters(Builder $query, array $params, int $tenantId, mixed $organizationUnitId): void
     {
-        if (! empty($params['date_from'])) {
-            $query->whereDate('commission_rows.job_date', '>=', (string) $params['date_from']);
-        }
-        if (! empty($params['date_to'])) {
-            $query->whereDate('commission_rows.job_date', '<=', (string) $params['date_to']);
+        if (filter_var($params['period_view'] ?? false, FILTER_VALIDATE_BOOL)) {
+            $this->applyIncentivePeriod($query, $params);
+        } else {
+            if (! empty($params['date_from'])) {
+                $query->whereDate('commission_rows.job_date', '>=', (string) $params['date_from']);
+            }
+            if (! empty($params['date_to'])) {
+                $query->whereDate('commission_rows.job_date', '<=', (string) $params['date_to']);
+            }
         }
 
         $this->whereInteger($query, 'commission_rows.employee_id', $params['employee_id'] ?? null);
@@ -409,6 +500,38 @@ final class EmployeeCommissionReportService
                     ->orWhere('commission_rows.role_type', 'like', $search)
                     ->orWhere('commission_rows.commission_source', 'like', $search);
             });
+        }
+    }
+
+    /** @param array<string, mixed> $params */
+    private function applyIncentivePeriod(Builder $query, array $params): void
+    {
+        $query->where(function (Builder $period) use ($params): void {
+            $period->where(function (Builder $earned) use ($params): void {
+                $earned->where('commission_rows.commission_status', 'earned')
+                    ->whereNotNull('commission_rows.completed_at');
+                $this->applyDateBounds($earned, 'commission_rows.completed_at', $params);
+            })->orWhere(function (Builder $pending) use ($params): void {
+                $pending->where('commission_rows.commission_status', 'pending');
+                $this->applyDateBounds($pending, 'commission_rows.job_date', $params);
+            });
+            if (filter_var($params['include_cancelled'] ?? false, FILTER_VALIDATE_BOOL)) {
+                $period->orWhere(function (Builder $cancelled) use ($params): void {
+                    $cancelled->where('commission_rows.commission_status', 'cancelled');
+                    $this->applyDateBounds($cancelled, 'commission_rows.job_date', $params);
+                });
+            }
+        });
+    }
+
+    /** @param array<string, mixed> $params */
+    private function applyDateBounds(Builder $query, string $column, array $params): void
+    {
+        if (! empty($params['date_from'])) {
+            $query->whereDate($column, '>=', (string) $params['date_from']);
+        }
+        if (! empty($params['date_to'])) {
+            $query->whereDate($column, '<=', (string) $params['date_to']);
         }
     }
 

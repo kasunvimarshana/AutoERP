@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -15,7 +15,8 @@ import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { compareDecimalStrings, nonNegativeDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { formatMoney } from '@/shared/utils/formatMoney';
-import { getInvoiceSignedPrintLink } from '@/modules/invoice/invoiceApi';
+import { getInvoiceSignedPrintLink, getInvoiceWhatsAppShare } from '@/modules/invoice/invoiceApi';
+import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { PaymentMethodFields } from '@/modules/payment/components/PaymentMethodFields';
 import {
     createVehicleServicePayment,
@@ -55,9 +56,9 @@ const DIRECT_PAYMENT_KINDS: Array<{ kind: DirectPaymentKind; label: string }> = 
 ];
 
 const PAYMENT_METHOD_STYLES: Record<DirectPaymentKind, { section: string; label: string }> = {
-    cash: { section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/30', label: 'bg-emerald-100 text-emerald-900' },
-    card: { section: 'border-blue-200 border-l-blue-500 bg-blue-50/30', label: 'bg-blue-100 text-blue-900' },
-    bank_transfer: { section: 'border-violet-200 border-l-violet-500 bg-violet-50/30', label: 'bg-violet-100 text-violet-900' },
+    cash: { section: 'border-emerald-500 bg-emerald-50/60', label: 'bg-emerald-100 text-emerald-900' },
+    card: { section: 'border-blue-500 bg-blue-50/60', label: 'bg-blue-100 text-blue-900' },
+    bank_transfer: { section: 'border-violet-500 bg-violet-50/60', label: 'bg-violet-100 text-violet-900' },
     cheque: { section: 'border-amber-200 border-l-amber-500 bg-amber-50/30', label: 'bg-amber-100 text-amber-900' },
     wallet: { section: 'border-indigo-200 border-l-indigo-500 bg-indigo-50/30', label: 'bg-indigo-100 text-indigo-900' },
     other: { section: 'border-slate-200 border-l-slate-500 bg-slate-50/30', label: 'bg-slate-100 text-slate-900' },
@@ -189,11 +190,12 @@ function focusNextPaymentField(form: HTMLFormElement | null, current: HTMLElemen
 }
 
 export default function VehicleServicePaymentPreparePage() {
-    const navigate = useNavigate();
     const jobId = Number(useParams().id);
+    const [searchParams] = useSearchParams();
+    const requestedInvoiceId = Number(searchParams.get('invoice_id'));
     const job = useApi((signal) => getVehicleServiceJob(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
-    const [invoiceId, setInvoiceId] = useState('');
+    const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
     const [date, setDate] = useState(businessDateInputValue());
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('direct');
     const [rows, setRows] = useState<PaymentRow[]>(DIRECT_PAYMENT_KINDS.map(({ kind }) => ({
@@ -206,6 +208,9 @@ export default function VehicleServicePaymentPreparePage() {
     })));
     const [createdPayment, setCreatedPayment] = useState<VehicleServicePaymentCreated | null>(null);
     const [settledInvoice, setSettledInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
+    const [creditedInvoice, setCreditedInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
+    const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+    const [whatsAppShareError, setWhatsAppShareError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const [creditCheckFeedback, setCreditCheckFeedback] = useState<{ kind: 'blocked' | 'warning'; message: string } | null>(null);
     const [acknowledgedCreditWarning, setAcknowledgedCreditWarning] = useState<string | null>(null);
@@ -220,20 +225,22 @@ export default function VehicleServicePaymentPreparePage() {
         ),
         [job.data?.invoice_links],
     );
+    const requestedInvoice = eligibleInvoices.find((link) => link.invoice_id === requestedInvoiceId);
+    const invoiceId = selectedInvoiceId ?? String(requestedInvoice?.invoice_id ?? (eligibleInvoices.length === 1 ? eligibleInvoices[0].invoice_id : ''));
     useEffect(() => {
-        const onlyInvoice = !invoiceId && eligibleInvoices.length === 1 ? eligibleInvoices[0] : undefined;
-        const soleKind = soleNonCashMethodKind(paymentMethods);
-        const soleInvoice = eligibleInvoices.find((candidate) => candidate.invoice_id === Number(invoiceId))
-            ?? onlyInvoice;
+        const directMethods = paymentMethods.filter((method) =>
+            DIRECT_PAYMENT_KINDS.some(({ kind }) => paymentMethodKind(method) === kind),
+        );
+        const soleMethod = directMethods.length === 1 ? directMethods[0] : undefined;
+        const soleKind = paymentMethodKind(soleMethod);
+        const soleInvoice = eligibleInvoices.find((candidate) => candidate.invoice_id === Number(invoiceId));
         const prefillNonCash = Boolean(soleKind && soleInvoice);
-        if (!onlyInvoice && !prefillNonCash) return;
+        if (!prefillNonCash) return;
 
         let cancelled = false;
         queueMicrotask(() => {
             if (cancelled) return;
-            if (onlyInvoice) {
-                setInvoiceId((current) => current || String(onlyInvoice.invoice_id));
-            }
+
             if (prefillNonCash && soleInvoice) {
                 setRows((current) => current.map((row) => row.kind === soleKind && row.amount === ZERO_AMOUNT
                     ? { ...row, amount: soleInvoice.balance_due ?? soleInvoice.invoice_total }
@@ -245,7 +252,10 @@ export default function VehicleServicePaymentPreparePage() {
     }, [eligibleInvoices, invoiceId, paymentMethods]);
     const invoice = eligibleInvoices.find((link) => link.invoice_id === Number(invoiceId));
     const outstanding = invoice?.balance_due ?? ZERO_AMOUNT;
-    const paymentEntryDisabled = Boolean(createdPayment) || !invoice;
+    const completedInvoice = settledInvoice ?? creditedInvoice;
+    const displayedInvoice = completedInvoice ?? invoice;
+    const submissionLocked = busy || Boolean(createdPayment || creditedInvoice);
+    const paymentEntryDisabled = submissionLocked || !invoice;
     const appliedAmounts = invoice
         ? calculateAppliedAmounts(rows, paymentMethods, outstanding)
         : rows.map(() => ZERO_AMOUNT);
@@ -261,6 +271,42 @@ export default function VehicleServicePaymentPreparePage() {
 
     const updateRow = (kind: DirectPaymentKind, update: Partial<PaymentRow>) => {
         setRows((current) => current.map((row) => row.kind === kind ? { ...row, ...update } : row));
+    };
+    const printInvoice = async (targetInvoiceId: number) => {
+        try {
+            const json = await getInvoiceSignedPrintLink(targetInvoiceId);
+            if (json.print_url) {
+                openSameOriginUrl(json.print_url);
+                return;
+            }
+        } catch {
+            // Use the invoice print page when a signed link is unavailable.
+        }
+        openSameOriginUrl(`/invoices/${targetInvoiceId}/print`);
+    };
+    const shareInvoiceViaWhatsApp = async () => {
+        if (!completedInvoice) return;
+
+        const pendingWindow = openPendingWhatsAppWindow();
+        setSharingWhatsApp(true);
+        setWhatsAppShareError(null);
+        try {
+            const share = await getInvoiceWhatsAppShare(completedInvoice.invoice_id);
+            if (share.recipient.verification_status !== 'verified'
+                && !confirmPendingWhatsAppShare(pendingWindow, 'This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
+                closePendingWhatsAppWindow(pendingWindow);
+                return;
+            }
+
+            if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
+                throw new Error('The server returned an invalid WhatsApp link.');
+            }
+        } catch (requestError) {
+            closePendingWhatsAppWindow(pendingWindow);
+            setWhatsAppShareError(toApiError(requestError));
+        } finally {
+            setSharingWhatsApp(false);
+        }
     };
     const payload = (): VehicleServicePaymentPayload => ({
         expected_version: options.data?.job_version ?? 0,
@@ -305,7 +351,8 @@ export default function VehicleServicePaymentPreparePage() {
         && compareDecimalStrings(paymentTotal, ZERO_AMOUNT) > 0
         && compareDecimalStrings(paymentTotal, outstanding) <= 0
         && !busy
-        && !createdPayment,
+        && !createdPayment
+        && !creditedInvoice,
     );
 
     if (job.loading || options.loading) return <LoadingState />;
@@ -314,8 +361,8 @@ export default function VehicleServicePaymentPreparePage() {
     return (
         <>
             <ContentHeader
-                title={`Payment for ${job.data.job_number}`}
-                description="Collect a direct payment or keep the outstanding invoice on an approved customer account."
+                title="Record payment"
+                description={`Settle an invoice for service job ${job.data.job_number}.`}
                 actions={<LinkButton to="/payments/methods" variant="secondary">Manage payment methods</LinkButton>}
             />
             <ErrorAlert error={error ?? options.error} />
@@ -336,24 +383,28 @@ export default function VehicleServicePaymentPreparePage() {
                     setBusy(false);
                 }
             }}>
-                <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+                <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_306px]">
                     <Panel className="space-y-5">
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-1">
-                                <Select
-                                    label="Invoice"
+                        <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_1fr]">
+                            <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-4 sm:px-5">
+                                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700">Invoice number</p>
+                                {completedInvoice ? (
+                                    <p className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">{completedInvoice.invoice_number ?? 'Invoice'}</p>
+                                ) : <Select
+                                    aria-label="Invoice number"
+                                    className="border-blue-200 bg-white/80 font-semibold text-slate-950"
                                     value={invoiceId}
                                     error={fieldError(error, 'invoice_id')}
                                     options={eligibleInvoices.map((link) => ({
                                         value: link.invoice_id,
-                                        label: `${link.invoice_number ?? 'Invoice'} · balance ${formatMoney(link.balance_due ?? link.invoice_total)}`,
+                                        label: link.invoice_number ?? 'Invoice',
                                     }))}
                                     placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
-                                    disabled={Boolean(createdPayment)}
+                                    disabled={submissionLocked}
                                     onChange={(event) => {
                                         const selectedInvoice = eligibleInvoices.find((candidate) => String(candidate.invoice_id) === event.target.value);
                                         const prefillKind = soleNonCashMethodKind(paymentMethods);
-                                        setInvoiceId(event.target.value);
+                                        setSelectedInvoiceId(event.target.value);
                                         setRows((current) => current.map((row) => ({
                                             ...row,
                                             amount: selectedInvoice && row.kind === prefillKind
@@ -364,58 +415,68 @@ export default function VehicleServicePaymentPreparePage() {
                                         setCreditCheckFeedback(null);
                                         setAcknowledgedCreditWarning(null);
                                     }}
-                                />
-                                {eligibleInvoices.length === 0 && (
-                                    <p className="text-sm text-amber-700">
+                                />}
+                                {!completedInvoice && eligibleInvoices.length === 0 && (
+                                    <p className="mt-2 text-sm text-amber-700">
                                         {job.data.invoice_links?.some((link) => link.status === 'active')
                                             ? 'No linked invoice has an outstanding balance. A payment cannot be recorded.'
                                             : 'There are no active posted invoices to receive a payment.'}
                                     </p>
                                 )}
                             </div>
+                            <div className="rounded-lg bg-blue-600 px-4 py-4 text-white sm:px-5">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">Invoice total</p>
+                                <p className="mt-3 text-2xl font-bold tabular-nums sm:text-3xl">{displayedInvoice ? formatMoney(displayedInvoice.invoice_total) : '—'}</p>
+                            </div>
+                            <div className="rounded-lg bg-amber-50 px-4 py-4 text-amber-900 sm:px-5">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Outstanding balance</p>
+                                <p className="mt-3 text-2xl font-bold tabular-nums sm:text-3xl">{displayedInvoice ? formatMoney(displayedInvoice.balance_due ?? displayedInvoice.invoice_total) : '—'}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <Input
                                 label="Payment date"
                                 type="date"
                                 value={date}
                                 error={fieldError(error, 'payment_date')}
-                                disabled={Boolean(createdPayment)}
+                                disabled={submissionLocked}
                                 onChange={(event) => { setDate(event.target.value); }}
                             />
-                        </div>
-
-                        <fieldset className="space-y-2">
-                            <legend className="text-sm font-medium text-slate-800">Payment type</legend>
-                            <div className="flex flex-wrap gap-3">
-                                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
-                                    <input
-                                        type="radio"
-                                        name="payment-mode"
-                                        value="direct"
-                                        checked={paymentMode === 'direct'}
-                                        disabled={Boolean(createdPayment)}
-                                        onChange={() => { setPaymentMode('direct'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
-                                    />
-                                    Direct Payment
-                                </label>
-                                {options.data?.credit_allowed && (
-                                    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
+                            <fieldset>
+                                <legend className="mb-1.5 text-sm font-medium text-slate-700">Payment type</legend>
+                                <div className="flex flex-wrap gap-2">
+                                    <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-900">
                                         <input
                                             type="radio"
                                             name="payment-mode"
-                                            value="credit"
-                                            checked={paymentMode === 'credit'}
-                                            disabled={Boolean(createdPayment)}
-                                            onChange={() => { setPaymentMode('credit'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
+                                            value="direct"
+                                            checked={paymentMode === 'direct'}
+                                            disabled={submissionLocked}
+                                            onChange={() => { setPaymentMode('direct'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
                                         />
-                                        Credit Payment
+                                        Direct payment
                                     </label>
-                                )}
-                            </div>
-                        </fieldset>
+                                    {options.data?.credit_allowed && (
+                                        <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-900">
+                                            <input
+                                                type="radio"
+                                                name="payment-mode"
+                                                value="credit"
+                                                checked={paymentMode === 'credit'}
+                                                disabled={submissionLocked}
+                                                onChange={() => { setPaymentMode('credit'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
+                                            />
+                                            Credit payment
+                                        </label>
+                                    )}
+                                </div>
+                            </fieldset>
+                        </div>
 
                         {paymentMode === 'direct' ? <>
                             <div>
-                                <h2 className="text-base font-semibold text-slate-900">Payment amounts</h2>
+                                <h2 className="text-lg font-semibold text-slate-950">Payment amounts</h2>
                                 <p className="mt-1 text-sm text-slate-600">Enter amounts for the methods you use. Press Enter or Tab to move through the fields.</p>
                             </div>
 
@@ -432,10 +493,10 @@ export default function VehicleServicePaymentPreparePage() {
                                     const amountValue = row.kind === 'cash' ? row.cashReceivedAmount : row.amount;
 
                                     return (
-                                        <section key={row.kind} className={`rounded-lg border-l-4 p-3 sm:p-4 ${PAYMENT_METHOD_STYLES[row.kind].section}`}>
-                                            <div className="grid gap-4 md:grid-cols-[minmax(10rem,0.7fr)_minmax(12rem,1.3fr)]">
+                                        <section key={row.kind} className={`rounded-lg border-l-4 p-4 ${PAYMENT_METHOD_STYLES[row.kind].section}`}>
+                                            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,1.3fr)] sm:items-end">
                                                 <div>
-                                                    <h3 className={`inline-flex rounded-md px-2 py-1 text-sm font-semibold ${PAYMENT_METHOD_STYLES[row.kind].label}`}>{label}</h3>
+                                                    <h3 className={`inline-flex rounded-md px-3 py-1 text-sm font-semibold ${PAYMENT_METHOD_STYLES[row.kind].label}`}>{label}</h3>
                                                     {availableMethods.length > 1 ? (
                                                         <Select
                                                             label={`${label} method`}
@@ -463,6 +524,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                 <DecimalInput
                                                     label={row.kind === 'cash' ? 'Cash received' : `${label} amount`}
                                                     value={amountValue}
+                                                    className="text-right text-lg font-semibold tabular-nums"
                                                     error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.amount`) : undefined}
                                                     disabled={paymentEntryDisabled || availableMethods.length === 0}
                                                     onFocus={(event) => event.currentTarget.select()}
@@ -514,7 +576,7 @@ export default function VehicleServicePaymentPreparePage() {
                                             )}
 
                                             {selectedMethod && (kind === 'card' || kind === 'bank_transfer' || kind === 'cheque' || kind === 'wallet') && (
-                                                <details className="mt-3 rounded-md bg-slate-50 px-3 py-2">
+                                                <details className="mt-3 rounded-md bg-white/70 px-3 py-2">
                                                     <summary className="cursor-pointer text-sm font-medium text-slate-700">Additional transaction details</summary>
                                                     <PaymentMethodFields
                                                         kind={kind}
@@ -535,13 +597,13 @@ export default function VehicleServicePaymentPreparePage() {
                                             )}
 
                                             {row.kind === 'cash' && (
-                                                <div className="mt-4 grid gap-3 rounded-md bg-slate-50 p-3 sm:grid-cols-2">
-                                                    <div>
-                                                        <p className="text-xs text-slate-500">Cash amount applied</p>
-                                                        <p className="mt-1 font-semibold tabular-nums text-slate-900">{formatMoney(appliedAmount)}</p>
+                                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                                    <div className="rounded-md bg-white/70 px-4 py-2">
+                                                        <p className="text-xs text-slate-600">Cash amount applied</p>
+                                                        <p className="mt-1 font-semibold tabular-nums text-slate-950">{formatMoney(appliedAmount)}</p>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-xs text-slate-500">Change to return</p>
+                                                    <div className="rounded-md bg-white/70 px-4 py-2">
+                                                        <p className="text-xs text-slate-600">Change to return</p>
                                                         <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(invoice ? nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)) : ZERO_AMOUNT)}</p>
                                                     </div>
                                                 </div>
@@ -568,16 +630,6 @@ export default function VehicleServicePaymentPreparePage() {
                             </div>
                         )}
 
-                        {invoice && (
-                            <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
-                                <DetailGrid items={[
-                                    { label: 'Invoice', value: invoice.invoice_number ?? 'Invoice' },
-                                    { label: 'Invoice total', value: formatMoney(invoice.invoice_total) },
-                                    { label: 'Outstanding balance', value: formatMoney(outstanding) },
-                                ]} />
-                            </div>
-                        )}
-
                         {createdPayment && settledInvoice && (
                             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                                 <p className="text-sm font-semibold text-emerald-900">Payment created and allocated successfully</p>
@@ -593,24 +645,52 @@ export default function VehicleServicePaymentPreparePage() {
                                 </div>
                             </div>
                         )}
+                        {creditedInvoice && (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                                <p className="text-sm font-semibold text-emerald-900">Invoice kept on customer credit</p>
+                                <p className="mt-1 text-sm text-emerald-800">
+                                    {creditedInvoice.invoice_number ?? 'Invoice'} remains outstanding on the customer account.
+                                </p>
+                                <div className="mt-4">
+                                    <DetailGrid items={[
+                                        { label: 'Invoice', value: creditedInvoice.invoice_number ?? '-' },
+                                        { label: 'Invoice total', value: formatMoney(creditedInvoice.invoice_total) },
+                                        { label: 'Outstanding balance', value: formatMoney(creditedInvoice.balance_due ?? creditedInvoice.invoice_total) },
+                                    ]} />
+                                </div>
+                            </div>
+                        )}
                     </Panel>
 
-                    <aside className="rounded-lg border border-blue-100 bg-blue-50 p-5 xl:sticky xl:top-5">
-                        <p className="text-sm font-medium text-slate-700">Outstanding balance</p>
-                        <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-950">{formatMoney(outstanding)}</p>
-                        <div className="my-5 border-t border-blue-200" />
-                        <p className="text-sm font-medium text-slate-700">Payment total</p>
-                        <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{formatMoney(paymentMode === 'direct' ? displayedPaymentTotal : ZERO_AMOUNT)}</p>
-                        {paymentMode === 'direct' && (
-                            <p className="mt-1 text-xs text-slate-600">Across {activeRows.length} {activeRows.length === 1 ? 'method' : 'methods'}</p>
-                        )}
-                        <div className="my-5 border-t border-blue-200" />
-                        <p className="text-sm font-medium text-slate-700">{paymentMode === 'credit' ? 'Credit amount' : 'Balance after payment'}</p>
-                        <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">
-                            {formatMoney(paymentMode === 'credit'
-                                ? outstanding
-                                : postedBalanceAfterPayment ?? remainingAfterPayment)}
-                        </p>
+                    <aside className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm xl:sticky xl:top-5">
+                        <ErrorAlert error={whatsAppShareError} />
+                        <h2 className="text-lg font-semibold text-slate-950">Payment summary</h2>
+                        <div className="mt-4 border-t border-blue-200 pt-4">
+                            <p className="text-sm text-slate-700">Outstanding balance</p>
+                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{displayedInvoice ? formatMoney(displayedInvoice.balance_due ?? displayedInvoice.invoice_total) : '—'}</p>
+                        </div>
+                        <div className="mt-5 border-t border-blue-200 pt-4">
+                            <p className="text-sm text-slate-700">Payment total</p>
+                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{formatMoney(paymentMode === 'direct' ? displayedPaymentTotal : ZERO_AMOUNT)}</p>
+                            {paymentMode === 'direct' && (
+                                <p className="mt-1 text-xs text-slate-600">Across {activeRows.length} {activeRows.length === 1 ? 'method' : 'methods'}</p>
+                            )}
+                        </div>
+                        <div className={`mt-5 rounded-lg border px-4 py-4 ${paymentMode === 'credit'
+                            ? 'border-sky-200 bg-sky-50 text-sky-900'
+                            : 'border-emerald-100 bg-emerald-50 text-emerald-900'}`}>
+                            <p className="text-sm font-medium">{paymentMode === 'credit' ? 'Credit amount' : 'Balance after payment'}</p>
+                            <p className="mt-1 text-2xl font-bold tabular-nums">
+                                {formatMoney(paymentMode === 'credit'
+                                    ? displayedInvoice?.balance_due ?? displayedInvoice?.invoice_total ?? ZERO_AMOUNT
+                                    : postedBalanceAfterPayment ?? remainingAfterPayment)}
+                            </p>
+                            <p className="mt-1 text-xs">{paymentMode === 'credit'
+                                ? 'Remains due on the customer account'
+                                : compareDecimalStrings(postedBalanceAfterPayment ?? remainingAfterPayment, ZERO_AMOUNT) === 0
+                                    ? 'Fully settled after finalizing'
+                                    : 'Remaining balance after finalizing'}</p>
+                        </div>
                         {paymentMode === 'direct' && invoice && !createdPayment && compareDecimalStrings(paymentTotal, outstanding) > 0 && (
                             <p className="mt-2 text-sm text-red-700">Payment total exceeds the outstanding balance.</p>
                         )}
@@ -628,27 +708,33 @@ export default function VehicleServicePaymentPreparePage() {
                         <div className="mt-6 flex flex-col gap-2">
                             {paymentMode === 'direct' ? (
                                 createdPayment && settledInvoice ? (
-                                    <Button type="button" onClick={async () => {
-                                        try {
-                                            const json = await getInvoiceSignedPrintLink(settledInvoice.invoice_id);
-                                            if (json.print_url) {
-                                                openSameOriginUrl(json.print_url);
-                                                return;
-                                            }
-                                        } catch {
-                                            // Use the invoice print page when a signed link is unavailable.
-                                        }
-                                        openSameOriginUrl(`/invoices/${settledInvoice.invoice_id}/print`);
-                                    }}>
-                                        Print bill
-                                    </Button>
+                                    <>
+                                        <Button type="button" onClick={() => void printInvoice(settledInvoice.invoice_id)}>
+                                            Print bill
+                                        </Button>
+                                        <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={() => void shareInvoiceViaWhatsApp()}>
+                                            Share via WhatsApp
+                                        </Button>
+                                    </>
                                 ) : (
                                     <Button type="submit" loading={busy} disabled={!canFinalize}>
                                         Finalize payment
                                     </Button>
                                 )
+                            ) : creditedInvoice ? (
+                                <>
+                                    <Button type="button" onClick={() => void printInvoice(creditedInvoice.invoice_id)}>
+                                        Print bill
+                                    </Button>
+                                    <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={() => void shareInvoiceViaWhatsApp()}>
+                                        Share via WhatsApp
+                                    </Button>
+                                </>
                             ) : (
                                 <Button type="button" loading={busy} disabled={!invoice || !options.data || busy} onClick={async () => {
+                                    const targetInvoice = invoice;
+                                    if (!targetInvoice) return;
+
                                     setBusy(true);
                                     setCreditCheckFeedback(null);
                                     try {
@@ -667,10 +753,12 @@ export default function VehicleServicePaymentPreparePage() {
                                             return;
                                         }
                                         await keepVehicleServiceInvoiceOnCredit(jobId, {
-                                            invoice_id: Number(invoiceId),
+                                            invoice_id: targetInvoice.invoice_id,
                                             expected_version: options.data?.job_version ?? 0,
                                         });
-                                        navigate(`/vehicle-service/jobs/${jobId}`);
+                                        setCreditedInvoice(targetInvoice);
+                                        options.reload();
+                                        job.reload();
                                     } catch (requestError) {
                                         setCreditCheckFeedback({
                                             kind: 'blocked',
@@ -683,6 +771,7 @@ export default function VehicleServicePaymentPreparePage() {
                                     {acknowledgedCreditWarning ? 'Confirm credit payment' : 'Keep invoice on credit'}
                                 </Button>
                             )}
+                            <LinkButton to={`/vehicle-service/jobs/${jobId}`} variant="secondary">{createdPayment || creditedInvoice ? 'Return to service job' : 'Cancel'}</LinkButton>
                         </div>
                     </aside>
                 </div>

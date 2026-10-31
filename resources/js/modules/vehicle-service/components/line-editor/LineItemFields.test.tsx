@@ -101,6 +101,26 @@ describe('LineItemFields', () => {
         expect(screen.getByText('Batch BATCH-4')).toBeInTheDocument();
     });
 
+    it('explains unavailable stock separately from an unknown item', async () => {
+        const user = userEvent.setup();
+        vi.spyOn(apiClient, 'get')
+            .mockResolvedValueOnce({
+                data: { data: [], meta: { current_page: 1, last_page: 1, per_page: 20, total: 0, unavailable_stock_matches: true } },
+            } as never)
+            .mockResolvedValueOnce({
+                data: { data: [], meta: { current_page: 1, last_page: 1, per_page: 20, total: 0, unavailable_stock_matches: false } },
+            } as never);
+
+        render(<LineItemFields value={emptyLineForm()} error={null} onChange={vi.fn()} />);
+        const input = screen.getByLabelText('Item');
+        await user.type(input, 'coolant');
+        expect(await screen.findByText('Matching stock items are in the system, but currently have no available stock. Check Inventory stock.')).toBeInTheDocument();
+
+        await user.clear(input);
+        await user.type(input, 'unknown');
+        expect(await screen.findByText('No matching item found.')).toBeInTheDocument();
+    });
+
     it('does not expose line type and provides a secondary external-item flow', async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();

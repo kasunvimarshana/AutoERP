@@ -27,6 +27,7 @@ final class GoodsReceiptNoteResource extends PurchaseResource
             'return_status' => $returnStatus,
             'return_status_label' => $this->statusLabel($returnStatus),
             'capabilities' => $this->arrayAttribute('capabilities'),
+            'linked_invoices' => $this->arrayAttribute('linked_invoices'),
             'purchase_order' => $this->whenLoaded('purchaseOrder', fn () => $this->summary($this->purchaseOrder, ['purchase_order_number', 'status'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),

@@ -26,6 +26,13 @@ final class EmployeeCommissionReportController
         return response()->json($this->reports->run($this->input($request)));
     }
 
+    public function employeeJobs(EmployeeCommissionReportRequest $request, int $employeeId): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), ReportingAuthorizationService::REPORTS_VIEW);
+
+        return response()->json($this->reports->employeeJobs($this->input($request), $employeeId));
+    }
+
     public function export(EmployeeCommissionReportRequest $request, string $format): Response
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), ReportingAuthorizationService::REPORTS_EXPORT);
@@ -35,6 +42,23 @@ final class EmployeeCommissionReportController
             $format,
             $this->reports->definition(),
             $this->reports->exportRows($input)->all(),
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $input,
+        );
+    }
+
+    public function exportIncentiveSummary(EmployeeCommissionReportRequest $request, string $format): Response
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), ReportingAuthorizationService::REPORTS_EXPORT);
+        $input = $this->input($request);
+        $rows = $this->reports->exportIncentiveSummaryRows($input)->all();
+        unset($input['period_view'], $input['group_by']);
+
+        return $this->export->export(
+            $format,
+            $this->reports->incentiveSummaryDefinition(),
+            $rows,
             $request->tenantId(),
             $request->organizationUnitId(),
             $input,

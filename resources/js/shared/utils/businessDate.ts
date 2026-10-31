@@ -29,6 +29,10 @@ export function businessTimeZoneLabel(timeZone = configuredTimeZone): string {
     return timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+export function businessTimeZone(): string {
+    return configuredTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 export function businessDateInputValue(date = new Date(), timeZone = configuredTimeZone): string {
     const parts = dateParts(date, timeZone);
     return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;

@@ -16,5 +16,6 @@ final readonly class CustomerContactData
         public bool $isPrimary = false,
         public bool $isActive = true,
         public ?string $notes = null,
+        public ?int $rowVersion = null,
     ) {}
 }

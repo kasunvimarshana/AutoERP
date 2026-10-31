@@ -10,7 +10,7 @@ export function useCustomerRelationCrud<T extends { id: number }, P>({ customerI
     list: (customerId: number, page: number, signal: AbortSignal) => Promise<ApiCollection<T>>;
     create: (customerId: number, payload: P) => Promise<T>;
     update: (customerId: number, id: number, payload: P) => Promise<T>;
-    remove: (customerId: number, id: number) => Promise<unknown>;
+    remove: (customerId: number, id: number, row: T) => Promise<unknown>;
 }) {
     const [page, setPage] = useState(1);
     const [editing, setEditing] = useState<T | null>(null);
@@ -43,7 +43,7 @@ export function useCustomerRelationCrud<T extends { id: number }, P>({ customerI
             if (!confirmed) return;
             setActionError(null);
             try {
-                await remove(customerId, row.id);
+                await remove(customerId, row.id, row);
                 result.setData((current) => removeFromCollection(current, row.id));
                 notifySuccess('Customer record deleted successfully.');
             }

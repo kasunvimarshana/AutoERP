@@ -15,6 +15,9 @@ import {
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
+import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { sellingPermissions } from '@/modules/selling/sellingPermissions';
+import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -26,7 +29,7 @@ import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { RecordTable } from '@/shared/components/RecordTable';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { InvoiceStatusBadge } from '../components/InvoiceStatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -64,6 +67,11 @@ export default function InvoiceDetailPage() {
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
     const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
     const canCreatePayment = hasPaymentPermission(auth, paymentPermissions.create);
+    const canOpenPaymentEntry = useTenantRouteAccess('/payments/create');
+    const canViewPaymentMethods = useTenantRouteAccess('/payments/methods');
+    const canViewInvoices = useTenantRouteAccess('/invoices');
+    const canOpenSellingPayment = canOpenPaymentEntry && canViewPaymentMethods && canViewInvoices
+        && hasPermission(auth, sellingPermissions.salesCreate);
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [reversalOpen, setReversalOpen] = useState(false);
@@ -102,13 +110,23 @@ export default function InvoiceDetailPage() {
     const vehicleServiceJobId = vehicleServiceSource?.source_id ?? Number(searchParams.get('job_id'));
     const hasVehicleServiceJobContext = Number.isInteger(vehicleServiceJobId) && vehicleServiceJobId > 0;
     const isServiceInvoice = value.invoice_type === 'service' && value.direction === 'outbound';
+    const isSellingInvoice = value.invoice_type === 'sales' && value.direction === 'outbound';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
+    const canPaySupplierInvoice = isSupplierInvoice
+        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
+        && isPositiveDecimal(value.balance_due ?? '0')
+        && hasPermission(auth, purchasePermissions.paymentsExecute);
     const isRetiredSourceInvoice = retiredSourceInvoiceTypes.has(value.invoice_type ?? '');
     const hasFreshRentalSource = (value.sources ?? []).some((source) => freshRentalSourceTypes.has(source.source_type));
     const canSettleServiceInvoice = hasVehicleServiceJobContext
         && isServiceInvoice
         && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
         && isPositiveDecimal(value.balance_due ?? '0');
+    const canSettleSellingInvoice = canOpenSellingPayment
+        && isSellingInvoice
+        && !isRetiredSourceInvoice
+        && (settlementStatuses as readonly string[]).includes(value.status ?? '')
+        && isPositiveDecimal(value.balance_due ?? value.balance?.remaining_amount ?? '0');
     const canSettleRentalInvoice = hasFreshRentalSource
         && !isRetiredSourceInvoice
         && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
@@ -189,14 +207,11 @@ export default function InvoiceDetailPage() {
                 description={formatDate(value.invoice_date)}
                 actions={(
                     <div className="flex flex-wrap justify-end gap-2">
-                        {fromPurchase && isSupplierInvoice ? (
-                            <>
-                                <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>
-                                <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>
-                            </>
-                        ) : null}
+                        {fromPurchase && isSupplierInvoice && <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>}
+                        {canPaySupplierInvoice && <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>}
+                        {canSettleSellingInvoice && <LinkButton to={`/payments/create?invoice_id=${id}&view=selling`}>Receive payment</LinkButton>}
                         {canSettleServiceInvoice && canCreateVehicleServicePayment ? (
-                            <LinkButton to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}>
+                            <LinkButton to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment?invoice_id=${id}`}>
                                 Pay this invoice
                             </LinkButton>
                         ) : null}
@@ -266,7 +281,7 @@ export default function InvoiceDetailPage() {
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">
                     {tabState.activeTab === 'summary' && <DetailGrid items={[
-                        { label: 'Status', value: <StatusBadge status={value.status} /> },
+                        { label: 'Status', value: <InvoiceStatusBadge invoice={value} /> },
                         { label: 'Party', value: readableRelation(value.party) },
                         { label: 'Type', value: humanize(value.invoice_type) },
                         { label: 'Direction', value: humanize(value.direction) },
@@ -315,7 +330,7 @@ function BalanceSummary({ loading, error, balance, currency }: {
         { label: 'Debit adjustments', value: <MoneyDisplay value={balance.debitAmount} currency={currency} /> },
         { label: 'Refunded', value: <MoneyDisplay value={balance.refundedAmount} currency={currency} /> },
         { label: 'Remaining', value: <MoneyDisplay value={balance.remainingAmount} currency={currency} /> },
-        { label: 'Balance status', value: <StatusBadge status={balance.status} /> },
+        { label: 'Balance status', value: <InvoiceStatusBadge invoice={{ paid_total: balance.paidAmount, credit_total: balance.creditAmount, balance_due: balance.remainingAmount }} status={balance.status} /> },
     ]} />;
 }
 

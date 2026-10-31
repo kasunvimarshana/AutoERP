@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Illuminate\Support\Collection;
 use Modules\Payment\Models\PaymentAllocation;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseDebitNote;
@@ -74,20 +75,7 @@ final class PurchaseRelatedDocumentService
                 'status' => $this->enumValue($grn->status),
                 'url' => '/purchase/goods-receipts/'.$grn->getKey(),
             ])->all(),
-            'supplier_invoices' => $invoiceLinks
-                ->pluck('invoice')
-                ->filter()
-                ->unique('id')
-                ->values()
-                ->map(fn ($invoice): array => [
-                    'id' => (int) $invoice->getKey(),
-                    'type' => 'supplier_invoice',
-                    'number' => $invoice->invoice_number,
-                    'date' => $invoice->invoice_date?->toDateString(),
-                    'status' => $this->enumValue($invoice->status),
-                    'url' => '/invoices/'.$invoice->getKey(),
-                ])
-                ->all(),
+            'supplier_invoices' => $this->supplierInvoiceSummaries($invoiceLinks, '/invoices/'),
             'payments' => $payments->map(fn ($payment): array => [
                 'id' => (int) $payment->getKey(),
                 'type' => 'supplier_payment',
@@ -113,6 +101,41 @@ final class PurchaseRelatedDocumentService
                 'url' => '/purchase/debit-notes/'.$note->getKey(),
             ])->all(),
         ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function supplierInvoicesForGoodsReceipt(GoodsReceiptNote $grn): array
+    {
+        $links = PurchaseInvoiceLink::query()
+            ->with('invoice')
+            ->where('tenant_id', $grn->tenant_id)
+            ->where('source_type', 'goods_receipt_note')
+            ->where('source_id', $grn->getKey())
+            ->orderBy('id')
+            ->get();
+
+        return $this->supplierInvoiceSummaries($links, '/purchase/invoices/');
+    }
+
+    /**
+     * @param  Collection<int, PurchaseInvoiceLink>  $links
+     * @return list<array<string, mixed>>
+     */
+    private function supplierInvoiceSummaries(Collection $links, string $urlPrefix): array
+    {
+        return $links->pluck('invoice')
+            ->filter()
+            ->unique('id')
+            ->values()
+            ->map(fn ($invoice): array => [
+                'id' => (int) $invoice->getKey(),
+                'type' => 'supplier_invoice',
+                'number' => $invoice->invoice_number,
+                'date' => $invoice->invoice_date?->toDateString(),
+                'status' => $this->enumValue($invoice->status),
+                'url' => $urlPrefix.$invoice->getKey(),
+            ])
+            ->all();
     }
 
     private function enumValue(mixed $value): mixed

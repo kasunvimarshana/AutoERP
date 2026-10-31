@@ -1,6 +1,7 @@
 import { useCallback, type ReactNode } from 'react';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupBehaviorOptions, LookupLoader } from '@/shared/types/lookup';
+import type { PaginationMeta } from '@/shared/types/pagination';
 import { GenericLookupSelect } from './GenericLookupSelect';
 
 export interface LookupSelectProps<T extends NamedResource = NamedResource> extends LookupBehaviorOptions {
@@ -10,6 +11,7 @@ export interface LookupSelectProps<T extends NamedResource = NamedResource> exte
     search: LookupLoader<T>;
     formatLabel?: (resource: T) => string;
     renderOption?: (resource: T, state: { active: boolean; selected: boolean }) => ReactNode;
+    renderEmptyState?: (state: { searchText: string; meta: PaginationMeta | undefined }) => ReactNode;
     placeholder?: string;
     error?: string;
     excludeId?: number | null;
@@ -28,6 +30,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     search,
     formatLabel: customFormatLabel,
     renderOption,
+    renderEmptyState,
     placeholder = 'Search...',
     error,
     excludeId,
@@ -57,6 +60,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
             search={search}
             formatLabel={formatLabel}
             renderOption={renderOption}
+            renderEmptyState={renderEmptyState}
             placeholder={placeholder}
             error={error}
             excludeId={excludeId}

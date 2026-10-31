@@ -86,7 +86,13 @@ export function VehicleServiceLineItemLookup({
             search={searchVehicleServiceLineItems}
             formatLabel={vehicleServiceItemLabel}
             renderOption={(item, state) => <ItemOption option={item} active={state.active} />}
-            recentResultsKey="vehicle-service:job-line-items"
+            renderEmptyState={({ meta }) => (
+                <p className="px-3 py-2 text-sm text-slate-600" role="status">
+                    {meta && 'unavailable_stock_matches' in meta && meta.unavailable_stock_matches === true
+                        ? 'Matching stock items are in the system, but currently have no available stock. Check Inventory stock.'
+                        : 'No matching item found.'}
+                </p>
+            )}
             placeholder="Search inventory, service, labour, or package items..."
             required={required}
             disabled={disabled}

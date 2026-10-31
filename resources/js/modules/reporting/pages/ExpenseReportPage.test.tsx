@@ -27,15 +27,17 @@ describe('ExpenseReportPage', () => {
             </TestRouter>,
         );
 
-        expect(await screen.findByRole('heading', { name: 'Expense report' })).toBeInTheDocument();
-        expect(screen.getByText('Net operating expense')).toBeInTheDocument();
-        expect(screen.getByText(/Rent was the largest category at 83%/)).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Where the money went' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'How expenses were paid' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'Overall expense report' })).toBeInTheDocument();
+        expect(screen.getByText('Net expense · Profit and Loss')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Paid expense types' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Consumables by item' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'How paid expenses were paid' })).toBeInTheDocument();
         expect(screen.getByTestId('export-actions')).toHaveTextContent('expenses');
 
+        await user.selectOptions(screen.getByLabelText('Source'), 'paid');
+        await user.click(screen.getByText('More filters'));
         await user.type(screen.getByLabelText('Search'), 'office');
-        await user.selectOptions(screen.getByLabelText('Expense type'), '1');
+        await user.selectOptions(screen.getByLabelText('Expense type (paid only)'), '1');
         await user.selectOptions(screen.getByLabelText('Activity'), 'posted');
         await user.click(screen.getByRole('button', { name: 'Apply filters' }));
 
@@ -45,6 +47,7 @@ describe('ExpenseReportPage', () => {
                     page: 1,
                     per_page: 25,
                     search: 'office',
+                    source: 'paid',
                     expense_type_id: 1,
                     event_type: 'posted',
                 }),
@@ -87,10 +90,17 @@ function expenseReportResult() {
         by_payment_method: [
             { id: 1, code: 'BANK', name: 'Bank transfer', transaction_count: 3, posted_amount: '65000', reversed_amount: '5000', net_amount: '60000' },
         ],
+        by_source: [
+            { source: 'paid', net_amount: '50000' },
+            { source: 'consumable', net_amount: '10000' },
+        ],
+        by_consumable_item: [{ id: 3, code: 'SHAMPOO', name: 'Shampoo', quantity: '2.000000', net_amount: '10000' }],
+        by_other_account: [],
         trend: [{ date: '2026-09-10', posted_amount: '65000', reversed_amount: '5000', net_amount: '60000' }],
         filter_options: {
             expense_types: [{ id: 1, name: 'Rent' }],
             payment_methods: [{ id: 1, name: 'Bank transfer' }],
+            items: [{ id: 3, name: 'Shampoo' }],
         },
         currency_code: 'LKR',
         period: { date_from: '2026-09-01', date_to: '2026-09-23' },

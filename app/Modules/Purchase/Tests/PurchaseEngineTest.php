@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Purchase\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -29,6 +31,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Item\Services\ItemQueryService;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
@@ -74,6 +77,7 @@ use Modules\Purchase\Services\PurchaseFinancePreparationService;
 use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Purchase\Services\PurchasePaymentIntegrationService;
+use Modules\Purchase\Services\PurchaseRelatedDocumentService;
 use Modules\Purchase\Services\PurchaseReturnService;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
@@ -96,6 +100,52 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('10000.000000', (string) $order->charge_total);
         $this->assertSame('123000.000000', (string) $order->grand_total);
         $this->assertCount(2, $order->adjustments);
+    }
+
+    public function test_stockable_consumable_can_be_selected_for_purchase_order_and_received(): void
+    {
+        $route = Route::getRoutes()->match(Request::create('/api/v1/items/lookup/purchase-stock', 'GET'));
+        $this->assertSame('api.v1.items.lookup', $route->getName());
+
+        [$tenantId, $warehouseId, , $supplierId, $uomId] = $this->purchaseContext();
+        $consumable = $this->createItem($tenantId, 'CONSUMABLE-'.Str::upper(Str::random(4)), ItemType::Consumable, true, $uomId);
+        $lookup = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ItemQueryService::class)->lookup(['search' => $consumable->code], $tenantId, null, 20, 'purchase-stock'),
+        );
+        $this->assertSame([(int) $consumable->getKey()], $lookup->getCollection()->modelKeys());
+
+        $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
+            tenantId: $tenantId,
+            purchaseOrderDate: '2026-06-06',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            warehouseId: $warehouseId,
+            lines: [new PurchaseOrderLineData((int) $consumable->getKey(), '2.000000', '100.000000', uomId: $uomId)],
+        ));
+        $order = $this->approveOrder($order);
+
+        $grn = $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
+            tenantId: $tenantId,
+            receivedDate: '2026-06-06',
+            warehouseId: $warehouseId,
+            purchaseOrderId: (int) $order->getKey(),
+            lines: [new GoodsReceiptNoteLineData(
+                (int) $consumable->getKey(),
+                '2.000000',
+                '2.000000',
+                '100.000000',
+                purchaseOrderLineId: (int) $order->lines->first()->getKey(),
+                orderedQuantity: '2.000000',
+            )],
+        ));
+        $this->postGoodsReceiptNote($grn);
+
+        $availability = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $consumable->getKey(), $warehouseId)),
+        );
+        $this->assertSame('2.000000', $availability->quantityOnHand);
     }
 
     public function test_purchase_permission_descriptions_exclude_unsupported_workflows(): void
@@ -171,10 +221,9 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('1105.000000', (string) $order->grand_total);
     }
 
-    public function test_partial_grn_posts_inventory_and_skips_service_items(): void
+    public function test_partial_stock_grn_posts_inventory_and_preserves_order_balance(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
-        $service = $this->createItem($tenantId, 'SVC-'.Str::upper(Str::random(4)), ItemType::Service, false, $uomId);
         $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
@@ -183,7 +232,6 @@ final class PurchaseEngineTest extends TestCase
             warehouseId: $warehouseId,
             lines: [
                 new PurchaseOrderLineData((int) $item->getKey(), '10.000000', '100.000000', uomId: $uomId),
-                new PurchaseOrderLineData((int) $service->getKey(), '1.000000', '50.000000', uomId: $uomId),
             ],
         ));
         $order = $this->approveOrder($order);
@@ -195,7 +243,6 @@ final class PurchaseEngineTest extends TestCase
             purchaseOrderId: (int) $order->getKey(),
             lines: [
                 new GoodsReceiptNoteLineData((int) $item->getKey(), '4.000000', '4.000000', '100.000000', purchaseOrderLineId: (int) $order->lines[0]->getKey(), orderedQuantity: '10.000000'),
-                new GoodsReceiptNoteLineData((int) $service->getKey(), '1.000000', '1.000000', '50.000000', purchaseOrderLineId: (int) $order->lines[1]->getKey(), orderedQuantity: '1.000000'),
             ],
         ));
 
@@ -311,6 +358,16 @@ final class PurchaseEngineTest extends TestCase
             fn (): string => (string) $grn->lines()->firstOrFail()->invoiced_quantity,
         );
         $this->assertSame('40.000000', $invoicedQuantity);
+
+        $linkedInvoices = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(PurchaseRelatedDocumentService::class)->supplierInvoicesForGoodsReceipt($grn),
+        );
+        $this->assertSame(
+            [$invoiceOne->invoice_number, $invoiceTwo->invoice_number],
+            array_column($linkedInvoices, 'number'),
+        );
+        $this->assertSame('/purchase/invoices/'.$invoiceOne->getKey(), $linkedInvoices[0]['url']);
     }
 
     public function test_example_40_percent_grn_invoice_allocates_adjustments(): void

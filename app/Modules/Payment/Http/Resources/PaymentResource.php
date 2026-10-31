@@ -94,6 +94,8 @@ final class PaymentResource extends JsonResource
                 'notes' => $line->notes,
                 'allowed_settlement_statuses' => $settlements->allowedTransitionsForLine($this->resource, $line),
                 'card_brand' => ($line->metadata ?? [])['card_brand'] ?? null,
+                'cash_received_amount' => ($line->metadata ?? [])['cash_received_amount'] ?? null,
+                'cash_change_amount' => ($line->metadata ?? [])['cash_change_amount'] ?? null,
             ])->values()->all()),
             'allocations' => $this->whenLoaded('allocations'),
             'unapplied_balance' => $this->whenLoaded('unappliedBalance'),
