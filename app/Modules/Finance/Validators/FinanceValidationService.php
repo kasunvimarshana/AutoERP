@@ -85,7 +85,7 @@ final class FinanceValidationService
         $this->validateJournalCurrency($data->tenantId, $data->currencyId, $data->exchangeRate);
 
         foreach ($data->lines as $line) {
-            if (! $line instanceof FinanceJournalLine
+            if (! $line instanceof JournalLineData) {
                 throw new InvalidArgumentException('Journal lines must be JournalLineData instances.');
             }
 
@@ -209,7 +209,7 @@ final class FinanceValidationService
         $totalCredit = '0.000000';
         foreach ($entries as $entry) {
             $line = $lines->pull((int) $entry->journal_line_id);
-            if (! $line instanceof \\Modules\\Finance\\Models\\FinanceJournalLine
+            if (! $line instanceof FinanceJournalLine
                 || (int) $entry->journal_entry_id !== (int) $journal->getKey()
                 || (int) $entry->tenant_id !== (int) $journal->tenant_id
                 || $entry->organization_unit_id !== $journal->organization_unit_id
