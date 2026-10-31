@@ -868,6 +868,34 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('12.000000', (string) $note->remaining_amount);
         $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
 
+        // A balanced note can only be allocated when its persisted amounts
+        // still conserve face value. Reject historical/import corruption.
+        $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice): void {
+            foreach ([
+                ['allocated_amount' => '7.000000'],
+                ['remaining_amount' => '-1.000000'],
+                ['amount' => '19.000000'],
+            ] as $corruptValues) {
+                DB::table('purchase_debit_notes')->where('id', $note->getKey())->update($corruptValues);
+                try {
+                    app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                    $this->fail('Accepted a debit note with an inconsistent persisted amount.');
+                } catch (InvalidArgumentException $exception) {
+                    $this->assertSame(
+                        'Purchase debit note allocation balances are inconsistent.',
+                        $exception->getMessage(),
+                    );
+                } finally {
+                    DB::table('purchase_debit_notes')->where('id', $note->getKey())->update([
+                        'amount' => '20.000000',
+                        'allocated_amount' => '8.000000',
+                        'remaining_amount' => '12.000000',
+                    ]);
+                }
+            }
+            $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+        });
+
         // A Purchase-owned debit note cannot masquerade as another party type,
         // even when the supplied numeric supplier ID exists.
         try {
