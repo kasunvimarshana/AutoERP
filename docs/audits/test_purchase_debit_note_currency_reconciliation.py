@@ -23,7 +23,8 @@ CREATE TABLE purchase_debit_notes (
     remaining_amount NUMERIC
 );
 CREATE TABLE purchase_returns (
-    id INTEGER PRIMARY KEY, tenant_id INTEGER, currency_id INTEGER,
+    id INTEGER PRIMARY KEY, tenant_id INTEGER, organization_unit_id INTEGER,
+    supplier_id INTEGER, supplier_type TEXT, currency_id INTEGER,
     source_type TEXT, source_id INTEGER
 );
 CREATE TABLE invoices (
@@ -95,7 +96,7 @@ def fixture() -> sqlite3.Connection:
         (10, 2, 1, "purchase_debit_note", 1, 1, 10),
     ]
     db.executemany("INSERT INTO invoice_credit_allocations VALUES (?,?,?,?,?,?,?)", allocations)
-    db.execute("INSERT INTO purchase_returns VALUES (1,1,NULL,'goods_receipt_note',1)")
+    db.execute("INSERT INTO purchase_returns VALUES (1,1,1,11,'supplier',NULL,'goods_receipt_note',1)")
     db.execute("INSERT INTO goods_receipt_notes VALUES (1,1,1)")
     db.execute("INSERT INTO purchase_orders VALUES (1,1,2)")
     db.commit()
@@ -165,6 +166,38 @@ class PurchaseDebitNoteCurrencyAuditTest(unittest.TestCase):
         self.assertIsNone(result[0]["note_currency_id"])
         self.assertIsNone(result[0]["return_currency_id"])
         self.assertEqual(2, result[0]["order_currency_id"])
+
+    def test_lineage_flags_historical_scope_and_supplier_drift_with_matching_currency(self) -> None:
+        # These deliberately inconsistent historical rows do not affect other
+        # tests; all stored currencies match, so the original query missed them.
+        self.db.executemany(
+            "INSERT INTO purchase_returns VALUES (?,?,?,?,?,?,?,?)",
+            [
+                (2, 1, 2, 11, "supplier", 2, None, None),
+                (3, 1, 1, 11, "supplier", 2, None, None),
+                (4, 1, 1, 11, "supplier", 2, None, None),
+            ],
+        )
+        self.db.executemany(
+            "INSERT INTO purchase_debit_notes VALUES (?,?,?,?,?,?,?,?,?,?)",
+            [
+                (10, 1, 1, 11, "supplier", 2, 2, 30, 0, 30),
+                (11, 1, None, 11, "supplier", 2, 3, 30, 0, 30),
+                (12, 1, 1, 12, "supplier", 2, 4, 30, 0, 30),
+            ],
+        )
+
+        flagged = {row["purchase_debit_note_id"]: row for row in self.report(4)}
+        self.assertEqual({1, 10, 11, 12}, set(flagged))
+        self.assertEqual((1, 2), (
+            flagged[10]["note_organization_unit_id"],
+            flagged[10]["return_organization_unit_id"],
+        ))
+        self.assertIsNone(flagged[11]["note_organization_unit_id"])
+        self.assertEqual((12, 11), (
+            flagged[12]["note_supplier_id"],
+            flagged[12]["return_supplier_id"],
+        ))
 
 
 if __name__ == "__main__":
