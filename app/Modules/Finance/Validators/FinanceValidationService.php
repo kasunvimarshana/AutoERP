@@ -190,6 +190,50 @@ final class FinanceValidationService
         }
     }
 
+    /**
+     * Posted journals may be replayed or reversed only while their immutable
+     * ledger evidence still agrees with every original journal line.
+     */
+    public function assertPostedLedgerIntegrity(FinanceJournalEntry $journal): void
+    {
+        $lines = $journal->lines->keyBy('id');
+        $entries = $journal->ledgerEntries()->get();
+        $invalid = 'Posted Finance journal ledger does not match its journal lines.';
+
+        if ($lines->isEmpty() || $lines->count() !== $entries->count()) {
+            throw new InvalidArgumentException($invalid);
+        }
+
+        $totalDebit = '0.000000';
+        $totalCredit = '0.000000';
+        foreach ($entries as $entry) {
+            $line = $lines->pull((int) $entry->journal_line_id);
+            if (! $line instanceof \\Modules\\Finance\\Models\\FinanceJournalLine
+                || (int) $entry->journal_entry_id !== (int) $journal->getKey()
+                || (int) $entry->tenant_id !== (int) $journal->tenant_id
+                || $entry->organization_unit_id !== $journal->organization_unit_id
+                || (int) $line->tenant_id !== (int) $journal->tenant_id
+                || $line->organization_unit_id !== $journal->organization_unit_id
+                || (int) $entry->account_id !== (int) $line->account_id
+                || $entry->dimension_id !== $line->dimension_id
+                || $this->math->compare((string) $entry->debit, (string) $line->debit) !== 0
+                || $this->math->compare((string) $entry->credit, (string) $line->credit) !== 0
+            ) {
+                throw new InvalidArgumentException($invalid);
+            }
+
+            $totalDebit = $this->math->add($totalDebit, (string) $line->debit);
+            $totalCredit = $this->math->add($totalCredit, (string) $line->credit);
+        }
+
+        if ($this->math->compare($totalDebit, (string) $journal->total_debit) !== 0
+            || $this->math->compare($totalCredit, (string) $journal->total_credit) !== 0
+            || $this->math->compare($totalDebit, $totalCredit) !== 0
+        ) {
+            throw new InvalidArgumentException($invalid);
+        }
+    }
+
     public function assertReversible(FinanceJournalEntry $journal, bool $allowSourceOwned = false): void
     {
         $status = $journal->status instanceof JournalStatus
@@ -205,6 +249,9 @@ final class FinanceValidationService
                 'Source-owned journals must be reversed through the module that owns the source document.',
             );
         }
+
+        $journal->loadMissing('lines');
+        $this->assertPostedLedgerIntegrity($journal);
 
         if ($journal->reversals()->exists()) {
             throw new InvalidArgumentException('Journal has already been reversed.');
