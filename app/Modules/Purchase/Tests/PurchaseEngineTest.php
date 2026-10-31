@@ -1008,6 +1008,101 @@ final class PurchaseEngineTest extends TestCase
         }
     }
 
+    public function test_known_return_currency_cannot_hide_conflicting_source_order_currency(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        $originalCurrencyId = CurrencyFixture::create();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($order, $originalCurrencyId): void {
+            $order->currency_id = $originalCurrencyId;
+            $order->save();
+        });
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-08',
+            warehouseId: $warehouseId,
+            lines: [new PurchaseReturnLineData(
+                'goods_receipt_note_line', (int) $grn->lines->first()->getKey(), '1.000000',
+            )],
+        ));
+        self::assertSame($originalCurrencyId, $return->currency_id);
+
+        $conflictingCurrencyId = CurrencyFixture::create();
+        DB::table('purchase_orders')->where('id', $order->getKey())
+            ->update(['currency_id' => $conflictingCurrencyId]);
+
+        try {
+            $this->createDebitNote(new CreatePurchaseDebitNoteData(
+                tenantId: $tenantId,
+                debitNoteDate: '2026-06-09',
+                amount: '1.000000',
+                supplierType: 'supplier',
+                supplierId: (int) $return->supplier_id,
+                purchaseReturnId: (int) $return->getKey(),
+                sourceType: PurchaseDebitNoteService::SOURCE_PURCHASE_RETURN,
+                sourceId: (int) $return->getKey(),
+                reason: 'Historical currency lineage inconsistency',
+            ));
+            self::fail('Stored return currency concealed conflicting Purchase Order currency.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame(
+                'Purchase return currency conflicts with its source purchase order.',
+                $exception->getMessage(),
+            );
+        }
+        self::assertSame(0, DB::table('purchase_debit_notes')
+            ->where('tenant_id', $tenantId)->count());
+    }
+
+    public function test_known_return_currency_cannot_hide_foreign_receipt_supplier(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        $originalCurrencyId = CurrencyFixture::create();
+        $this->withTenantExecutionContext($tenantId, function () use ($order, $originalCurrencyId): void {
+            $order->currency_id = $originalCurrencyId;
+            $order->save();
+        });
+        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-08',
+            warehouseId: $warehouseId,
+            lines: [new PurchaseReturnLineData(
+                'goods_receipt_note_line', (int) $grn->lines->first()->getKey(), '1.000000',
+            )],
+        ));
+        self::assertSame($originalCurrencyId, $return->currency_id);
+
+        $otherSupplierId = $this->createSupplier($tenantId, 'SUP-FOREIGN-'.Str::upper(Str::random(4)));
+        DB::table('goods_receipt_notes')->where('id', $grn->getKey())
+            ->update(['supplier_id' => $otherSupplierId]);
+
+        try {
+            $this->createDebitNote(new CreatePurchaseDebitNoteData(
+                tenantId: $tenantId,
+                debitNoteDate: '2026-06-09',
+                amount: '1.000000',
+                supplierType: 'supplier',
+                supplierId: (int) $return->supplier_id,
+                purchaseReturnId: (int) $return->getKey(),
+                sourceType: PurchaseDebitNoteService::SOURCE_PURCHASE_RETURN,
+                sourceId: (int) $return->getKey(),
+                reason: 'Historical supplier lineage inconsistency',
+            ));
+            self::fail('Stored return currency concealed a foreign supplier receipt.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertSame(
+                'Purchase debit note source receipt is outside the return scope.',
+                $exception->getMessage(),
+            );
+        }
+        self::assertSame(0, DB::table('purchase_debit_notes')
+            ->where('tenant_id', $tenantId)->count());
+    }
+
     public function test_purchase_return_from_grn_line_posts_inventory_and_creates_debit_note(): void
     {
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
