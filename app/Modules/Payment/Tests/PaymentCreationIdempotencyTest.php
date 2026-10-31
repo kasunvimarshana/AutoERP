@@ -14,6 +14,7 @@ use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentMethodDirection;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Payment\Services\PaymentCalculationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Tenant\Constants\TenantStatus;
 use Tests\TestCase;
@@ -26,6 +27,34 @@ final class PaymentCreationIdempotencyTest extends TestCase
     private const IDEMPOTENCY_KEY = 'payment-create-idempotency-test';
     private const PAYMENT_METHOD_CODE = 'IDEMP-CASH';
     private const PAYMENT_METHOD_NAME = 'Idempotency Cash';
+
+    public function test_payment_recalculation_preserves_six_decimal_micro_amounts(): void
+    {
+        [$tenantId, $customerId, $paymentMethodId] = $this->fixtures();
+        $payment = $this->withTenantExecutionContext($tenantId, fn () => app(PaymentCreationService::class)->create(new CreatePaymentData(
+            tenantId: $tenantId,
+            paymentType: PaymentType::CustomerReceipt,
+            direction: PaymentDirection::Inbound,
+            paymentDate: self::PAYMENT_DATE,
+            partyType: 'customer',
+            partyId: $customerId,
+            lines: [
+                new PaymentLineData('0.000001', $paymentMethodId),
+                new PaymentLineData('0.000001', $paymentMethodId),
+                new PaymentLineData('0.000001', $paymentMethodId),
+            ],
+            idempotencyKey: 'payment-six-decimal-recalculation',
+        )));
+
+        $calculation = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(PaymentCalculationService::class)->recalculate($payment),
+        );
+        $this->assertSame('0.000003', $calculation->totalAmount);
+        $this->assertSame('0.000000', $calculation->allocatedAmount);
+        $this->assertSame('0.000000', $calculation->refundedAmount);
+        $this->assertSame('0.000003', $calculation->unappliedAmount);
+    }
 
     public function test_exact_retry_returns_the_existing_payment_without_duplicate_writes(): void
     {
