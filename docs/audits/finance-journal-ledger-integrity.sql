@@ -86,3 +86,20 @@ WHERE j.id IS NULL OR d.id IS NULL
    OR (l.debit = 0 AND l.credit = 0)
    OR (l.debit > 0 AND l.credit > 0)
 ORDER BY l.tenant_id, l.id;
+
+-- 3. Missing/duplicate ledger postings for a specific posted journal line.
+-- Header totals and entry counts can balance even when one line was posted
+-- twice and a different, identically valued line was never posted.
+SELECT d.tenant_id, d.journal_entry_id, j.journal_number,
+       d.id AS journal_line_id, COUNT(l.id) AS matching_ledger_entry_count
+FROM finance_journal_lines AS d
+INNER JOIN finance_journal_entries AS j
+    ON j.id = d.journal_entry_id AND j.tenant_id = d.tenant_id
+LEFT JOIN finance_ledger_entries AS l
+    ON l.tenant_id = d.tenant_id
+   AND l.journal_entry_id = d.journal_entry_id
+   AND l.journal_line_id = d.id
+WHERE j.status IN ('posted', 'reversed')
+GROUP BY d.tenant_id, d.journal_entry_id, j.journal_number, d.id
+HAVING COUNT(l.id) <> 1
+ORDER BY d.tenant_id, d.journal_entry_id, d.id;
