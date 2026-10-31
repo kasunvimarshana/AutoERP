@@ -98,6 +98,8 @@ HAVING n.amount <> n.allocated_amount + n.remaining_amount
 ORDER BY n.tenant_id, n.id;
 
 -- 5. Return -> GRN -> Purchase Order lineage for human source-evidence review.
+-- Flag historical Note -> Return supplier/organization mismatch even if the
+-- stored currencies agree. Show both source identities for investigation.
 -- An order's currency is a CANDIDATE, not authority to rewrite historical terms.
 SELECT n.id AS purchase_debit_note_id,
        n.tenant_id,
@@ -106,7 +108,13 @@ SELECT n.id AS purchase_debit_note_id,
        r.currency_id AS return_currency_id,
        g.id AS goods_receipt_note_id,
        o.id AS purchase_order_id,
-       o.currency_id AS order_currency_id
+       o.currency_id AS order_currency_id,
+       n.organization_unit_id AS note_organization_unit_id,
+       r.organization_unit_id AS return_organization_unit_id,
+       n.supplier_type AS note_supplier_type,
+       r.supplier_type AS return_supplier_type,
+       n.supplier_id AS note_supplier_id,
+       r.supplier_id AS return_supplier_id
 FROM purchase_debit_notes AS n
 JOIN purchase_returns AS r
     ON r.id = n.purchase_return_id AND r.tenant_id = n.tenant_id
@@ -121,4 +129,11 @@ WHERE n.currency_id IS NULL
        AND n.currency_id <> r.currency_id)
    OR (r.currency_id IS NOT NULL AND o.currency_id IS NOT NULL
        AND r.currency_id <> o.currency_id)
+   OR n.supplier_id IS NULL OR r.supplier_id IS NULL
+   OR n.supplier_id <> r.supplier_id
+   OR n.supplier_type IS NULL OR n.supplier_type <> 'supplier'
+   OR r.supplier_type IS NULL OR r.supplier_type <> 'supplier'
+   OR n.organization_unit_id <> r.organization_unit_id
+   OR (n.organization_unit_id IS NULL AND r.organization_unit_id IS NOT NULL)
+   OR (n.organization_unit_id IS NOT NULL AND r.organization_unit_id IS NULL)
 ORDER BY n.tenant_id, n.id;
