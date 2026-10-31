@@ -7,6 +7,7 @@ namespace Modules\Purchase\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
@@ -306,6 +307,75 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.currency_id', $currencyId)
             ->assertJsonPath('data.currency.id', $currencyId);
+    }
+
+    public function test_manual_debit_note_creation_rolls_back_when_audit_recording_fails(): void
+    {
+        $context = $this->context();
+        $currencyId = CurrencyFixture::create();
+
+        $this->mock(AuditRecorderInterface::class, function ($mock): void {
+            $mock->shouldReceive('record')->once()
+                ->andThrow(new \\RuntimeException('Injected purchase audit failure'));
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'debit_note_date' => '2026-06-10',
+                'supplier_type' => 'supplier',
+                'supplier_id' => $context['supplier_id'],
+                'currency_id' => $currencyId,
+                'amount' => '10.000000',
+                'reason' => 'Audit atomicity regression',
+            ]);
+            self::fail('Debit note creation must not succeed without its audit record.');
+        } catch (\\RuntimeException $exception) {
+            self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        }
+
+        self::assertSame(0, DB::table('purchase_debit_notes')
+            ->where('tenant_id', $context['tenant_id'])->count());
+    }
+
+    public function test_manual_debit_note_approval_rolls_back_when_audit_recording_fails(): void
+    {
+        $context = $this->context();
+        $currencyId = CurrencyFixture::create();
+        $note = $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'debit_note_date' => '2026-06-10',
+            'supplier_type' => 'supplier',
+            'supplier_id' => $context['supplier_id'],
+            'currency_id' => $currencyId,
+            'amount' => '10.000000',
+            'reason' => 'Approval audit atomicity regression',
+        ])->assertCreated()->json('data');
+
+        $this->mock(AuditRecorderInterface::class, function ($mock): void {
+            $mock->shouldReceive('record')->once()
+                ->andThrow(new \\RuntimeException('Injected purchase audit failure'));
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->withAuth($context)->patchJson('/api/v1/purchase/debit-notes/'.$note['id'].'/approve', [
+                'tenant_id' => $context['tenant_id'],
+                'expected_version' => $note['row_version'],
+            ]);
+            self::fail('Debit note approval must not succeed without its audit record.');
+        } catch (\\RuntimeException $exception) {
+            self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        }
+
+        $persisted = DB::table('purchase_debit_notes')->where('tenant_id', $context['tenant_id'])
+            ->where('id', $note['id'])->first();
+        self::assertSame('draft', $persisted->status);
+        self::assertSame((int) $note['row_version'], (int) $persisted->row_version);
+        self::assertNull($persisted->approved_at);
     }
 
     public function test_approve_cancel_and_close_purchase_orders(): void
