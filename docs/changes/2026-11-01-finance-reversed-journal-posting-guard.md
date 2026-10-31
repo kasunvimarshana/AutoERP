@@ -11,11 +11,11 @@ A reissued posting command for a reversed source could therefore return a *rever
 
 ## Implementation
 
-Both Finance-owned posting entry points now return the existing journal only if it is **Posted** (true idempotent replay). Reversed, Cancelled and other non-Draft states reject the operation. The existing Draft flow, posting profile/account/period checks, and ledger atomicity remain intact. No historical journal data, GL balances, posting profiles, or financial documents were rewritten.
+Both Finance-owned posting entry points now return the existing journal only if it is **Posted** (true idempotent replay). Reversed, Cancelled and other non-Draft states reject the operation. The shared source-fingerprint replay path in `FinancePostingService::createDraftJournal()` also rejects a **Reversed** journal, so draft preparation cannot silently report a terminal source as reusable. The existing Draft flow, posting profile/account/period checks, and ledger atomicity remain intact. No historical journal data, GL balances, posting profiles, or financial documents were rewritten.
 
 ## Regression coverage
 
-- `FinanceHardeningTest::test_posted_replay_is_idempotent_but_reversed_finance_journal_cannot_post_again` creates a finance-owned posting on a disposable database, verifies successful Posted replay, reverses it, then checks that the contract's `postJournal`, `post`, and the underlying JournalPostingService all reject reversed replays. Original and reversal ledger-entry counts must remain unchanged.
+- `FinanceHardeningTest::test_posted_replay_is_idempotent_but_reversed_finance_journal_cannot_post_again` creates a finance-owned posting on a disposable database, verifies successful Posted replay, reverses it, then checks that the contract's `postJournal`, `createDraftJournal`, `post`, and the underlying JournalPostingService all reject reversed replays. Original and reversal ledger-entry counts must remain unchanged.
 - Updated `FinancePostingIdempotencyBoundaryTest` to assert the new terminal-state guard in both Finance services, without weakening the existing unique-source/fingerprint protections.
 
 ## Verification boundary
