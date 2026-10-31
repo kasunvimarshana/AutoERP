@@ -52,7 +52,7 @@ class FinanceLedgerIntegrityAuditTest(unittest.TestCase):
     def setUp(self) -> None:
         self.db = fixture()
         self.sql = statements()
-        self.assertEqual(2, len(self.sql))
+        self.assertEqual(3, len(self.sql))
 
     def tearDown(self) -> None:
         self.db.close()
@@ -71,6 +71,7 @@ class FinanceLedgerIntegrityAuditTest(unittest.TestCase):
     def test_valid_journal_has_no_finding(self) -> None:
         self.assertEqual([], self.query(0))
         self.assertEqual([], self.query(1))
+        self.assertEqual([], self.query(2))
 
     def test_read_only_statements_can_execute(self) -> None:
         for index, statement in enumerate(self.sql):
@@ -115,6 +116,26 @@ class FinanceLedgerIntegrityAuditTest(unittest.TestCase):
     def test_organization_mismatch_is_detected_including_null(self) -> None:
         self.db.execute('UPDATE finance_ledger_entries SET organization_unit_id=2 WHERE id=1')
         self.assertEqual('organization_mismatch', self.query(1)[0]['review_reason'])
+
+    def test_duplicate_ledger_line_and_missing_identical_line_cannot_cancel_out(self) -> None:
+        # Both journal lines have equal amounts and account. Report 1 can see
+        # the same number and amounts, while report 2 sees only valid entries.
+        self.db.execute("INSERT INTO finance_journal_lines VALUES (3,1,NULL,1,101,100,0)")
+        self.db.execute("INSERT INTO finance_journal_lines VALUES (4,1,NULL,1,201,0,100)")
+        self.db.execute("INSERT INTO finance_ledger_entries VALUES (3,1,NULL,1,1,101,100,0)")
+        self.db.execute("INSERT INTO finance_ledger_entries VALUES (4,1,NULL,1,4,201,0,100)")
+        self.db.execute('UPDATE finance_journal_entries SET total_debit=200,total_credit=200 WHERE id=1')
+        self.assertEqual([], self.query(0))
+        self.assertEqual([], self.query(1))
+        rows = self.query(2)
+        self.assertEqual([(1, 2), (3, 0)],
+                         [(row['journal_line_id'], row['matching_ledger_entry_count']) for row in rows])
+
+    def test_missing_ledger_line_detected_independently_from_header_totals(self) -> None:
+        self.db.execute('DELETE FROM finance_ledger_entries WHERE id=2')
+        rows = self.query(2)
+        self.assertEqual([(2, 0)],
+                         [(row['journal_line_id'], row['matching_ledger_entry_count']) for row in rows])
 
     def test_reversed_journal_is_audited_without_double_posting(self) -> None:
         self.db.execute("UPDATE finance_journal_entries SET status='reversed' WHERE id=1")
