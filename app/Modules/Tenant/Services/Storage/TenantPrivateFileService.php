@@ -63,9 +63,18 @@ final class TenantPrivateFileService implements TenantPrivateFileServiceInterfac
             $this->disk(),
         );
 
+        // Uploaded filenames are untrusted client metadata. Strip both Windows and
+        // POSIX directory separators and control characters before persisting or
+        // reflecting the name in download headers and audit evidence.
+        $safeFilename = basename(str_replace('\\\\', '/', trim($originalFilename)));
+        $safeFilename = trim(preg_replace('/[\\x00-\\x1F\\x7F]/', '', $safeFilename) ?? '');
+        if (in_array($safeFilename, ['', '.', '..'], true)) {
+            $safeFilename = 'file.bin';
+        }
+
         return [
             'object_key' => $this->paths->objectKeyFromPath($tenantId, $storedPath),
-            'original_filename' => mb_substr(basename(trim($originalFilename)) ?: 'file.bin', 0, 255),
+            'original_filename' => mb_substr($safeFilename, 0, 255),
             'mime_type' => $mimeType,
             'size_bytes' => (int) $size,
             'checksum_sha256' => $checksum,
