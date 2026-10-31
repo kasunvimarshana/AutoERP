@@ -90,11 +90,13 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
             $contract,
         );
         self::assertStringContainsString(
-            '$this->statusOf($journal) === JournalStatus::Reversed',
+            'if ($status === JournalStatus::Reversed)',
             $contract,
         );
 
         $ledger = $this->source('../Services/JournalPostingService.php');
+        self::assertStringContainsString('$this->validator->assertPostedLedgerIntegrity($journal);', $ledger);
+        self::assertStringContainsString('$this->posting->post($journal', $contract);
         self::assertLessThan(
             strpos($ledger, '$ledgerCount = $this->ledger->post($journal);'),
             strpos($ledger, 'if ($status === JournalStatus::Posted)'),
