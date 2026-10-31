@@ -257,6 +257,81 @@ final class FinanceHardeningTest extends TestCase
         });
     }
 
+    public function test_posted_journal_cannot_be_replayed_or_reversed_with_missing_ledger(): void
+    {
+        [$tenantId] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $posting = app(FinancePostingInterface::class);
+            $request = $this->directRequest($tenantId, '2026-06-30');
+            $posted = $posting->post($request);
+
+            $ledgerId = DB::table('finance_ledger_entries')
+                ->where('journal_entry_id', $posted->journalId)
+                ->orderBy('id')
+                ->value('id');
+            $this->assertNotNull($ledgerId);
+            // Deliberate untrusted historical import corruption in disposable
+            // test DB: bypass the immutable Eloquent ledger guard.
+            DB::table('finance_ledger_entries')->where('id', $ledgerId)->delete();
+
+            foreach ([
+                fn () => $posting->postJournal($posted->journalId),
+                fn () => $posting->createDraftJournal($request),
+                fn () => $posting->post($request),
+                fn () => $posting->reverseJournal(
+                    $posted->journalId, '2026-07-01', reason: 'Correct document',
+                ),
+            ] as $operation) {
+                try {
+                    $operation();
+                    $this->fail('Corrupt posted Finance journal was accepted.');
+                } catch (InvalidArgumentException $exception) {
+                    $this->assertSame(
+                        'Posted Finance journal ledger does not match its journal lines.',
+                        $exception->getMessage(),
+                    );
+                }
+            }
+
+            $this->assertDatabaseHas('finance_journal_entries', [
+                'id' => $posted->journalId,
+                'status' => 'posted',
+            ]);
+            $this->assertDatabaseCount('finance_ledger_entries', 1);
+            $this->assertDatabaseCount('finance_journal_entries', 1);
+        });
+    }
+
+    public function test_posted_journal_cannot_be_replayed_with_modified_ledger_amount(): void
+    {
+        [$tenantId] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $posting = app(FinancePostingInterface::class);
+            $posted = $posting->post($this->directRequest($tenantId, '2026-06-30'));
+            $ledgerId = DB::table('finance_ledger_entries')
+                ->where('journal_entry_id', $posted->journalId)
+                ->where('debit', '>', 0)
+                ->value('id');
+            $this->assertNotNull($ledgerId);
+
+            DB::table('finance_ledger_entries')->where('id', $ledgerId)
+                ->update(['debit' => '99.000000']);
+
+            try {
+                $posting->postJournal($posted->journalId);
+                $this->fail('Finance accepted a posted ledger with altered monetary evidence.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame(
+                    'Posted Finance journal ledger does not match its journal lines.',
+                    $exception->getMessage(),
+                );
+            }
+
+            $this->assertDatabaseCount('finance_ledger_entries', 2);
+            $this->assertDatabaseCount('finance_journal_entries', 1);
+        });
+    }
+
     public function test_source_owned_journal_cannot_be_reversed_directly_from_finance(): void
     {
         [$tenantId] = $this->context();
