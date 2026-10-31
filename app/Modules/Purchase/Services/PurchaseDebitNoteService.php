@@ -243,6 +243,7 @@ final class PurchaseDebitNoteService
             if ($this->math->compare($amount, '0.000000') <= 0) {
                 throw new InvalidArgumentException('Debit allocation amount must be greater than zero.');
             }
+            $this->assertAllocationBalanceIntegrity($lockedNote);
             if ($this->math->compare($amount, (string) $lockedNote->remaining_amount) > 0) {
                 throw new InvalidArgumentException(
                     'Debit allocation cannot exceed purchase debit note remaining amount.',
@@ -268,6 +269,21 @@ final class PurchaseDebitNoteService
 
             return $lockedNote->refresh();
         });
+    }
+
+    private function assertAllocationBalanceIntegrity(PurchaseDebitNote $note): void
+    {
+        $faceValue = $this->math->normalize((string) $note->amount);
+        $allocated = $this->math->normalize((string) $note->allocated_amount);
+        $remaining = $this->math->normalize((string) $note->remaining_amount);
+
+        if ($this->math->isNegative($faceValue) || $this->math->isZero($faceValue)
+            || $this->math->isNegative($allocated)
+            || $this->math->isNegative($remaining)
+            || $this->math->compare($this->math->add($allocated, $remaining), $faceValue) !== 0
+        ) {
+            throw new InvalidArgumentException('Purchase debit note allocation balances are inconsistent.');
+        }
     }
 
     private function assertAllocationScope(PurchaseDebitNote $note, Invoice $invoice): void
