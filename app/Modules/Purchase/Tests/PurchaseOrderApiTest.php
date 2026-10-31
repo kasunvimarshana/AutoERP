@@ -316,7 +316,7 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->mock(AuditRecorderInterface::class, function ($mock): void {
             $mock->shouldReceive('record')->once()
-                ->andThrow(new \\RuntimeException('Injected purchase audit failure'));
+                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
         });
 
         $this->withoutExceptionHandling();
@@ -332,7 +332,7 @@ final class PurchaseOrderApiTest extends TestCase
                 'reason' => 'Audit atomicity regression',
             ]);
             self::fail('Debit note creation must not succeed without its audit record.');
-        } catch (\\RuntimeException $exception) {
+        } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
         }
 
@@ -357,7 +357,7 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->mock(AuditRecorderInterface::class, function ($mock): void {
             $mock->shouldReceive('record')->once()
-                ->andThrow(new \\RuntimeException('Injected purchase audit failure'));
+                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
         });
 
         $this->withoutExceptionHandling();
@@ -367,7 +367,7 @@ final class PurchaseOrderApiTest extends TestCase
                 'expected_version' => $note['row_version'],
             ]);
             self::fail('Debit note approval must not succeed without its audit record.');
-        } catch (\\RuntimeException $exception) {
+        } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
         }
 
