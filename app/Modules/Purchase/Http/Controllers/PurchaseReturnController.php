@@ -7,6 +7,7 @@ namespace Modules\Purchase\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
@@ -70,8 +71,12 @@ final class PurchaseReturnController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_CREATE);
 
-        $return = $service->create($request->toData())->load($this->relations());
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_CREATED, 'purchase_return', $return);
+        $return = DB::transaction(function () use ($request, $service): PurchaseReturn {
+            $return = $service->create($request->toData())->load($this->relations());
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_CREATED, 'purchase_return', $return);
+
+            return $return;
+        });
 
         return new PurchaseReturnResource($this->presentation->preparePurchaseReturn($return));
     }
@@ -93,13 +98,16 @@ final class PurchaseReturnController
 
         $model = $this->scope(PurchaseReturn::query(), $request)->findOrFail($return);
         $before = $model->attributesToArray();
-        $updated = $service->approve(
-            $model,
-            $request->currentUserId(),
-            $request->expectedVersion(),
-        )
-            ->load($this->relations());
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_APPROVED, 'purchase_return', $updated, $before);
+        $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseReturn {
+            $updated = $service->approve(
+                $model,
+                $request->currentUserId(),
+                $request->expectedVersion(),
+            )->load($this->relations());
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_APPROVED, 'purchase_return', $updated, $before);
+
+            return $updated;
+        });
 
         return new PurchaseReturnResource($this->presentation->preparePurchaseReturn($updated));
     }
@@ -111,16 +119,20 @@ final class PurchaseReturnController
         $model = $this->scope(PurchaseReturn::query(), $request)->with('lines')->findOrFail($return);
 
         $before = $model->attributesToArray();
-        $result = $service->post(
-            $model,
-            $request->currentUserId(),
-            $request->expectedVersion(),
-        );
-        $posted = $this->scope(PurchaseReturn::query(), $request)->findOrFail($return);
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_POSTED, 'purchase_return', $posted, $before, [
-            'debit_note_id' => $result->debitNoteId,
-            'inventory_movement_ids' => $result->inventoryMovementIds,
-        ]);
+        $result = DB::transaction(function () use ($model, $request, $service, $before, $return) {
+            $result = $service->post(
+                $model,
+                $request->currentUserId(),
+                $request->expectedVersion(),
+            );
+            $posted = $this->scope(PurchaseReturn::query(), $request)->findOrFail($return);
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_POSTED, 'purchase_return', $posted, $before, [
+                'debit_note_id' => $result->debitNoteId,
+                'inventory_movement_ids' => $result->inventoryMovementIds,
+            ]);
+
+            return $result;
+        });
 
         return response()->json(['data' => [
             'purchase_return_id' => $result->documentId,
@@ -137,12 +149,15 @@ final class PurchaseReturnController
 
         $model = $this->scope(PurchaseReturn::query(), $request)->findOrFail($return);
         $before = $model->attributesToArray();
-        $updated = $service->cancel(
-            $model,
-            $request->expectedVersion(),
-        )
-            ->load($this->relations());
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_CANCELLED, 'purchase_return', $updated, $before);
+        $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseReturn {
+            $updated = $service->cancel(
+                $model,
+                $request->expectedVersion(),
+            )->load($this->relations());
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_CANCELLED, 'purchase_return', $updated, $before);
+
+            return $updated;
+        });
 
         return new PurchaseReturnResource($this->presentation->preparePurchaseReturn($updated));
     }
@@ -151,8 +166,12 @@ final class PurchaseReturnController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_CREATE_MANUAL);
 
-        $return = $service->create($request->toData())->load($this->relations());
-        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_CREATED, 'purchase_return', $return);
+        $return = DB::transaction(function () use ($request, $service): PurchaseReturn {
+            $return = $service->create($request->toData())->load($this->relations());
+            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_RETURN_CREATED, 'purchase_return', $return);
+
+            return $return;
+        });
 
         return new PurchaseReturnResource($this->presentation->preparePurchaseReturn($return));
     }
