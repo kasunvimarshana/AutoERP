@@ -66,17 +66,28 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
         self::assertStringContainsString("->update(['source_key' => \$key])", $migration);
     }
 
-    public function test_posted_or_reversed_journal_replay_does_not_repost_ledger(): void
+    public function test_posted_journal_replay_is_idempotent_and_reversed_journal_replay_is_rejected(): void
     {
-        $posting = $this->source('../Services/JournalPostingService.php');
-        $statusGuard = 'in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)';
+        foreach ([
+            '../Services/JournalPostingService.php',
+            '../Services/FinancePostingService.php',
+        ] as $servicePath) {
+            $posting = $this->source($servicePath);
+            self::assertStringContainsString('if ($status === JournalStatus::Posted)', $posting);
+            self::assertStringContainsString(
+                'Only draft journals can be posted. Reversed journals cannot be reposted.',
+                $posting,
+            );
+            self::assertStringNotContainsString(
+                'in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)',
+                $posting,
+            );
+        }
 
-        self::assertStringContainsString($statusGuard, $posting);
-        self::assertStringContainsString('return $this->resultFromJournal($journal, $status);', $posting);
-        self::assertStringContainsString('$ledgerCount = $this->ledger->post($journal);', $posting);
+        $ledger = $this->source('../Services/JournalPostingService.php');
         self::assertLessThan(
-            strpos($posting, '$ledgerCount = $this->ledger->post($journal);'),
-            strpos($posting, $statusGuard),
+            strpos($ledger, '$ledgerCount = $this->ledger->post($journal);'),
+            strpos($ledger, 'if ($status === JournalStatus::Posted)'),
         );
     }
 
