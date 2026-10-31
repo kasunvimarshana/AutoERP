@@ -6,6 +6,7 @@ namespace Modules\Purchase\Http\Controllers;
 
 use Dompdf\Dompdf;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -107,8 +108,12 @@ final class PurchaseOrderController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CREATE);
 
         try {
-            $order = $service->create($request->toData());
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_CREATED, 'purchase_order', $order);
+            $order = DB::transaction(function () use ($request, $service): PurchaseOrder {
+                $order = $service->create($request->toData());
+                $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_CREATED, 'purchase_order', $order);
+
+                return $order;
+            });
 
             return (new PurchaseOrderResource($this->presentation->preparePurchaseOrder($order)))
                 ->response()
@@ -221,12 +226,16 @@ final class PurchaseOrderController
         try {
             $model = $this->scope(PurchaseOrder::query(), $request)->findOrFail($order);
             $before = $model->attributesToArray();
-            $updated = $service->update(
-                $model,
-                $request->toData(),
-                $request->expectedVersion(),
-            );
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_UPDATED, 'purchase_order', $updated, $before);
+            $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseOrder {
+                $updated = $service->update(
+                    $model,
+                    $request->toData(),
+                    $request->expectedVersion(),
+                );
+                $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_UPDATED, 'purchase_order', $updated, $before);
+
+                return $updated;
+            });
 
             return new PurchaseOrderResource($this->presentation->preparePurchaseOrder($updated));
         } catch (InvalidArgumentException $exception) {
@@ -242,8 +251,10 @@ final class PurchaseOrderController
 
         $model = $this->scope(PurchaseOrder::query(), $request)->findOrFail($order);
         $before = $model->attributesToArray();
-        $service->delete($model, $request->expectedVersion());
-        $this->audit->recordDeletedDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_DELETED, 'purchase_order', $model, $before);
+        DB::transaction(function () use ($model, $request, $service, $before): void {
+            $service->delete($model, $request->expectedVersion());
+            $this->audit->recordDeletedDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_DELETED, 'purchase_order', $model, $before);
+        });
 
         return response()->json(status: 204);
     }
@@ -255,12 +266,16 @@ final class PurchaseOrderController
         try {
             $model = $this->scope(PurchaseOrder::query(), $request)->findOrFail($order);
             $before = $model->attributesToArray();
-            $updated = $service->approve(
-                $model,
-                $request->currentUserId(),
-                $request->expectedVersion(),
-            );
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_APPROVED, 'purchase_order', $updated, $before);
+            $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseOrder {
+                $updated = $service->approve(
+                    $model,
+                    $request->currentUserId(),
+                    $request->expectedVersion(),
+                );
+                $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_APPROVED, 'purchase_order', $updated, $before);
+
+                return $updated;
+            });
 
             return new PurchaseOrderResource($this->presentation->preparePurchaseOrder($updated));
         } catch (InvalidArgumentException $exception) {
@@ -277,12 +292,16 @@ final class PurchaseOrderController
         try {
             $model = $this->scope(PurchaseOrder::query(), $request)->findOrFail($order);
             $before = $model->attributesToArray();
-            $updated = $service->submit(
-                $model,
-                $request->currentUserId(),
-                $request->expectedVersion(),
-            );
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_SUBMITTED, 'purchase_order', $updated, $before);
+            $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseOrder {
+                $updated = $service->submit(
+                    $model,
+                    $request->currentUserId(),
+                    $request->expectedVersion(),
+                );
+                $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_SUBMITTED, 'purchase_order', $updated, $before);
+
+                return $updated;
+            });
 
             return new PurchaseOrderResource($this->presentation->preparePurchaseOrder($updated));
         } catch (InvalidArgumentException $exception) {
@@ -299,12 +318,16 @@ final class PurchaseOrderController
         try {
             $model = $this->scope(PurchaseOrder::query(), $request)->findOrFail($order);
             $before = $model->attributesToArray();
-            $updated = $service->cancel(
-                $model,
-                $request->currentUserId(),
-                $request->expectedVersion(),
-            );
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_CANCELLED, 'purchase_order', $updated, $before);
+            $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseOrder {
+                $updated = $service->cancel(
+                    $model,
+                    $request->currentUserId(),
+                    $request->expectedVersion(),
+                );
+                $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_CANCELLED, 'purchase_order', $updated, $before);
+
+                return $updated;
+            });
 
             return new PurchaseOrderResource($this->presentation->preparePurchaseOrder($updated));
         } catch (InvalidArgumentException $exception) {
@@ -321,12 +344,16 @@ final class PurchaseOrderController
         try {
             $model = $this->scope(PurchaseOrder::query(), $request)->findOrFail($order);
             $before = $model->attributesToArray();
-            $updated = $service->close(
-                $model,
-                $request->currentUserId(),
-                $request->expectedVersion(),
-            );
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_CLOSED, 'purchase_order', $updated, $before);
+            $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseOrder {
+                $updated = $service->close(
+                    $model,
+                    $request->currentUserId(),
+                    $request->expectedVersion(),
+                );
+                $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_ORDER_CLOSED, 'purchase_order', $updated, $before);
+
+                return $updated;
+            });
 
             return new PurchaseOrderResource($this->presentation->preparePurchaseOrder($updated));
         } catch (InvalidArgumentException $exception) {
