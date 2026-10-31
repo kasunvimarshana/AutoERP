@@ -522,6 +522,61 @@ final class PurchaseOrderApiTest extends TestCase
             ->where('tenant_id', $context['tenant_id'])->count());
     }
 
+    public function test_grn_post_rolls_back_inventory_and_finance_when_audit_fails(): void
+    {
+        $context = $this->context('AUDITGRNPOST');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+        $grn = $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'received_date' => '2026-06-18',
+            'warehouse_id' => $context['warehouse_id'],
+            'purchase_order_id' => $order['id'],
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'purchase_order_line_id' => $order['lines'][0]['id'],
+                'ordered_quantity' => '10.000000',
+                'received_quantity' => '1.000000',
+                'accepted_quantity' => '1.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ])->assertCreated()->json('data');
+
+        $previousMovements = DB::table('inventory_movements')
+            ->where('tenant_id', $context['tenant_id'])->count();
+        $previousJournals = DB::table('finance_journal_entries')
+            ->where('tenant_id', $context['tenant_id'])->count();
+
+        $this->mock(AuditRecorderInterface::class, function ($mock): void {
+            $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::GOODS_RECEIPT_POSTED)
+                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::GOODS_RECEIPT_POSTED);
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->withAuth($context)->patchJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', [
+                'tenant_id' => $context['tenant_id'],
+                'expected_version' => $grn['row_version'],
+            ]);
+            self::fail('GRN posting without audit must roll back inventory and Finance.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        }
+
+        $persisted = DB::table('goods_receipt_notes')->where('tenant_id', $context['tenant_id'])
+            ->where('id', $grn['id'])->first();
+        self::assertSame('draft', $persisted->status);
+        self::assertSame((int) $grn['row_version'], (int) $persisted->row_version);
+        self::assertSame($previousMovements, DB::table('inventory_movements')
+            ->where('tenant_id', $context['tenant_id'])->count());
+        self::assertSame($previousJournals, DB::table('finance_journal_entries')
+            ->where('tenant_id', $context['tenant_id'])->count());
+    }
+
     public function test_approve_cancel_and_close_purchase_orders(): void
     {
         $context = $this->context();
