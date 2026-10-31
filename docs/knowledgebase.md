@@ -114,6 +114,18 @@ The newly attached `TACGL(20261011-122256).zip` has SHA-256 `79c2404949434379787
 
 All four videos uploaded on 2026-10-11 match the individual SHA-256 fingerprints in §2.2, as do the attached engineering rules relative to the repository root copies at the content level. This is an **identity/reuse verification**, not a claim that the videos were watched continuously again or that the password-protected nested backup was decrypted. It introduces **no new evidence for pricing, adjustment liability, VAT/withholding, free-kilometre pooling, or other monetary rules**. The open release gates in `docs/vehicle-rental/TODO.md` §R remain open; in particular, an incident must not automatically become a debit note, credit note, customer recovery or owner deduction without approved evidence and explicit policy.
 
+### 2026-10-31 uploaded-source identity verification
+
+A new dated TACGL archive and reuploaded videos were inspected **without treating duplicate bytes as new business evidence**:
+
+- Canonical `TACGL.zip`: SHA-256 `0e0733fff720072af4c3aaa787995ff128bfa79060a37739d6d2ebbe18a25313`; 452 non-directory entries under the `TACGL/` wrapper.
+- Newly supplied `TACGL(20261031-171427).zip`: SHA-256 `79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77`; 452 non-directory entries without that wrapper.
+- After normalizing the directory prefix, all 452 paths, sizes and CRCs match. Every corresponding decompressed file also matches by SHA-256; no additional or changed business records or report layouts were found in the dated ZIP.
+- The accompanying `TACGL.rar` has SHA-256 `0001a91ab4dfdf31d60f669b30f1ccc2da475d7841b2ceea505ef97eff5bedbf`, matching the previously registered archive. Its protected nested backup remains **unavailable evidence** absent a valid password.
+- All four reuploaded MP4 files have the exact SHA-256 fingerprints already recorded in §2.2 (respectively `ac4ca8e6…`, `11866d25…`, `cd2ba139…`, `c9853b79…`). FFprobe reports approximately 40:50, 41:58, 21:14 and 12:24; this is an **identity and media-metadata check**, not a new frame-by-frame video review.
+
+**Interpretation:** these uploads corroborate the registered primary sources but introduce no new proven tariffs, proration conventions, owner/customer liability splits, historical currencies, tax percentages or posting policy. Preserve all existing evidence classifications and unresolved financial release gates. This check does not imply that any runtime change was tested, merged, deployed or approved. The reproducible check and its limits are recorded in [the 2026-10-31 change record](changes/2026-10-31-tacgl-upload-identity-verification.md).
+
 ### 2.3 Evidence classes
 
 Every rule in this document belongs to one of these classes:
