@@ -138,6 +138,8 @@ final class FinancePostingService implements FinancePostingInterface
         $journal = FinanceJournalEntry::query()->lockForUpdate()->findOrFail($journalId);
         $status = $this->statusOf($journal);
         if ($status === JournalStatus::Posted) {
+            $this->posting->post($journal, $postedBy);
+
             return $this->resultFromJournal($journal);
         }
         if ($status !== JournalStatus::Draft) {
@@ -247,8 +249,12 @@ final class FinancePostingService implements FinancePostingInterface
         if ($stored === '' || ! hash_equals($stored, $fingerprint)) {
             throw new InvalidArgumentException('Finance posting source was already used with different posting facts.');
         }
-        if ($this->statusOf($journal) === JournalStatus::Reversed) {
+        $status = $this->statusOf($journal);
+        if ($status === JournalStatus::Reversed) {
             throw new InvalidArgumentException('Reversed Finance posting sources cannot be replayed.');
+        }
+        if ($status === JournalStatus::Posted) {
+            $this->posting->post($journal);
         }
 
         return $this->resultFromJournal($journal);
