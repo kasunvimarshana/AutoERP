@@ -577,6 +577,63 @@ final class PurchaseOrderApiTest extends TestCase
             ->where('tenant_id', $context['tenant_id'])->count());
     }
 
+    public function test_order_create_rolls_back_when_audit_write_fails(): void
+    {
+        $context = $this->context('AUDITORDER');
+        $this->mock(AuditRecorderInterface::class, function ($mock): void {
+            $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_ORDER_CREATED)
+                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_ORDER_CREATED);
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context));
+            self::fail('Purchase order creation without audit must roll back.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        }
+
+        self::assertSame(0, DB::table('purchase_orders')
+            ->where('tenant_id', $context['tenant_id'])->count());
+        self::assertSame(0, DB::table('purchase_order_lines')
+            ->where('tenant_id', $context['tenant_id'])->count());
+    }
+
+    public function test_order_delete_rolls_back_when_audit_write_fails(): void
+    {
+        $context = $this->context('AUDITORDERDELETE');
+        $order = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))
+            ->assertCreated()->json('data');
+
+        $this->mock(AuditRecorderInterface::class, function ($mock): void {
+            $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_ORDER_DELETED)
+                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_ORDER_DELETED);
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->withAuth($context)->deleteJson('/api/v1/purchase/orders/'.$order['id'], [
+                'tenant_id' => $context['tenant_id'],
+                'expected_version' => $order['row_version'],
+            ]);
+            self::fail('Purchase order deletion without audit must roll back.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        }
+
+        $persisted = DB::table('purchase_orders')->where('tenant_id', $context['tenant_id'])
+            ->where('id', $order['id'])->first();
+        self::assertNotNull($persisted);
+        self::assertNull($persisted->deleted_at);
+        self::assertSame('draft', $persisted->status);
+    }
+
     public function test_approve_cancel_and_close_purchase_orders(): void
     {
         $context = $this->context();
