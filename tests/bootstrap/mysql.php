@@ -6,7 +6,7 @@ const AUTOERP_SUPPORTED_MYSQL_TEST_CONNECTIONS = ['mysql', 'mariadb'];
 const AUTOERP_TEST_DATABASE_SUFFIX = '_test';
 
 $connection = strtolower(trim((string) getenv('DB_CONNECTION')));
-$database = strtolower(trim((string) getenv('DB_DATABASE')));
+$database = trim((string) getenv('DB_DATABASE'));
 $databaseUrl = trim((string) getenv('DB_URL'));
 $host = trim((string) getenv('DB_HOST'));
 
@@ -18,7 +18,7 @@ if ($databaseUrl !== '') {
     throw new RuntimeException('MySQL verification requires DB_URL to be empty so the guarded DB_DATABASE target is authoritative.');
 }
 
-if ($database === '' || ! str_ends_with($database, AUTOERP_TEST_DATABASE_SUFFIX)) {
+if ($database === '' || ! str_ends_with(strtolower($database), AUTOERP_TEST_DATABASE_SUFFIX)) {
     throw new RuntimeException('MySQL verification requires a disposable DB_DATABASE ending with _test.');
 }
 
