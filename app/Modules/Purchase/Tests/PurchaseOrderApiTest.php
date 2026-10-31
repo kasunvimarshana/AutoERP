@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Audit\Contracts\AuditRecorderInterface;
+use Modules\Audit\Data\AuditEventData;
+use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
@@ -316,7 +318,10 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->mock(AuditRecorderInterface::class, function ($mock): void {
             $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_CREATED)
                 ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_CREATED);
         });
 
         $this->withoutExceptionHandling();
@@ -357,7 +362,10 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->mock(AuditRecorderInterface::class, function ($mock): void {
             $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_APPROVED)
                 ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_APPROVED);
         });
 
         $this->withoutExceptionHandling();
@@ -399,7 +407,10 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->mock(AuditRecorderInterface::class, function ($mock): void {
             $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_POSTED)
                 ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_POSTED);
         });
 
         $this->withoutExceptionHandling();
@@ -426,7 +437,10 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->mock(AuditRecorderInterface::class, function ($mock): void {
             $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::GOODS_RECEIPT_CREATED)
                 ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::GOODS_RECEIPT_CREATED);
         });
         $this->withoutExceptionHandling();
 
@@ -481,7 +495,10 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->mock(AuditRecorderInterface::class, function ($mock): void {
             $mock->shouldReceive('record')->once()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_RETURN_POSTED)
                 ->andThrow(new \RuntimeException('Injected purchase audit failure'));
+            $mock->shouldReceive('record')->zeroOrMoreTimes()
+                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_RETURN_POSTED);
         });
         $this->withoutExceptionHandling();
 
