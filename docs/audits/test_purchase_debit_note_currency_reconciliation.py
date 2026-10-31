@@ -200,5 +200,49 @@ class PurchaseDebitNoteCurrencyAuditTest(unittest.TestCase):
         ))
 
 
+    def test_invalid_zero_or_negative_allocation_does_not_hide_inside_balanced_totals(self) -> None:
+        # The original conservation SELECT checked only equalities and could
+        # miss a negative allocation offset by a larger remaining balance.
+        self.db.execute(
+            "INSERT INTO purchase_debit_notes VALUES (10,1,1,11,'supplier',2,NULL,30,-5,35)"
+        )
+        self.db.execute(
+            "INSERT INTO invoice_credit_allocations VALUES (11,1,1,'purchase_debit_note',10,1,-5)"
+        )
+        # A zero allocation can coexist with otherwise valid credit history.
+        self.db.execute(
+            "INSERT INTO invoice_credit_allocations VALUES (12,1,1,'purchase_debit_note',3,3,0)"
+        )
+
+        allocation_flags = {
+            row["allocation_id"]: row["review_reason"] for row in self.report(2)
+        }
+        self.assertEqual("invalid_allocation_amount", allocation_flags[11])
+        self.assertEqual("invalid_allocation_amount", allocation_flags[12])
+
+        invalid_note_ids = {
+            row["purchase_debit_note_id"] for row in self.report(3)
+        }
+        self.assertIn(10, invalid_note_ids)
+        note = next(row for row in self.report(3)
+                    if row["purchase_debit_note_id"] == 10)
+        self.assertEqual(-5, note["stored_allocated_amount"])
+        self.assertEqual(-5, note["invoice_credit_allocation_sum"])
+        self.assertEqual(30, note["amount"])
+        self.assertEqual(35, note["stored_remaining_amount"])
+
+    def test_nonpositive_face_value_and_negative_remaining_are_audited(self) -> None:
+        # No mismatch or allocation exists; only sign constraints can catch
+        # these inconsistent legacy financial rows.
+        self.db.execute(
+            "INSERT INTO purchase_debit_notes VALUES (10,1,1,11,'supplier',2,NULL,0,0,0)"
+        )
+        self.db.execute(
+            "INSERT INTO purchase_debit_notes VALUES (11,1,1,11,'supplier',2,NULL,-10,0,-10)"
+        )
+        flagged = {row["purchase_debit_note_id"] for row in self.report(3)}
+        self.assertEqual({1, 10, 11}, flagged)
+
+
 if __name__ == "__main__":
     unittest.main()
