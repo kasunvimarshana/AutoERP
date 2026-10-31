@@ -17,10 +17,11 @@ Within `app/Modules/Purchase/Http/Controllers/PurchaseDebitNoteController.php`, 
 
 ## Regression coverage
 
-Two real API regression tests were added to the existing `PurchaseOrderApiTest` fixture:
+Three real API regression tests were added to the existing `PurchaseOrderApiTest` fixture:
 
 1. Inject a failing `AuditRecorderInterface` after valid authorization and supplier/currency setup; a manual debit note POST must throw and leave **zero** persisted notes.
 2. Create a valid audited manual note, then inject an audit failure on approve; the note must remain **draft**, its `row_version` unchanged and `approved_at` NULL.
+3. Create and approve a valid audited manual note, then inject an audit failure on post; the note must remain **approved** with the previously recorded version.
 
 These tests exercise the existing authorization, request, service, transaction and audit DI boundaries and will fail on the prior implementation. They do not mock away Purchase business logic.
 
