@@ -247,6 +247,9 @@ final class FinancePostingService implements FinancePostingInterface
         if ($stored === '' || ! hash_equals($stored, $fingerprint)) {
             throw new InvalidArgumentException('Finance posting source was already used with different posting facts.');
         }
+        if ($this->statusOf($journal) === JournalStatus::Reversed) {
+            throw new InvalidArgumentException('Reversed Finance posting sources cannot be replayed.');
+        }
 
         return $this->resultFromJournal($journal);
     }
