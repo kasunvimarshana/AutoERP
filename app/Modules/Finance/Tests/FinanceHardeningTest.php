@@ -201,6 +201,62 @@ final class FinanceHardeningTest extends TestCase
         });
     }
 
+    public function test_unbalanced_source_lines_cannot_hide_behind_balanced_journal_header(): void
+    {
+        [$tenantId] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $posting = app(FinancePostingInterface::class);
+            $draft = $posting->createDraftJournal($this->directRequest($tenantId, '2026-06-30'));
+
+            // Simulate a stale imported header: both header sides still balance
+            // each other, but neither matches the underlying journal lines.
+            FinanceJournalEntry::query()->findOrFail($draft->journalId)
+                ->forceFill(['total_debit' => '90.000000', 'total_credit' => '90.000000'])
+                ->save();
+
+            try {
+                $posting->postJournal($draft->journalId);
+                $this->fail('A journal with inconsistent header and line totals was posted.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame('Journal header totals do not match its lines.', $exception->getMessage());
+            }
+
+            $this->assertDatabaseHas('finance_journal_entries', [
+                'id' => $draft->journalId,
+                'status' => 'draft',
+            ]);
+            $this->assertDatabaseCount('finance_ledger_entries', 0);
+        });
+    }
+
+    public function test_draft_journal_without_lines_cannot_post_zero_entry_ledger(): void
+    {
+        [$tenantId] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $posting = app(FinancePostingInterface::class);
+            $draft = $posting->createDraftJournal($this->directRequest($tenantId, '2026-06-30'));
+
+            // An incomplete historical import must never become a posted
+            // journal merely because the stored header still balances.
+            DB::table('finance_journal_lines')
+                ->where('journal_entry_id', $draft->journalId)
+                ->delete();
+
+            try {
+                $posting->postJournal($draft->journalId);
+                $this->fail('A journal with no lines was posted.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame('Journal cannot be posted without lines.', $exception->getMessage());
+            }
+
+            $this->assertDatabaseHas('finance_journal_entries', [
+                'id' => $draft->journalId,
+                'status' => 'draft',
+            ]);
+            $this->assertDatabaseCount('finance_ledger_entries', 0);
+        });
+    }
+
     public function test_source_owned_journal_cannot_be_reversed_directly_from_finance(): void
     {
         [$tenantId] = $this->context();
