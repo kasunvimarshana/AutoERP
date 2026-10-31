@@ -134,13 +134,19 @@ final class PurchaseDebitNoteService
         if ($data->currencyId !== null) {
             throw new InvalidArgumentException('Purchase return debit note currency is determined by the source.');
         }
-        if ($purchaseReturn->currency_id !== null) {
-            return (int) $purchaseReturn->currency_id;
+        $returnCurrencyId = $purchaseReturn->currency_id === null
+            ? null
+            : (int) $purchaseReturn->currency_id;
+        if ((string) $purchaseReturn->source_type !== 'goods_receipt_note') {
+            return $returnCurrencyId;
         }
-        if ((string) $purchaseReturn->source_type !== 'goods_receipt_note' || $purchaseReturn->source_id === null) {
-            return null;
+        if ($purchaseReturn->source_id === null) {
+            throw new InvalidArgumentException('Referenced purchase return has no source receipt.');
         }
 
+        // Validate the entire referenced source chain even when the return
+        // already has a currency. A stored currency must not conceal a foreign
+        // supplier/organization receipt or a conflicting purchase order.
         $receipt = GoodsReceiptNote::query()->findOrFail((int) $purchaseReturn->source_id);
         if ((int) $receipt->tenant_id !== $data->tenantId
             || $receipt->organization_unit_id !== $data->organizationUnitId
@@ -149,7 +155,7 @@ final class PurchaseDebitNoteService
             throw new InvalidArgumentException('Purchase debit note source receipt is outside the return scope.');
         }
         if ($receipt->purchase_order_id === null) {
-            return null;
+            return $returnCurrencyId;
         }
 
         $order = PurchaseOrder::query()->findOrFail((int) $receipt->purchase_order_id);
@@ -160,7 +166,14 @@ final class PurchaseDebitNoteService
             throw new InvalidArgumentException('Purchase debit note source order is outside the return scope.');
         }
 
-        return $order->currency_id === null ? null : (int) $order->currency_id;
+        $orderCurrencyId = $order->currency_id === null ? null : (int) $order->currency_id;
+        if ($returnCurrencyId !== null && $orderCurrencyId !== null
+            && $returnCurrencyId !== $orderCurrencyId
+        ) {
+            throw new InvalidArgumentException('Purchase return currency conflicts with its source purchase order.');
+        }
+
+        return $returnCurrencyId ?? $orderCurrencyId;
     }
 
     public function approve(PurchaseDebitNote $note, ?int $approvedBy = null, ?int $expectedVersion = null): PurchaseDebitNote
