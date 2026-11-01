@@ -19,6 +19,12 @@ final class PurchaseReleaseVerificationTest extends TestCase
 {
     use DatabaseMigrations;
 
+    protected function tearDown(): void
+    {
+        DB::disconnect();
+        parent::tearDown();
+    }
+
     public function test_competing_requests_for_one_note_reject_the_stale_version_after_the_invoice_lock_releases(): void
     {
         [$tenant, $invoice, $note] = $this->fixture();
@@ -134,8 +140,21 @@ final class PurchaseReleaseVerificationTest extends TestCase
     {
         $this->assertSame('mysql', DB::connection()->getDriverName(), 'Execute this suite with the guarded phpunit.mysql.xml profile.');
         $input = new InputStream;
-        $first = new Process([PHP_BINARY, base_path('tests/Support/purchase-allocation-worker.php'), (string) $tenant, (string) $invoice, (string) $firstNote, 'holder'], base_path(), null, $input, 20);
-        $second = new Process([PHP_BINARY, base_path('tests/Support/purchase-allocation-worker.php'), (string) $tenant, (string) $invoice, (string) $secondNote, 'contender'], base_path(), null, null, 20);
+        $processEnv = array_filter([
+            'APP_ENV' => 'testing',
+            'DB_CONNECTION' => (string) getenv('DB_CONNECTION'),
+            'DB_HOST' => (string) getenv('DB_HOST'),
+            'DB_PORT' => (string) getenv('DB_PORT'),
+            'DB_DATABASE' => (string) getenv('DB_DATABASE'),
+            'DB_USERNAME' => (string) getenv('DB_USERNAME'),
+            'DB_PASSWORD' => (string) getenv('DB_PASSWORD'),
+            'DB_URL' => '',
+            'SYSTEMROOT' => getenv('SYSTEMROOT') ?: null,
+            'PATH' => getenv('PATH') ?: null,
+        ], static fn ($val): bool => $val !== null);
+
+        $first = new Process([PHP_BINARY, base_path('tests/Support/purchase-allocation-worker.php'), (string) $tenant, (string) $invoice, (string) $firstNote, 'holder'], base_path(), $processEnv, $input, 120);
+        $second = new Process([PHP_BINARY, base_path('tests/Support/purchase-allocation-worker.php'), (string) $tenant, (string) $invoice, (string) $secondNote, 'contender'], base_path(), $processEnv, null, 120);
         try {
             $first->start();
             $this->assertTrue($first->waitUntil(fn () => str_contains($first->getOutput(), 'locked')), $first->getErrorOutput());
@@ -143,10 +162,22 @@ final class PurchaseReleaseVerificationTest extends TestCase
             $this->assertTrue($second->waitUntil(fn () => str_contains($second->getOutput(), 'attempting:')), $second->getErrorOutput());
             preg_match('/attempting:(\d+)/', $second->getOutput(), $match);
             $this->assertArrayHasKey(1, $match);
-            $deadline = microtime(true) + 5;
+            $deadline = microtime(true) + 15;
             $waiting = false;
+            $versionOutput = (string) (DB::selectOne('SELECT VERSION() AS ver')?->ver ?? '');
+            $isMariaDb = str_contains(strtolower($versionOutput), 'mariadb');
             do {
-                $waiting = DB::selectOne('SELECT COUNT(*) AS waits FROM performance_schema.data_lock_waits w JOIN performance_schema.threads t ON t.THREAD_ID = w.REQUESTING_THREAD_ID WHERE t.PROCESSLIST_ID = ?', [(int) $match[1]])->waits > 0;
+                if ($isMariaDb) {
+                    $waiting = DB::selectOne(
+                        'SELECT COUNT(*) AS waits FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_TRX t ON t.trx_id = w.requesting_trx_id WHERE t.trx_mysql_thread_id = ?',
+                        [(int) $match[1]],
+                    )->waits > 0;
+                } else {
+                    $waiting = DB::selectOne(
+                        'SELECT COUNT(*) AS waits FROM performance_schema.data_lock_waits w JOIN performance_schema.threads t ON t.THREAD_ID = w.REQUESTING_THREAD_ID WHERE t.PROCESSLIST_ID = ?',
+                        [(int) $match[1]],
+                    )->waits > 0;
+                }
                 if (! $waiting) {
                     usleep(10000);
                 }

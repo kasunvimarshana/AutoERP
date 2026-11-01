@@ -24,6 +24,7 @@ use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\FinanceStatementService;
+use Modules\Finance\Services\JournalPostingService;
 use Modules\Finance\Services\JournalReversalService;
 use Modules\Finance\Services\TrialBalanceService;
 use Tests\TestCase;
@@ -181,7 +182,7 @@ final class FinanceHardeningTest extends TestCase
                     'Reversed Finance posting sources cannot be replayed.'],
                 [fn () => $posting->post($request),
                     'Reversed Finance posting sources cannot be replayed.'],
-                [fn () => app(\\Modules\\Finance\\Services\\JournalPostingService::class)->post(
+                [fn () => app(JournalPostingService::class)->post(
                     FinanceJournalEntry::query()->findOrFail($posted->journalId),
                 ), 'Only draft journals can be posted. Reversed journals cannot be reposted.'],
             ] as [$repost, $expectedMessage]) {

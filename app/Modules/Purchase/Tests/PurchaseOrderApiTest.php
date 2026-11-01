@@ -339,6 +339,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('Debit note creation must not succeed without its audit record.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         self::assertSame(0, DB::table('purchase_debit_notes')
@@ -377,6 +379,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('Debit note approval must not succeed without its audit record.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         $persisted = DB::table('purchase_debit_notes')->where('tenant_id', $context['tenant_id'])
@@ -422,6 +426,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('Debit note posting must not succeed without its audit record.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         $persisted = DB::table('purchase_debit_notes')->where('tenant_id', $context['tenant_id'])
@@ -464,6 +470,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('GRN creation without its audit event must roll back.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         self::assertSame(0, DB::table('goods_receipt_notes')
@@ -510,6 +518,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('Purchase return posting without audit must roll back.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         $persisted = DB::table('purchase_returns')->where('tenant_id', $context['tenant_id'])
@@ -565,6 +575,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('GRN posting without audit must roll back inventory and Finance.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         $persisted = DB::table('goods_receipt_notes')->where('tenant_id', $context['tenant_id'])
@@ -594,6 +606,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('Purchase order creation without audit must roll back.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         self::assertSame(0, DB::table('purchase_orders')
@@ -625,6 +639,8 @@ final class PurchaseOrderApiTest extends TestCase
             self::fail('Purchase order deletion without audit must roll back.');
         } catch (\RuntimeException $exception) {
             self::assertSame('Injected purchase audit failure', $exception->getMessage());
+        } finally {
+            $this->withExceptionHandling();
         }
 
         $persisted = DB::table('purchase_orders')->where('tenant_id', $context['tenant_id'])
