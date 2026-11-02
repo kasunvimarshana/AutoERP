@@ -37,6 +37,7 @@ export interface FinanceAccountRole extends FinanceLookup {
 export interface FinanceAccountAssignment extends Record<string, unknown> {
     id: number;
     organization_unit_id?: number | null;
+    organization_unit?: { id: number; code: string; name: string } | null;
     account_role_id: number;
     account_id: number;
     effective_from: string;
@@ -48,7 +49,9 @@ export interface FinanceAccountAssignment extends Record<string, unknown> {
 
 export interface PostingProfile extends FinanceLookup {
     row_version: number;
+    description?: string | null;
     organization_unit_id?: number | null;
+    organization_unit?: { id: number; code: string; name: string } | null;
     scope?: 'tenant_default' | 'organization';
     rules?: Array<{
         id: number;
@@ -59,6 +62,30 @@ export interface PostingProfile extends FinanceLookup {
         is_active: boolean;
         role?: FinanceAccountRole;
         description?: string | null;
+    }>;
+}
+
+export interface PostingProfileSimulationResult {
+    profile_id: number;
+    profile_code: string;
+    profile_name: string;
+    posting_date: string;
+    organization_unit_id: number | null;
+    is_ready: boolean;
+    lines: Array<{
+        line_key: string;
+        account_role_id: number;
+        role: { id: number; code: string; name: string; is_active: boolean } | null;
+        status: 'resolved' | 'missing_role' | 'error';
+        resolved_account: {
+            id: number;
+            code: string;
+            name: string;
+            normal_balance: string;
+            scope: 'tenant_default' | 'organization';
+            organization_unit_id: number | null;
+        } | null;
+        message: string | null;
     }>;
 }
 

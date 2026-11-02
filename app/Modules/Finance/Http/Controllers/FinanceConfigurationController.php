@@ -51,6 +51,7 @@ final class FinanceConfigurationController
         )
             ->where('is_active', true)
             ->with('rules.role:id,code,name,is_active')
+            ->with('organizationUnit:id,name,code')
             ->orderByRaw('organization_unit_id IS NULL ASC')
             ->orderBy('code')
             ->get();
@@ -68,7 +69,7 @@ final class FinanceConfigurationController
                     $query->orWhere('organization_unit_id', $organizationUnitId);
                 }
             })
-            ->with(['role:id,code,name', 'account:id,code,name'])
+            ->with(['role:id,code,name', 'account:id,code,name', 'organizationUnit:id,name,code'])
             ->orderByRaw('organization_unit_id IS NULL ASC')
             ->orderBy('account_role_id')
             ->orderByDesc('effective_from')
@@ -104,6 +105,7 @@ final class FinanceConfigurationController
                 $request->organizationUnitId(),
             )
                 ->with('rules.role')
+                ->with('organizationUnit')
                 ->orderByRaw('organization_unit_id IS NULL ASC')
                 ->orderBy('code')
                 ->paginate($request->perPage()),
@@ -201,7 +203,7 @@ final class FinanceConfigurationController
                         $query->orWhere('organization_unit_id', $request->organizationUnitId());
                     }
                 })
-                ->with(['role', 'account'])
+                ->with(['role', 'account', 'organizationUnit'])
                 ->orderByRaw('organization_unit_id IS NULL ASC')
                 ->orderBy('account_role_id')
                 ->orderByDesc('effective_from')
@@ -239,6 +241,120 @@ final class FinanceConfigurationController
             (string) $request->input('effective_to'),
             $request->currentUserId(),
         ));
+    }
+
+    public function simulatePostingProfile(
+        ListFinanceRequest $request,
+        int $profile,
+        AccountRoleAssignmentService $assignmentService,
+    ): JsonResponse {
+        $model = $this->scopeOrganizationWithTenantFallback(
+            FinancePostingProfile::query()->where('tenant_id', $request->tenantId()),
+            $request->organizationUnitId(),
+        )->with('rules.role')->findOrFail($profile);
+
+        $postingDate = trim((string) $request->input('posting_date', now()->toDateString()));
+        if ($postingDate === '') {
+            $postingDate = now()->toDateString();
+        }
+        $organizationUnitId = $request->organizationUnitId();
+
+        $activeRules = $model->rules->filter(function ($rule) use ($postingDate): bool {
+            if (! (bool) $rule->is_active) {
+                return false;
+            }
+            $from = $rule->effective_from?->format('Y-m-d') ?? (string) $rule->getRawOriginal('effective_from');
+            if ($from && strcmp($from, $postingDate) > 0) {
+                return false;
+            }
+            $to = $rule->effective_to?->format('Y-m-d') ?? (string) $rule->getRawOriginal('effective_to');
+            if ($to && strcmp($to, $postingDate) < 0) {
+                return false;
+            }
+
+            return true;
+        });
+
+        $results = [];
+        $hasErrors = false;
+
+        foreach ($activeRules as $rule) {
+            $role = $rule->role;
+            if (! $role instanceof FinanceAccountRole || ! (bool) $role->is_active) {
+                $hasErrors = true;
+                $results[] = [
+                    'line_key' => (string) $rule->line_key,
+                    'account_role_id' => (int) $rule->account_role_id,
+                    'role' => $role ? [
+                        'id' => (int) $role->getKey(),
+                        'code' => (string) $role->code,
+                        'name' => (string) $role->name,
+                        'is_active' => (bool) $role->is_active,
+                    ] : null,
+                    'status' => 'missing_role',
+                    'resolved_account' => null,
+                    'message' => 'Role is missing or inactive.',
+                ];
+                continue;
+            }
+
+            try {
+                $account = $assignmentService->resolve(
+                    $request->tenantId(),
+                    $organizationUnitId,
+                    $role,
+                    $postingDate,
+                );
+
+                $results[] = [
+                    'line_key' => (string) $rule->line_key,
+                    'account_role_id' => (int) $role->getKey(),
+                    'role' => [
+                        'id' => (int) $role->getKey(),
+                        'code' => (string) $role->code,
+                        'name' => (string) $role->name,
+                        'is_active' => (bool) $role->is_active,
+                    ],
+                    'status' => 'resolved',
+                    'resolved_account' => [
+                        'id' => (int) $account->getKey(),
+                        'code' => (string) $account->code,
+                        'name' => (string) $account->name,
+                        'normal_balance' => (string) $account->normal_balance->value,
+                        'scope' => $account->organization_unit_id === null ? 'tenant_default' : 'organization',
+                        'organization_unit_id' => $account->organization_unit_id,
+                    ],
+                    'message' => null,
+                ];
+            } catch (\Throwable $e) {
+                $hasErrors = true;
+                $results[] = [
+                    'line_key' => (string) $rule->line_key,
+                    'account_role_id' => (int) $role->getKey(),
+                    'role' => [
+                        'id' => (int) $role->getKey(),
+                        'code' => (string) $role->code,
+                        'name' => (string) $role->name,
+                        'is_active' => (bool) $role->is_active,
+                    ],
+                    'status' => 'error',
+                    'resolved_account' => null,
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'data' => [
+                'profile_id' => (int) $model->getKey(),
+                'profile_code' => (string) $model->code,
+                'profile_name' => (string) $model->name,
+                'posting_date' => $postingDate,
+                'organization_unit_id' => $organizationUnitId,
+                'is_ready' => ! $hasErrors && count($results) > 0,
+                'lines' => $results,
+            ],
+        ]);
     }
 
     private function scopeOrganization(Builder $query, ?int $organizationUnitId): Builder

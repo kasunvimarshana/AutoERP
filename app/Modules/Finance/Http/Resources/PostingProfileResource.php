@@ -25,6 +25,11 @@ final class PostingProfileResource extends JsonResource
             'description' => $this->description,
             'is_active' => (bool) $this->is_active,
             'rules' => PostingProfileRuleResource::collection($this->whenLoaded('rules')),
+            'organization_unit' => $this->whenLoaded('organizationUnit', fn (): ?array => $this->organizationUnit ? [
+                'id' => (int) $this->organizationUnit->getKey(),
+                'code' => (string) $this->organizationUnit->code,
+                'name' => (string) $this->organizationUnit->name,
+            ] : null),
         ];
     }
 }

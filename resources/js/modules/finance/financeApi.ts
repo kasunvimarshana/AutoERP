@@ -23,6 +23,7 @@ import type {
     LedgerEntry,
     PostingProfile,
     PostingProfilePayload,
+    PostingProfileSimulationResult,
     TrialBalance,
 } from './financeTypes';
 
@@ -47,6 +48,7 @@ export type {
     LedgerEntry,
     PostingProfile,
     PostingProfilePayload,
+    PostingProfileSimulationResult,
     TrialBalance,
 } from './financeTypes';
 
@@ -212,6 +214,19 @@ export async function createPostingProfile(payload: PostingProfilePayload) {
 
 export async function updatePostingProfile(id: number, payload: PostingProfilePayload) {
     const response = await apiClient.patch<ApiResource<PostingProfile>>(`${endpoints.finance}/posting-profiles/${id}`, payload);
+    return response.data.data;
+}
+
+export async function simulatePostingProfile(
+    id: number,
+    payload: { posting_date?: string } = {},
+    signal?: AbortSignal,
+) {
+    const response = await apiClient.post<ApiResource<PostingProfileSimulationResult>>(
+        `${endpoints.finance}/posting-profiles/${id}/simulate`,
+        payload,
+        { signal },
+    );
     return response.data.data;
 }
 
