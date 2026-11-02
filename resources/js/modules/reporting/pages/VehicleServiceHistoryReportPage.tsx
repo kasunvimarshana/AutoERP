@@ -23,12 +23,12 @@ const reportKey = 'vehicle-service/service-history';
 const jobStatuses = ['draft', 'inspected', 'in_progress', 'completed', 'invoiced', 'partially_paid', 'paid', 'cancelled'];
 const statusStyles: Record<string, { border: string; badge: string }> = {
     draft: { border: 'border-l-slate-400', badge: 'bg-slate-100 text-slate-700' },
-    inspected: { border: 'border-l-violet-500', badge: 'bg-violet-50 text-violet-800' },
+    inspected: { border: 'border-l-blue-500', badge: 'bg-blue-50 text-blue-800' },
     in_progress: { border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-800' },
     completed: { border: 'border-l-emerald-500', badge: 'bg-emerald-50 text-emerald-800' },
     invoiced: { border: 'border-l-sky-500', badge: 'bg-sky-50 text-sky-800' },
-    partially_paid: { border: 'border-l-orange-500', badge: 'bg-orange-50 text-orange-800' },
-    paid: { border: 'border-l-teal-600', badge: 'bg-teal-50 text-teal-800' },
+    partially_paid: { border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-800' },
+    paid: { border: 'border-l-emerald-600', badge: 'bg-emerald-50 text-emerald-800' },
     cancelled: { border: 'border-l-rose-500', badge: 'bg-rose-50 text-rose-800' },
 };
 
@@ -153,7 +153,7 @@ function ServiceJobCard({ job }: { job: VehicleServiceHistoryRow }) {
                             <Link className="text-lg font-bold text-sky-700 underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500" to={`/vehicle-service/jobs/${job.live_job_id}`}>{job.job_number}</Link>
                         ) : <span className="text-lg font-bold text-slate-900">{job.job_number}</span>}
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone.badge}`}>{humanize(job.status)}</span>
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${job.source === 'legacy' ? 'bg-indigo-50 text-indigo-800' : 'bg-sky-50 text-sky-800'}`}>{job.source_label}</span>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${job.source === 'legacy' ? 'bg-slate-100 text-slate-700' : 'bg-sky-50 text-sky-800'}`}>{job.source_label}</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Job type</span>

@@ -26,7 +26,7 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
         } catch (failure) { if (!controller.signal.aborted) setError(toApiError(failure)); }
         finally { if (!controller.signal.aborted) setBusy(false); }
     }
-    return <details className="rounded border p-3"><summary className="cursor-pointer font-medium">Estimate base rent</summary>
+    return <details className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><summary className="cursor-pointer font-medium text-slate-900">Estimate base rent</summary>
         <p className="my-3 text-sm">Calendar-day estimate using the recorded base rate. Both selected dates are included.
             {agreement.basis === RentalBasis.Monthly && ' Monthly cycles start on the agreement anniversary, adjusted to the last day in shorter months; partial cycles use their actual number of days.'}
             {' '}This estimates base rent only. It does not include mileage, extras, deductions or tax, change the agreement, or create an invoice.</p>

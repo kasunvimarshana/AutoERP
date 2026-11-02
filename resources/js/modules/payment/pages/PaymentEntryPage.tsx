@@ -40,9 +40,9 @@ const SETTLEABLE_INVOICE_STATUSES = ['posted', 'partially_paid'] as const;
 const SELLING_INVOICE_TYPE = 'sales';
 const ZERO_AMOUNT = '0.000000';
 const SELLING_PAYMENT_METHODS = [
-    { kind: 'cash', label: 'Cash', section: 'border-emerald-500 bg-emerald-50/60', badge: 'bg-emerald-100 text-emerald-900' },
-    { kind: 'card', label: 'Card', section: 'border-blue-500 bg-blue-50/60', badge: 'bg-blue-100 text-blue-900' },
-    { kind: 'bank_transfer', label: 'Bank transfer', section: 'border-violet-500 bg-violet-50/60', badge: 'bg-violet-100 text-violet-900' },
+    { kind: 'cash', label: 'Cash', section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/40', badge: 'bg-emerald-100 text-emerald-900' },
+    { kind: 'card', label: 'Card', section: 'border-blue-200 border-l-blue-500 bg-blue-50/40', badge: 'bg-blue-100 text-blue-900' },
+    { kind: 'bank_transfer', label: 'Bank transfer', section: 'border-sky-200 border-l-sky-500 bg-sky-50/40', badge: 'bg-sky-100 text-sky-900' },
 ] as const;
 type SellingPaymentKind = typeof SELLING_PAYMENT_METHODS[number]['kind'];
 type SellingPaymentRow = PaymentLineDraft & { kind: SellingPaymentKind; cashReceivedAmount: string };

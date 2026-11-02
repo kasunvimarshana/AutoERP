@@ -101,11 +101,11 @@ export default function SummaryReportPage() {
             {result ? (
                 <div className="space-y-5">
                     <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-7 text-white shadow-xl shadow-slate-200 sm:px-8">
-                        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-cyan-400/15 blur-3xl" />
+                        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-sky-400/15 blur-3xl" />
                         <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
                         <div className="relative grid gap-7 lg:grid-cols-[1.2fr_1fr] lg:items-end">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">
+                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300">
                                     Net result
                                 </p>
                                 <p className={`mt-3 text-4xl font-bold tracking-tight sm:text-5xl ${netProfit < 0 ? 'text-rose-300' : 'text-white'}`}>

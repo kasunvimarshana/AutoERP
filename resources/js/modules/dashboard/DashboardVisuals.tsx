@@ -14,7 +14,7 @@ export function RevenueTrendChart({ rows, currency }: { rows: DashboardSummary['
                         <div key={row.key} className="flex min-w-16 flex-1 flex-col items-center gap-2">
                             <span className="text-[11px] font-semibold tabular-nums text-slate-600">{compactMoney(row.value, currency)}</span>
                             <div className="flex h-36 w-full items-end rounded-lg bg-slate-100 px-2">
-                                <div className="w-full rounded-t-md bg-gradient-to-t from-blue-700 to-cyan-400" style={{ height: `${height}%` }} />
+                                <div className="w-full rounded-t-md bg-gradient-to-t from-blue-700 to-sky-400" style={{ height: `${height}%` }} />
                             </div>
                             <span className="text-center text-xs text-slate-500">{row.label}</span>
                         </div>
@@ -51,7 +51,7 @@ export function CashFlowChart({ rows, currency }: { rows: DashboardSummary['cash
 
 export function ServiceStatusChart({ rows }: { rows: DashboardSummary['service_jobs'] }) {
     const total = rows.reduce((sum, row) => sum + row.count, 0);
-    const palette = ['bg-slate-400', 'bg-cyan-500', 'bg-blue-600', 'bg-violet-500', 'bg-amber-500', 'bg-orange-500', 'bg-emerald-500', 'bg-rose-500'];
+    const palette = ['bg-slate-400', 'bg-sky-500', 'bg-blue-600', 'bg-indigo-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-slate-600'];
 
     return (
         <ChartPanel title="Service job status" description="Jobs created inside the selected period.">
@@ -75,7 +75,7 @@ export function InventoryHealth({ health }: { health: DashboardSummary['inventor
         ['In stock', health.in_stock_items, 'text-emerald-700', '/inventory?tab=availability'],
         ['Low stock', health.low_stock_items, 'text-amber-700', '/inventory?tab=availability'],
         ['Out of stock', health.out_of_stock_items, 'text-rose-700', '/inventory?tab=availability'],
-        ['Expiring batches', health.expiring_batches, 'text-violet-700', '/inventory?tab=tracking'],
+        ['Expiring batches', health.expiring_batches, 'text-amber-700', '/inventory?tab=tracking'],
     ] as const;
 
     return (
@@ -122,8 +122,8 @@ export function ProfitabilityOverview({
     const rows = [
         ['Revenue', profitability.total_income, 'bg-blue-600'],
         ['Cost of sales', profitability.cost_of_sales, 'bg-amber-500'],
-        ['Gross profit', profitability.gross_profit, 'bg-cyan-500'],
-        ['Other expenses', profitability.other_expenses, 'bg-orange-500'],
+        ['Gross profit', profitability.gross_profit, 'bg-sky-600'],
+        ['Other expenses', profitability.other_expenses, 'bg-slate-500'],
         ['Net profit', profitability.net_profit, Number(profitability.net_profit) < 0 ? 'bg-rose-600' : 'bg-emerald-600'],
     ] as const;
     const maximum = Math.max(...rows.map(([, value]) => Math.abs(Number(value))), 0);

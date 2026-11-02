@@ -56,12 +56,12 @@ const DIRECT_PAYMENT_KINDS: Array<{ kind: DirectPaymentKind; label: string }> = 
 ];
 
 const PAYMENT_METHOD_STYLES: Record<DirectPaymentKind, { section: string; label: string }> = {
-    cash: { section: 'border-emerald-500 bg-emerald-50/60', label: 'bg-emerald-100 text-emerald-900' },
-    card: { section: 'border-blue-500 bg-blue-50/60', label: 'bg-blue-100 text-blue-900' },
-    bank_transfer: { section: 'border-violet-500 bg-violet-50/60', label: 'bg-violet-100 text-violet-900' },
-    cheque: { section: 'border-amber-200 border-l-amber-500 bg-amber-50/30', label: 'bg-amber-100 text-amber-900' },
-    wallet: { section: 'border-indigo-200 border-l-indigo-500 bg-indigo-50/30', label: 'bg-indigo-100 text-indigo-900' },
-    other: { section: 'border-slate-200 border-l-slate-500 bg-slate-50/30', label: 'bg-slate-100 text-slate-900' },
+    cash: { section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/40', label: 'bg-emerald-100 text-emerald-900' },
+    card: { section: 'border-blue-200 border-l-blue-500 bg-blue-50/40', label: 'bg-blue-100 text-blue-900' },
+    bank_transfer: { section: 'border-sky-200 border-l-sky-500 bg-sky-50/40', label: 'bg-sky-100 text-sky-900' },
+    cheque: { section: 'border-amber-200 border-l-amber-500 bg-amber-50/40', label: 'bg-amber-100 text-amber-900' },
+    wallet: { section: 'border-indigo-200 border-l-indigo-500 bg-indigo-50/40', label: 'bg-indigo-100 text-indigo-900' },
+    other: { section: 'border-slate-200 border-l-slate-400 bg-slate-50/60', label: 'bg-slate-100 text-slate-900' },
 };
 
 type PaymentMode = 'direct' | 'credit';
@@ -692,14 +692,14 @@ export default function VehicleServicePaymentPreparePage() {
                                     : 'Remaining balance after finalizing'}</p>
                         </div>
                         {paymentMode === 'direct' && invoice && !createdPayment && compareDecimalStrings(paymentTotal, outstanding) > 0 && (
-                            <p className="mt-2 text-sm text-red-700">Payment total exceeds the outstanding balance.</p>
+                            <p className="mt-2 text-sm text-rose-600">Payment total exceeds the outstanding balance.</p>
                         )}
                         {paymentMode === 'credit' && creditCheckFeedback && (
                             <p
                                 role="alert"
                                 aria-live="assertive"
                                 className={`mt-4 rounded-md border p-3 text-sm font-medium ${creditCheckFeedback.kind === 'blocked'
-                                    ? 'border-red-200 bg-red-50 text-red-800'
+                                    ? 'border-rose-200 bg-rose-50 text-rose-800'
                                     : 'border-amber-200 bg-amber-50 text-amber-800'}`}
                             >
                                 {creditCheckFeedback.message}

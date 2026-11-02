@@ -108,5 +108,6 @@ Start with these append-only records:
 - `docs/changes/2026-11-01-full-project-integration-and-verification.md`
 - `docs/changes/2026-11-02-finance-posting-configuration-deep-audit.md`
 - `docs/changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`
+- `docs/changes/2026-11-02-unified-ui-ux-design-system-consistency.md`
 
 When this index and an older change record disagree, this index and the current authoritative branch take precedence.
