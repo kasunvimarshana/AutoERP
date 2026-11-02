@@ -122,4 +122,65 @@ final class RentalReservationTest extends TestCase
             $service->transition($cancelled, RentalReservationStatus::Confirmed, $cancelled->row_version, $context->actorId);
         });
     }
+
+    public function test_reservation_api_endpoints(): void
+    {
+        [$context, $customerData] = $this->loginFixture();
+
+        // 1. Index should return 200 without requiring POST fields
+        $this->getJson($this->rentalRoot.'/reservations')
+            ->assertOk()
+            ->assertJsonPath('data', []);
+
+        // 2. Store Draft Reservation
+        $createResponse = $this->postJson($this->rentalRoot.'/reservations', [
+            'customer_id' => $customerData['party_id'],
+            'rental_mode' => DriverMode::SelfDrive->value,
+            'billing_cycle' => RentalBasis::Daily->value,
+            'requested_start_at' => '2026-11-25T10:00:00+05:30',
+            'requested_end_at' => '2026-11-28T18:00:00+05:30',
+            'currency_id' => $customerData['currency_id'],
+            'estimated_amount' => '18000.000000',
+            'estimated_deposit_amount' => '5000.000000',
+            'remarks' => 'API Reservation test',
+        ])->assertCreated();
+
+        $reservationId = $createResponse->json('data.id');
+        $version = $createResponse->json('data.row_version');
+
+        // 3. Show Reservation should return 200
+        $this->getJson($this->rentalRoot.'/reservations/'.$reservationId)
+            ->assertOk()
+            ->assertJsonPath('data.id', $reservationId)
+            ->assertJsonPath('data.status', 'draft');
+
+        // 4. Update Reservation
+        $updateResponse = $this->putJson($this->rentalRoot.'/reservations/'.$reservationId, [
+            'expected_version' => $version,
+            'estimated_amount' => '20000.000000',
+        ])->assertOk();
+
+        $version = $updateResponse->json('data.row_version');
+
+        // 5. Transition to Confirmed
+        $transitionResponse = $this->patchJson($this->rentalRoot.'/reservations/'.$reservationId.'/transition', [
+            'expected_version' => $version,
+            'status' => RentalReservationStatus::Confirmed->value,
+            'reason' => 'Customer confirmed',
+        ])->assertOk();
+
+        $version = $transitionResponse->json('data.row_version');
+
+        // 6. Convert to Agreement
+        $convertResponse = $this->postJson($this->rentalRoot.'/reservations/'.$reservationId.'/convert', [
+            'expected_version' => $version,
+        ])->assertCreated();
+
+        $this->assertNotNull($convertResponse->json('data.id'));
+
+        // 7. Verify reservation status is converted
+        $this->getJson($this->rentalRoot.'/reservations/'.$reservationId)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'converted');
+    }
 }

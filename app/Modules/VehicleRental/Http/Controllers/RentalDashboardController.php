@@ -6,7 +6,7 @@ namespace Modules\VehicleRental\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\VehicleRental\Http\Requests\AgreementRequest;
+use Modules\VehicleRental\Http\Requests\RentalDashboardRequest;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalDashboardService;
 
@@ -17,7 +17,7 @@ final class RentalDashboardController extends Controller
         private readonly RentalAuthorization $auth,
     ) {}
 
-    public function show(AgreementRequest $request): JsonResponse
+    public function show(RentalDashboardRequest $request): JsonResponse
     {
         $context = $request->context();
         $this->auth->assertDashboard($context);

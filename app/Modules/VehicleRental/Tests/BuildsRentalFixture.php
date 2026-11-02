@@ -6,18 +6,29 @@ namespace Modules\VehicleRental\Tests;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Tenancy\TenantFeature;
+use Modules\Payment\Constants\PaymentPermission;
+use Modules\User\Constants\UserGuard;
+use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Services\AgreementService;
+use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\VehicleUseService;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
 use Tests\Support\TenantUserFixture;
 
 trait BuildsRentalFixture
 {
+    protected string $rentalRoot = '/api/v1/vehicle-rental';
+
+    protected string $fixturePassword = 'secret-password';
+
     protected function fixture(): array
     {
         $code = Str::upper(Str::random(10));
@@ -31,6 +42,46 @@ trait BuildsRentalFixture
         $input = ['reference' => 'AG-'.$code, 'party_id' => $customer, 'currency_id' => $currency, 'agreed_on' => '2026-09-01', 'starts_on' => '2026-09-07', 'ends_on' => null, 'basis' => 'monthly', 'driver_mode' => 'self_drive', 'terms' => ['excess_km_rate' => '90']];
 
         return [new AgreementContext($tenant, $org, $actor), $input, array_replace($input, ['party_id' => $supplier, 'vehicle_id' => $vehicle, 'terms' => ['excess_km_rate' => '60', 'included_km' => '0']])];
+    }
+
+    protected function loginFixture(?array $permissions = null, ?array $modules = null): array
+    {
+        [$context, $customer, $owner] = $this->fixture();
+        ActiveTenantSubscriptionFixture::create($context->tenantId, $modules ?? [TenantFeature::VEHICLE_RENTAL]);
+        DB::table('user_organization_units')->insert(['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId, 'user_id' => $context->actorId, 'status' => UserOrganizationUnitStatus::ACTIVE, 'is_default' => true, 'default_marker' => UserOrganizationUnitStatus::DEFAULT_MARKER, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        $email = DB::table('users')->where('id', $context->actorId)->value('email');
+        TenantAuthenticationFixture::provision($context->tenantId, $context->actorId, $email);
+        $this->grant($context, $permissions ?? array_keys(RentalAuthorization::descriptions()));
+        $this->flushHeaders();
+        $token = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)->postJson('/api/v1/auth/login', ['organization_unit_id' => $context->organizationUnitId, 'identifier' => $email, 'password' => $this->fixturePassword])->assertOk()->json('token');
+        $this->withToken($token);
+
+        return [$context, $customer, $owner];
+    }
+
+    protected function grant(AgreementContext $context, array $permissions): void
+    {
+        $allDescriptions = RentalAuthorization::descriptions() + PaymentPermission::descriptions();
+        foreach ($permissions as $name) {
+            $permission = DB::table('permissions')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'name' => $name,
+                'guard_name' => UserGuard::TENANT_API,
+                'module' => 'VehicleRental',
+                'description' => $allDescriptions[$name] ?? $name,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('user_permissions')->insert([
+                'tenant_id' => $context->tenantId,
+                'user_id' => $context->actorId,
+                'permission_id' => $permission,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function activeFixture(callable $work): void

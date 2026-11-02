@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
+use Modules\VehicleRental\Http\Requests\RentalExpenseQueryRequest;
 use Modules\VehicleRental\Http\Requests\RentalExpenseTransitionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalExpenseRequest;
 use Modules\VehicleRental\Http\Resources\RentalExpenseResource;
@@ -22,7 +23,7 @@ final class RentalExpenseController extends Controller
         private readonly RentalAuthorization $auth,
     ) {}
 
-    public function index(StoreRentalExpenseRequest $request): AnonymousResourceCollection
+    public function index(RentalExpenseQueryRequest $request): AnonymousResourceCollection
     {
         $context = $request->context();
         $this->auth->assertExpense($context, write: false);
@@ -52,7 +53,7 @@ final class RentalExpenseController extends Controller
         return (new RentalExpenseResource($expense))->response()->setStatusCode(201);
     }
 
-    public function show(StoreRentalExpenseRequest $request, RentalExpense $expense): RentalExpenseResource
+    public function show(RentalExpenseQueryRequest $request, RentalExpense $expense): RentalExpenseResource
     {
         $context = $request->context();
         $this->auth->assertExpense($context, write: false);

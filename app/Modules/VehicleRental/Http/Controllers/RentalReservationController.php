@@ -9,6 +9,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Http\Requests\ConvertRentalReservationRequest;
+use Modules\VehicleRental\Http\Requests\RentalReservationQueryRequest;
 use Modules\VehicleRental\Http\Requests\RentalReservationTransitionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalReservationRequest;
 use Modules\VehicleRental\Http\Requests\UpdateRentalReservationRequest;
@@ -25,7 +26,7 @@ final class RentalReservationController extends Controller
         private readonly RentalAuthorization $auth,
     ) {}
 
-    public function index(StoreRentalReservationRequest $request): AnonymousResourceCollection
+    public function index(RentalReservationQueryRequest $request): AnonymousResourceCollection
     {
         $context = $request->context();
         $this->auth->assertReservation($context, write: false);
@@ -55,7 +56,7 @@ final class RentalReservationController extends Controller
         return (new RentalReservationResource($reservation))->response()->setStatusCode(201);
     }
 
-    public function show(StoreRentalReservationRequest $request, RentalReservation $reservation): RentalReservationResource
+    public function show(RentalReservationQueryRequest $request, RentalReservation $reservation): RentalReservationResource
     {
         $context = $request->context();
         $this->auth->assertReservation($context, write: false);

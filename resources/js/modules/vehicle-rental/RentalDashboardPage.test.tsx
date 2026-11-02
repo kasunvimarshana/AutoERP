@@ -22,6 +22,8 @@ const mockSummary: RentalDashboardSummary = {
         pending_reservations: 5,
         confirmed_reservations: 2,
         due_finance_installments: 3,
+        pending_expenses: 4,
+        active_vehicle_incidents: 1,
         total_fleet: 25,
         available_fleet: 10,
     },

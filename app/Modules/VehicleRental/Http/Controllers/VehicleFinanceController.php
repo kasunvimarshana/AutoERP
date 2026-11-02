@@ -8,8 +8,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 use Modules\Invoice\Http\Resources\InvoiceResource;
+use Modules\VehicleRental\Http\Requests\ActivateVehicleFinanceAgreementRequest;
 use Modules\VehicleRental\Http\Requests\CreateVehicleFinancePayableRequest;
+use Modules\VehicleRental\Http\Requests\RefreshVehicleFinanceDueStatusesRequest;
 use Modules\VehicleRental\Http\Requests\StoreVehicleFinanceAgreementRequest;
+use Modules\VehicleRental\Http\Requests\VehicleFinanceQueryRequest;
 use Modules\VehicleRental\Http\Resources\VehicleFinanceAgreementResource;
 use Modules\VehicleRental\Models\VehicleFinanceAgreement;
 use Modules\VehicleRental\Models\VehicleFinanceInstallment;
@@ -23,7 +26,7 @@ final class VehicleFinanceController extends Controller
         private readonly RentalAuthorization $auth,
     ) {}
 
-    public function index(StoreVehicleFinanceAgreementRequest $request): AnonymousResourceCollection
+    public function index(VehicleFinanceQueryRequest $request): AnonymousResourceCollection
     {
         $context = $request->context();
         $this->auth->assertFinance($context, write: false);
@@ -53,7 +56,7 @@ final class VehicleFinanceController extends Controller
         return (new VehicleFinanceAgreementResource($agreement))->response()->setStatusCode(201);
     }
 
-    public function show(StoreVehicleFinanceAgreementRequest $request, VehicleFinanceAgreement $agreement): VehicleFinanceAgreementResource
+    public function show(VehicleFinanceQueryRequest $request, VehicleFinanceAgreement $agreement): VehicleFinanceAgreementResource
     {
         $context = $request->context();
         $this->auth->assertFinance($context, write: false);
@@ -66,7 +69,7 @@ final class VehicleFinanceController extends Controller
         return new VehicleFinanceAgreementResource($agreement);
     }
 
-    public function activate(CreateVehicleFinancePayableRequest $request, VehicleFinanceAgreement $agreement): VehicleFinanceAgreementResource
+    public function activate(ActivateVehicleFinanceAgreementRequest $request, VehicleFinanceAgreement $agreement): VehicleFinanceAgreementResource
     {
         $context = $request->context();
         $this->auth->assertFinance($context, write: true);
@@ -104,12 +107,16 @@ final class VehicleFinanceController extends Controller
         return (new InvoiceResource($invoice))->response()->setStatusCode(201);
     }
 
-    public function refreshDueStatuses(StoreVehicleFinanceAgreementRequest $request): JsonResponse
+    public function refreshDueStatuses(RefreshVehicleFinanceDueStatusesRequest $request): JsonResponse
     {
         $context = $request->context();
         $this->auth->assertFinance($context, write: true);
 
-        $count = $this->service->refreshDueStatuses($context->tenantId, $context->organizationUnitId);
+        $count = $this->service->refreshDueStatuses(
+            $context->tenantId,
+            $context->organizationUnitId,
+            $request->validated('as_at'),
+        );
 
         return response()->json(['updated' => $count]);
     }

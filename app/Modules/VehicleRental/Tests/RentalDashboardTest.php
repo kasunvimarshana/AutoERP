@@ -30,4 +30,29 @@ final class RentalDashboardTest extends TestCase
             $this->assertArrayHasKey('recent_running_charts', $summary);
         });
     }
+
+    public function test_dashboard_api_endpoint(): void
+    {
+        $this->loginFixture();
+
+        $response = $this->getJson($this->rentalRoot.'/dashboard')
+            ->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    'metrics' => [
+                        'active_customer_agreements',
+                        'active_owner_agreements',
+                        'vehicles_in_custody',
+                        'planned_vehicle_uses',
+                        'pending_reservations',
+                        'due_finance_installments',
+                        'pending_expenses',
+                        'active_vehicle_incidents',
+                    ],
+                    'recent_running_charts',
+                ],
+            ]);
+
+        $this->assertIsArray($response->json('data.recent_running_charts'));
+    }
 }

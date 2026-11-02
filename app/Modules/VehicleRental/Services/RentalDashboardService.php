@@ -6,12 +6,16 @@ namespace Modules\VehicleRental\Services;
 
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\IncidentStatus;
+use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleFinanceInstallmentStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\OwnerAgreement;
+use Modules\VehicleRental\Models\RentalExpense;
+use Modules\VehicleRental\Models\RentalIncident;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Models\VehicleFinanceInstallment;
@@ -56,6 +60,16 @@ final class RentalDashboardService
             ->whereIn('status', [VehicleFinanceInstallmentStatus::Due->value, VehicleFinanceInstallmentStatus::Overdue->value])
             ->count();
 
+        $pendingExpenses = RentalExpense::query()
+            ->forContext($tenantId, $organizationUnitId)
+            ->whereIn('status', [RentalExpenseStatus::Draft->value, RentalExpenseStatus::Submitted->value])
+            ->count();
+
+        $activeIncidents = RentalIncident::query()
+            ->forContext($tenantId, $organizationUnitId)
+            ->where('status', IncidentStatus::Recorded->value)
+            ->count();
+
         $totalFleetVehicles = Vehicle::query()->forTenant($tenantId)->count();
         $availableFleetVehicles = max(0, $totalFleetVehicles - $vehiclesInCustody);
 
@@ -85,6 +99,8 @@ final class RentalDashboardService
                 'pending_reservations' => $pendingReservations,
                 'confirmed_reservations' => $confirmedReservations,
                 'due_finance_installments' => $dueInstallments,
+                'pending_expenses' => $pendingExpenses,
+                'active_vehicle_incidents' => $activeIncidents,
                 'total_fleet' => $totalFleetVehicles,
                 'available_fleet' => $availableFleetVehicles,
             ],

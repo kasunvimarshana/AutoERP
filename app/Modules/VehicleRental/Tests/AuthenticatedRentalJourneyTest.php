@@ -601,27 +601,4 @@ final class AuthenticatedRentalJourneyTest extends TestCase
 
         return $this->postJson($path.'/'.$draft['id'].'/activate', ['expected_version' => $draft['row_version']])->assertOk()->json('data');
     }
-
-    private function loginFixture(?array $permissions = null, ?array $modules = null): array
-    {
-        [$context, $customer, $owner] = $this->fixture();
-        ActiveTenantSubscriptionFixture::create($context->tenantId, $modules ?? [TenantFeature::VEHICLE_RENTAL]);
-        DB::table('user_organization_units')->insert(['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId, 'user_id' => $context->actorId, 'status' => UserOrganizationUnitStatus::ACTIVE, 'is_default' => true, 'default_marker' => UserOrganizationUnitStatus::DEFAULT_MARKER, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
-        $email = DB::table('users')->where('id', $context->actorId)->value('email');
-        TenantAuthenticationFixture::provision($context->tenantId, $context->actorId, $email);
-        $this->grant($context, $permissions ?? array_keys(RentalAuthorization::descriptions()));
-        $this->flushHeaders();
-        $token = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)->postJson('/api/v1/auth/login', ['organization_unit_id' => $context->organizationUnitId, 'identifier' => $email, 'password' => self::FIXTURE_PASSWORD])->assertOk()->json('token');
-        $this->withToken($token);
-
-        return [$context, $customer, $owner];
-    }
-
-    private function grant(AgreementContext $context, array $permissions): void
-    {
-        foreach ($permissions as $name) {
-            $permission = DB::table('permissions')->insertGetId(['tenant_id' => $context->tenantId, 'name' => $name, 'guard_name' => UserGuard::TENANT_API, 'module' => 'VehicleRental', 'description' => (RentalAuthorization::descriptions() + PaymentPermission::descriptions())[$name], 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
-            DB::table('user_permissions')->insert(['tenant_id' => $context->tenantId, 'user_id' => $context->actorId, 'permission_id' => $permission, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
-        }
-    }
 }

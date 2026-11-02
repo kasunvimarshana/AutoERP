@@ -9,6 +9,8 @@ export interface RentalDashboardSummary {
         pending_reservations: number;
         confirmed_reservations: number;
         due_finance_installments: number;
+        pending_expenses: number;
+        active_vehicle_incidents: number;
         total_fleet: number;
         available_fleet: number;
     };

@@ -118,6 +118,22 @@ export default function RentalDashboardPage() {
                         </div>
 
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pending Expenses</span>
+                            <div className="mt-2 flex items-baseline justify-between">
+                                <span className="text-2xl font-bold text-amber-600">{m.pending_expenses}</span>
+                                <Link to={EXPENSE_REGISTER_PATH} className="text-xs font-medium text-blue-600 hover:underline">Expenses</Link>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Incidents</span>
+                            <div className="mt-2 flex items-baseline justify-between">
+                                <span className="text-2xl font-bold text-red-600">{m.active_vehicle_incidents}</span>
+                                <Link to={INCIDENT_REGISTER_PATH} className="text-xs font-medium text-blue-600 hover:underline">Incidents</Link>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Fleet Availability</span>
                             <div className="mt-2 flex items-baseline justify-between">
                                 <span className="text-2xl font-bold text-slate-900">{m.available_fleet} <span className="text-sm font-normal text-slate-500">/ {m.total_fleet}</span></span>

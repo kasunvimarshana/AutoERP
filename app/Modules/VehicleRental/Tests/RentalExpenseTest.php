@@ -88,4 +88,65 @@ final class RentalExpenseTest extends TestCase
             $service->create($payload, $context->tenantId, $context->organizationUnitId, $context->actorId);
         });
     }
+
+    public function test_rental_expense_api_endpoints(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture();
+
+        // 1. Index expenses returns 200 without requiring POST fields
+        $this->getJson($this->rentalRoot.'/expenses')
+            ->assertOk()
+            ->assertJsonPath('data', []);
+
+        // 2. Store expense
+        $createResponse = $this->postJson($this->rentalRoot.'/expenses', [
+            'vehicle_id' => $ownerData['vehicle_id'],
+            'expense_type' => RentalExpenseType::Maintenance->value,
+            'expense_date' => '2026-09-12',
+            'currency_id' => $ownerData['currency_id'],
+            'net_amount' => '8000.000000',
+            'reference_number' => 'MAINT-001',
+            'description' => 'Regular service',
+        ])->assertCreated();
+
+        $expenseId = $createResponse->json('data.id');
+        $version = $createResponse->json('data.row_version');
+
+        // 3. Show expense
+        $this->getJson($this->rentalRoot.'/expenses/'.$expenseId)
+            ->assertOk()
+            ->assertJsonPath('data.id', $expenseId)
+            ->assertJsonPath('data.status', 'draft');
+
+        // 4. Transition to submitted
+        $submittedResponse = $this->patchJson($this->rentalRoot.'/expenses/'.$expenseId.'/transition', [
+            'expected_version' => $version,
+            'status' => RentalExpenseStatus::Submitted->value,
+        ])->assertOk();
+
+        $version = $submittedResponse->json('data.row_version');
+
+        // 5. Transition to approved
+        $approvedResponse = $this->patchJson($this->rentalRoot.'/expenses/'.$expenseId.'/transition', [
+            'expected_version' => $version,
+            'status' => RentalExpenseStatus::Approved->value,
+        ])->assertOk();
+
+        $version = $approvedResponse->json('data.row_version');
+
+        // 6. Transition to allocated
+        $allocatedResponse = $this->patchJson($this->rentalRoot.'/expenses/'.$expenseId.'/transition', [
+            'expected_version' => $version,
+            'status' => RentalExpenseStatus::Allocated->value,
+            'allocations' => [
+                [
+                    'allocation_type' => RentalExpenseAllocationType::CompanyCost->value,
+                    'net_amount' => '8000.000000',
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertSame('allocated', $allocatedResponse->json('data.status'));
+        $this->assertCount(1, $allocatedResponse->json('data.allocations'));
+    }
 }
