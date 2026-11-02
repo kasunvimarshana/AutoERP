@@ -26,6 +26,19 @@ final class VehicleUseController
         return VehicleUseResource::collection($register->list($request->context(), $request->only(['search', 'use_status', 'from', 'until']), $request->perPage()));
     }
 
+    public function available(AgreementRequest $request): JsonResponse
+    {
+        $categoryId = $request->input('category_id') ? (int) $request->input('category_id') : null;
+        $vehicles = $this->uses->availableVehicles(
+            $request->context(),
+            $request->input('starts_at'),
+            $request->input('ends_at'),
+            $categoryId,
+        );
+
+        return response()->json(['data' => $vehicles]);
+    }
+
     public function index(AgreementRequest $request, int $agreement): AnonymousResourceCollection
     {
         return VehicleUseResource::collection($this->uses->list($request->context(), $agreement, $request->perPage()));

@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`](changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md)
+**Latest current-head re-verification:** [`changes/2026-11-02-vehicle-rental-branch-reconciliation-and-audit.md`](changes/2026-11-02-vehicle-rental-branch-reconciliation-and-audit.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -1223,3 +1223,7 @@ Full multi-module integration baseline verified across the entire AutoERP codeba
 ### 2026-11-02 Vehicle Rental module and documentation deep audit
 
 End-to-end audit of `docs/knowledgebase.md`, the `docs/` tree, and the entire `VehicleRental` codebase (`app/Modules/VehicleRental/`, `resources/js/modules/vehicle-rental/`). Standardized ISO timestamp serialization across API resources (`toIso8601String()`), improved request validation error messages on optimistic version mismatch, harmonized documentation across `AUDIT_AUTHORITY.md` and `README.md`, and re-verified all 149 backend tests and 79 frontend tests. See `docs/changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`.
+
+### 2026-11-02 Vehicle Rental branch audit, reconciliation and reporting modernization
+
+In-depth comparative audit of `worktree-0.0.8-vehicle-rental-module` against `worktree-0.0.8`. Reconciled and implemented the authentic Sri Lankan 31-day running chart matrix sheet (`RunningChartReportService`, `RunningChartReportController`, and `resources/views/reports/vehicle-rental/running-chart-sheet.blade.php`), registered centralized reporting catalog entries (`vehicle-rental.running-chart`, `vehicle-rental.driver-overtime`), exposed a vehicle availability query endpoint (`/api/v1/vehicle-rental/vehicles/available`), added operator "Print Sheet" action in the running chart panel, and verified all 152 backend tests and 79 frontend tests. See `docs/changes/2026-11-02-vehicle-rental-branch-reconciliation-and-audit.md`.

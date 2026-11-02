@@ -17,6 +17,16 @@ final class CustomerAgreement extends Agreement
         return $this->belongsTo(Customer::class, 'customer_id')->withTrashed();
     }
 
+    public function customer(): BelongsTo
+    {
+        return $this->party();
+    }
+
+    public function vehicleUses(): HasMany
+    {
+        return $this->hasMany(VehicleUse::class, 'customer_agreement_id');
+    }
+
     public function history(): HasMany
     {
         return $this->hasMany(CustomerAgreementHistory::class, 'agreement_id')->orderBy('row_version');

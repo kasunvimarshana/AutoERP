@@ -11,3 +11,21 @@ export const vehicleUseHistory = (id: number, page: number, signal?: AbortSignal
 export const replaceVehicleUse = (use: VehicleUse, input: { vehicle_id: number; owner_agreement_id: number | null; starts_at: string; ends_at: string | null; notes: string | null; reason: string; return_odometer: string | null; handover_odometer: string | null }) => apiClient.post<ApiResource<VehicleUse>>(`${USE_API}/${use.id}/replace`, { ...input, expected_version: use.row_version }).then(r => r.data.data);
 
 export const listVehicleUseRegister = (filters: VehicleUseRegisterFilters, page: number, signal?: AbortSignal) => apiClient.get<ApiCollection<VehicleUse>>(USE_API, { params: { ...filters, page, per_page: PAGE_SIZE }, signal }).then(r => r.data);
+
+export interface AvailableVehicleOption {
+    id: number;
+    vehicle_number: string;
+    registration_number: string | null;
+    display_label: string;
+    make: string | null;
+    model: string | null;
+    category: string | null;
+    category_id: number | null;
+    odometer_reading: string;
+}
+
+export const fetchAvailableVehicles = (startsAt: string, endsAt?: string | null, categoryId?: number | null, signal?: AbortSignal) =>
+    apiClient.get<{ data: AvailableVehicleOption[] }>('/api/v1/vehicle-rental/vehicles/available', {
+        params: { starts_at: startsAt, ends_at: endsAt ?? undefined, category_id: categoryId ?? undefined },
+        signal,
+    }).then(r => r.data.data);

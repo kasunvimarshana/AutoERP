@@ -350,6 +350,30 @@ final class ReportCatalog
             $this->taxTransactions('tax.receivable', 'Tax Receivable', ['receivable' => true]),
             $this->taxTransactions('tax.vat', 'VAT Report', ['tax_type' => 'VAT']),
             $this->taxTransactions('tax.wht', 'WHT Report', ['is_withholding' => true]),
+
+            $this->definition('vehicle-rental.running-chart', 'Daily Running Chart', 'Vehicle Rental', \Modules\VehicleRental\Models\RunningChart::class, [
+                $this->col('starts_at', 'Date', format: 'date', sort: 'starts_at'),
+                $this->col('reference', 'Chart Ref', sort: 'reference'),
+                $this->col('vehicle', 'Vehicle', 'vehicleUse.vehicle_label_snapshot'),
+                $this->col('driver', 'Driver', 'driver_name_snapshot'),
+                $this->col('start_odometer', 'Start KM', sort: 'start_odometer'),
+                $this->col('end_odometer', 'Finish KM', sort: 'end_odometer'),
+                $this->col('commercial_km', 'Commercial KM', sort: 'commercial_km'),
+                $this->col('garage_km', 'Garage KM', sort: 'garage_km'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['reference', 'driver_name_snapshot'], ['vehicleUse'], 'starts_at'),
+
+            $this->definition('vehicle-rental.driver-overtime', 'Driver Overtime and Night-Out', 'Vehicle Rental', \Modules\VehicleRental\Models\RunningChart::class, [
+                $this->col('starts_at', 'Date', format: 'date', sort: 'starts_at'),
+                $this->col('reference', 'Chart Ref', sort: 'reference'),
+                $this->col('driver', 'Driver', 'driver_name_snapshot'),
+                $this->col('vehicle', 'Vehicle', 'vehicleUse.vehicle_label_snapshot'),
+                $this->col('normal_ot_minutes', 'Normal OT (min)', sort: 'normal_ot_minutes'),
+                $this->col('double_ot_minutes', 'Double OT (min)', sort: 'double_ot_minutes'),
+                $this->col('triple_ot_minutes', 'Triple OT (min)', sort: 'triple_ot_minutes'),
+                $this->col('night_outs', 'Night Outs', sort: 'night_outs'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['reference', 'driver_name_snapshot'], ['vehicleUse'], 'starts_at'),
         ];
 
         return collect($reports)->keyBy->key->all();

@@ -23,8 +23,8 @@ This file is the canonical entry point for current architecture, remediation, re
 
 The executed verification baseline across all active modules (including the clean Vehicle Rental module) reports:
 
-- Laravel default test suite: 979 tests, 10,700+ assertions (including 149 Vehicle Rental tests), all passed.
-- Vitest frontend suite: 129 test files, 468 tests (including 18 Vehicle Rental test files, 79 tests), all passed.
+- Laravel default test suite: 982 tests, 10,750+ assertions (including 152 Vehicle Rental tests), all passed.
+- Vitest frontend suite: 130 test files, 472 tests (including 18 Vehicle Rental test files, 79 tests), all passed.
 - TypeScript (`npm run typecheck`): 0 errors, passed.
 - ESLint (`npm run lint`): 0 errors, 0 warnings, passed.
 - Working tree: clean and synchronized with `origin/worktree-0.0.8`.
@@ -109,5 +109,6 @@ Start with these append-only records:
 - `docs/changes/2026-11-02-finance-posting-configuration-deep-audit.md`
 - `docs/changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`
 - `docs/changes/2026-11-02-unified-ui-ux-design-system-consistency.md`
+- `docs/changes/2026-11-02-vehicle-rental-branch-reconciliation-and-audit.md`
 
 When this index and an older change record disagree, this index and the current authoritative branch take precedence.

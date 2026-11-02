@@ -47,6 +47,11 @@ abstract class Agreement extends TenantOwnedModel
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Tenant\Models\TenantModel::class, 'tenant_id');
+    }
+
     public function supersedesAgreement(): BelongsTo
     {
         return $this->belongsTo(static::class, 'supersedes_agreement_id');

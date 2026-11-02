@@ -14,6 +14,7 @@ use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
 use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
 use Modules\VehicleRental\Http\Controllers\DriverDirectoryController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
+use Modules\VehicleRental\Http\Controllers\RunningChartReportController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentAttachmentController;
 use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
@@ -79,4 +80,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::put('running-charts/{chart}', [RunningChartController::class, 'update'])->whereNumber('chart');
     Route::get('running-charts/{chart}/history', [RunningChartController::class, 'history'])->whereNumber('chart');
     Route::post('running-charts/{chart}/{action}', [RunningChartController::class, 'transition'])->whereNumber('chart')->whereIn('action', [RunningChartAction::Finalize->value, RunningChartAction::Reverse->value]);
+    Route::get('vehicles/available', [VehicleUseController::class, 'available']);
+    Route::get('reports/running-chart-sheet', [RunningChartReportController::class, 'show']);
+    Route::get('reports/running-chart-sheet/export/{format}', [RunningChartReportController::class, 'export'])->whereIn('format', ['pdf', 'print', 'html']);
 });

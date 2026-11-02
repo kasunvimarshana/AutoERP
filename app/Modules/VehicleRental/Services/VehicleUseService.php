@@ -45,6 +45,51 @@ final class VehicleUseService
             ->with(OperationalFields::USE_RELATIONS)->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
     }
 
+    public function availableVehicles(AgreementContext $context, ?string $startsAt, ?string $endsAt, ?int $categoryId = null): array
+    {
+        $this->authorization->assertUse($context, false);
+        if (empty($startsAt)) {
+            throw ValidationException::withMessages(['starts_at' => ['Provide the start date and time to check vehicle availability.']]);
+        }
+        [$start, $end] = OperationalTime::plannedPeriod($startsAt, $endsAt);
+        $startDb = OperationalTime::database($start);
+        $endDb = $end === null ? null : OperationalTime::database($end);
+
+        $vehicles = Vehicle::query()
+            ->where('tenant_id', $context->tenantId)
+            ->when(
+                $context->organizationUnitId === null,
+                fn ($q) => $q->whereNull('organization_unit_id'),
+                fn ($q) => $q->where(fn ($sub) => $sub->whereNull('organization_unit_id')->orWhere('organization_unit_id', $context->organizationUnitId)),
+            )
+            ->where('status', VehicleStatus::Active)
+            ->when($categoryId !== null, fn ($q) => $q->where('vehicle_category_id', $categoryId))
+            ->with(['make', 'model', 'category'])
+            ->orderBy('registration_number')
+            ->orderBy('vehicle_number')
+            ->get();
+
+        $available = [];
+        foreach ($vehicles as $vehicle) {
+            if ($this->rentalBlocker->conflicts($context->tenantId, (int) $vehicle->id, $startDb, $endDb)) {
+                continue;
+            }
+            $available[] = [
+                'id' => (int) $vehicle->id,
+                'vehicle_number' => $vehicle->vehicle_number,
+                'registration_number' => $vehicle->registration_number,
+                'display_label' => $vehicle->registration_number ?: $vehicle->vehicle_number,
+                'make' => $vehicle->make?->name,
+                'model' => $vehicle->model?->name,
+                'category' => $vehicle->category?->name,
+                'category_id' => $vehicle->vehicle_category_id,
+                'odometer_reading' => (string) ($vehicle->odometer_reading ?? '0'),
+            ];
+        }
+
+        return $available;
+    }
+
     public function find(AgreementContext $context, int $id): VehicleUse
     {
         $this->authorization->assertUse($context, false);
