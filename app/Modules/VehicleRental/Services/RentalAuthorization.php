@@ -37,6 +37,20 @@ class RentalAuthorization
 
     public const OWNER_MANAGE = 'vehicle-rental.owner-agreements.manage';
 
+    public const RESERVATION_VIEW = 'vehicle-rental.reservations.view';
+
+    public const RESERVATION_MANAGE = 'vehicle-rental.reservations.manage';
+
+    public const FINANCE_VIEW = 'vehicle-rental.finance.view';
+
+    public const FINANCE_MANAGE = 'vehicle-rental.finance.manage';
+
+    public const EXPENSE_VIEW = 'vehicle-rental.expenses.view';
+
+    public const EXPENSE_MANAGE = 'vehicle-rental.expenses.manage';
+
+    public const DASHBOARD_VIEW = 'vehicle-rental.dashboard.view';
+
     public function __construct(private readonly UserAccessResolver $access) {}
 
     public static function descriptions(): array
@@ -57,6 +71,13 @@ class RentalAuthorization
             self::CUSTOMER_MANAGE => 'Create, edit drafts, activate and close customer rental agreements.',
             self::OWNER_VIEW => 'View owner rental agreements.',
             self::OWNER_MANAGE => 'Create, edit drafts, activate and close owner rental agreements.',
+            self::RESERVATION_VIEW => 'View rental reservations.',
+            self::RESERVATION_MANAGE => 'Create, edit, transition, and convert rental reservations.',
+            self::FINANCE_VIEW => 'View vehicle finance agreements and installment schedules.',
+            self::FINANCE_MANAGE => 'Create and activate vehicle finance agreements and generate payable invoices.',
+            self::EXPENSE_VIEW => 'View vehicle rental expenses and allocations.',
+            self::EXPENSE_MANAGE => 'Record, approve, allocate, and reverse vehicle rental expenses.',
+            self::DASHBOARD_VIEW => 'View the vehicle rental operational overview dashboard.',
         ];
     }
 
@@ -103,6 +124,39 @@ class RentalAuthorization
         };
         if (! $this->access->can($context->actorId, $context->tenantId, $permission)) {
             throw new AuthorizationException('This Rental action requires permission: '.$permission);
+        }
+    }
+
+    public function assertReservation(AgreementContext $context, bool $write): void
+    {
+        $permission = $write ? self::RESERVATION_MANAGE : self::RESERVATION_VIEW;
+        if (! $this->access->can($context->actorId, $context->tenantId, $permission)) {
+            throw new AuthorizationException('This Rental action requires permission: '.$permission);
+        }
+    }
+
+    public function assertFinance(AgreementContext $context, bool $write): void
+    {
+        $permission = $write ? self::FINANCE_MANAGE : self::FINANCE_VIEW;
+        if (! $this->access->can($context->actorId, $context->tenantId, $permission)) {
+            throw new AuthorizationException('This Rental action requires permission: '.$permission);
+        }
+    }
+
+    public function assertExpense(AgreementContext $context, bool $write): void
+    {
+        $permission = $write ? self::EXPENSE_MANAGE : self::EXPENSE_VIEW;
+        if (! $this->access->can($context->actorId, $context->tenantId, $permission)) {
+            throw new AuthorizationException('This Rental action requires permission: '.$permission);
+        }
+    }
+
+    public function assertDashboard(AgreementContext $context): void
+    {
+        if (! $this->access->can($context->actorId, $context->tenantId, self::DASHBOARD_VIEW)
+            && ! $this->access->can($context->actorId, $context->tenantId, self::CUSTOMER_VIEW)
+            && ! $this->access->can($context->actorId, $context->tenantId, self::USE_VIEW)) {
+            throw new AuthorizationException('This Rental action requires permission: '.self::DASHBOARD_VIEW);
         }
     }
 }

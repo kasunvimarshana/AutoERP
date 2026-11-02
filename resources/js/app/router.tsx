@@ -1,6 +1,10 @@
 import { USE_PERMISSION, USE_REGISTER_PATH } from '@/modules/vehicle-rental/vehicleUse';
 import { CHART_PERMISSION, CHART_REGISTER_PATH } from '@/modules/vehicle-rental/runningCharts';
 import { INCIDENT_PERMISSION, INCIDENT_REGISTER_PATH } from '@/modules/vehicle-rental/incidentEvidence';
+import { RESERVATION_PERMISSION, RESERVATION_REGISTER_PATH } from '@/modules/vehicle-rental/reservationApi';
+import { FINANCE_PERMISSION, FINANCE_REGISTER_PATH } from '@/modules/vehicle-rental/vehicleFinanceApi';
+import { EXPENSE_PERMISSION, EXPENSE_REGISTER_PATH } from '@/modules/vehicle-rental/rentalExpenseApi';
+import { DASHBOARD_PATH as RENTAL_DASHBOARD_PATH, DASHBOARD_PERMISSION as RENTAL_DASHBOARD_PERMISSION } from '@/modules/vehicle-rental/rentalDashboardApi';
 import { AgreementKind, agreementPermissions } from '@/modules/vehicle-rental/agreements';
 import { lazy } from "react";
 import { Route, RouterProvider, createBrowserRouter, createRoutesFromElements } from "react-router-dom";
@@ -98,6 +102,10 @@ const VehicleUseRegisterPage = lazy(() => import("@/modules/vehicle-rental/Vehic
 const RunningChartRegisterPage = lazy(() => import("@/modules/vehicle-rental/RunningChartRegisterPage"));
 const RentalAgreementsPage = lazy(() => import("@/modules/vehicle-rental/AgreementsPage"));
 const IncidentRegisterPage = lazy(() => import("@/modules/vehicle-rental/IncidentRegisterPage"));
+const RentalDashboardPage = lazy(() => import("@/modules/vehicle-rental/RentalDashboardPage"));
+const ReservationsPage = lazy(() => import("@/modules/vehicle-rental/ReservationsPage"));
+const VehicleFinancePage = lazy(() => import("@/modules/vehicle-rental/VehicleFinancePage"));
+const RentalExpensesPage = lazy(() => import("@/modules/vehicle-rental/RentalExpensesPage"));
 const VehicleListPage = lazy(() => import("@/modules/vehicle/VehicleListPage"));
 const VehicleCreatePage = lazy(
     () => import("@/modules/vehicle/VehicleCreatePage"),
@@ -1036,8 +1044,12 @@ const appRouter = createBrowserRouter(
                             path="/hr/employees/:id"
                             element={<EmployeeDetailPage />}
                         />
+                        <Route path={RENTAL_DASHBOARD_PATH} element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><RentalDashboardPage /></PermissionRoute>} />
+                        <Route path={RESERVATION_REGISTER_PATH} element={<PermissionRoute permission={RESERVATION_PERMISSION.view}><ReservationsPage /></PermissionRoute>} />
                         <Route path={USE_REGISTER_PATH} element={<PermissionRoute permission={USE_PERMISSION.view}><VehicleUseRegisterPage /></PermissionRoute>} />
                         <Route path={CHART_REGISTER_PATH} element={<PermissionRoute permission={CHART_PERMISSION.view}><RunningChartRegisterPage /></PermissionRoute>} />
+                        <Route path={EXPENSE_REGISTER_PATH} element={<PermissionRoute permission={EXPENSE_PERMISSION.view}><RentalExpensesPage /></PermissionRoute>} />
+                        <Route path={FINANCE_REGISTER_PATH} element={<PermissionRoute permission={FINANCE_PERMISSION.view}><VehicleFinancePage /></PermissionRoute>} />
                         <Route path={INCIDENT_REGISTER_PATH} element={<PermissionRoute permission={INCIDENT_PERMISSION.view}><IncidentRegisterPage /></PermissionRoute>} />
                         <Route path="/vehicle-rental/customer/agreements" element={<PermissionRoute permission={agreementPermissions.customer.view}><RentalAgreementsPage key={AgreementKind.Customer} kind={AgreementKind.Customer} /></PermissionRoute>} />
                         <Route path="/vehicle-rental/owner/agreements" element={<PermissionRoute permission={agreementPermissions.owner.view}><RentalAgreementsPage key={AgreementKind.Owner} kind={AgreementKind.Owner} /></PermissionRoute>} />
