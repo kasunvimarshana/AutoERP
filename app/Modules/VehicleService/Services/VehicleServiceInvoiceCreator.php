@@ -13,6 +13,7 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -29,6 +30,7 @@ final class VehicleServiceInvoiceCreator
         private readonly VehicleServiceInvoiceSourceMapper $sources,
         private readonly VehicleServiceStatusService $statuses,
         private readonly VehicleServicePaymentIntegrationService $payments,
+        private readonly PromotionRuntimeService $promotions,
     ) {}
 
     /** @param array<int, string> $lineQuantities */
@@ -56,6 +58,7 @@ final class VehicleServiceInvoiceCreator
         ): Invoice {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
+            $this->promotions->assertInvoiceChoices($job, $lineQuantities);
             $data = $this->sources->toInvoiceData(
                 $job,
                 $invoiceDate,
@@ -84,6 +87,7 @@ final class VehicleServiceInvoiceCreator
 
             $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
             $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
+            $this->promotions->recordPostedInvoice($job, $invoice, $createdBy);
 
             $statusChanged = false;
             if (! $this->sources->hasRemainingBillableLines($job)

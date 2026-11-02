@@ -325,7 +325,7 @@ export function VehicleServiceLineTable({
         .filter((line) => line.parent_line_id == null && line.status !== 'cancelled');
     const billableTotalLines = totalLines.filter((line) => line.is_billable);
     const quantityTotal = sumDecimals(totalLines.map((line) => line.quantity));
-    const discountTotal = sumDecimals(billableTotalLines.map((line) => line.discount_amount));
+    const discountTotal = sumDecimals(billableTotalLines.map((line) => addDecimal(line.discount_amount, line.promotion_discount_amount)));
     const subtotalTotal = sumDecimals(billableTotalLines.map((line) => line.line_total));
     const toggleCombo = (comboId: number) => {
         setExpandedComboIds((current) => {
@@ -559,7 +559,8 @@ function LineMobileDetails({
             <SummaryValue label="UOM" value={line.uom?.code ?? '-'} />
             {showStock && <SummaryValue label="Stock" value={stockStateLabel(line)} />}
             {showPricing && <SummaryValue label="Price" value={row.isComboChild && !line.is_billable ? 'Included in pack' : <MoneyDisplay value={line.unit_price} />} />}
-            {showPricing && <SummaryValue label="Discount" value={<MoneyDisplay value={line.discount_amount} />} />}
+            {showPricing && <SummaryValue label="Manual discount" value={<MoneyDisplay value={line.discount_amount} />} />}
+            {showPricing && compareDecimalStrings(line.promotion_discount_amount, '0') > 0 && <SummaryValue label="Card / offer savings" value={<MoneyDisplay value={line.promotion_discount_amount} />} />}
             {showPricing && <SummaryValue label="Total" value={<MoneyDisplay value={line.line_total} />} />}
         </div>
     );
@@ -677,7 +678,10 @@ function renderLineDiscount(row: VehicleServiceLineDisplayRow) {
         return <span className="text-slate-400">-</span>;
     }
 
-    return <span className={row.isComboChild ? 'text-slate-500' : ''}><MoneyDisplay value={row.line.discount_amount} /></span>;
+    return <span className={row.isComboChild ? 'text-slate-500' : ''}>
+        <MoneyDisplay value={addDecimal(row.line.discount_amount, row.line.promotion_discount_amount)} />
+        {compareDecimalStrings(row.line.promotion_discount_amount, '0') > 0 && <span className="block text-xs text-emerald-700">Includes card / offer savings</span>}
+    </span>;
 }
 
 function renderLineTotal(row: VehicleServiceLineDisplayRow) {

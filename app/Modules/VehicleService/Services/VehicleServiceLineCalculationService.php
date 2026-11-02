@@ -112,7 +112,10 @@ final class VehicleServiceLineCalculationService
                 $subtotal,
                 $this->math->mul((string) $line->quantity, (string) $line->unit_price),
             );
-            $discount = $this->math->add($discount, (string) $line->discount_amount);
+            $discount = $this->math->add($discount, $this->math->add(
+                (string) $line->discount_amount,
+                (string) $line->promotion_discount_amount,
+            ));
             $tax = $this->math->add($tax, (string) $line->tax_amount);
             $charge = $this->math->add($charge, (string) $line->charge_amount);
             $grand = $this->math->add($grand, (string) $line->line_total);
@@ -195,7 +198,10 @@ final class VehicleServiceLineCalculationService
                 $subtotal,
                 $this->math->mul((string) $line->quantity, (string) $line->unit_price),
             );
-            $lineDiscount = $this->math->add($lineDiscount, (string) $line->discount_amount);
+            $lineDiscount = $this->math->add($lineDiscount, $this->math->add(
+                (string) $line->discount_amount,
+                (string) $line->promotion_discount_amount,
+            ));
         }
 
         return $this->math->sub($subtotal, $lineDiscount);

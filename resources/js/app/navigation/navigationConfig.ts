@@ -709,6 +709,14 @@ export const tenantNavigationSections: NavigationSection[] = [
                         access: operationalAccess(["vehicle-service"]),
                     },
                     {
+                        id: "service-promotions",
+                        type: "link",
+                        label: "Service Cards & Offers",
+                        to: "/vehicle-service/promotions",
+                        match: ["/vehicle-service/promotions"],
+                        access: { ...operationalAccess(["vehicle-service"]), permissions: ["promotion.view"] },
+                    },
+                    {
                         id: "service-invoices",
                         type: "link",
                         label: "Service Invoices",

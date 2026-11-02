@@ -133,6 +133,7 @@ export interface VehicleServiceJobLine {
     discount_calculation_type?: 'fixed' | 'percentage' | null;
     discount_rate: string;
     discount_amount: string;
+    promotion_discount_amount: string;
     tax_calculation_type?: 'fixed' | 'percentage' | null;
     tax_rate: string;
     tax_amount: string;
@@ -293,6 +294,7 @@ export interface VehicleServiceJobPayload {
 }
 
 export interface VehicleServiceLinePayload {
+    promotion?: { card_id?: number; card_benefit_id?: number; offer_assignment_id?: number };
     expected_version?: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number;

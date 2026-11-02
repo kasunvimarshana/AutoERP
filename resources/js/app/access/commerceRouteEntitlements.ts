@@ -35,4 +35,5 @@ export const commerceRouteEntitlements: readonly EntitlementRule[] = [
     operational('/vehicle-service/jobs/:id/payment', ['vehicle-service'], [vehicleServicePermissions.paymentsCreate]),
     operational('/vehicle-service/jobs/:id', ['vehicle-service'], [vehicleServicePermissions.jobsView]),
     operational('/vehicle-service/jobs', ['vehicle-service'], [vehicleServicePermissions.jobsView]),
+    operational('/vehicle-service/promotions', ['vehicle-service'], ['promotion.view']),
 ];

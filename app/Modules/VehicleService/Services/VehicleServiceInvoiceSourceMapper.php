@@ -134,7 +134,10 @@ final class VehicleServiceInvoiceSourceMapper
             }
 
             $ratio = $this->math->div($quantity, (string) $line->quantity, 12);
-            $discount = $this->math->mul((string) $line->discount_amount, $ratio);
+            $discount = $this->math->mul($this->math->add(
+                (string) $line->discount_amount,
+                (string) $line->promotion_discount_amount,
+            ), $ratio);
             $tax = $this->math->mul((string) $line->tax_amount, $ratio);
             $charge = $this->math->mul((string) $line->charge_amount, $ratio);
             $selectedDiscountBase = $this->math->add(

@@ -233,7 +233,7 @@ final class VehicleServiceLineItemLookupService
             : (string) $option['model']->code;
     }
 
-    private function isSupportedItem(Item $item): bool
+    public function isSupportedItem(Item $item): bool
     {
         $type = $item->item_type instanceof \BackedEnum
             ? $item->item_type->value

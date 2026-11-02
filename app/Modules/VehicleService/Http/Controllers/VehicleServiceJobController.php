@@ -75,6 +75,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         return (new VehicleServiceJobResource($service->create(
             $request->toData(),
             $request->lineData(),
+            $request->promotionChoices(),
         )))
             ->response()->setStatusCode(201);
     }

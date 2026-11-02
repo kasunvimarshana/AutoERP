@@ -15,6 +15,7 @@ use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Finance\Enums\FinancePostingProfileCode;
+use Modules\Finance\Enums\JournalStatus;
 use Modules\Invoice\Constants\InvoiceFinanceSource;
 use Modules\Invoice\DTOs\InvoicePostingLineData;
 use Modules\Invoice\DTOs\InvoicePostingPlanData;
@@ -25,6 +26,8 @@ use Modules\Invoice\Models\InvoicePostingPlan;
 final class InvoicePostingPlanService
 {
     private const ZERO = '0.000000';
+
+    private const NO_JOURNAL_ID = 0;
 
     public function __construct(
         private readonly DecimalMath $math,
@@ -50,7 +53,7 @@ final class InvoicePostingPlanService
                 throw new InvalidArgumentException('Invoice posting plan already exists and cannot be replaced.');
             }
 
-            $plan = new InvoicePostingPlan();
+            $plan = new InvoicePostingPlan;
             $plan->forceFill([
                 'tenant_id' => (int) $invoice->tenant_id,
                 'organization_unit_id' => $invoice->organization_unit_id,
@@ -81,11 +84,13 @@ final class InvoicePostingPlanService
                 throw new InvalidArgumentException('Reversed invoice posting plans cannot be posted again.');
             }
 
-            $result = $this->postings->post($this->context($invoice, $plan), $actorId);
+            $result = $plan->lines === []
+                ? $this->emptyPostingResult(JournalStatus::Posted)
+                : $this->postings->post($this->context($invoice, $plan), $actorId);
             if ($status === InvoicePostingPlanStatus::Prepared) {
                 $plan->forceFill([
                     'status' => InvoicePostingPlanStatus::Posted->value,
-                    'finance_posting_reference' => $result->journalNumber,
+                    'finance_posting_reference' => $plan->lines === [] ? null : $result->journalNumber,
                     'posted_by' => $actorId,
                     'posted_at' => now(),
                     'row_version' => (int) $plan->row_version + 1,
@@ -117,19 +122,21 @@ final class InvoicePostingPlanService
                 throw new InvalidArgumentException('Invoice reversal date cannot be before the posting date.');
             }
 
-            $result = $this->reversals->reverseSource(
-                (int) $invoice->tenant_id,
-                $invoice->organization_unit_id,
-                InvoiceFinanceSource::MODULE,
-                InvoiceFinanceSource::POSTING_TYPE,
-                (int) $invoice->getKey(),
-                $reversalDate,
-                $actorId,
-                $reason,
-            );
+            $result = $plan->lines === []
+                ? $this->emptyPostingResult(JournalStatus::Reversed)
+                : $this->reversals->reverseSource(
+                    (int) $invoice->tenant_id,
+                    $invoice->organization_unit_id,
+                    InvoiceFinanceSource::MODULE,
+                    InvoiceFinanceSource::POSTING_TYPE,
+                    (int) $invoice->getKey(),
+                    $reversalDate,
+                    $actorId,
+                    $reason,
+                );
             $plan->forceFill([
                 'status' => InvoicePostingPlanStatus::Reversed->value,
-                'finance_reversal_reference' => $result->journalNumber,
+                'finance_reversal_reference' => $plan->lines === [] ? null : $result->journalNumber,
                 'reversed_by' => $actorId,
                 'reversed_at' => now(),
                 'reversal_reason' => $reason,
@@ -212,8 +219,8 @@ final class InvoicePostingPlanService
         if ($data->postingDate < $invoice->invoice_date->toDateString()) {
             throw new InvalidArgumentException('Invoice posting date cannot be before the invoice date.');
         }
-        if ($data->lines === []) {
-            throw new InvalidArgumentException('Invoice posting plan requires at least one line.');
+        if ($data->lines === [] && ! $this->math->isZero((string) $invoice->grand_total)) {
+            throw new InvalidArgumentException('A non-zero invoice requires accounting lines.');
         }
 
         $debit = self::ZERO;
@@ -259,5 +266,17 @@ final class InvoicePostingPlanService
         return $plan->status instanceof InvoicePostingPlanStatus
             ? $plan->status
             : InvoicePostingPlanStatus::from((string) $plan->status);
+    }
+
+    private function emptyPostingResult(JournalStatus $status): PostingResultData
+    {
+        // A zero-value invoice still needs document state, but creates no ledger movement.
+        return new PostingResultData(
+            journalId: self::NO_JOURNAL_ID,
+            journalNumber: '',
+            status: $status->value,
+            totalDebit: self::ZERO,
+            totalCredit: self::ZERO,
+        );
     }
 }

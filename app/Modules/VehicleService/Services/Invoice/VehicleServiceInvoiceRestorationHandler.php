@@ -6,13 +6,17 @@ namespace Modules\VehicleService\Services\Invoice;
 
 use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
 use Modules\Invoice\Data\InvoiceSourceRestorationContext;
+use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
 
 final class VehicleServiceInvoiceRestorationHandler implements InvoiceSourceRestorationHandlerInterface
 {
-    public function __construct(private readonly VehicleServiceStatusService $statuses) {}
+    public function __construct(
+        private readonly VehicleServiceStatusService $statuses,
+        private readonly PromotionRuntimeService $promotions,
+    ) {}
 
     public function supports(InvoiceSourceRestorationContext $context): bool
     {
@@ -25,6 +29,7 @@ final class VehicleServiceInvoiceRestorationHandler implements InvoiceSourceRest
 
     public function restore(InvoiceSourceRestorationContext $context): void
     {
+        $this->promotions->reverseInvoice($context->tenantId, $context->invoiceId, $context->actorId);
         $jobIds = VehicleServiceInvoiceLink::query()
             ->where('tenant_id', $context->tenantId)
             ->where('invoice_id', $context->invoiceId)

@@ -41,6 +41,9 @@ use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
+use Modules\Promotion\Services\PromotionCardService;
+use Modules\Promotion\Services\PromotionOfferService;
+use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\User\Models\UserModel;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentBatchEntryData;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
@@ -67,11 +70,12 @@ use Modules\VehicleService\Services\VehicleServiceInventoryIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceInvoiceIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceJobDiscountService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
-use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServiceLineItemLookupService;
+use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
 use Modules\VehicleService\Services\VehicleServicePaymentOptionService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\Support\TenantUserFixture;
@@ -87,6 +91,194 @@ final class VehicleServiceEngineTest extends TestCase
     {
         parent::setUp();
         $this->trustTenantScopedRequestContextFromPayload();
+    }
+
+    public function test_promotions_accept_items_supported_by_vehicle_service_jobs(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+
+        $offer = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->create(
+            $tenantId, null, $actorId, [
+                'code' => 'JOB-ITEM-REWARD', 'name' => 'Stock earns labour',
+                'qualifying_item_id' => (int) $context['stock']->id,
+                'reward_item_id' => (int) $context['labour']->id,
+                'paid_quantity' => 5, 'reward_quantity' => 1, 'count_scope' => 'vehicle',
+                'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+            ],
+        ));
+
+        $this->assertSame((int) $context['stock']->id, (int) $offer['qualifying_item_id']);
+        $this->assertSame((int) $context['labour']->id, (int) $offer['reward_item_id']);
+
+        $options = $this->withTenantExecutionContext($tenantId, fn (): array => app(VehicleServiceLineItemLookupService::class)->search(
+            tenantId: $tenantId,
+            organizationUnitId: null,
+            search: '',
+            page: 1,
+            perPage: 20,
+            includeBatchOptions: false,
+        ));
+        $itemIds = array_map(static fn (array $option): int => (int) $option['model']->getKey(), $options['options']);
+        $this->assertContains((int) $context['labour']->id, $itemIds);
+        $this->assertContains((int) $context['service']->id, $itemIds);
+    }
+
+    public function test_promotion_availability_accepts_numeric_query_strings(): void
+    {
+        $context = $this->context();
+        $this->actingAsTenantUser((int) $context['tenant_id']);
+        $this->withoutMiddleware();
+        $query = http_build_query([
+            'tenant_id' => $context['tenant_id'],
+            'customer_id' => $context['customer_id'],
+            'vehicle_id' => $context['vehicle_id'],
+        ]);
+
+        $this->tenantGetJson((int) $context['tenant_id'], "/api/v1/promotions/available?{$query}")
+            ->assertOk()
+            ->assertJsonPath('data.cards', [])
+            ->assertJsonPath('data.offers', []);
+    }
+
+    public function test_repeat_offer_counts_posted_paid_services_and_restores_a_reversed_reward(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $offer = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->create(
+            $tenantId, null, $actorId, [
+                'code' => 'WASH-FIVE', 'name' => 'Five washes, one free',
+                'qualifying_item_id' => (int) $context['service']->id,
+                'reward_item_id' => (int) $context['service']->id,
+                'paid_quantity' => 5, 'reward_quantity' => 1, 'count_scope' => 'vehicle',
+                'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+            ],
+        ));
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->assign(
+            $tenantId, null, $actorId, (int) $offer['id'], [
+                'customer_id' => $context['customer_id'], 'vehicle_id' => $context['vehicle_id'],
+            ],
+        ));
+
+        for ($visit = 0; $visit < 5; $visit++) {
+            $job = $this->createJob($context);
+            if ($visit === 0) {
+                $this->withTenantExecutionContext($tenantId, fn () => app(VehicleServiceLineService::class)->create(
+                    $job, new VehicleServiceLineData(
+                        lineSourceType: VehicleServiceLineSourceType::ServiceItem,
+                        description: 'Discounted paid wash', quantity: '1.000000', unitPrice: '100.000000',
+                        itemId: (int) $context['service']->id, uomId: (int) $context['service']->base_uom_id,
+                        discountCalculationType: 'percentage', discountRate: '25.000000',
+                    ),
+                ));
+            } else {
+                $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '100.000000');
+            }
+            $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+            $this->changeStatus($job, VehicleServiceJobStatus::Completed);
+            $this->createServiceInvoice($job, '2026-06-07');
+        }
+
+        $otherVehicleContext = $context;
+        $otherVehicleContext['vehicle_id'] = $this->vehicle($tenantId, (int) $context['customer_id'], 'OTHER-WASH');
+        $otherJob = $this->createJob($otherVehicleContext);
+        $this->line($otherJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '100.000000');
+        $this->changeStatus($otherJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($otherJob, VehicleServiceJobStatus::Completed);
+        $this->createServiceInvoice($otherJob, '2026-06-07');
+
+        $available = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('1.000000', $available['offers'][0]['available_rewards']);
+        $this->assertSame('0.000000', $available['offers'][0]['progress_quantity']);
+        $rewardJob = $this->createJob($context);
+        $rewardLine = $this->line($rewardJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '100.000000');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->choose(
+            $tenantId, null, $actorId, (int) $rewardJob->id, (int) $rewardLine->id,
+            $this->currentJobVersion($rewardJob), ['offer_assignment_id' => $available['offers'][0]['id']],
+        ));
+        $this->assertSame('100.000000', (string) $rewardLine->refresh()->promotion_discount_amount);
+        $this->changeStatus($rewardJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($rewardJob, VehicleServiceJobStatus::Completed);
+        try {
+            $this->createServiceInvoice($rewardJob, '2026-06-07', [(int) $rewardLine->id => '0.500000']);
+            $this->fail('A promotion use cannot be split between invoices.');
+        } catch (ConflictHttpException $exception) {
+            $this->assertStringContainsString('full promotion service line', $exception->getMessage());
+        }
+        $rewardInvoice = $this->createServiceInvoice($rewardJob, '2026-06-07');
+        $afterReward = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('0.000000', $afterReward['offers'][0]['available_rewards']);
+        for ($visit = 0; $visit < 5; $visit++) {
+            $job = $this->createJob($context);
+            $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '100.000000');
+            $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+            $this->changeStatus($job, VehicleServiceJobStatus::Completed);
+            $this->createServiceInvoice($job, '2026-06-07');
+        }
+        $secondCycle = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('1.000000', $secondCycle['offers'][0]['available_rewards']);
+        $this->reverseBillingInvoice($rewardInvoice, $actorId);
+        $afterReversal = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('2.000000', $afterReversal['offers'][0]['available_rewards']);
+    }
+
+    public function test_card_uses_best_benefit_tracks_limited_uses_and_expires(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $template = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->createTemplate(
+            $tenantId, null, $actorId, [
+                'code' => 'WASH-CARD', 'name' => 'Wash card',
+                'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+                'benefits' => [
+                    ['kind' => 'direct', 'item_id' => (int) $context['service']->id,
+                        'discount_type' => 'free', 'use_limit' => 1],
+                    ['kind' => 'direct', 'item_id' => (int) $context['service']->id,
+                        'discount_type' => 'percentage', 'discount_rate' => '25', 'use_limit' => 2],
+                ],
+            ],
+        ));
+        $card = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->issue(
+            $tenantId, null, $actorId, [
+                'template_id' => $template['id'], 'card_number' => 'CARD-WASH-1',
+                'customer_id' => $context['customer_id'], 'vehicle_id' => $context['vehicle_id'],
+            ],
+        ));
+        $percentage = $template['benefits'][1];
+        $firstJob = $this->createJob($context);
+        $firstLine = $this->line($firstJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '200.000000');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->choose(
+            $tenantId, null, $actorId, (int) $firstJob->id, (int) $firstLine->id,
+            $this->currentJobVersion($firstJob), ['card_id' => $card['id'], 'card_benefit_id' => $percentage['id']],
+        ));
+        $this->assertSame('200.000000', (string) $firstLine->refresh()->promotion_discount_amount);
+        $this->changeStatus($firstJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($firstJob, VehicleServiceJobStatus::Completed);
+        $this->createServiceInvoice($firstJob, '2026-06-07');
+
+        $secondJob = $this->createJob($context);
+        $secondLine = $this->line($secondJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '200.000000');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->choose(
+            $tenantId, null, $actorId, (int) $secondJob->id, (int) $secondLine->id,
+            $this->currentJobVersion($secondJob), ['card_id' => $card['id'], 'card_benefit_id' => $percentage['id']],
+        ));
+        $this->assertSame('50.000000', (string) $secondLine->refresh()->promotion_discount_amount);
+        $this->travel(1)->years();
+        $available = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame([], $available['cards']);
     }
 
     public function test_line_item_search_prioritizes_name_prefixes_across_item_types(): void
