@@ -72,14 +72,14 @@ export function CustomerOutstandingGroupTable({ rows, selected, invoiceResult, i
                 </div>}
             </article>)}
         </div>
-        <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white md:block">
+        <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
             <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <tr>{customerHeaders.map((header) => <th key={header} scope="col" className={header === 'Customer' ? 'px-4 py-3' : 'px-4 py-3 text-right'}>{header}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {rows.map((row) => <Fragment key={`${row.customer.id}-${row.currency.code}`}>
-                        <tr className={isSelected(row) ? 'bg-sky-50' : undefined}>
+                        <tr className={`transition-colors ${isSelected(row) ? 'bg-sky-50' : 'hover:bg-blue-50/40'}`}>
                             <td className="px-4 py-3"><CustomerToggle row={row} open={isSelected(row)} detailsId={detailsId(row, 'desktop')} onSelect={onSelect} /></td>
                             <td className="px-4 py-3 text-right">{row.invoice_count}</td>
                             <td className="px-4 py-3 text-right"><MoneyDisplay value={row.current} currency={row.currency.code} /></td>

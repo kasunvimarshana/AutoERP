@@ -55,10 +55,10 @@ export default function ItemListPage() {
         { key: 'uom', header: 'Base UOM', render: (row) => readableRelation(row.base_uom) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
         { key: 'actions', header: '', className: 'text-right', render: (row) => (
-            <div className="flex justify-end gap-3">
-                {canUpdate && <Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/items/${row.id}/edit`}>Edit</Link>}
-                {row.is_active && canDeactivate && <button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>Deactivate</button>}
-                {!row.is_active && canActivate && <button type="button" className="font-semibold text-emerald-700" onClick={() => void toggle(row)}>Activate</button>}
+            <div className="flex items-center justify-end gap-2">
+                {canUpdate && <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500" to={`/items/${row.id}/edit`}>Edit</Link>}
+                {row.is_active && canDeactivate && <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 hover:text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-500" onClick={() => void toggle(row)}>Deactivate</button>}
+                {!row.is_active && canActivate && <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" onClick={() => void toggle(row)}>Activate</button>}
             </div>
         ) },
     ];

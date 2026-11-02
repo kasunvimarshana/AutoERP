@@ -54,12 +54,14 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
         finally { inFlight.current = false; setBusy(false); }
     }
     return <section className="space-y-3 border-t pt-4" aria-label="Security deposit">
-        <h3 className="font-semibold">Security deposit · {agreement.currency.code}</h3>
-        <p>Receive the agreed deposit, then open its payment to approve, post, apply to an invoice or refund. Draft receipts reserve collection capacity; they are not posted cash.</p>
+        <h3 className="font-semibold text-slate-900">Security deposit · {agreement.currency.code}</h3>
+        <p className="text-sm text-slate-600">Receive the agreed deposit, then open its payment to approve, post, apply to an invoice or refund. Draft receipts reserve collection capacity; they are not posted cash.</p>
         <ErrorAlert error={error ?? summaryRequest.error ?? methods.error} inline />
         <Button variant="secondary" disabled={busy || summaryRequest.loading} onClick={() => { setError(null); summaryRequest.reload(); }}>Refresh deposits</Button>
         {summaryRequest.loading ? <LoadingState label="Loading deposit summary…" /> : summary && <>
-            <p className="text-sm text-slate-700">Agreed: {summary.requirement === null ? 'Not specified' : <MoneyDisplay value={summary.requirement} currency={agreement.currency.code} />} · Net receipts including drafts: <MoneyDisplay value={summary.net_receipts} currency={agreement.currency.code} /> · Remaining collection capacity: {summary.remaining_to_receive === null ? 'Not specified' : <MoneyDisplay value={summary.remaining_to_receive} currency={agreement.currency.code} />}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm text-slate-700">Agreed: {summary.requirement === null ? 'Not specified' : <MoneyDisplay value={summary.requirement} currency={agreement.currency.code} />} · Net receipts including drafts: <MoneyDisplay value={summary.net_receipts} currency={agreement.currency.code} /> · Remaining collection capacity: {summary.remaining_to_receive === null ? 'Not specified' : <MoneyDisplay value={summary.remaining_to_receive} currency={agreement.currency.code} />}</p>
+            </div>
             {canCreate && agreement.status === AgreementStatus.Active && isPositiveDecimal(summary.remaining_to_receive ?? '0') && <fieldset disabled={busy} className="space-y-3">
                 <Input label="Deposit receipt date" type="date" value={date} onChange={event => setDate(event.target.value)} required error={error?.fields.payment_date?.[0]} />
                 <Input label="Deposit exchange rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} required error={error?.fields.exchange_rate?.[0]} />
@@ -70,9 +72,15 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
                     onRemoveLine={key => setLines(current => current.filter(line => line.key !== key))} />
                 <Button onClick={receive} disabled={!valid} loading={busy}>Create deposit receipt</Button>
             </fieldset>}
-            {summary.payments.length === 0 ? <p className="text-sm text-slate-500">No deposit receipts have been recorded.</p> : <ul className="space-y-2">{summary.payments.map(payment => <li key={payment.id}>
-                <Link to={`/payments/${payment.id}`} className="text-blue-700 underline">{payment.payment_number}</Link>
-                {' · '}<StatusBadge status={payment.document_status} /> <StatusBadge status={payment.posting_status} /> · Received <MoneyDisplay value={payment.total_amount} currency={agreement.currency.code} /> · Applied <MoneyDisplay value={payment.allocated_amount} currency={agreement.currency.code} /> · Refunded <MoneyDisplay value={payment.refunded_amount} currency={agreement.currency.code} /> · Unapplied <MoneyDisplay value={payment.unapplied_amount} currency={agreement.currency.code} />
+            {summary.payments.length === 0 ? <p className="text-sm text-slate-500">No deposit receipts have been recorded.</p> : <ul className="space-y-2">{summary.payments.map(payment => <li key={payment.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                    <Link to={`/payments/${payment.id}`} className="font-semibold text-sky-700 hover:underline">{payment.payment_number}</Link>
+                    <StatusBadge status={payment.document_status} />
+                    <StatusBadge status={payment.posting_status} />
+                </div>
+                <div className="mt-2 text-xs text-slate-600">
+                    Received <MoneyDisplay value={payment.total_amount} currency={agreement.currency.code} /> · Applied <MoneyDisplay value={payment.allocated_amount} currency={agreement.currency.code} /> · Refunded <MoneyDisplay value={payment.refunded_amount} currency={agreement.currency.code} /> · Unapplied <MoneyDisplay value={payment.unapplied_amount} currency={agreement.currency.code} />
+                </div>
             </li>)}</ul>}
         </>}
     </section>;

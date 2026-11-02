@@ -151,30 +151,32 @@ export default function StockCardPage() {
                 </div>
             </div>
             <Panel title="Movements">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full border-collapse text-sm">
-                        <thead className="bg-slate-50 text-left text-slate-600"><tr>
-                            <th className="px-3 py-3">Posted at</th><th className="px-3 py-3">Document date</th><th className="px-3 py-3">Document</th><th className="px-3 py-3">Description</th><th className="px-3 py-3 text-right">IN</th><th className="px-3 py-3 text-right">OUT</th><th className="px-3 py-3 text-right">Balance</th>
-                        </tr></thead>
-                        <tbody className="divide-y divide-slate-100">
-                            <tr className="bg-slate-50 font-semibold"><td colSpan={6} className="px-3 py-3">Opening balance</td><td className="px-3 py-3 text-right tabular-nums">{result.opening}</td></tr>
-                            {result.rows.map((row) => <tr key={row.movement_number}>
-                                <td className="whitespace-nowrap px-3 py-3">{new Date(row.posted_at).toLocaleString()}</td>
-                                <td className="whitespace-nowrap px-3 py-3">{row.document_date ?? '—'}</td>
-                                <td className="px-3 py-3">{row.document?.url ? <Link className="font-medium text-sky-700 hover:underline" to={row.document.url}>{row.document.label}</Link> : row.document?.label ?? row.movement_number}</td>
-                                <td className="px-3 py-3">{row.description ?? row.type}</td>
-                                <td className="px-3 py-3 text-right tabular-nums">{row.quantity_in === '0.000000' ? '—' : row.quantity_in}</td>
-                                <td className="px-3 py-3 text-right tabular-nums">{row.quantity_out === '0.000000' ? '—' : row.quantity_out}</td>
-                                <td className="px-3 py-3 text-right font-medium tabular-nums">{row.balance}</td>
-                            </tr>)}
-                        </tbody>
-                        <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold"><tr>
-                            <td colSpan={4} className="px-3 py-3">Period totals / closing balance</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{result.total_in}</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{result.total_out}</td>
-                            <td className="px-3 py-3 text-right tabular-nums">{result.closing}</td>
-                        </tr></tfoot>
-                    </table>
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full border-collapse text-sm">
+                            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr>
+                                <th className="px-4 py-3">Posted at</th><th className="px-4 py-3">Document date</th><th className="px-4 py-3">Document</th><th className="px-4 py-3">Description</th><th className="px-4 py-3 text-right">IN</th><th className="px-4 py-3 text-right">OUT</th><th className="px-4 py-3 text-right">Balance</th>
+                            </tr></thead>
+                            <tbody className="divide-y divide-slate-100">
+                                <tr className="bg-slate-50 font-semibold"><td colSpan={6} className="px-4 py-3 text-slate-900">Opening balance</td><td className="px-4 py-3 text-right tabular-nums text-slate-900">{result.opening}</td></tr>
+                                {result.rows.map((row) => <tr key={row.movement_number} className="transition-colors hover:bg-blue-50/40">
+                                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{new Date(row.posted_at).toLocaleString()}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.document_date ?? '—'}</td>
+                                    <td className="px-4 py-3">{row.document?.url ? <Link className="font-medium text-sky-700 hover:underline" to={row.document.url}>{row.document.label}</Link> : row.document?.label ?? row.movement_number}</td>
+                                    <td className="px-4 py-3 text-slate-700">{row.description ?? row.type}</td>
+                                    <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.quantity_in === '0.000000' ? '—' : row.quantity_in}</td>
+                                    <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.quantity_out === '0.000000' ? '—' : row.quantity_out}</td>
+                                    <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">{row.balance}</td>
+                                </tr>)}
+                            </tbody>
+                            <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold"><tr>
+                                <td colSpan={4} className="px-4 py-3 text-slate-900">Period totals / closing balance</td>
+                                <td className="px-4 py-3 text-right tabular-nums text-slate-900">{result.total_in}</td>
+                                <td className="px-4 py-3 text-right tabular-nums text-slate-900">{result.total_out}</td>
+                                <td className="px-4 py-3 text-right tabular-nums text-slate-900">{result.closing}</td>
+                            </tr></tfoot>
+                        </table>
+                    </div>
                 </div>
                 {result.rows.length === 0 ? <p className="mt-4 text-sm text-slate-500">No posted movements in this period.</p> : null}
             </Panel>

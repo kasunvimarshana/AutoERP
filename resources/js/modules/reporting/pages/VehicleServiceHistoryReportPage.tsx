@@ -246,18 +246,18 @@ function PricedLineList({ title, lines }: { title: string; lines: VehicleService
             {lines.length ? (
                 <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200">
                     <table className="w-full min-w-[580px] text-left text-sm">
-                        <thead className="bg-slate-50 text-xs text-slate-600">
+                        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                             <tr>
-                                <th scope="col" className="px-3 py-2 font-semibold">Item / work</th>
-                                <th scope="col" className="px-3 py-2 text-right font-semibold">Qty</th>
-                                <th scope="col" className="px-3 py-2 text-right font-semibold">Unit price</th>
-                                <th scope="col" className="px-3 py-2 text-right font-semibold">Discount</th>
-                                <th scope="col" className="px-3 py-2 text-right font-semibold">Line total</th>
+                                <th scope="col" className="px-4 py-3">Item / work</th>
+                                <th scope="col" className="px-4 py-3 text-right">Qty</th>
+                                <th scope="col" className="px-4 py-3 text-right">Unit price</th>
+                                <th scope="col" className="px-4 py-3 text-right">Discount</th>
+                                <th scope="col" className="px-4 py-3 text-right">Line total</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {lines.map((line) => <tr key={line.id} className="align-top">
-                                <th scope="row" className="px-3 py-3 font-medium text-slate-900">
+                            {lines.map((line) => <tr key={line.id} className="align-top transition-colors hover:bg-blue-50/40">
+                                <th scope="row" className="px-4 py-3 font-medium text-slate-900">
                                     {line.description}
                                     {line.is_billable === false && <span className="ml-2 text-xs font-normal text-slate-500">Not billable</span>}
                                     {line.status === 'cancelled' && <span className="ml-2 text-xs font-normal text-rose-700">Cancelled</span>}

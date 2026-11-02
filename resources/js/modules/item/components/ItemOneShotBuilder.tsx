@@ -207,7 +207,7 @@ function DraftSection({ title, rows, remove, children }: { title: string; rows: 
     return <div>
         <h3 className="mb-3 font-semibold text-slate-900">{title}</h3>
         <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4">{children}</div>
-        <div className="mt-5 space-y-2">{rows.map((row, index) => <div key={`${row}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"><span>{row}</span><button type="button" className="font-semibold text-rose-600" onClick={() => remove(index)}>Remove</button></div>)}</div>
+        <div className="mt-5 space-y-2">{rows.map((row, index) => <div key={`${row}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><span>{row}</span><button type="button" className="rounded px-2 py-1 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={() => remove(index)}>Remove</button></div>)}</div>
     </div>;
 }
 

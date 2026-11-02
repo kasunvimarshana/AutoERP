@@ -74,12 +74,12 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         </div>}
         <Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
         {selected && <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-5" aria-label="Agreement review">
-            <div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold">{selected.reference} · {selected.party.name}</h2><StatusBadge status={selected.status} /></div>
-            <p>{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
-            <p>Agreement date: {formatBusinessDate(selected.agreed_on)} · Executing date: {formatBusinessDate(selected.executing_on, 'Not recorded')}</p>
-            {selected.supersedes_agreement && <p className="text-sm text-slate-600">Successor of {selected.supersedes_agreement.reference}</p>}
+            <div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold text-slate-900">{selected.reference} · {selected.party.name}</h2><StatusBadge status={selected.status} /></div>
+            <p className="text-sm text-slate-600">{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
+            <p className="text-xs text-slate-500">Agreement date: {formatBusinessDate(selected.agreed_on)} · Executing date: {formatBusinessDate(selected.executing_on, 'Not recorded')}</p>
+            {selected.supersedes_agreement && <p className="text-xs text-sky-700 font-medium">Successor of {selected.supersedes_agreement.reference}</p>}
             <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
-            {selected.notes && <p><span className="font-medium">Notes:</span> {selected.notes}</p>}
+            {selected.notes && <p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">Notes:</span> {selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
             {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" aria-expanded={showDeposits} onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
@@ -94,7 +94,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             </div>}
             {showSuccessor && selected.status === AgreementStatus.Active && <AgreementSuccessorForm kind={kind} agreement={selected} onSaved={reload} onCancel={() => setShowSuccessor(false)} />}
             {action && <div className="space-y-3 border-t pt-4">
-                <p>{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
+                <p className="text-sm text-slate-600">{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
                 {action === AgreementAction.Close && <Textarea label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
                 <Button variant={action === AgreementAction.Close ? 'danger' : 'primary'} onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>

@@ -53,10 +53,10 @@ export default function UomListPage() {
             header: '',
             className: 'text-right',
             render: (row: UnitOfMeasure) => (
-                <div className="flex justify-end gap-3">
-                    {canUpdate && <Link className="text-sm font-semibold text-slate-600 hover:text-sky-700" to={`/uoms/${row.id}/edit`}>Edit</Link>}
+                <div className="flex items-center justify-end gap-2">
+                    {canUpdate && <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500" to={`/uoms/${row.id}/edit`}>Edit</Link>}
                     {canDeactivate && row.is_active && (
-                        <button type="button" className="text-sm font-semibold text-rose-600 hover:text-rose-700" onClick={async () => {
+                        <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={async () => {
                             setActionError(null);
                             try {
                                 await deactivateUom(row.id);

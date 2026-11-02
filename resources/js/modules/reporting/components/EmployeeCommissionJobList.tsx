@@ -24,22 +24,22 @@ export function EmployeeCommissionJobList({ employeeId, params }: { employeeId: 
             <div className="space-y-2 md:hidden">
                 {(result.data?.data ?? []).map((row) => <JobCard key={row.job.id} row={row} />)}
             </div>
-            <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white md:block">
+            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                    <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <tr>
-                            <th className="px-3 py-2">Job</th>
-                            <th className="px-3 py-2">Completed</th>
-                            <th className="px-3 py-2">Job date</th>
-                            <th className="px-3 py-2">Customer / vehicle</th>
-                            <th className="px-3 py-2 text-right">EOM eligible</th>
-                            <th className="px-3 py-2 text-right">Pending</th>
-                            <th className="px-3 py-2 text-right">Total incentive</th>
+                            <th className="px-4 py-3">Job</th>
+                            <th className="px-4 py-3">Completed</th>
+                            <th className="px-4 py-3">Job date</th>
+                            <th className="px-4 py-3">Customer / vehicle</th>
+                            <th className="px-4 py-3 text-right">EOM eligible</th>
+                            <th className="px-4 py-3 text-right">Pending</th>
+                            <th className="px-4 py-3 text-right">Total incentive</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {(result.data?.data ?? []).map((row) => <tr key={row.job.id}>
-                            <td className="px-3 py-2.5"><Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job.number}</Link>{row.entry_count > 1 && <span className="block text-xs text-slate-500">{row.entry_count} commission entries</span>}</td>
+                        {(result.data?.data ?? []).map((row) => <tr key={row.job.id} className="transition-colors hover:bg-blue-50/40">
+                            <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job.number}</Link>{row.entry_count > 1 && <span className="block text-xs text-slate-500">{row.entry_count} commission entries</span>}</td>
                             <td className="whitespace-nowrap px-3 py-2.5">{row.last_earned_at ? formatDate(row.last_earned_at.slice(0, 10)) : '—'}</td>
                             <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(row.job_date)}</td>
                             <td className="px-3 py-2.5"><span className="block">{row.customer_name || '—'}</span><span className="block text-xs text-slate-500">{row.vehicle_label || '—'}</span></td>

@@ -93,12 +93,30 @@ export default function ConsumableUsageReportPage() {
                     <p className="text-sm text-slate-600">Posted usage from {filters.from} to {filters.to}</p>
                     <p className="text-lg font-bold tabular-nums text-slate-950">Total expense cost (base currency): {totalCost}</p>
                 </div>
-                {items.length === 0 ? <p className="text-sm text-slate-600">No posted usage matches these filters.</p> : <div className="overflow-x-auto">
-                    <table className="w-full min-w-[32rem] text-left text-sm">
-                        <thead><tr className="border-b border-slate-200 text-slate-600"><th className="pb-2 font-semibold">Item</th><th className="pb-2 text-right font-semibold">Used quantity</th><th className="pb-2 text-right font-semibold">Expense cost (base currency)</th></tr></thead>
-                        <tbody>{items.map((row) => <tr key={row.item.id} className="border-b border-slate-100 last:border-0"><td className="py-3 font-medium text-slate-900">{row.item.name}<span className="ml-2 text-xs font-normal text-slate-500">{row.item.code}</span></td><td className="py-3 text-right tabular-nums">{row.quantity} {row.uom ?? ''}</td><td className="py-3 text-right tabular-nums">{row.cost}</td></tr>)}</tbody>
-                    </table>
-                </div>}
+                {items.length === 0 ? <p className="text-sm text-slate-600">No posted usage matches these filters.</p> : (
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[32rem] text-left text-sm">
+                                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    <tr>
+                                        <th className="px-4 py-3">Item</th>
+                                        <th className="px-4 py-3 text-right">Used quantity</th>
+                                        <th className="px-4 py-3 text-right">Expense cost (base currency)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {items.map((row) => (
+                                        <tr key={row.item.id} className="transition-colors hover:bg-blue-50/40">
+                                            <td className="px-4 py-3 font-medium text-slate-900">{row.item.name}<span className="ml-2 text-xs font-normal text-slate-500">{row.item.code}</span></td>
+                                            <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.quantity} {row.uom ?? ''}</td>
+                                            <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">{row.cost}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </Panel>
 
             <Panel title="Usage entries">

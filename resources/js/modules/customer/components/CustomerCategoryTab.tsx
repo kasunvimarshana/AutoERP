@@ -24,7 +24,7 @@ export default function CustomerCategoryTab({ customerId, canManage }: { custome
     const columns: DataColumn<CustomerCategory>[] = [
         { key: 'category', header: 'Category', render: (row) => <>{row.code} - {row.name}</> },
         { key: 'parent', header: 'Parent', render: (row) => row.parent ? `${row.parent.code} - ${row.parent.name}` : '-' },
-        ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: CustomerCategory) => <button type="button" className="font-semibold text-rose-600" onClick={() => setRemoveTarget(row)}>Remove</button> }] : []),
+        ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: CustomerCategory) => <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={() => setRemoveTarget(row)}>Remove</button> }] : []),
     ];
     async function remove(row: CustomerCategory) {
         setActionError(null);

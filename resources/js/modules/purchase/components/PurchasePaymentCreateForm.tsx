@@ -378,11 +378,11 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                         <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm font-medium text-slate-600">Select a supplier to load outstanding invoices.</div>
                     ) : (
                         <>
-                            <div className="overflow-hidden rounded-lg border border-slate-200">
+                            <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
                                 <div className="hidden overflow-x-auto md:block">
                                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                                            <tr>{['Invoice', 'Date', 'Status', 'Balance', 'Allocation'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
+                                        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                            <tr>{['Invoice', 'Date', 'Status', 'Balance', 'Allocation'].map((header) => <th key={header} className="px-4 py-3">{header}</th>)}</tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {(invoiceResult.data?.data ?? []).map((invoice) => (
@@ -447,14 +447,14 @@ function PaymentPreviewPanel({ preview }: { preview: PurchasePaymentPreview }) {
                 <Summary label="Unapplied" value={<MoneyDisplay value={preview.unapplied_amount} />} />
             </div>
             {preview.allocations.length > 0 && (
-                <div className="mt-4 overflow-hidden rounded-lg border border-emerald-200 bg-white">
+                <div className="mt-4 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-emerald-100 text-left text-sm">
-                        <thead className="bg-emerald-50 text-xs uppercase tracking-wide text-emerald-700">
-                            <tr>{['Invoice', 'Before', 'Allocated', 'After'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
+                        <thead className="border-b border-emerald-200 bg-emerald-50 text-xs font-semibold uppercase tracking-wider text-emerald-800">
+                            <tr>{['Invoice', 'Before', 'Allocated', 'After'].map((header) => <th key={header} className="px-4 py-3">{header}</th>)}</tr>
                         </thead>
                         <tbody className="divide-y divide-emerald-100">
                             {preview.allocations.map((allocation) => (
-                                <tr key={allocation.invoice_id}>
+                                <tr key={allocation.invoice_id} className="transition-colors hover:bg-emerald-50/50">
                                     <td className="px-4 py-3">{allocation.invoice_number ?? 'Invoice number unavailable'}</td>
                                     <td className="px-4 py-3"><MoneyDisplay value={allocation.invoice_balance_before} /></td>
                                     <td className="px-4 py-3"><MoneyDisplay value={allocation.allocated_amount} /></td>
@@ -476,7 +476,7 @@ function AllocationRow({ invoice, value, error, onChange }: {
     onChange: (value: string) => void;
 }) {
     return (
-        <tr>
+        <tr className="transition-colors hover:bg-blue-50/40">
             <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
             <td className="px-4 py-3">{formatDate(invoice.invoice_date)}</td>
             <td className="px-4 py-3">{invoice.status ? <StatusBadge status={invoice.status} /> : '-'}</td>

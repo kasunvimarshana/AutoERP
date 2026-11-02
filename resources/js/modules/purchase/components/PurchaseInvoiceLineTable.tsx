@@ -28,21 +28,21 @@ export function PurchaseInvoiceLineTable({ lines, sourceIndex, onChange, errorFo
     return (
         <div className="space-y-3">
         <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onChange(lines.map((line) => ({ ...line, include: true })))}>Select All</button>
-            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onChange(lines.map((line) => ({ ...line, include: false, quantity: '' })))}>Clear</button>
-            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => onChange(lines.map((line) => ({ ...line, include: true, quantity: line.remainingQty })))}>Invoice All Remaining</button>
+            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: true })))}>Select All</button>
+            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: false, quantity: '' })))}>Clear</button>
+            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: true, quantity: line.remainingQty })))}>Invoice All Remaining</button>
         </div>
-        <div className="overflow-hidden rounded-lg border border-slate-200 md:overflow-x-auto">
+        <div className="overflow-hidden rounded-xl border border-slate-200 md:overflow-x-auto shadow-sm">
             <table className="w-full divide-y divide-slate-200 text-left text-sm md:min-w-[860px]">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <tr>
                         {['Include', 'Source', 'Item', 'Source qty', 'Previously invoiced', 'Remaining', 'Quantity now']
-                            .map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}
+                            .map((header) => <th key={header} className="px-4 py-3">{header}</th>)}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {lines.map((line, index) => (
-                        <tr key={`${line.sourceType}-${line.lineId}`}>
+                        <tr key={`${line.sourceType}-${line.lineId}`} className="transition-colors hover:bg-blue-50/40">
                             <td className="px-4 py-3">
                                 <input
                                     type="checkbox"

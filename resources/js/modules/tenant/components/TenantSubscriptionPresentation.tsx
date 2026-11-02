@@ -74,23 +74,23 @@ export function SubscriptionComparison({ current, proposed, readiness }: {
                 <ModuleChanges title="Modules removed" values={removed} empty="No modules removed" tone="amber" />
             </div>
             {limitKeys.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table className="min-w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                             <tr>
-                                <th className="px-3 py-2">Limit</th>
-                                <th className="px-3 py-2">Current</th>
-                                <th className="px-3 py-2">Proposed</th>
-                                <th className="px-3 py-2">Usage</th>
+                                <th className="px-4 py-3">Limit</th>
+                                <th className="px-4 py-3">Current</th>
+                                <th className="px-4 py-3">Proposed</th>
+                                <th className="px-4 py-3">Usage</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {limitKeys.map((key) => (
-                                <tr key={key}>
-                                    <td className="px-3 py-2 font-medium text-slate-900">{formatLimitLabel(key)}</td>
-                                    <td className="px-3 py-2">{displayLimit(currentLimits[key as keyof typeof currentLimits])}</td>
-                                    <td className="px-3 py-2">{displayLimit(proposed.limits[key as keyof typeof proposed.limits])}</td>
-                                    <td className="px-3 py-2">{readiness?.usage[key] ?? 'Check impact'}</td>
+                                <tr key={key} className="transition-colors hover:bg-blue-50/40">
+                                    <td className="px-4 py-3 font-medium text-slate-900">{formatLimitLabel(key)}</td>
+                                    <td className="px-4 py-3 text-slate-700">{displayLimit(currentLimits[key as keyof typeof currentLimits])}</td>
+                                    <td className="px-4 py-3 text-slate-700">{displayLimit(proposed.limits[key as keyof typeof proposed.limits])}</td>
+                                    <td className="px-4 py-3 text-slate-600">{readiness?.usage[key] ?? 'Check impact'}</td>
                                 </tr>
                             ))}
                         </tbody>

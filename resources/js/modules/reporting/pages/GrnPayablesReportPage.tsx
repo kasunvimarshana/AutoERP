@@ -259,7 +259,7 @@ function SupplierBreakdown({ rows, currency }: { rows: GrnPayablesSupplierRow[];
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {rows.length > 0 ? rows.map((row) => (
-                            <tr key={row.supplier}>
+                            <tr key={row.supplier} className="transition-colors hover:bg-blue-50/40">
                                 <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">{row.supplier || 'Supplier unavailable'}</td>
                                 <td className="px-4 py-3 text-right tabular-nums text-slate-600">{row.grn_count}</td>
                                 <MoneyCell value={row.uninvoiced_amount} currency={currency} />

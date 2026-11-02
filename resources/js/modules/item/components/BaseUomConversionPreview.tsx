@@ -17,24 +17,26 @@ export function BaseUomConversionPreview({ preview }: { preview: Preview }) {
                 </div>
             )}
 
-            <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <tr><th className="px-3 py-2">Area</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Metric</th><th className="px-3 py-2 text-right">Before</th><th className="px-3 py-2 text-right">After</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {preview.preview_rows.map((row, index) => (
-                            <tr key={`${row.area}-${row.reference}-${row.metric}-${index}`}>
-                                <td className="px-3 py-2 capitalize">{row.area.replaceAll('_', ' ')}</td>
-                                <td className="px-3 py-2">{row.reference}</td>
-                                <td className="px-3 py-2 capitalize">{row.metric.replaceAll('_', ' ')}</td>
-                                <td className="px-3 py-2 text-right font-mono">{row.before}</td>
-                                <td className="px-3 py-2 text-right font-mono font-semibold">{row.after}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {preview.preview_rows.length === 0 && <p className="py-5 text-center text-sm text-slate-500">No operational quantity rows require conversion.</p>}
+            <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                            <tr><th className="px-4 py-3">Area</th><th className="px-4 py-3">Reference</th><th className="px-4 py-3">Metric</th><th className="px-4 py-3 text-right">Before</th><th className="px-4 py-3 text-right">After</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {preview.preview_rows.map((row, index) => (
+                                <tr key={`${row.area}-${row.reference}-${row.metric}-${index}`} className="transition-colors hover:bg-blue-50/40">
+                                    <td className="px-4 py-3 capitalize text-slate-900">{row.area.replaceAll('_', ' ')}</td>
+                                    <td className="px-4 py-3 text-slate-700">{row.reference}</td>
+                                    <td className="px-4 py-3 capitalize text-slate-700">{row.metric.replaceAll('_', ' ')}</td>
+                                    <td className="px-4 py-3 text-right font-mono text-slate-600">{row.before}</td>
+                                    <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">{row.after}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {preview.preview_rows.length === 0 && <p className="py-5 text-center text-sm text-slate-500">No operational quantity rows require conversion.</p>}
+                </div>
             </div>
         </Panel>
     );

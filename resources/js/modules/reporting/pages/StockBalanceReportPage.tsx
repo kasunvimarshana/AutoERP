@@ -46,10 +46,10 @@ function StockBreakdown({ details }: { details: StockBalanceDetail[] }) {
         <h3 className="mb-2 text-sm font-semibold text-slate-900">Stock breakdown by batch</h3>
         <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-left text-slate-600"><tr>
-                    {['Batch', 'Current', 'Available', 'Reserved', 'Allocated', 'Returned', 'In transit', 'Damaged', 'Quarantine', 'Expired', 'Scrapped'].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}
+                <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr>
+                    {['Batch', 'Current', 'Available', 'Reserved', 'Allocated', 'Returned', 'In transit', 'Damaged', 'Quarantine', 'Expired', 'Scrapped'].map((label) => <th key={label} className="px-3 py-2.5">{label}</th>)}
                 </tr></thead>
-                <tbody className="divide-y divide-slate-100">{details.map((detail, index) => <tr key={`${detail.batch_number ?? 'none'}-${index}`}>
+                <tbody className="divide-y divide-slate-100">{details.map((detail, index) => <tr key={`${detail.batch_number ?? 'none'}-${index}`} className="transition-colors hover:bg-blue-50/40">
                     <td className="px-3 py-2">{detail.batch_number ?? 'No batch'}</td>
                     {(['quantity_on_hand', 'quantity_available', 'quantity_reserved', 'quantity_allocated', 'quantity_returned', 'quantity_in_transit', 'quantity_damaged', 'quantity_quarantine', 'quantity_expired', 'quantity_scrapped'] as const).map((field) => <td key={field} className="px-3 py-2 text-right tabular-nums">{quantity(detail[field])}</td>)}
                 </tr>)}</tbody>
@@ -111,12 +111,12 @@ export default function StockBalanceReportPage() {
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
                     <table className="min-w-full text-sm">
-                        <thead className="bg-slate-50 text-left text-slate-600"><tr><th className="min-w-64 px-4 py-3">Item</th><th className="px-4 py-3 text-right">Current stock</th><th className="px-4 py-3 text-right">Available to sell</th><th className="px-4 py-3 text-right">Damaged</th><th className="px-4 py-3 text-right">Expired</th></tr></thead>
+                        <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="min-w-64 px-4 py-3">Item</th><th className="px-4 py-3 text-right">Current stock</th><th className="px-4 py-3 text-right">Available to sell</th><th className="px-4 py-3 text-right">Damaged</th><th className="px-4 py-3 text-right">Expired</th></tr></thead>
                         <tbody className="divide-y divide-slate-100">{result.data.map((row) => {
                             const key = rowKey(row);
                             const expanded = key === openKey;
                             return <Fragment key={key}>
-                                <tr className="hover:bg-slate-50">
+                                <tr className="transition-colors hover:bg-blue-50/40">
                                     <td className="px-4 py-3"><button type="button" aria-expanded={expanded} className="flex w-full items-start gap-2 text-left hover:text-blue-700" onClick={() => { setOpenKey(expanded ? null : key); setDetails(null); }}><span aria-hidden="true">{expanded ? '▾' : '▸'}</span><ItemLabel row={row} /></button></td>
                                     <td className="px-4 py-3 text-right"><StockValue value={row.quantity_on_hand} /></td>
                                     <td className="px-4 py-3 text-right"><StockValue value={row.quantity_available} tone={row.stock_level === 'in_stock' ? 'good' : row.stock_level === 'low_stock' ? 'warning' : 'danger'} /><div className="text-xs text-slate-500">{row.stock_level === 'in_stock' ? 'In stock' : row.stock_level === 'low_stock' ? 'Low stock' : 'Out of stock'}</div></td>

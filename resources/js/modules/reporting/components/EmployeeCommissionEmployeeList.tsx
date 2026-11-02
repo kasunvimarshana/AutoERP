@@ -127,23 +127,23 @@ function EmployeeCommissionDetails({ employeeId, params }: {
                             </p>
                         )}
                     </div>
-                    <div className="hidden overflow-x-auto rounded-lg border border-slate-200 bg-white md:block">
+                    <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
                         <table className="min-w-[850px] divide-y divide-slate-200 text-left text-sm">
-                            <thead className="bg-white text-xs uppercase tracking-wide text-slate-500">
+                            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th className="px-3 py-2 font-semibold">Job</th>
-                                    <th className="px-3 py-2 font-semibold">Date</th>
-                                    <th className="px-3 py-2 font-semibold">Customer / vehicle</th>
-                                    <th className="px-3 py-2 font-semibold">Work</th>
-                                    <th className="px-3 py-2 text-right font-semibold">Hours</th>
-                                    <th className="px-3 py-2 text-right font-semibold">Commission</th>
-                                    <th className="px-3 py-2 font-semibold">Status</th>
+                                    <th className="px-4 py-3">Job</th>
+                                    <th className="px-4 py-3">Date</th>
+                                    <th className="px-4 py-3">Customer / vehicle</th>
+                                    <th className="px-4 py-3">Work</th>
+                                    <th className="px-4 py-3 text-right">Hours</th>
+                                    <th className="px-4 py-3 text-right">Commission</th>
+                                    <th className="px-4 py-3">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {(result.data?.data ?? []).map((row) => (
-                                    <tr key={row.id}>
-                                        <td className="whitespace-nowrap px-3 py-2.5">
+                                    <tr key={row.id} className="transition-colors hover:bg-blue-50/40">
+                                        <td className="whitespace-nowrap px-4 py-3">
                                             <Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link>
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(row.job_date)}</td>

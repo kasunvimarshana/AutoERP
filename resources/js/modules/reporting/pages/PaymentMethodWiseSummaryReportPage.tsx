@@ -92,12 +92,12 @@ export default function PaymentMethodWiseSummaryReportPage() {
                 <Panel title="Daily summary">
                     <div className="max-h-[75vh] overflow-auto print:max-h-none print:overflow-visible">
                         <table className="min-w-full border-collapse text-sm">
-                            <thead className="bg-slate-50 text-left text-slate-600">
+                            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3">Date</th>
-                                    {result.methods.map((method) => <th key={method.key} className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3 text-right">{method.name}</th>)}
-                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3 text-right">Receipts total</th>
-                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3 text-right">New credit sales</th>
+                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3">Date</th>
+                                    {result.methods.map((method) => <th key={method.key} className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right">{method.name}</th>)}
+                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right">Receipts total</th>
+                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right">New credit sales</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -106,29 +106,29 @@ export default function PaymentMethodWiseSummaryReportPage() {
                                     const expanded = openKey === key;
                                     const documents = expanded && details?.key === key ? details.rows.find((row) => row.currency === day.currency)?.documents : undefined;
                                     return <Fragment key={key}>
-                                    <tr>
-                                    <td className="px-3 py-3 font-medium">
-                                        <button type="button" aria-expanded={expanded} onClick={() => setOpenKey(expanded ? null : key)} className="text-left font-semibold text-blue-700 hover:underline">
+                                    <tr className="transition-colors hover:bg-blue-50/40">
+                                    <td className="px-4 py-3 font-medium">
+                                        <button type="button" aria-expanded={expanded} onClick={() => setOpenKey(expanded ? null : key)} className="text-left font-semibold text-sky-700 hover:underline focus:outline-none focus:ring-2 focus:ring-sky-500 rounded">
                                             <span aria-hidden="true">{expanded ? '▾' : '▸'} </span>{day.date}
                                             <span className="block pl-4 text-xs font-normal text-slate-500">{day.currency}</span>
                                         </button>
                                     </td>
-                                    {result.methods.map((method) => <td key={method.key} className="px-3 py-3 text-right tabular-nums">{formatMoney(day.methods[method.key], day.currency)}</td>)}
-                                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatMoney(day.receipts, day.currency)}</td>
-                                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatMoney(day.credit_sales, day.currency)}</td>
+                                    {result.methods.map((method) => <td key={method.key} className="px-4 py-3 text-right tabular-nums">{formatMoney(day.methods[method.key], day.currency)}</td>)}
+                                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(day.receipts, day.currency)}</td>
+                                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(day.credit_sales, day.currency)}</td>
                                     </tr>
                                     {expanded ? <tr><td colSpan={result.methods.length + 3} className="bg-slate-50 px-4 py-4">
                                         {details?.key !== key ? <p className="text-sm text-slate-500">Loading documents...</p> : null}
                                         {details?.key === key && details.error ? <ErrorAlert error={details.error} /> : null}
-                                        {documents ? <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                        {documents ? <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                                             <table className="min-w-full text-sm">
-                                                <thead className="bg-slate-50 text-left text-slate-600"><tr><th className="px-3 py-2">Type</th><th className="px-3 py-2">Document</th><th className="px-3 py-2">Invoice</th><th className="px-3 py-2">Method</th><th className="px-3 py-2 text-right">Amount</th></tr></thead>
-                                                <tbody className="divide-y divide-slate-100">{documents.map((document, index) => <tr key={`${document.type}-${document.payment?.id ?? 'credit'}-${document.invoice.id}-${index}`}>
-                                                    <td className="px-3 py-2">{document.type === 'receipt' ? 'Receipt' : 'Credit sale'}</td>
-                                                    <td className="px-3 py-2">{document.payment ? <Link to={`/payments/${document.payment.id}`} className="font-semibold text-blue-700 hover:underline">{document.payment.number}</Link> : <Link to={`/invoices/${document.invoice.id}`} className="font-semibold text-blue-700 hover:underline">{document.invoice.number}</Link>}</td>
-                                                    <td className="px-3 py-2">{document.payment ? <Link to={`/invoices/${document.invoice.id}`} className="text-blue-700 hover:underline">{document.invoice.number}</Link> : '—'}</td>
-                                                    <td className="px-3 py-2">{Object.entries(document.methods).map(([method, amount]) => `${result.methods.find((entry) => entry.key === method)?.name ?? method}: ${formatMoney(amount, day.currency)}`).join(', ') || '—'}</td>
-                                                    <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatMoney(document.amount, day.currency)}</td>
+                                                <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Type</th><th className="px-4 py-3">Document</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Method</th><th className="px-4 py-3 text-right">Amount</th></tr></thead>
+                                                <tbody className="divide-y divide-slate-100">{documents.map((document, index) => <tr key={`${document.type}-${document.payment?.id ?? 'credit'}-${document.invoice.id}-${index}`} className="transition-colors hover:bg-blue-50/40">
+                                                    <td className="px-4 py-3">{document.type === 'receipt' ? 'Receipt' : 'Credit sale'}</td>
+                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/payments/${document.payment.id}`} className="font-semibold text-sky-700 hover:underline">{document.payment.number}</Link> : <Link to={`/invoices/${document.invoice.id}`} className="font-semibold text-sky-700 hover:underline">{document.invoice.number}</Link>}</td>
+                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/invoices/${document.invoice.id}`} className="text-sky-700 hover:underline">{document.invoice.number}</Link> : '—'}</td>
+                                                    <td className="px-4 py-3">{Object.entries(document.methods).map(([method, amount]) => `${result.methods.find((entry) => entry.key === method)?.name ?? method}: ${formatMoney(amount, day.currency)}`).join(', ') || '—'}</td>
+                                                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(document.amount, day.currency)}</td>
                                                 </tr>)}</tbody>
                                             </table>
                                         </div> : null}

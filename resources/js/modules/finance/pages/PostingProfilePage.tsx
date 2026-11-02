@@ -1738,7 +1738,7 @@ export default function PostingProfilePage() {
                                 {healthAudit.issues.length > 0 && (
                                     <div className="overflow-x-auto rounded-lg border border-slate-200">
                                         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                                            <thead className="bg-slate-50 font-semibold text-slate-700">
+                                            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                                 <tr>
                                                     <th className="px-4 py-2.5">Profile</th>
                                                     <th className="px-4 py-2.5">Line Key</th>
@@ -1747,9 +1747,9 @@ export default function PostingProfilePage() {
                                                     <th className="px-4 py-2.5 text-right">Remedy</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                            <tbody className="divide-y divide-slate-100 bg-white">
                                                 {healthAudit.issues.map((issue, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50">
+                                                    <tr key={idx} className="transition-colors hover:bg-blue-50/40">
                                                         <td className="px-4 py-2.5 font-medium text-slate-800">
                                                             {issue.profileName} (<code className="text-xs text-slate-600">{issue.profileCode}</code>)
                                                         </td>
@@ -1850,7 +1850,7 @@ export default function PostingProfilePage() {
 
                                         <div className="overflow-x-auto rounded-lg border border-slate-200">
                                             <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                                                <thead className="bg-slate-50 font-semibold text-slate-700">
+                                                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                                                     <tr>
                                                         <th className="px-4 py-2.5">Line Key</th>
                                                         <th className="px-4 py-2.5">Account Role</th>
@@ -1859,14 +1859,14 @@ export default function PostingProfilePage() {
                                                         <th className="px-4 py-2.5">Status</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-slate-200 bg-white">
+                                                <tbody className="divide-y divide-slate-100 bg-white">
                                                     {simulationResult.lines.map((line, idx) => (
-                                                        <tr key={idx} className="hover:bg-slate-50">
+                                                        <tr key={idx} className="transition-colors hover:bg-blue-50/40">
                                                             <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-800">
                                                                 {line.line_key}
                                                             </td>
                                                             <td className="px-4 py-2.5 text-slate-700">
-                                                                {line.role ? `${line.role.name} (${line.role.code})` : `#${line.account_role_id}`}
+                                                                {line.role ? `${line.role.name} (${line.role.code})` : `Account role ${line.account_role_id}`}
                                                             </td>
                                                             <td className="px-4 py-2.5">
                                                                 {line.resolved_account ? (

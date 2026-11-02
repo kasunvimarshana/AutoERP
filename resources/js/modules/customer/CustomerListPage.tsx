@@ -43,7 +43,13 @@ export default function CustomerListPage() {
         { key: 'contact', header: 'Contact', render: (row) => <WhatsAppContactCell contact={row.whatsapp_contact} email={row.email} phone={row.phone} /> },
         { key: 'vehicles', header: 'Current Vehicles', render: (row) => row.current_vehicles?.some((vehicle) => vehicle.registration_number) ? <div className="flex flex-wrap gap-1">{row.current_vehicles.filter((vehicle) => vehicle.registration_number).map((vehicle) => <Link key={vehicle.id} className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50" to={`/vehicles/${vehicle.id}`}>{vehicle.registration_number}</Link>)}</div> : '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => canUpdate ? <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/customers/${row.id}/edit`}>Edit</Link><button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button><button type="button" className="font-semibold text-sky-700" onClick={() => { setStatusCustomer(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button></div> : null },
+        { key: 'actions', header: '', className: 'text-right', render: (row) => canUpdate ? (
+            <div className="flex items-center justify-end gap-2">
+                <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500" to={`/customers/${row.id}/edit`}>Edit</Link>
+                <button type="button" className={`rounded px-2 py-1 text-sm font-semibold transition focus:outline-none focus:ring-2 ${row.status === 'active' ? 'text-amber-700 hover:bg-amber-50 hover:text-amber-800 focus:ring-amber-500' : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 focus:ring-emerald-500'}`} onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+                <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => { setStatusCustomer(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button>
+            </div>
+        ) : null },
     ];
     async function toggle(row: CustomerSummary) {
         setActionError(null);

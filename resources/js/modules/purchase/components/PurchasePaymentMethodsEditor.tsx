@@ -84,17 +84,18 @@ export function PurchasePaymentMethodsEditor({ rows, methods, errorFor, errorInd
                     );
                 })}
             </div>
-            <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
-                <table className="min-w-full table-fixed text-sm">
-                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                        <tr>
-                            <th className="w-44 px-3 py-2">Method</th>
-                            <th className="px-3 py-2">Reference</th>
-                            <th className="w-40 px-3 py-2">Amount</th>
-                            <th className="w-24 px-3 py-2" />
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
+            <div className="hidden overflow-hidden rounded-xl border border-slate-200 md:block shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full table-fixed text-sm">
+                        <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                            <tr>
+                                <th className="w-44 px-4 py-3">Method</th>
+                                <th className="px-4 py-3">Reference</th>
+                                <th className="w-40 px-4 py-3">Amount</th>
+                                <th className="w-24 px-4 py-3" />
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
                         {rows.map((row, index) => {
                             const method = methods.find((option) => String(option.id) === row.payment_method_id);
                             const errorIndex = errorIndexForRow?.(row, index) ?? index;
@@ -121,6 +122,7 @@ export function PurchasePaymentMethodsEditor({ rows, methods, errorFor, errorInd
                     </tbody>
                 </table>
             </div>
+        </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button type="button" variant="secondary" onClick={addRow}>Add payment method</Button>
                 <span className="text-sm font-semibold text-slate-800">Rows total: {paymentRowsTotal(rows)}</span>

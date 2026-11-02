@@ -35,14 +35,31 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
             <Input label="Estimate through" type="date" required min={from} max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={event => { setUntil(event.target.value); setResult(null); }} error={error?.fields.until?.[0]} />
             <ErrorAlert error={error} inline />
             <Button type="submit" loading={busy} disabled={!from || !until || agreement.terms.base_rate === null}>Calculate base rent</Button>
-            {agreement.terms.base_rate === null && <p>Record a base rental rate to calculate an estimate.</p>}
+            {agreement.terms.base_rate === null && <p className="text-sm text-amber-700">Record a base rental rate to calculate an estimate.</p>}
         </form>
-        {result && <section aria-label="Base rent estimate" className="mt-4 overflow-x-auto">
-            <p className="font-semibold">Base rent: <MoneyDisplay value={result.base_rent} currency={result.currency} /></p>
-            <p className="text-sm">{result.agreement.reference} · revision {result.agreement.version} · rate <MoneyDisplay value={result.rate} currency={result.currency} /></p>
-            <table className="w-full text-left text-sm"><caption className="mb-2 text-left font-medium">Calculation by period</caption><thead className="border-b border-slate-200"><tr>{['Period', 'Days', 'Cycle days', 'Amount'].map(label => <th key={label} className="p-2 font-medium text-slate-600">{label}</th>)}</tr></thead>
-                <tbody>{result.segments.map(segment => <tr key={segment.from} className="border-b border-slate-100 last:border-0"><td className="p-2">{formatBusinessDate(segment.from)} – {formatBusinessDate(segment.until)}</td><td className="p-2">{segment.days}</td><td className="p-2">{segment.cycle_from ? <>{segment.denominator_days} ({formatBusinessDate(segment.cycle_from)} – {formatBusinessDate(segment.cycle_until)})</> : 'Daily rate'}</td><td className="p-2"><MoneyDisplay value={segment.amount} currency={result.currency} /></td></tr>)}</tbody>
-            </table>
+        {result && <section aria-label="Base rent estimate" className="mt-4 space-y-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-base font-semibold text-slate-900">Base rent: <MoneyDisplay value={result.base_rent} currency={result.currency} /></p>
+                <p className="mt-1 text-xs text-slate-500">{result.agreement.reference} · revision {result.agreement.version} · rate <MoneyDisplay value={result.rate} currency={result.currency} /></p>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <table className="w-full text-left text-sm">
+                    <caption className="sr-only">Calculation by period</caption>
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        <tr>{['Period', 'Days', 'Cycle days', 'Amount'].map(label => <th key={label} className="px-4 py-3">{label}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {result.segments.map(segment => (
+                            <tr key={segment.from} className="transition-colors hover:bg-blue-50/40">
+                                <td className="px-4 py-3 text-slate-700">{formatBusinessDate(segment.from)} – {formatBusinessDate(segment.until)}</td>
+                                <td className="px-4 py-3 text-slate-600">{segment.days}</td>
+                                <td className="px-4 py-3 text-slate-600">{segment.cycle_from ? <>{segment.denominator_days} ({formatBusinessDate(segment.cycle_from)} – {formatBusinessDate(segment.cycle_until)})</> : 'Daily rate'}</td>
+                                <td className="px-4 py-3 font-medium text-slate-900"><MoneyDisplay value={segment.amount} currency={result.currency} /></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
             <p className="text-xs text-slate-500">Calculations retain full internal precision so adjacent partial periods reconcile to the complete cycle; displayed amounts use the standard money format.</p>
         </section>}
     </details>;

@@ -44,15 +44,15 @@ export function ServiceAssignmentTable({
     }
 
     return (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
                 <table className="min-w-[1900px] divide-y divide-slate-200 text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <tr>
                             {columns.map(([key, label, sort]) => (
-                                <th key={key} className="whitespace-nowrap px-3 py-3 font-semibold">
+                                <th key={key} className="whitespace-nowrap px-4 py-3">
                                     {sort ? (
-                                        <button type="button" className="font-semibold hover:text-slate-900" onClick={() => onSort(sort)}>
+                                        <button type="button" className="font-semibold transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 rounded px-1" onClick={() => onSort(sort)}>
                                             {label}{sortKey === sort ? ` ${direction === 'asc' ? 'Asc' : 'Desc'}` : ''}
                                         </button>
                                     ) : label}
@@ -62,7 +62,7 @@ export function ServiceAssignmentTable({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {rows.map((row) => (
-                            <tr key={row.id} className="hover:bg-slate-50/70">
+                            <tr key={row.id} className="transition-colors hover:bg-blue-50/40">
                                 <td className="whitespace-nowrap px-3 py-3">{row.job_number}</td>
                                 <td className="whitespace-nowrap px-3 py-3">{formatDate(row.job_date)}</td>
                                 <td className="whitespace-nowrap px-3 py-3">{humanize(row.job_status)}</td>

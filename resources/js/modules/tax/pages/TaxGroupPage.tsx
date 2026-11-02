@@ -71,10 +71,28 @@ export default function TaxGroupPage() {
                             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} /> Active</label>
                             <div className="space-y-2">
                                 {(form.lines ?? []).map((line, index) => (
-                                    <div key={index} className="grid grid-cols-[1fr_80px_32px] gap-2">
-                                        <Select value={line.tax_id || ''} options={taxOptions} placeholder="Tax" onChange={(event) => setLine(index, { tax_id: Number(event.target.value) })} />
-                                        <Input value={String(line.sequence)} onChange={(event) => setLine(index, { sequence: Number(event.target.value) })} />
-                                        <button type="button" className="text-rose-600" onClick={() => setForm({ ...form, lines: (form.lines ?? []).filter((_, lineIndex) => lineIndex !== index) })}>x</button>
+                                    <div key={index} className="grid grid-cols-[1fr_80px_40px] items-center gap-2">
+                                        <Select
+                                            aria-label="Tax"
+                                            value={line.tax_id || ''}
+                                            options={taxOptions}
+                                            placeholder="Select tax"
+                                            onChange={(event) => setLine(index, { tax_id: Number(event.target.value) })}
+                                        />
+                                        <Input
+                                            aria-label="Sequence"
+                                            placeholder="Seq"
+                                            value={String(line.sequence)}
+                                            onChange={(event) => setLine(index, { sequence: Number(event.target.value) })}
+                                        />
+                                        <button
+                                            type="button"
+                                            aria-label={`Remove tax line ${index + 1}`}
+                                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                                            onClick={() => setForm({ ...form, lines: (form.lines ?? []).filter((_, lineIndex) => lineIndex !== index) })}
+                                        >
+                                            ✕
+                                        </button>
                                     </div>
                                 ))}
                             </div>

@@ -196,22 +196,22 @@ function AdjustmentDetails({ adjustment, onClose }: { adjustment: InventoryRecor
             </dl>
             <div className="mt-6">
                 <h3 className="mb-3 text-sm font-semibold text-slate-900">Item details</h3>
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                        <thead className="bg-slate-50 text-xs text-slate-500">
-                            <tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">System stock</th><th className="px-3 py-2">Counted stock</th><th className="px-3 py-2">Stock change</th><th className="px-3 py-2">Reason</th></tr>
+                        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                            <tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">System stock</th><th className="px-4 py-3">Counted stock</th><th className="px-4 py-3">Stock change</th><th className="px-4 py-3">Reason</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {lines.map((line, index) => (
-                                <tr key={Number(line.id ?? index)}>
-                                    <td className="px-3 py-2 font-medium text-slate-800">{relation(line.item)}</td>
-                                    <td className="px-3 py-2">{quantity(line.system_quantity)}</td>
-                                    <td className="px-3 py-2">{quantity(line.counted_quantity)}</td>
-                                    <td className="px-3 py-2"><StockChange system={line.system_quantity} counted={line.counted_quantity} /></td>
-                                    <td className="px-3 py-2">{String(line.reason ?? '-')}</td>
+                                <tr key={Number(line.id ?? index)} className="transition-colors hover:bg-blue-50/40">
+                                    <td className="px-4 py-3 font-medium text-slate-900">{relation(line.item)}</td>
+                                    <td className="px-4 py-3 text-slate-700">{quantity(line.system_quantity)}</td>
+                                    <td className="px-4 py-3 text-slate-700">{quantity(line.counted_quantity)}</td>
+                                    <td className="px-4 py-3"><StockChange system={line.system_quantity} counted={line.counted_quantity} /></td>
+                                    <td className="px-4 py-3 text-slate-600">{String(line.reason ?? '-')}</td>
                                 </tr>
                             ))}
-                            {lines.length === 0 && <tr><td className="px-3 py-4 text-slate-500" colSpan={5}>No item details available.</td></tr>}
+                            {lines.length === 0 && <tr><td className="px-4 py-6 text-center text-slate-500" colSpan={5}>No item details available.</td></tr>}
                         </tbody>
                     </table>
                 </div>

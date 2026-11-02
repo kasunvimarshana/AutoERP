@@ -172,18 +172,18 @@ function PurchaseOrderBlock({ order }: { order: PurchaseOrderDetailOrder }) {
 
         <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[680px] border-collapse text-sm">
-                <thead className="border-y border-slate-300 bg-slate-50 text-left text-xs font-semibold text-slate-600">
+                <thead className="border-y border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <tr>
-                        <th className="py-2 pr-3">Item</th>
-                        <th className="px-2 py-2 text-right">Cost price</th>
-                        <th className="px-2 py-2 text-right">Order qty</th>
-                        <th className="px-2 py-2 text-right">GRN qty</th>
-                        <th className="py-2 pl-2 text-right">Total GRN cost</th>
+                        <th className="py-3 pr-4">Item</th>
+                        <th className="px-3 py-3 text-right">Cost price</th>
+                        <th className="px-3 py-3 text-right">Order qty</th>
+                        <th className="px-3 py-3 text-right">GRN qty</th>
+                        <th className="py-3 pl-3 text-right">Total GRN cost</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {order.items.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-slate-500">No items on this purchase order.</td></tr>}
-                    {order.items.map((item) => <tr key={item.id}>
+                    {order.items.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-slate-500">No items on this purchase order.</td></tr>}
+                    {order.items.map((item) => <tr key={item.id} className="transition-colors hover:bg-blue-50/40">
                         <td className="py-2 pr-3 text-slate-900">
                             <span className="font-medium">{item.description}</span>
                             {(item.item_code || item.variant) && <span className="ml-2 text-xs text-slate-500">{[item.item_code, item.variant].filter(Boolean).join(' · ')}</span>}

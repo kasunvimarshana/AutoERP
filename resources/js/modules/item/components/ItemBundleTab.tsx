@@ -136,7 +136,7 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
 }
 
 function Actions({ edit, remove }: { edit: () => void; remove: () => void }) {
-    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={edit}>Edit line</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Remove line</button></div>;
+    return <div className="flex items-center justify-end gap-2"><button type="button" className="rounded px-2 py-1 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={edit}>Edit line</button><button type="button" className="rounded px-2 py-1 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={remove}>Remove line</button></div>;
 }
 
 function resolveBundleLineType(item: ItemSummary): BundleLineType {

@@ -15,14 +15,14 @@ export function ItemSummaryCard({ item }: { item: Item }) {
     return <>
         {item.item_type === 'stock' && <section className="mb-6" aria-labelledby="item-profit-heading">
             <h2 id="item-profit-heading" className="mb-3 text-sm font-semibold text-slate-900">Profit by price type</h2>
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full min-w-[36rem] text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <tr>
-                            <th className="px-4 py-3 font-semibold">Price type</th>
-                            <th className="px-4 py-3 font-semibold">Price</th>
-                            <th className="px-4 py-3 font-semibold">Profit / base unit</th>
-                            <th className="px-4 py-3 font-semibold">Margin</th>
+                            <th className="px-4 py-3">Price type</th>
+                            <th className="px-4 py-3">Price</th>
+                            <th className="px-4 py-3">Profit / base unit</th>
+                            <th className="px-4 py-3">Margin</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -34,7 +34,7 @@ export function ItemSummaryCard({ item }: { item: Item }) {
                                 ? `${((Number(profit) / Number(price)) * 100).toFixed(2)}%`
                                 : null;
 
-                            return <tr key={label}>
+                            return <tr key={label} className="transition-colors hover:bg-blue-50/40">
                                 <th scope="row" className="px-4 py-3 font-medium text-slate-800">{label}</th>
                                 <td className="px-4 py-3 text-slate-700">{price === null || price === undefined ? 'Not set' : <MoneyDisplay value={price} currency={currency} />}</td>
                                 <td className="px-4 py-3 text-slate-700">{profit === null ? 'Set purchase price to calculate' : <MoneyDisplay value={profit} currency={currency} />}</td>

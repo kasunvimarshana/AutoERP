@@ -118,19 +118,19 @@ export default function GoodsReceiptSummaryReportPage() {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[940px] border-collapse text-sm">
-                            <thead className="border-b border-slate-300 bg-slate-50 text-left text-xs font-semibold text-slate-600">
+                            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                 <tr>
-                                    <th className="px-4 py-2">GRN</th>
-                                    <th className="px-3 py-2">GRN date</th>
-                                    <th className="px-3 py-2">Supplier</th>
-                                    <th className="px-3 py-2">PO</th>
-                                    <th className="px-3 py-2">Note</th>
-                                    <th className="px-3 py-2 text-right">Accepted qty</th>
-                                    <th className="px-4 py-2 text-right">Total cost</th>
+                                    <th className="px-4 py-3">GRN</th>
+                                    <th className="px-4 py-3">GRN date</th>
+                                    <th className="px-4 py-3">Supplier</th>
+                                    <th className="px-4 py-3">PO</th>
+                                    <th className="px-4 py-3">Note</th>
+                                    <th className="px-4 py-3 text-right">Accepted qty</th>
+                                    <th className="px-4 py-3 text-right">Total cost</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {group.receipts.map((receipt) => <tr key={receipt.id}>
+                                {group.receipts.map((receipt) => <tr key={receipt.id} className="transition-colors hover:bg-blue-50/40">
                                     <td className="whitespace-nowrap px-4 py-3"><Link to={`/purchase/goods-receipts/${receipt.id}`} className="font-semibold text-sky-800 underline-offset-2 hover:underline">{receipt.grn_number}</Link></td>
                                     <td className="whitespace-nowrap px-3 py-3 text-slate-700">{receipt.received_date}</td>
                                     <td className="px-3 py-3 text-slate-800">{receipt.supplier}</td>

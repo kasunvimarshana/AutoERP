@@ -150,7 +150,30 @@ export default function ConsumableUsagePage() {
                 <Input label="To" type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} error={from > to ? 'To must be on or after From.' : undefined} />
             </div>
             <p className="mb-3 text-sm text-slate-600">Totals include posted usage in the selected period. Reversed entries remain in history.</p>
-            {history.data?.summary.items.length ? <div className="mb-5 overflow-x-auto rounded-lg bg-blue-50 p-4"><table className="w-full text-sm"><thead><tr className="text-left text-slate-600"><th className="pb-2">Item</th><th className="pb-2">Used quantity</th><th className="pb-2">Expense cost (base currency)</th></tr></thead><tbody>{history.data.summary.items.map((row) => <tr key={row.item.id} className="border-t border-blue-100"><td className="py-2 font-medium">{row.item.name}</td><td>{row.quantity} {row.uom ?? ''}</td><td>{row.cost}</td></tr>)}</tbody></table></div> : null}
+            {history.data?.summary.items.length ? (
+                <div className="mb-5 overflow-hidden rounded-xl border border-sky-200 bg-sky-50/40 shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="border-b border-sky-200 bg-sky-100/50 text-left text-xs font-semibold uppercase tracking-wider text-sky-900">
+                                <tr>
+                                    <th className="px-4 py-3">Item</th>
+                                    <th className="px-4 py-3 text-right">Used quantity</th>
+                                    <th className="px-4 py-3 text-right">Expense cost (base currency)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-sky-100">
+                                {history.data.summary.items.map((row) => (
+                                    <tr key={row.item.id} className="transition-colors hover:bg-sky-50">
+                                        <td className="px-4 py-3 font-medium text-slate-900">{row.item.name}</td>
+                                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.quantity} {row.uom ?? ''}</td>
+                                        <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">{row.cost}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : null}
             {history.loading ? <LoadingState /> : <DataTable rows={history.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No consumable usage in this period." />}
             <Pagination meta={history.data?.meta} onPageChange={setPage} />
         </Panel>

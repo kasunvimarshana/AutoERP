@@ -114,8 +114,8 @@ export default function VehicleServiceSalesSummaryReportPage() {
                         <p className="-mt-2 mb-4 text-sm text-slate-500">Expand a job to see stock items, combos, and the items inside each combo. Job profit is after direct costs and commission.</p>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead>
-                                    <tr className="text-left text-xs font-semibold text-slate-500">
+                                <thead className="border-b border-slate-200 bg-slate-50">
+                                    <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                         <th scope="col" className="py-3 pr-3">Job</th>
                                         <th scope="col" className="py-3 px-3">Customer / vehicle</th>
                                         <th scope="col" className="py-3 px-3 text-right">Revenue</th>
@@ -196,8 +196,8 @@ function RankedItemsTable({ items, kind }: { items: VehicleServiceSalesSummaryRa
     return (
         <div className="overflow-x-auto rounded-md border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                    <tr className="text-left text-xs font-semibold text-slate-500">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <th scope="col" className="py-2 pl-3 pr-2">#</th>
                         <th scope="col" className="px-2 py-2">Item</th>
                         <th scope="col" className="px-2 py-2 text-right">Qty sold</th>

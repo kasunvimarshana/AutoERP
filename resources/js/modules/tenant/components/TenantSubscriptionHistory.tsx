@@ -65,22 +65,22 @@ function HistoryTable({
     canAudit: boolean;
 }) {
     return (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <tr>
-                        <th className="px-3 py-2">Revision</th>
-                        <th className="px-3 py-2">Operation</th>
-                        <th className="px-3 py-2">Plan snapshot</th>
-                        <th className="px-3 py-2">Period</th>
-                        <th className="px-3 py-2">Reason</th>
-                        {canAudit ? <th className="px-3 py-2 text-right">Audit</th> : null}
+                        <th className="px-4 py-3">Revision</th>
+                        <th className="px-4 py-3">Operation</th>
+                        <th className="px-4 py-3">Plan snapshot</th>
+                        <th className="px-4 py-3">Period</th>
+                        <th className="px-4 py-3">Reason</th>
+                        {canAudit ? <th className="px-4 py-3 text-right">Audit</th> : null}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {subscriptions.map((subscription) => (
-                        <tr key={subscription.id}>
-                            <td className="px-3 py-2">#{subscription.revision_number}</td>
+                        <tr key={subscription.id} className="transition-colors hover:bg-blue-50/40">
+                            <td className="px-4 py-3 text-slate-700">#{subscription.revision_number}</td>
                             <td className="px-3 py-2"><StatusBadge status={subscription.operation} /></td>
                             <td className="px-3 py-2">
                                 {subscription.plan_name}
