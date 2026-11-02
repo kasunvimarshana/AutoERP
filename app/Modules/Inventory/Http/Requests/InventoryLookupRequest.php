@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Requests;
 
-use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\Inventory\Enums\InventoryStockLevel;
 
 final class InventoryLookupRequest extends TenantScopedRequest
 {
@@ -22,9 +20,6 @@ final class InventoryLookupRequest extends TenantScopedRequest
             'batch_id' => ['nullable', 'integer', 'min:1'],
             'serial_number_id' => ['nullable', 'integer', 'min:1'],
             'status' => ['nullable', 'string', 'max:50'],
-            'stock_level' => ['nullable', Rule::enum(InventoryStockLevel::class)],
-            'as_of' => ['nullable', 'date_format:Y-m-d'],
-            'as_of_timezone' => ['nullable', 'timezone'],
             'search' => ['nullable', 'string', 'max:150'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ];

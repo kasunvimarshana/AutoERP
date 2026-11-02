@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Reporting\Services;
 
 use Illuminate\Http\Response;
-use Modules\Reporting\Constants\ReportExportHeader;
 use Modules\Reporting\DTOs\ReportData;
 use Modules\Reporting\DTOs\ReportDefinition;
 use Modules\Reporting\Exporters\CsvExporter;
@@ -25,7 +24,7 @@ final class ReportExport
 
     public function response(string $format, ReportData $report): Response
     {
-        $response = match ($format) {
+        return match ($format) {
             'html' => $this->html->preview($report),
             'print' => $this->html->print($report),
             'pdf' => $this->pdf->export($report),
@@ -33,13 +32,6 @@ final class ReportExport
             'xlsx' => $this->excel->export($report),
             default => response('Unsupported export format.', 422),
         };
-
-        if ($report->rowLimit !== null) {
-            $response->headers->set(ReportExportHeader::ROW_LIMIT, (string) $report->rowLimit);
-            $response->headers->set(ReportExportHeader::TRUNCATED, $report->truncated ? 'true' : 'false');
-        }
-
-        return $response;
     }
 
     /**

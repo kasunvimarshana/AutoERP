@@ -31,13 +31,13 @@ final class FinancePostingService implements FinancePostingInterface
 
     public function createDraftJournal(PostingContext $request): PostingResultData
     {
-        return DB::transaction(function () use ($request): PostingResultData {
-            $profile = $this->profiles->resolveProfile($request);
-            $this->validatePosting($request, $profile);
-            $lines = $this->journalLines($request, $profile);
-            $sourceKey = $this->sourceKey($request);
-            $fingerprint = $this->postingFingerprint($request, $profile, $lines);
+        $this->validatePosting($request);
+        $profile = $this->profiles->resolveProfile($request);
+        $lines = $this->journalLines($request, $profile);
+        $sourceKey = $this->sourceKey($request);
+        $fingerprint = $this->postingFingerprint($request, $profile, $lines);
 
+        return DB::transaction(function () use ($request, $profile, $lines, $sourceKey, $fingerprint): PostingResultData {
             $existing = $this->sourceJournal($sourceKey);
             if ($existing instanceof FinanceJournalEntry) {
                 return $this->assertReplayMatches($existing, $fingerprint);
@@ -83,28 +83,33 @@ final class FinancePostingService implements FinancePostingInterface
         });
     }
 
-    public function validatePosting(PostingContext $request, ?FinancePostingProfile $profile = null): void
+    public function validatePosting(PostingContext $request): void
     {
         if (trim($request->postingDate) === '') {
             throw new InvalidArgumentException('Posting date is required.');
         }
+
         if ($request->lines === []) {
             throw new InvalidArgumentException('Posting request requires at least one line.');
         }
+
         if ($request->source->tenantId === null) {
             throw new InvalidArgumentException('Posting source tenant is required.');
         }
+
         if (trim($request->source->sourceType) === '' || $request->source->sourceId < 1) {
             throw new InvalidArgumentException('Posting source type and ID are required.');
         }
 
-        $profile ??= $this->profiles->resolveProfile($request);
+        $profile = $this->profiles->resolveProfile($request);
+
         if ($this->math->isNegative($request->exchangeRate) || $this->math->isZero($request->exchangeRate)) {
             throw new InvalidArgumentException('Posting exchange rate must be greater than zero.');
         }
 
         $totalDebit = '0.000000';
         $totalCredit = '0.000000';
+
         foreach ($request->lines as $line) {
             if ($this->math->isNegative($line->debit) || $this->math->isNegative($line->credit)) {
                 throw new InvalidArgumentException('Posting line debit and credit cannot be negative.');
@@ -137,13 +142,12 @@ final class FinancePostingService implements FinancePostingInterface
     {
         $journal = FinanceJournalEntry::query()->lockForUpdate()->findOrFail($journalId);
         $status = $this->statusOf($journal);
-        if ($status === JournalStatus::Posted) {
-            $this->posting->post($journal, $postedBy);
 
+        if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
             return $this->resultFromJournal($journal);
         }
         if ($status !== JournalStatus::Draft) {
-            throw new InvalidArgumentException('Only draft journals can be posted. Reversed journals cannot be reposted.');
+            throw new InvalidArgumentException('Only draft journals can be posted.');
         }
 
         $result = $this->posting->post($journal, $postedBy);
@@ -174,7 +178,9 @@ final class FinancePostingService implements FinancePostingInterface
         return $this->resultFromJournal($reversal);
     }
 
-    /** @return list<JournalLineData> */
+    /**
+     * @return list<JournalLineData>
+     */
     private function journalLines(
         PostingContext $request,
         ?FinancePostingProfile $profile,
@@ -203,12 +209,15 @@ final class FinancePostingService implements FinancePostingInterface
         return hash('sha256', json_encode([
             'tenant_id' => $request->source->tenantId,
             'organization_unit_id' => $request->source->organizationUnitId,
+            'source_module' => $request->source->sourceModule ?: $request->source->sourceType,
             'source_type' => $request->source->sourceType,
             'source_id' => $request->source->sourceId,
         ], JSON_THROW_ON_ERROR));
     }
 
-    /** @param list<JournalLineData> $lines */
+    /**
+     * @param  list<JournalLineData>  $lines
+     */
     private function postingFingerprint(
         PostingContext $request,
         ?FinancePostingProfile $profile,
@@ -249,13 +258,6 @@ final class FinancePostingService implements FinancePostingInterface
         if ($stored === '' || ! hash_equals($stored, $fingerprint)) {
             throw new InvalidArgumentException('Finance posting source was already used with different posting facts.');
         }
-        $status = $this->statusOf($journal);
-        if ($status === JournalStatus::Reversed) {
-            throw new InvalidArgumentException('Reversed Finance posting sources cannot be replayed.');
-        }
-        if ($status === JournalStatus::Posted) {
-            $this->posting->post($journal);
-        }
 
         return $this->resultFromJournal($journal);
     }
@@ -279,7 +281,7 @@ final class FinancePostingService implements FinancePostingInterface
     {
         return match ($sourceType) {
             'invoice', 'sales_invoice', 'purchase_invoice', 'vehicle_service_invoice' => JournalType::Invoice,
-            'payment', 'payment_received', 'payment_made', 'expense' => JournalType::Payment,
+            'payment', 'payment_received', 'payment_made' => JournalType::Payment,
             'contra', 'cash_transfer', 'bank_transfer', 'account_transfer' => JournalType::Contra,
             'adjustment', 'write_off', 'reclassification', 'rounding_adjustment' => JournalType::Adjustment,
             'opening_balance', 'opening' => JournalType::Opening,

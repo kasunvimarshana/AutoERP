@@ -3,80 +3,100 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Core\Tenancy\TenantFeature;
-use Modules\VehicleRental\Enums\AgreementAction;
-use Modules\VehicleRental\Enums\AgreementKind;
-use Modules\VehicleRental\Enums\IncidentReviewAction;
-use Modules\VehicleRental\Enums\RunningChartAction;
-use Modules\VehicleRental\Enums\VehicleUseAction;
-use Modules\VehicleRental\Http\Controllers\AgreementController;
-use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
-use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
-use Modules\VehicleRental\Http\Controllers\DriverDirectoryController;
-use Modules\VehicleRental\Http\Controllers\RunningChartController;
-use Modules\VehicleRental\Http\Controllers\RentalIncidentController;
-use Modules\VehicleRental\Http\Controllers\RentalIncidentAttachmentController;
-use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
-use Modules\VehicleRental\Http\Controllers\VehicleUseController;
+use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
+use Modules\VehicleRental\Http\Controllers\RentalAllocationController;
+use Modules\VehicleRental\Http\Controllers\RentalAvailabilityController;
+use Modules\VehicleRental\Http\Controllers\RentalCalculationController;
+use Modules\VehicleRental\Http\Controllers\RentalContextController;
+use Modules\VehicleRental\Http\Controllers\RentalCustodyController;
+use Modules\VehicleRental\Http\Controllers\RentalDepositController;
+use Modules\VehicleRental\Http\Controllers\RentalExpenseController;
+use Modules\VehicleRental\Http\Controllers\RentalRateVersionController;
+use Modules\VehicleRental\Http\Controllers\RentalReplacementController;
+use Modules\VehicleRental\Http\Controllers\RentalReservationController;
+use Modules\VehicleRental\Http\Controllers\RentalRunningChartReportController;
+use Modules\VehicleRental\Http\Controllers\RentalUsageController;
+use Modules\VehicleRental\Http\Controllers\RentalUsageFactController;
+use Modules\VehicleRental\Http\Controllers\VehicleFinanceController;
 
-Route::prefix('api/v1/vehicle-rental')->middleware([
-    'api', 'auth:'.config('module-auth.protected_route_guard', 'auth-api'),
-    config('core.current_user.middleware_alias', 'current.user'), config('core.current_tenant.middleware_alias', 'current.tenant'),
-    config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required', 'tenant.feature:'.TenantFeature::VEHICLE_RENTAL,
-])->group(function (): void {
-    Route::get('driver-employees', [DriverDirectoryController::class, 'index']);
-    Route::prefix('incidents')->group(function (): void {
-        Route::post('{incident}/attachments', [RentalIncidentAttachmentController::class, 'store'])->whereNumber('incident');
-        Route::get('{incident}/attachments/{attachment}', [RentalIncidentAttachmentController::class, 'download'])->whereNumber(['incident', 'attachment']);
-        Route::get('vehicle-use-options', [RentalIncidentController::class, 'vehicleUseOptions']);
-        Route::get('vehicle-uses/{use}/running-chart-options', [RentalIncidentController::class, 'runningChartOptions'])->whereNumber('use');
-        Route::get('/', [RentalIncidentController::class, 'index']);
-        Route::post('/', [RentalIncidentController::class, 'store']);
-        Route::get('{incident}', [RentalIncidentController::class, 'show'])->whereNumber('incident');
-        Route::get('{incident}/history', [RentalIncidentController::class, 'history'])->whereNumber('incident');
-        Route::post('{incident}/{action}', [RentalIncidentController::class, 'review'])
-            ->whereNumber('incident')
-            ->whereIn('action', array_column(IncidentReviewAction::cases(), 'value'));
-    });
-    Route::prefix('{kind}/agreements')->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->group(function (): void {
-        Route::get('/', [AgreementController::class, 'index']);
-        Route::post('/', [AgreementController::class, 'store']);
-        Route::get('{agreement}', [AgreementController::class, 'show'])->whereNumber('agreement');
-        Route::put('{agreement}', [AgreementController::class, 'update'])->whereNumber('agreement');
-        Route::post('{agreement}/successor', [AgreementController::class, 'successor'])->whereNumber('agreement');
-        Route::get('{agreement}/history', [AgreementController::class, 'history'])->whereNumber('agreement');
-        Route::middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
-            Route::get('{agreement}/base-charges', [BaseRentBillingController::class, 'index'])->whereNumber('agreement');
-            Route::post('{agreement}/base-charges', [BaseRentBillingController::class, 'store'])->whereNumber('agreement');
-            Route::post('{agreement}/base-charges/{charge}/void', [BaseRentBillingController::class, 'void'])->whereNumber('agreement')->whereNumber('charge');
-            Route::post('{agreement}/base-charges/{charge}/reissue', [BaseRentBillingController::class, 'reissue'])->whereNumber('agreement')->whereNumber('charge');
-        });
-        Route::post('{agreement}/base-rent-preview', [AgreementController::class, 'previewBaseRent'])->whereNumber('agreement');
-        Route::post('{agreement}/{action}', [AgreementController::class, 'transition'])->whereNumber('agreement')->whereIn('action', [AgreementAction::Activate->value, AgreementAction::Close->value]);
-    });
-    Route::prefix('customer/agreements/{agreement}/deposits')->whereNumber('agreement')->middleware('tenant.feature:'.TenantFeature::PAYMENT)->group(function (): void {
-        Route::get('/', [DepositReceiptController::class, 'index']);
-        Route::post('/', [DepositReceiptController::class, 'store']);
-    });
-    Route::get('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'index'])->whereNumber('agreement');
-    Route::post('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'store'])->whereNumber('agreement');
-    Route::get('vehicles/{vehicle}/sources', [VehicleUseController::class, 'sources'])->whereNumber('vehicle');
-    Route::post('vehicle-uses/{use}/replace', [VehicleUseController::class, 'replace'])->whereNumber('use');
-    Route::get('vehicle-uses/{use}/history', [VehicleUseController::class, 'history'])->whereNumber('use');
-    Route::post('vehicle-uses/{use}/{action}', [VehicleUseController::class, 'transition'])->whereNumber('use')->whereIn('action', [VehicleUseAction::Handover->value, VehicleUseAction::ReturnVehicle->value, VehicleUseAction::Cancel->value]);
-    Route::get('vehicle-uses/{use}/running-charts', [RunningChartController::class, 'index'])->whereNumber('use');
-    Route::post('vehicle-uses/{use}/running-charts', [RunningChartController::class, 'store'])->whereNumber('use');
-    Route::get('vehicle-uses', [VehicleUseController::class, 'register']);
-    Route::prefix('running-charts/{chart}/{kind}/charges')->whereNumber('chart')->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
-        Route::get('/', [UsageChargeBillingController::class, 'index']);
-        Route::get('mileage', [UsageChargeBillingController::class, 'previewMileage']);
-        Route::post('mileage', [UsageChargeBillingController::class, 'assessMileage']);
-        Route::post('/', [UsageChargeBillingController::class, 'store']);
-        Route::post('{charge}/reissue', [UsageChargeBillingController::class, 'reissue'])->whereNumber('charge');
-        Route::post('{charge}/void', [UsageChargeBillingController::class, 'void'])->whereNumber('charge');
-    });
-    Route::get('running-charts', [RunningChartController::class, 'register']);
-    Route::put('running-charts/{chart}', [RunningChartController::class, 'update'])->whereNumber('chart');
-    Route::get('running-charts/{chart}/history', [RunningChartController::class, 'history'])->whereNumber('chart');
-    Route::post('running-charts/{chart}/{action}', [RunningChartController::class, 'transition'])->whereNumber('chart')->whereIn('action', [RunningChartAction::Finalize->value, RunningChartAction::Reverse->value]);
+$middleware = [
+    'api',
+    'auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'),
+    (string) config('core.current_user.middleware_alias', 'current.user'),
+    (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
+    (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
+    'tenant.feature:vehicle-rental',
+];
+
+Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.vehicle-rental.')->group(function (): void {
+    Route::get('metadata', [RentalContextController::class, 'metadata'])->name('metadata');
+    Route::get('dashboard', [RentalContextController::class, 'dashboard'])->name('dashboard');
+    Route::get('vehicles/available', [RentalAvailabilityController::class, 'index'])->name('vehicles.available');
+
+    Route::get('reservations', [RentalReservationController::class, 'index'])->name('reservations.index');
+    Route::post('reservations', [RentalReservationController::class, 'store'])->name('reservations.store');
+    Route::get('reservations/{reservation}', [RentalReservationController::class, 'show'])->whereNumber('reservation')->name('reservations.show');
+    Route::put('reservations/{reservation}', [RentalReservationController::class, 'update'])->whereNumber('reservation')->name('reservations.update');
+    Route::patch('reservations/{reservation}/transition', [RentalReservationController::class, 'transition'])->whereNumber('reservation')->name('reservations.transition');
+
+    Route::get('agreements', [RentalAgreementController::class, 'index'])->name('agreements.index');
+    Route::post('agreements', [RentalAgreementController::class, 'store'])->name('agreements.store');
+    Route::get('agreements/{agreement}', [RentalAgreementController::class, 'show'])->whereNumber('agreement')->name('agreements.show');
+    Route::put('agreements/{agreement}', [RentalAgreementController::class, 'update'])->whereNumber('agreement')->name('agreements.update');
+    Route::patch('agreements/{agreement}/transition', [RentalAgreementController::class, 'transition'])->whereNumber('agreement')->name('agreements.transition');
+    Route::post('agreements/{agreement}/rate-versions', [RentalRateVersionController::class, 'store'])->whereNumber('agreement')->name('rate-versions.store');
+    Route::patch('rate-versions/{version}/activate', [RentalRateVersionController::class, 'activate'])->whereNumber('version')->name('rate-versions.activate');
+
+    Route::get('allocations', [RentalAllocationController::class, 'index'])->name('allocations.index');
+    Route::post('agreements/{agreement}/allocations', [RentalAllocationController::class, 'store'])->whereNumber('agreement')->name('allocations.store');
+    Route::get('allocations/{allocation}', [RentalAllocationController::class, 'show'])->whereNumber('allocation')->name('allocations.show');
+    Route::post('allocations/{allocation}/drivers', [RentalAllocationController::class, 'assignDriver'])->whereNumber('allocation')->name('allocations.drivers.store');
+
+    Route::get('custody-events', [RentalCustodyController::class, 'index'])->name('custody.index');
+    Route::post('allocations/{allocation}/custody-events', [RentalCustodyController::class, 'store'])->whereNumber('allocation')->name('custody.store');
+    Route::get('custody-events/{event}', [RentalCustodyController::class, 'show'])->whereNumber('event')->name('custody.show');
+    Route::patch('custody-events/{event}/confirm', [RentalCustodyController::class, 'confirm'])->whereNumber('event')->name('custody.confirm');
+    Route::patch('custody-events/{event}/reverse', [RentalCustodyController::class, 'reverse'])->whereNumber('event')->name('custody.reverse');
+
+    Route::post('allocations/{allocation}/replacement', [RentalReplacementController::class, 'store'])->whereNumber('allocation')->name('replacements.store');
+    Route::get('replacements/{replacement}', [RentalReplacementController::class, 'show'])->whereNumber('replacement')->name('replacements.show');
+
+    Route::get('usage-logs', [RentalUsageController::class, 'index'])->name('usage.index');
+    Route::post('allocations/{allocation}/usage-logs', [RentalUsageController::class, 'store'])->whereNumber('allocation')->name('usage.store');
+    Route::get('usage-logs/{usage}', [RentalUsageController::class, 'show'])->whereNumber('usage')->name('usage.show');
+    Route::patch('usage-logs/{usage}/transition', [RentalUsageController::class, 'transition'])->whereNumber('usage')->name('usage.transition');
+    Route::get('usage-facts/{fact}', [RentalUsageFactController::class, 'show'])->whereNumber('fact')->name('usage-facts.show');
+    Route::patch('usage-facts/{fact}', [RentalUsageFactController::class, 'update'])->whereNumber('fact')->name('usage-facts.update');
+    Route::patch('usage-facts/{fact}/transition', [RentalUsageFactController::class, 'transition'])->whereNumber('fact')->name('usage-facts.transition');
+
+    Route::get('reports/running-chart-sheet', [RentalRunningChartReportController::class, 'show'])->name('reports.running-chart-sheet.show');
+    Route::get('reports/running-chart-sheet/export/{format}', [RentalRunningChartReportController::class, 'export'])
+        ->whereIn('format', ['pdf', 'print', 'html'])
+        ->name('reports.running-chart-sheet.export');
+
+    Route::get('expenses', [RentalExpenseController::class, 'index'])->name('expenses.index');
+    Route::post('expenses', [RentalExpenseController::class, 'store'])->name('expenses.store');
+    Route::get('expenses/{expense}', [RentalExpenseController::class, 'show'])->whereNumber('expense')->name('expenses.show');
+    Route::patch('expenses/{expense}/transition', [RentalExpenseController::class, 'transition'])->whereNumber('expense')->name('expenses.transition');
+
+    Route::get('calculation-runs', [RentalCalculationController::class, 'index'])->name('calculations.index');
+    Route::post('agreements/{agreement}/calculate', [RentalCalculationController::class, 'calculate'])->whereNumber('agreement')->name('calculations.calculate');
+    Route::get('calculation-runs/{run}', [RentalCalculationController::class, 'show'])->whereNumber('run')->name('calculations.show');
+    Route::patch('calculation-runs/{run}/transition', [RentalCalculationController::class, 'transition'])->whereNumber('run')->name('calculations.transition');
+    Route::post('calculation-runs/{run}/invoice', [RentalCalculationController::class, 'createInvoice'])->whereNumber('run')->name('calculations.invoice');
+
+    Route::get('deposits', [RentalDepositController::class, 'index'])->name('deposits.index');
+    Route::get('deposits/{deposit}', [RentalDepositController::class, 'show'])->whereNumber('deposit')->name('deposits.show');
+    Route::post('deposits/{deposit}/receive', [RentalDepositController::class, 'receive'])->whereNumber('deposit')->name('deposits.receive');
+    Route::post('deposits/{deposit}/apply', [RentalDepositController::class, 'apply'])->whereNumber('deposit')->name('deposits.apply');
+    Route::post('deposits/{deposit}/refund', [RentalDepositController::class, 'refund'])->whereNumber('deposit')->name('deposits.refund');
+    Route::post('deposits/{deposit}/forfeit', [RentalDepositController::class, 'forfeit'])->whereNumber('deposit')->name('deposits.forfeit');
+    Route::patch('deposit-links/{link}/reverse', [RentalDepositController::class, 'reverse'])->whereNumber('link')->name('deposits.links.reverse');
+
+    Route::get('finance-agreements', [VehicleFinanceController::class, 'index'])->name('finance-agreements.index');
+    Route::post('finance-agreements', [VehicleFinanceController::class, 'store'])->name('finance-agreements.store');
+    Route::get('finance-agreements/{agreement}', [VehicleFinanceController::class, 'show'])->whereNumber('agreement')->name('finance-agreements.show');
+    Route::patch('finance-agreements/{agreement}/activate', [VehicleFinanceController::class, 'activate'])->whereNumber('agreement')->name('finance-agreements.activate');
+    Route::post('finance-installments/{installment}/payable', [VehicleFinanceController::class, 'createPayable'])->whereNumber('installment')->name('finance-installments.payable');
+    Route::patch('finance-installments/refresh-due-statuses', [VehicleFinanceController::class, 'refreshDueStatuses'])->name('finance-installments.refresh-due-statuses');
 });

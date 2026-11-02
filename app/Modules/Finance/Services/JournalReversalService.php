@@ -26,15 +26,14 @@ final class JournalReversalService
         string $reversalDate,
         ?int $reversedBy = null,
         ?string $reason = null,
-        bool $allowSourceOwned = false,
     ): FinanceJournalEntry {
-        return DB::transaction(function () use ($journal, $reversalDate, $reversedBy, $reason, $allowSourceOwned): FinanceJournalEntry {
+        return DB::transaction(function () use ($journal, $reversalDate, $reversedBy, $reason): FinanceJournalEntry {
             $journal = FinanceJournalEntry::query()
                 ->with(['lines', 'reversals'])
                 ->lockForUpdate()
                 ->findOrFail($journal->getKey());
 
-            $this->validator->assertReversible($journal, $allowSourceOwned);
+            $this->validator->assertReversible($journal);
             if ($reversalDate < $journal->journal_date->toDateString()) {
                 throw new \InvalidArgumentException('Reversal date cannot be before the original journal date.');
             }

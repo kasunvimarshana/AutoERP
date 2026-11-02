@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Services;
 
+use Illuminate\Support\Facades\DB;
+use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\CustomerCreditProfileData;
 use Modules\Customer\Models\Customer;
@@ -12,6 +14,7 @@ use Modules\Customer\Validators\CustomerValidationService;
 final class CustomerCreationService
 {
     public function __construct(
+        private readonly DecimalMath $math,
         private readonly CustomerValidationService $validator,
         private readonly CustomerNumberService $numbers,
         private readonly CustomerContactService $contacts,
@@ -21,21 +24,18 @@ final class CustomerCreationService
         private readonly CustomerDocumentService $documents,
         private readonly CustomerCreditProfileService $creditProfiles,
         private readonly CustomerStatusService $statuses,
-        private readonly CustomerPhoneService $phones,
     ) {}
 
     public function create(CreateCustomerData $data): Customer
     {
-        return $this->phones->write($data->tenantId, function () use ($data): Customer {
-            $this->phones->assertCustomerNumber($data->phone, $data->mobile);
-            $code = $data->code ?? $this->numbers->nextCode($data->tenantId);
-            $this->validator->validateCreate($data, $code);
-            $this->phones->assertAvailable($data->tenantId, $data->organizationUnitId, null, ['phone' => $data->phone, 'mobile' => $data->mobile]);
+        $this->validator->validateCreate($data);
+
+        return DB::transaction(function () use ($data): Customer {
             $customer = Customer::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'customer_number' => $data->customerNumber ?? $this->numbers->next($data->tenantId),
-                'code' => $code,
+                'code' => $data->code,
                 'name' => $data->name,
                 'legal_name' => $data->legalName,
                 'display_name' => $data->displayName,
@@ -51,6 +51,10 @@ final class CustomerCreationService
                 'vat_number' => $data->vatNumber,
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
+                'credit_limit' => $this->math->normalize($data->creditProfile?->creditLimit ?? $data->creditLimit),
+                'opening_balance' => $this->math->normalize($data->openingBalance),
+                'is_credit_allowed' => $data->isCreditAllowed,
+                'is_advance_allowed' => $data->isAdvanceAllowed,
                 'is_tax_exempt' => $data->isTaxExempt,
                 'marketing_consent' => $data->marketingConsent,
                 'preferred_communication_channel' => $data->preferredCommunicationChannel,
@@ -60,8 +64,8 @@ final class CustomerCreationService
                 'approved_at' => $data->status->value === 'active' ? now() : null,
             ]);
 
-            foreach ($data->contacts as $index => $contact) {
-                $this->contacts->create($customer, $contact, "contacts.{$index}.");
+            foreach ($data->contacts as $contact) {
+                $this->contacts->create($customer, $contact);
             }
             foreach ($data->addresses as $address) {
                 $this->addresses->create($customer, $address);
@@ -73,7 +77,12 @@ final class CustomerCreationService
             foreach ($data->documents as $document) {
                 $this->documents->create($customer, $document);
             }
-            $this->creditProfiles->set($customer, $data->creditProfile ?? new CustomerCreditProfileData);
+            $this->creditProfiles->set(
+                $customer,
+                $data->creditProfile ?? new CustomerCreditProfileData(
+                    creditLimit: $data->creditLimit,
+                ),
+            );
             $this->statuses->recordInitial($customer, $data->createdBy);
 
             return $customer->refresh()->load([

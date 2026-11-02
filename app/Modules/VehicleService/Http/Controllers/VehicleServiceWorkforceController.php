@@ -7,12 +7,10 @@ namespace Modules\VehicleService\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
-use Modules\VehicleService\Http\Requests\StoreVehicleServiceEmployeeBatchRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceEmployeeRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
 use Modules\VehicleService\Http\Resources\VehicleServiceEmployeeAssignmentResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
-use Modules\VehicleService\Services\VehicleServiceAssignableLineService;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 
 final class VehicleServiceWorkforceController extends VehicleServiceController
@@ -43,18 +41,6 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
             $request->toData(),
             $request->expectedVersion(),
         )))->response()->setStatusCode(201);
-    }
-
-    public function storeBatch(
-        StoreVehicleServiceEmployeeBatchRequest $request,
-        int $job,
-        VehicleServiceEmployeeAssignmentService $service,
-    ): JsonResponse {
-        $jobModel = $this->job($request, $job);
-
-        return VehicleServiceEmployeeAssignmentResource::collection(
-            $service->createBatch($jobModel, $request->toData(), $request->expectedVersion()),
-        )->response()->setStatusCode(201);
     }
 
     public function update(
@@ -93,10 +79,12 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
     public function assignableLines(
         ListVehicleServiceJobRequest $request,
         int $job,
-        VehicleServiceAssignableLineService $assignableLines,
     ): AnonymousResourceCollection {
-        $jobModel = $this->job($request, $job);
-
-        return VehicleServiceJobLineResource::collection($assignableLines->forJob($jobModel));
+        return VehicleServiceJobLineResource::collection(
+            $this->job($request, $job)->lines()
+                ->where('is_employee_assignable', true)
+                ->with(['item', 'variant', 'uom', 'employeeAssignments.employee'])
+                ->get(),
+        );
     }
 }

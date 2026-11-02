@@ -27,7 +27,6 @@ final class PaymentSettlementService
         Payment $payment,
         int $lineId,
         string $toStatus,
-        string $eventDate,
         int $expectedPaymentVersion,
         int $expectedLineVersion,
         ?int $actorId = null,
@@ -37,7 +36,6 @@ final class PaymentSettlementService
             $payment,
             $lineId,
             $toStatus,
-            $eventDate,
             $expectedPaymentVersion,
             $expectedLineVersion,
             $actorId,
@@ -46,9 +44,6 @@ final class PaymentSettlementService
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
             $this->assertPaymentVersion($lockedPayment, $expectedPaymentVersion);
             $this->assertPaymentAllowsSettlement($lockedPayment);
-            if ($eventDate < $lockedPayment->payment_date->toDateString()) {
-                throw new InvalidArgumentException('Payment settlement event date cannot be before the payment date.');
-            }
 
             $line = PaymentLine::query()
                 ->where('payment_id', $lockedPayment->getKey())
@@ -64,7 +59,7 @@ final class PaymentSettlementService
                 return $line;
             }
             $type = $this->methodType($line);
-            $allowed = $this->allowedTransitionsForLine($lockedPayment, $line);
+            $allowed = ($this->allowedTransitions()[$type] ?? [])[$fromStatus] ?? [];
             if (! in_array($toStatus, $allowed, true)) {
                 throw new InvalidArgumentException(sprintf(
                     'Payment line status cannot transition from %s to %s for %s payments.',
@@ -78,7 +73,7 @@ final class PaymentSettlementService
             $line->forceFill([
                 'status' => $toStatus,
                 'cleared_amount' => $this->clearedAmountForStatus($line, $toStatus),
-                ...$this->instrumentDatesForStatus($toStatus, $eventDate),
+                ...$this->instrumentDatesForStatus($toStatus),
                 'row_version' => (int) $line->row_version + 1,
             ])->save();
 
@@ -98,7 +93,7 @@ final class PaymentSettlementService
                     $instrumentAfter,
                     $actorId,
                     $reason,
-                    ['payment_line_id' => (int) $line->getKey(), 'line_state' => $toStatus, 'event_date' => $eventDate],
+                    ['payment_line_id' => (int) $line->getKey(), 'line_state' => $toStatus],
                 );
             }
 
@@ -106,27 +101,7 @@ final class PaymentSettlementService
         });
     }
 
-    /** @return list<string> */
-    public function allowedTransitionsForLine(Payment $payment, PaymentLine $line): array
-    {
-        if (! $this->paymentAllowsSettlement($payment)) {
-            return [];
-        }
-
-        $type = $this->methodType($line);
-        $fromStatus = strtolower(trim((string) $line->status));
-
-        return ($this->allowedTransitions()[$type] ?? [])[$fromStatus] ?? [];
-    }
-
     private function assertPaymentAllowsSettlement(Payment $payment): void
-    {
-        if (! $this->paymentAllowsSettlement($payment)) {
-            throw new InvalidArgumentException('Only approved and posted payments can be settled.');
-        }
-    }
-
-    private function paymentAllowsSettlement(Payment $payment): bool
     {
         $document = $payment->document_status instanceof PaymentDocumentStatus
             ? $payment->document_status
@@ -134,8 +109,9 @@ final class PaymentSettlementService
         $posting = $payment->posting_status instanceof PaymentPostingStatus
             ? $payment->posting_status
             : PaymentPostingStatus::from((string) $payment->posting_status);
-
-        return $document === PaymentDocumentStatus::Approved && $posting === PaymentPostingStatus::Posted;
+        if ($document !== PaymentDocumentStatus::Approved || $posting !== PaymentPostingStatus::Posted) {
+            throw new InvalidArgumentException('Only approved and posted payments can be settled.');
+        }
     }
 
     private function methodType(PaymentLine $line): string
@@ -218,13 +194,15 @@ final class PaymentSettlementService
     }
 
     /** @return array<string, string> */
-    private function instrumentDatesForStatus(string $status, string $eventDate): array
+    private function instrumentDatesForStatus(string $status): array
     {
+        $now = now()->toDateString();
+
         return match ($status) {
-            'deposited' => ['deposit_date' => $eventDate],
-            'cleared', 'settled' => ['clearing_date' => $eventDate, 'realized_date' => $eventDate],
-            'bounced' => ['bounced_date' => $eventDate],
-            'returned' => ['returned_date' => $eventDate],
+            'deposited' => ['deposit_date' => $now],
+            'cleared', 'settled' => ['clearing_date' => $now, 'realized_date' => $now],
+            'bounced' => ['bounced_date' => $now],
+            'returned' => ['returned_date' => $now],
             default => [],
         };
     }

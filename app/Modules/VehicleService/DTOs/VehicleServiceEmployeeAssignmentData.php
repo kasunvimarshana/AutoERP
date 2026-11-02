@@ -10,10 +10,11 @@ final readonly class VehicleServiceEmployeeAssignmentData
 {
     public function __construct(
         public int $employeeId,
+        public string $roleType,
         public string $assignedHours = '0.000000',
         public string $rate = '0.000000',
-        public ?VehicleServiceCommissionType $commissionType = null,
-        public ?string $commissionValue = null,
+        public VehicleServiceCommissionType $commissionType = VehicleServiceCommissionType::None,
+        public string $commissionValue = '0.000000',
         public string $status = 'assigned',
     ) {}
 }

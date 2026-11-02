@@ -15,7 +15,6 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
-use Modules\VehicleService\Enums\VehicleServiceJobType;
 use Modules\VehicleService\Models\Concerns\HasVehicleServiceJobRowVersion;
 
 final class VehicleServiceJob extends TenantOwnedModel
@@ -25,7 +24,7 @@ final class VehicleServiceJob extends TenantOwnedModel
 
     protected $table = 'vehicle_service_jobs';
 
-    protected $guarded = ['*'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {
@@ -35,7 +34,6 @@ final class VehicleServiceJob extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'job_date' => 'date',
             'expected_delivery_date' => 'date',
-            'type' => VehicleServiceJobType::class,
             'customer_id' => 'integer',
             'bill_to_customer_id' => 'integer',
             'vehicle_id' => 'integer',
@@ -45,17 +43,11 @@ final class VehicleServiceJob extends TenantOwnedModel
             'supervisor_commission_amount' => 'decimal:6',
             'status' => VehicleServiceJobStatus::class,
             'odometer_reading' => 'decimal:6',
-            'next_service_mileage' => 'decimal:6',
             'subtotal' => 'decimal:6',
-            'line_discount_total' => 'decimal:6',
-            'job_discount_base' => 'decimal:6',
-            'job_discount_amount' => 'decimal:6',
             'discount_total' => 'decimal:6',
             'tax_total' => 'decimal:6',
             'charge_total' => 'decimal:6',
             'grand_total' => 'decimal:6',
-            'commission_cost_total' => 'decimal:6',
-            'net_after_commission' => 'decimal:6',
             'approved_at' => 'datetime',
             'completed_at' => 'datetime',
         ]);
@@ -113,18 +105,6 @@ final class VehicleServiceJob extends TenantOwnedModel
     public function invoiceLinks(): HasMany
     {
         return $this->hasMany(VehicleServiceInvoiceLink::class, 'vehicle_service_job_id');
-    }
-
-    public function discountRevisions(): HasMany
-    {
-        return $this->hasMany(VehicleServiceJobDiscount::class, 'vehicle_service_job_id')
-            ->orderByDesc('revision');
-    }
-
-    public function currentDiscountRevision(): HasOne
-    {
-        return $this->hasOne(VehicleServiceJobDiscount::class, 'vehicle_service_job_id')
-            ->ofMany('revision', 'max');
     }
 
     public function paymentLinks(): HasMany

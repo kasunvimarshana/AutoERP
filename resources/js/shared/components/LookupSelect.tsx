@@ -1,7 +1,6 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback } from 'react';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupBehaviorOptions, LookupLoader } from '@/shared/types/lookup';
-import type { PaginationMeta } from '@/shared/types/pagination';
 import { GenericLookupSelect } from './GenericLookupSelect';
 
 export interface LookupSelectProps<T extends NamedResource = NamedResource> extends LookupBehaviorOptions {
@@ -9,18 +8,13 @@ export interface LookupSelectProps<T extends NamedResource = NamedResource> exte
     value: T | null;
     onChange: (resource: T | null) => void;
     search: LookupLoader<T>;
-    formatLabel?: (resource: T) => string;
-    renderOption?: (resource: T, state: { active: boolean; selected: boolean }) => ReactNode;
-    renderEmptyState?: (state: { searchText: string; meta: PaginationMeta | undefined }) => ReactNode;
     placeholder?: string;
     error?: string;
     excludeId?: number | null;
     excludeIds?: Array<number | string>;
     disabled?: boolean;
     required?: boolean;
-    autoFocus?: boolean;
     id?: string;
-    recentResultsKey?: string;
 }
 
 export function LookupSelect<T extends NamedResource = NamedResource>({
@@ -28,28 +22,20 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     value,
     onChange,
     search,
-    formatLabel: customFormatLabel,
-    renderOption,
-    renderEmptyState,
     placeholder = 'Search...',
     error,
     excludeId,
     excludeIds,
     disabled,
     required,
-    autoFocus,
     id,
-    recentResultsKey,
     minSearchLength,
     loadOnOpen,
     perPage,
     debounceMs,
 }: LookupSelectProps<T>) {
-    const defaultFormatLabel = useCallback((resource: NamedResource) =>
+    const formatLabel = useCallback((resource: NamedResource) =>
         resource.code ? `${resource.code} - ${resource.name}` : resource.name, []);
-    const formatLabel = useCallback((resource: T) => customFormatLabel
-        ? customFormatLabel(resource)
-        : defaultFormatLabel(resource), [customFormatLabel, defaultFormatLabel]);
 
     return (
         <GenericLookupSelect
@@ -59,16 +45,12 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
             onChange={onChange}
             search={search}
             formatLabel={formatLabel}
-            renderOption={renderOption}
-            renderEmptyState={renderEmptyState}
             placeholder={placeholder}
             error={error}
             excludeId={excludeId}
             excludeIds={excludeIds}
             disabled={disabled}
             required={required}
-            autoFocus={autoFocus}
-            recentResultsKey={recentResultsKey}
             minSearchLength={minSearchLength}
             loadOnOpen={loadOnOpen}
             perPage={perPage}

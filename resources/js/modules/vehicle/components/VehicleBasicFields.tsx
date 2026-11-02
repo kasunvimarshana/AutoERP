@@ -27,7 +27,6 @@ export function VehicleBasicFields({
     category,
     onCategoryChange,
     error,
-    creating = false,
     vehicleNumberReadOnly = false,
     statusReadOnly = false,
 }: {
@@ -39,10 +38,9 @@ export function VehicleBasicFields({
     onModelChange: (value: VehicleModel | null) => void;
     type: VehicleType | null;
     onTypeChange: (value: VehicleType | null) => void;
-    category?: VehicleCategory | null;
-    onCategoryChange?: (value: VehicleCategory | null) => void;
+    category: VehicleCategory | null;
+    onCategoryChange: (value: VehicleCategory | null) => void;
     error: ApiError | null;
-    creating?: boolean;
     vehicleNumberReadOnly?: boolean;
     statusReadOnly?: boolean;
 }) {
@@ -57,9 +55,9 @@ export function VehicleBasicFields({
         <div className="space-y-5">
             <fieldset className="grid gap-4 md:grid-cols-3">
                 <legend className="sr-only">Vehicle identity</legend>
-                {!creating && <Input label="Vehicle Number" {...input('vehicle_number')} disabled={vehicleNumberReadOnly} />}
+                <Input label="Vehicle Number" {...input('vehicle_number')} disabled={vehicleNumberReadOnly} />
                 <Input label="Code" {...input('code')} />
-                <Input label="Registration Number" {...input('registration_number')} />
+                <Input label="Registration" {...input('registration_number')} />
                 <VehicleMakeSelect
                     value={make}
                     onChange={(next) => {
@@ -72,7 +70,7 @@ export function VehicleBasicFields({
                 />
                 <VehicleModelSelect makeId={make?.id} value={model} onChange={onModelChange} error={fieldError(error, 'vehicle_model_id')} />
                 <VehicleTypeSelect value={type} onChange={onTypeChange} error={fieldError(error, 'vehicle_type_id')} />
-                {!creating && <VehicleCategorySelect value={category ?? null} onChange={(next) => onCategoryChange?.(next)} error={fieldError(error, 'vehicle_category_id')} />}
+                <VehicleCategorySelect value={category} onChange={onCategoryChange} error={fieldError(error, 'vehicle_category_id')} />
                 {statusReadOnly ? (
                     <div className="block text-sm text-slate-700">
                         <span className="mb-1.5 block font-medium">Status</span>
@@ -83,7 +81,7 @@ export function VehicleBasicFields({
                 ) : (
                     <Select label="Status" options={statusOptions.map((option) => ({ value: option, label: option.replaceAll('_', ' ') }))} {...input('status')} />
                 )}
-                {!creating && <DecimalInput label="Odometer" value={String(value.odometer_reading ?? '')} onChange={(event) => set('odometer_reading', event.target.value)} error={fieldError(error, 'odometer_reading')} />}
+                <DecimalInput label="Odometer" value={String(value.odometer_reading ?? '')} onChange={(event) => set('odometer_reading', event.target.value)} error={fieldError(error, 'odometer_reading')} />
             </fieldset>
 
             <details className="rounded-lg border border-slate-200 bg-slate-50">

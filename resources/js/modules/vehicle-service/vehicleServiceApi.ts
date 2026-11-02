@@ -1,4 +1,3 @@
-export * from './api/commissions';
 export * from './api/documents';
 export * from './api/inventory';
 export * from './api/invoices';

@@ -31,7 +31,7 @@ function certificationDraft(row: EmployeeCertificationAssignment): EmployeeCerti
     };
 }
 
-export function EmployeeCertificationTab({ employeeId, canManage }: { employeeId: number; canManage: boolean }) {
+export function EmployeeCertificationTab({ employeeId }: { employeeId: number }) {
     const crud = useEmployeeRelationCrud(employeeId, certificationApi);
     const [master, setMaster] = useState<HrCertification | null>(null);
     const [draft, setDraft] = useState<EmployeeCertificationPayload>(emptyCertification);
@@ -57,7 +57,6 @@ export function EmployeeCertificationTab({ employeeId, canManage }: { employeeId
             editing={crud.editing}
             submitting={crud.submitting}
             actionError={crud.actionError}
-            canManage={canManage}
             onCreate={startCreate}
             onEdit={startEdit}
             onDelete={crud.destroy}

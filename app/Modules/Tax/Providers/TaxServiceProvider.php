@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tax\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Tax\Constants\TaxPermission;
 use Modules\Tax\Contracts\TaxPartyProfileReaderInterface;
 use Modules\Tax\Contracts\TaxPartyResolverInterface;
 use Modules\Tax\Services\Party\TaxPartyResolverRegistry;
@@ -25,9 +23,6 @@ final class TaxServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('tax', TaxPermission::descriptions());
-
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

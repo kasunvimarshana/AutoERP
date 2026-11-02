@@ -19,9 +19,9 @@ final class FinanceJournalEntry extends TenantOwnedModel
 {
     use SoftDeletes;
 
-    public const SOURCE_MODULE = 'finance';
-
     protected $table = 'finance_journal_entries';
+
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {
@@ -85,13 +85,6 @@ final class FinanceJournalEntry extends TenantOwnedModel
     public function reversals(): HasMany
     {
         return $this->hasMany(self::class, 'reversal_of_id');
-    }
-
-    public function isFinanceOwned(): bool
-    {
-        $sourceModule = trim((string) $this->source_module);
-
-        return $sourceModule === '' || $sourceModule === self::SOURCE_MODULE;
     }
 
     protected static function booted(): void

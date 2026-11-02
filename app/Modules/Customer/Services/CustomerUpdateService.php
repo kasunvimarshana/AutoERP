@@ -4,49 +4,36 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Validators\CustomerValidationService;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class CustomerUpdateService
 {
     public function __construct(
+        private readonly DecimalMath $math,
         private readonly CustomerValidationService $validator,
         private readonly CustomerContactService $contacts,
         private readonly CustomerAddressService $addresses,
         private readonly CustomerBankAccountService $bankAccounts,
         private readonly CustomerCategoryService $categories,
         private readonly CustomerDocumentService $documents,
-        private readonly CustomerPhoneService $phones,
+        private readonly CustomerCreditProfileService $creditProfiles,
     ) {}
 
     public function update(Customer $customer, UpdateCustomerData $data): Customer
     {
-        return $this->phones->write((int) $customer->tenant_id, function () use ($customer, $data): Customer {
-            $customer = Customer::query()
-                ->whereKey($customer->getKey())
-                ->where('tenant_id', (int) $customer->tenant_id)
-                ->when(
-                    $customer->organization_unit_id === null,
-                    static fn ($query) => $query->whereNull('organization_unit_id'),
-                    static fn ($query) => $query->where('organization_unit_id', (int) $customer->organization_unit_id),
-                )
-                ->lockForUpdate()
-                ->firstOrFail();
+        if ($customer->status === CustomerStatus::Blacklisted) {
+            throw new InvalidArgumentException('Blacklisted customer master data cannot be updated directly.');
+        }
 
-            if ($data->rowVersion !== (int) $customer->row_version) {
-                throw new ConflictHttpException('Customer was changed by someone else. Reload before saving.');
-            }
+        $this->validator->validateUpdate($customer, $data);
 
-            if ($customer->status === CustomerStatus::Blacklisted) {
-                throw new InvalidArgumentException('Blacklisted customer master data cannot be updated directly.');
-            }
-
-            $this->validator->validateUpdate($customer, $data);
-
+        return DB::transaction(function () use ($customer, $data): Customer {
             $attributes = [];
             foreach ([
                 'organization_unit_id' => $data->organizationUnitId,
@@ -65,26 +52,25 @@ final class CustomerUpdateService
                 'vat_number' => $data->vatNumber,
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
+                'credit_limit' => $data->creditProfile !== null
+                    ? $this->math->normalize($data->creditProfile->creditLimit)
+                    : ($data->creditLimit !== null ? $this->math->normalize($data->creditLimit) : null),
+                'opening_balance' => $data->openingBalance !== null ? $this->math->normalize($data->openingBalance) : null,
+                'is_credit_allowed' => $data->isCreditAllowed,
+                'is_advance_allowed' => $data->isAdvanceAllowed,
                 'is_tax_exempt' => $data->isTaxExempt,
                 'marketing_consent' => $data->marketingConsent,
                 'preferred_communication_channel' => $data->preferredCommunicationChannel,
                 'notes' => $data->notes,
                 'metadata' => $data->metadata,
             ] as $key => $value) {
-                if (in_array($key, $data->provided, true)) {
+                $requestKey = $key;
+                if (in_array($requestKey, $data->provided, true)) {
                     $attributes[$key] = $value;
                 }
             }
 
             $customer->fill($attributes);
-            if (in_array('phone', $data->provided, true) || in_array('mobile', $data->provided, true)) {
-                $this->phones->assertCustomerNumber($customer->phone, $customer->mobile);
-            }
-            $this->phones->assertAvailable((int) $customer->tenant_id, $customer->organization_unit_id, (int) $customer->id, [
-                'phone' => $customer->phone,
-                'mobile' => $customer->mobile,
-            ]);
-            $customer->setAttribute('row_version', ((int) $customer->row_version) + 1);
             $customer->save();
 
             if ($data->contacts !== null) {
@@ -101,6 +87,9 @@ final class CustomerUpdateService
             }
             if ($data->documents !== null) {
                 $this->documents->replace($customer, $data->documents);
+            }
+            if ($data->creditProfile !== null) {
+                $this->creditProfiles->set($customer, $data->creditProfile);
             }
 
             return $customer->refresh()->load([

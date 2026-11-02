@@ -57,8 +57,7 @@ final class InvoiceLineService
         foreach ($data->lines as $index => $line) {
             /** @var InvoiceLineData $line */
             $snapshot = $snapshots[$line->lineNumber];
-            $model = new InvoiceLine();
-            $model->forceFill([
+            $model = InvoiceLine::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'invoice_id' => $invoice->getKey(),
@@ -83,7 +82,6 @@ final class InvoiceLineService
                 'source_line_id' => $line->sourceLineId,
                 'metadata' => $line->metadata,
             ]);
-            $model->save();
 
             if ($line->sourceLineType !== null && $line->sourceLineId !== null) {
                 $key = $this->sourceAllocations->sourceLineKey(

@@ -25,7 +25,7 @@ function skillDraft(row: EmployeeSkillAssignment): EmployeeSkillPayload {
     };
 }
 
-export function EmployeeSkillTab({ employeeId, canManage }: { employeeId: number; canManage: boolean }) {
+export function EmployeeSkillTab({ employeeId }: { employeeId: number }) {
     const crud = useEmployeeRelationCrud(employeeId, skillApi);
     const [skill, setSkill] = useState<HrSkill | null>(null);
     const [draft, setDraft] = useState<EmployeeSkillPayload>(emptySkill);
@@ -51,7 +51,6 @@ export function EmployeeSkillTab({ employeeId, canManage }: { employeeId: number
             editing={crud.editing}
             submitting={crud.submitting}
             actionError={crud.actionError}
-            canManage={canManage}
             onCreate={startCreate}
             onEdit={startEdit}
             onDelete={crud.destroy}

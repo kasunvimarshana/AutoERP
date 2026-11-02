@@ -15,7 +15,7 @@ import { useSupplierRelationCrud } from './useSupplierRelationCrud';
 
 const list = (id: number, page: number, signal: AbortSignal) => listSupplierContacts(id, { page, per_page: 20 }, signal);
 
-export default function SupplierContactTab({ supplierId, canManage }: { supplierId: number; canManage: boolean }) {
+export default function SupplierContactTab({ supplierId }: { supplierId: number }) {
     const crud = useSupplierRelationCrud({ supplierId, list, create: createSupplierContact, update: updateSupplierContact, remove: deleteSupplierContact });
     const columns: DataColumn<SupplierContact>[] = [
         { key: 'name', header: 'Contact', render: (row) => <>{row.contact_name}<span className="block text-xs text-slate-500">{row.designation ?? row.department ?? ''}</span></> },
@@ -23,16 +23,16 @@ export default function SupplierContactTab({ supplierId, canManage }: { supplier
         { key: 'phone', header: 'Phone', render: (row) => row.phone ?? row.mobile ?? '-' },
         { key: 'primary', header: 'Primary', render: (row) => row.is_primary ? 'Yes' : 'No' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: SupplierContact) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> }] : []),
+        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
     ];
-    return <><SupplierRelationHeader title="Contacts" description="Supplier people and communication details." onAdd={canManage ? crud.startCreate : undefined} />
+    return <><SupplierRelationHeader title="Contacts" description="Supplier people and communication details." onAdd={crud.startCreate} />
         <ErrorAlert error={crud.actionError ?? crud.error} />
         {crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
         <Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-        {canManage && <FormDrawer open={crud.open} title={crud.editing ? 'Edit contact' : 'Add contact'} onClose={crud.close}>
+        <FormDrawer open={crud.open} title={crud.editing ? 'Edit contact' : 'Add contact'} onClose={crud.close}>
             {crud.open && <ContactForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}
-        </FormDrawer>}
-        {canManage && crud.confirmDialog}
+        </FormDrawer>
+        {crud.confirmDialog}
     </>;
 }
 

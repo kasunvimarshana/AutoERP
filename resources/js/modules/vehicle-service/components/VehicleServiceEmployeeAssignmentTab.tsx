@@ -1,122 +1,64 @@
-import { useEffect, useRef, useState } from 'react';
-import { useStore } from 'zustand';
-import { ApiError, hasFieldError, toApiError } from '@/shared/api/apiError';
+import { useState } from 'react';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { useApi } from '@/shared/hooks/useApi';
-import type { NamedResource } from '@/shared/types/common';
 import {
-    createVehicleServiceEmployeeBatch,
+    createVehicleServiceEmployee,
     deleteVehicleServiceEmployee,
-    getVehicleServiceJob,
     listEmployeeAssignableLines,
     updateVehicleServiceEmployee,
 } from '../vehicleServiceApi';
-import type { VehicleServiceJobStore, WorkforceSnapshot } from '../state/vehicleServiceJobStore';
 import {
     assignmentFormToPayload,
     assignmentToForm,
+    emptyAssignmentForm,
     type AssignmentDialogState,
     type AssignmentFormValue,
     type AssignmentRow,
 } from './employee-assignment/assignmentForm';
 import { EmployeeAssignmentDialog } from './employee-assignment/EmployeeAssignmentDialog';
-import {
-    EmployeeAssignmentTable,
-    type PendingWorkforceAssignment,
-} from './employee-assignment/EmployeeAssignmentTable';
+import { EmployeeAssignmentTable } from './employee-assignment/EmployeeAssignmentTable';
 
-const STALE_VERSION_FIELD = 'expected_version';
-const STALE_VERSION_RECOVERY_MESSAGE = 'The service job changed while this request was open. Latest job and workforce data has been loaded. Review and try again.';
-const MISSING_JOB_VERSION_MESSAGE = 'The refreshed service job did not include its row version.';
-
-export default function VehicleServiceEmployeeAssignmentTab({ jobId, expectedVersion, onChanged, active, jobStore }: {
+export default function VehicleServiceEmployeeAssignmentTab({
+    jobId,
+    expectedVersion,
+    onChanged,
+}: {
     jobId: number;
     expectedVersion: number;
-    onChanged: (nextVersion: number) => void;
-    active: boolean;
-    jobStore: VehicleServiceJobStore;
+    onChanged?: () => void;
 }) {
-    const workforce = useStore(jobStore, (state) => state.workforce);
-    const result = useApi(async (signal) => {
-        const snapshot = await loadWorkforceSnapshot(jobId, signal);
-        jobStore.getState().replaceWorkforce(snapshot);
-        onChanged(snapshot.rowVersion);
-        return snapshot;
-    }, [jobId], true, false);
-    const wasActive = useRef(active);
+    const result = useApi((signal) => listEmployeeAssignableLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
-    const [pendingEmployees, setPendingEmployees] = useState<Record<number, NamedResource[]>>({});
     const [saving, setSaving] = useState(false);
-    const [assigning, setAssigning] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const reload = result.reload;
-
-    useEffect(() => {
-        setPendingEmployees({});
-    }, [jobId]);
-
-    useEffect(() => {
-        const becameActive = active && !wasActive.current;
-        wasActive.current = active;
-        if (becameActive) reload();
-    }, [active, reload]);
-
-    const synchronize = async () => {
-        const snapshot = await loadWorkforceSnapshot(jobId);
-        jobStore.getState().replaceWorkforce(snapshot);
-        result.setData(snapshot);
-        onChanged(snapshot.rowVersion);
-    };
-
-    const handleMutationError = async (requestError: unknown) => {
-        const apiError = toApiError(requestError);
-        if (!hasFieldError(apiError, STALE_VERSION_FIELD)) {
-            setError(apiError);
-            return;
-        }
-
-        try {
-            await synchronize();
-            setError(new ApiError(STALE_VERSION_RECOVERY_MESSAGE, apiError.status, apiError.code, apiError.type));
-        } catch (refreshError) {
-            setError(toApiError(refreshError));
-        }
-    };
-
-    const assignSelected = async (assignments: PendingWorkforceAssignment[]) => {
-        if (assigning || assignments.length === 0) return;
-        setAssigning(true);
-        setError(null);
-        try {
-            await createVehicleServiceEmployeeBatch(jobId, {
-                expected_version: expectedVersion,
-                lines: groupAssignmentsByLine(assignments),
-            });
-            setPendingEmployees({});
-            await synchronize();
-        } catch (requestError) {
-            await handleMutationError(requestError);
-        } finally {
-            setAssigning(false);
-        }
-    };
+    const assignments = (result.data ?? []).flatMap((line) =>
+        (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
 
     const saveAssignment = async (value: AssignmentFormValue) => {
         if (!dialog || value.lineId === null || !value.employee || saving) return;
         setSaving(true);
         setError(null);
         try {
-            await updateVehicleServiceEmployee(jobId, value.lineId, dialog.assignmentId, {
-                ...assignmentFormToPayload(value),
-                expected_version: expectedVersion,
-            });
+            const payload = { ...assignmentFormToPayload(value), expected_version: expectedVersion };
+            if (dialog.mode === 'edit') {
+                await updateVehicleServiceEmployee(
+                    jobId,
+                    value.lineId,
+                    dialog.assignmentId,
+                    payload,
+                );
+            } else {
+                await createVehicleServiceEmployee(jobId, value.lineId, payload);
+            }
             setDialog(null);
-            await synchronize();
+            result.reload();
+            onChanged?.();
         } catch (requestError) {
-            await handleMutationError(requestError);
+            setError(toApiError(requestError));
         } finally {
             setSaving(false);
         }
@@ -129,9 +71,10 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId, expectedVer
         try {
             await deleteVehicleServiceEmployee(jobId, row.line.id, row.id, expectedVersion);
             setRemoveTarget(null);
-            await synchronize();
+            result.reload();
+            onChanged?.();
         } catch (requestError) {
-            await handleMutationError(requestError);
+            setError(toApiError(requestError));
         } finally {
             setRemoving(false);
         }
@@ -141,60 +84,39 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId, expectedVer
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
             <EmployeeAssignmentTable
-                loading={result.loading && workforce === null}
-                lines={workforce?.lines ?? []}
-                jobSupervisor={workforce?.supervisor ?? null}
-                assigning={assigning}
-                pendingEmployees={pendingEmployees}
-                onPendingToggle={(lineId, employee) => setPendingEmployees((current) => {
-                    const selected = current[lineId] ?? [];
-                    const alreadySelected = selected.some((candidate) => Number(candidate.id) === Number(employee.id));
-                    const next = alreadySelected
-                        ? selected.filter((candidate) => Number(candidate.id) !== Number(employee.id))
-                        : [...selected, employee];
-                    if (next.length === 0) {
-                        const { [lineId]: removed, ...remaining } = current;
-                        void removed;
-                        return remaining;
-                    }
-
-                    return { ...current, [lineId]: next };
-                })}
-                onAssignSelected={(assignments) => void assignSelected(assignments)}
+                loading={result.loading}
+                rows={assignments}
+                onAdd={() => {
+                    setError(null);
+                    setDialog({ mode: 'create', value: emptyAssignmentForm() });
+                }}
                 onEdit={(row) => {
                     setError(null);
-                    setDialog({ assignmentId: row.id, value: assignmentToForm(row) });
+                    setDialog({
+                        mode: 'edit',
+                        assignmentId: row.id,
+                        value: assignmentToForm(row),
+                    });
                 }}
                 onRemove={setRemoveTarget}
             />
-            <EmployeeAssignmentDialog dialog={dialog} lines={workforce?.lines ?? []} jobSupervisor={workforce?.supervisor ?? null} error={error} saving={saving} onClose={() => setDialog(null)} onSave={(value) => void saveAssignment(value)} />
-            <ConfirmDialog open={Boolean(removeTarget)} title="Remove assignment" message="This employee assignment will be removed from the service line." confirmLabel="Remove assignment" loading={removing} onCancel={() => !removing && setRemoveTarget(null)} onConfirm={() => removeTarget && void removeAssignment(removeTarget)} />
+            <EmployeeAssignmentDialog
+                dialog={dialog}
+                lines={result.data ?? []}
+                error={error}
+                saving={saving}
+                onClose={() => setDialog(null)}
+                onSave={(value) => void saveAssignment(value)}
+            />
+            <ConfirmDialog
+                open={Boolean(removeTarget)}
+                title="Remove assignment"
+                message="This employee assignment will be removed from the service line."
+                confirmLabel="Remove assignment"
+                loading={removing}
+                onCancel={() => !removing && setRemoveTarget(null)}
+                onConfirm={() => removeTarget && void removeAssignment(removeTarget)}
+            />
         </div>
     );
-}
-
-async function loadWorkforceSnapshot(jobId: number, signal?: AbortSignal): Promise<WorkforceSnapshot> {
-    const [lines, job] = await Promise.all([
-        listEmployeeAssignableLines(jobId, signal),
-        getVehicleServiceJob(jobId, signal),
-    ]);
-    if (typeof job.row_version !== 'number') throw new Error(MISSING_JOB_VERSION_MESSAGE);
-    return { lines, rowVersion: job.row_version, supervisor: job.supervisor ?? null };
-}
-
-function groupAssignmentsByLine(assignments: PendingWorkforceAssignment[]): Array<{
-    line_id: number;
-    employee_ids: number[];
-}> {
-    const grouped = new Map<number, number[]>();
-    for (const { line, employee } of assignments) {
-        const employeeIds = grouped.get(line.id) ?? [];
-        employeeIds.push(Number(employee.id));
-        grouped.set(line.id, employeeIds);
-    }
-
-    return [...grouped.entries()].map(([lineId, employeeIds]) => ({
-        line_id: lineId,
-        employee_ids: employeeIds,
-    }));
 }

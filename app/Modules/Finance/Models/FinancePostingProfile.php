@@ -21,7 +21,6 @@ final class FinancePostingProfile extends TenantOwnedModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'row_version' => 'integer',
             'is_active' => 'boolean',
         ]);
     }

@@ -17,8 +17,6 @@ final class VehicleServiceJobResource extends JsonResource
             'job_number' => $this->job_number,
             'job_date' => $this->job_date?->toDateString(),
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
-            'type' => $this->enum($this->type),
-            'type_label' => str((string) $this->enum($this->type))->replace('_', ' ')->title()->toString(),
             'customer_id' => (int) $this->customer_id,
             'customer' => $this->whenLoaded('customer', fn () => $this->customerRelation($this->customer)),
             'bill_to_customer_id' => $this->bill_to_customer_id === null ? null : (int) $this->bill_to_customer_id,
@@ -33,37 +31,18 @@ final class VehicleServiceJobResource extends JsonResource
             'status' => $this->enum($this->status),
             'status_label' => str((string) $this->enum($this->status))->replace('_', ' ')->title()->toString(),
             'odometer_reading' => $this->odometer_reading === null ? null : (string) $this->odometer_reading,
-            'next_service_mileage' => $this->next_service_mileage === null ? null : (string) $this->next_service_mileage,
-            'manual_job_card' => $this->manual_job_card,
             'fuel_level' => $this->fuel_level,
             'priority' => $this->priority,
             'subtotal' => (string) $this->subtotal,
-            'line_discount_total' => (string) $this->line_discount_total,
-            'job_discount_base' => (string) $this->job_discount_base,
-            'job_discount_amount' => (string) $this->job_discount_amount,
             'discount_total' => (string) $this->discount_total,
             'tax_total' => (string) $this->tax_total,
             'charge_total' => (string) $this->charge_total,
             'grand_total' => (string) $this->grand_total,
-            'commission_cost_total' => (string) $this->commission_cost_total,
-            'net_after_commission' => (string) $this->net_after_commission,
             'notes' => $this->notes,
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toISOString(),
             'completed_by' => $this->completed_by,
             'completed_at' => $this->completed_at?->toISOString(),
-            'job_discount' => $this->whenLoaded('currentDiscountRevision', function () use ($request) {
-                if ($this->currentDiscountRevision === null
-                    || $this->enum($this->currentDiscountRevision->action) === 'removed') {
-                    return null;
-                }
-
-                $data = (new VehicleServiceJobDiscountResource($this->currentDiscountRevision))->resolve($request);
-                $data['calculation_base'] = (string) $this->job_discount_base;
-                $data['calculated_amount'] = (string) $this->job_discount_amount;
-
-                return $data;
-            }),
             'inspection' => $this->whenLoaded('inspection', fn () => $this->inspection === null ? null : (new VehicleServiceInspectionResource($this->inspection))->resolve($request)),
             'lines' => $this->whenLoaded('lines', fn () => VehicleServiceJobLineResource::collection($this->lines)->resolve($request), []),
             'invoice_links' => $this->whenLoaded(

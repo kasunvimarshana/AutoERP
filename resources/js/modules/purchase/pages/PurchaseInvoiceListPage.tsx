@@ -6,13 +6,13 @@ import { hasPurchasePermission, purchasePermissions } from '../purchasePermissio
 
 export default function PurchaseInvoiceListPage() {
     const auth = useAuth();
-    const canCreateInvoice = hasPurchasePermission(auth, purchasePermissions.supplierInvoicesCreate);
+    const canCreateInvoice = hasPurchasePermission(auth.permissions, purchasePermissions.supplierInvoicesCreate);
 
     return (
         <div className="space-y-5">
             <InvoiceListWorkspace
                 viewKey="supplier"
-                rowHref={(invoice) => `/purchase/invoices/${invoice.id}`}
+                rowHref={(invoice) => `/invoices/${invoice.id}?from=purchase`}
                 renderHeader={(view) => (
                     <PurchasePageHeader
                         title={view?.title ?? 'Supplier Invoices'}

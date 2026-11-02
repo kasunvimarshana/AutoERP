@@ -4,6 +4,8 @@ export interface FinanceAccount extends Record<string, unknown> {
     name: string;
     description?: string | null;
     normal_balance: 'debit' | 'credit';
+    opening_balance: string;
+    current_balance: string;
     is_control_account: boolean;
     is_posting_account: boolean;
     is_cash_account: boolean;
@@ -37,7 +39,6 @@ export interface FinanceAccountRole extends FinanceLookup {
 export interface FinanceAccountAssignment extends Record<string, unknown> {
     id: number;
     organization_unit_id?: number | null;
-    organization_unit?: { id: number; code: string; name: string } | null;
     account_role_id: number;
     account_id: number;
     effective_from: string;
@@ -48,44 +49,12 @@ export interface FinanceAccountAssignment extends Record<string, unknown> {
 }
 
 export interface PostingProfile extends FinanceLookup {
-    row_version: number;
-    description?: string | null;
-    organization_unit_id?: number | null;
-    organization_unit?: { id: number; code: string; name: string } | null;
-    scope?: 'tenant_default' | 'organization';
     rules?: Array<{
         id: number;
         line_key: string;
         account_role_id: number;
-        effective_from: string;
-        effective_to?: string | null;
-        is_active: boolean;
         role?: FinanceAccountRole;
         description?: string | null;
-    }>;
-}
-
-export interface PostingProfileSimulationResult {
-    profile_id: number;
-    profile_code: string;
-    profile_name: string;
-    posting_date: string;
-    organization_unit_id: number | null;
-    is_ready: boolean;
-    lines: Array<{
-        line_key: string;
-        account_role_id: number;
-        role: { id: number; code: string; name: string; is_active: boolean } | null;
-        status: 'resolved' | 'missing_role' | 'error';
-        resolved_account: {
-            id: number;
-            code: string;
-            name: string;
-            normal_balance: string;
-            scope: 'tenant_default' | 'organization';
-            organization_unit_id: number | null;
-        } | null;
-        message: string | null;
     }>;
 }
 
@@ -108,6 +77,7 @@ export interface AccountPayload {
     name: string;
     description?: string | null;
     normal_balance: 'debit' | 'credit';
+    opening_balance: string;
     is_control_account: boolean;
     is_posting_account: boolean;
     is_cash_account: boolean;
@@ -158,6 +128,11 @@ export interface JournalPayload {
     journal_date: string;
     journal_type: string;
     posting_profile_id?: number | null;
+    source_module?: string | null;
+    source_type?: string | null;
+    source_id?: number | null;
+    source_number?: string | null;
+    source_date?: string | null;
     description?: string | null;
     currency_id?: number | null;
     exchange_rate: string;
@@ -175,8 +150,6 @@ export interface LedgerEntry extends Record<string, unknown> {
     entry_date: string;
     debit: string;
     credit: string;
-    base_debit: string;
-    base_credit: string;
     balance_after: string;
     source_module?: string | null;
     source_type?: string | null;
@@ -220,14 +193,7 @@ export interface PostingProfilePayload {
     name: string;
     description?: string | null;
     is_active: boolean;
-    rules: Array<{
-        line_key: string;
-        account_role_id: number;
-        effective_from?: string | null;
-        effective_to?: string | null;
-        is_active?: boolean;
-        description?: string | null;
-    }>;
+    rules: Array<{ line_key: string; account_role_id: number; description?: string | null }>;
 }
 
 export interface AccountRolePayload {
@@ -250,71 +216,6 @@ export interface AgingReport {
     buckets: Record<string, string>;
     total: string;
     rows: Array<Record<string, unknown>>;
-}
-
-export type ReceivableAgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90_plus';
-
-export interface CustomerOutstandingParams {
-    page?: number;
-    per_page?: number;
-    customer_id?: number;
-    location_id?: number;
-    as_of_date?: string;
-    timezone?: string;
-    aging_bucket?: ReceivableAgingBucket | '';
-    currency_code?: string;
-}
-
-export interface CustomerOutstandingRow {
-    location: { id: number | null; name: string };
-    customer: { id: number; name: string; code: string; customer_number: string };
-    currency: { code: string };
-    invoice_count: number;
-    current: string;
-    days_1_30: string;
-    days_31_60: string;
-    days_61_90: string;
-    over_90: string;
-    outstanding_total: string;
-}
-
-export interface CustomerOutstandingReportResult {
-    as_of_date: string;
-    summary: {
-        customer_count: number;
-        overdue_invoice_count: number;
-        totals_by_currency: Array<{
-            currency: { code: string };
-            outstanding_total: string;
-            overdue_total: string;
-        }>;
-        totals_by_location: Array<{
-            location: { id: number | null; name: string };
-            currency: { code: string };
-            outstanding_total: string;
-        }>;
-    };
-    data: CustomerOutstandingRow[];
-    meta: { current_page: number; from: number | null; last_page: number; per_page: number; to: number | null; total: number };
-}
-
-export interface CustomerOutstandingInvoiceRow {
-    invoice: { id: number; number: string; date: string; due_date: string; service_job_number: string | null };
-    currency: { code: string };
-    invoice_total: string;
-    paid_amount: string;
-    credit_allocated_amount: string;
-    outstanding_amount: string;
-    invoice_age_days: number;
-    days_overdue: number;
-}
-
-export interface CustomerOutstandingInvoicesResult {
-    as_of_date: string;
-    customer: CustomerOutstandingRow['customer'] | null;
-    currency: { code: string };
-    data: CustomerOutstandingInvoiceRow[];
-    meta: CustomerOutstandingReportResult['meta'];
 }
 
 export interface BankReconciliation extends Record<string, unknown> {

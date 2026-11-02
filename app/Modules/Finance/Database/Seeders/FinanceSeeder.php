@@ -9,9 +9,6 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Modules\Finance\Constants\FinanceSystemAccountCode;
-use Modules\Finance\Enums\FinanceAccountRoleCode;
-use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountAssignment;
 use Modules\Finance\Models\FinanceAccountCategory;
@@ -26,46 +23,6 @@ final class FinanceSeeder extends Seeder
 
     private const OPENING_EFFECTIVE_DATE = '1900-01-01';
 
-    private const TYPE_ASSET = 'ASSET';
-
-    private const TYPE_LIABILITY = 'LIABILITY';
-
-    private const TYPE_EQUITY = 'EQUITY';
-
-    private const TYPE_REVENUE = 'REVENUE';
-
-    private const TYPE_EXPENSE = 'EXPENSE';
-
-    private const ACCOUNT_CASH = '1010';
-
-    private const ACCOUNT_BANK = '1020';
-
-    private const ACCOUNT_RECEIVABLE = '1100';
-
-    private const ACCOUNT_INVENTORY = '1200';
-
-    private const ACCOUNT_TAX_RECEIVABLE = '1300';
-
-    private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
-
-    private const ACCOUNT_PAYABLE = '2100';
-
-    private const ACCOUNT_GRNI = '2150';
-
-    private const ACCOUNT_TAX_PAYABLE = '2200';
-
-    private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
-
-    private const ACCOUNT_SALES_REVENUE = '4100';
-
-    private const ACCOUNT_SERVICE_REVENUE = '4200';
-
-    private const ACCOUNT_PURCHASE_EXPENSE = '5100';
-
-    private const ACCOUNT_COST_OF_GOODS_SOLD = '5200';
-
-    private const ACCOUNT_OPERATING_EXPENSE = '5400';
-
     public function run(): void
     {
         if (! Schema::hasTable('finance_accounts')) {
@@ -79,24 +36,29 @@ final class FinanceSeeder extends Seeder
         }
 
         DB::transaction(function () use ($tenant, $organizationUnit): void {
-            $tenantId = (int) $tenant->getKey();
-            $organizationUnitId = $organizationUnit?->getKey();
-            $types = $this->seedTypes($tenantId);
-            $categories = $this->seedCategories($tenantId, $types);
-            $this->seedAccounts($tenantId, $organizationUnitId, $types, $categories);
-            $this->seedPostingProfiles($tenantId, $organizationUnitId);
+            $types = $this->seedTypes((int) $tenant->getKey());
+            $categories = $this->seedCategories((int) $tenant->getKey(), $types);
+            $this->seedAccounts(
+                (int) $tenant->getKey(),
+                $organizationUnit?->getKey(),
+                $types,
+                $categories,
+            );
+            $this->seedPostingProfiles((int) $tenant->getKey(), $organizationUnit?->getKey());
         }, 3);
     }
 
-    /** @return array<string, FinanceAccountType> */
+    /**
+     * @return array<string,FinanceAccountType>
+     */
     private function seedTypes(int $tenantId): array
     {
         $definitions = [
-            self::TYPE_ASSET => ['Asset', 'debit', 'balance_sheet'],
-            self::TYPE_LIABILITY => ['Liability', 'credit', 'balance_sheet'],
-            self::TYPE_EQUITY => ['Equity', 'credit', 'balance_sheet'],
-            self::TYPE_REVENUE => ['Revenue', 'credit', 'income_statement'],
-            self::TYPE_EXPENSE => ['Expense', 'debit', 'income_statement'],
+            'ASSET' => ['Asset', 'debit', 'balance_sheet'],
+            'LIABILITY' => ['Liability', 'credit', 'balance_sheet'],
+            'EQUITY' => ['Equity', 'credit', 'balance_sheet'],
+            'REVENUE' => ['Revenue', 'credit', 'income_statement'],
+            'EXPENSE' => ['Expense', 'debit', 'income_statement'],
         ];
 
         $types = [];
@@ -118,30 +80,23 @@ final class FinanceSeeder extends Seeder
     }
 
     /**
-     * @param  array<string, FinanceAccountType>  $types
-     * @return array<string, FinanceAccountCategory>
+     * @param  array<string,FinanceAccountType>  $types
+     * @return array<string,FinanceAccountCategory>
      */
     private function seedCategories(int $tenantId, array $types): array
     {
         $definitions = [
-            'CASH' => ['Cash', self::TYPE_ASSET],
-            'BANK' => ['Bank', self::TYPE_ASSET],
-            'AR' => ['Accounts Receivable', self::TYPE_ASSET],
-            'INVENTORY' => ['Inventory', self::TYPE_ASSET],
-            'TAX_RECEIVABLE' => ['Tax Receivable', self::TYPE_ASSET],
-            'SUPPLIER_ADVANCE' => ['Supplier Advances', self::TYPE_ASSET],
-            'AP' => ['Accounts Payable', self::TYPE_LIABILITY],
-            'GRNI' => ['Goods Received Not Invoiced', self::TYPE_LIABILITY],
-            'TAX_PAYABLE' => ['Tax Payable', self::TYPE_LIABILITY],
-            'CUSTOMER_ADVANCE' => ['Customer Advances', self::TYPE_LIABILITY],
-            'CUSTOMER_DEPOSIT' => ['Customer Security Deposits', self::TYPE_LIABILITY],
-            'SALES' => ['Sales Revenue', self::TYPE_REVENUE],
-            'SERVICE' => ['Service Revenue', self::TYPE_REVENUE],
-            'FX_GAIN' => ['Realized FX Gain', self::TYPE_REVENUE],
-            'PURCHASE' => ['Purchase Expense', self::TYPE_EXPENSE],
-            'COGS' => ['Cost of Goods Sold', self::TYPE_EXPENSE],
-            'OPERATING_EXPENSE' => ['Operating Expense', self::TYPE_EXPENSE],
-            'FX_LOSS' => ['Realized FX Loss', self::TYPE_EXPENSE],
+            'CASH' => ['Cash', 'ASSET'],
+            'BANK' => ['Bank', 'ASSET'],
+            'AR' => ['Accounts Receivable', 'ASSET'],
+            'AP' => ['Accounts Payable', 'LIABILITY'],
+            'INVENTORY' => ['Inventory', 'ASSET'],
+            'SALES' => ['Sales Revenue', 'REVENUE'],
+            'SERVICE' => ['Service Revenue', 'REVENUE'],
+            'PURCHASE' => ['Purchase Expense', 'EXPENSE'],
+            'COGS' => ['Cost of Goods Sold', 'EXPENSE'],
+            'TAX_PAYABLE' => ['Tax Payable', 'LIABILITY'],
+            'TAX_RECEIVABLE' => ['Tax Receivable', 'ASSET'],
         ];
 
         $categories = [];
@@ -162,17 +117,17 @@ final class FinanceSeeder extends Seeder
     }
 
     /**
-     * @param  array<string, FinanceAccountType>  $types
-     * @param  array<string, FinanceAccountCategory>  $categories
+     * @param  array<string,FinanceAccountType>  $types
+     * @param  array<string,FinanceAccountCategory>  $categories
      */
     private function seedAccounts(int $tenantId, ?int $organizationUnitId, array $types, array $categories): void
     {
         $rootDefinitions = [
-            '1000' => ['Asset', self::TYPE_ASSET],
-            '2000' => ['Liability', self::TYPE_LIABILITY],
-            '3000' => ['Equity', self::TYPE_EQUITY],
-            '4000' => ['Revenue', self::TYPE_REVENUE],
-            '5000' => ['Expense', self::TYPE_EXPENSE],
+            '1000' => ['Asset', 'ASSET'],
+            '2000' => ['Liability', 'LIABILITY'],
+            '3000' => ['Equity', 'EQUITY'],
+            '4000' => ['Revenue', 'REVENUE'],
+            '5000' => ['Expense', 'EXPENSE'],
         ];
 
         $roots = [];
@@ -190,68 +145,46 @@ final class FinanceSeeder extends Seeder
                     'is_posting_account' => false,
                     'is_system' => true,
                     'is_active' => true,
+                    'opening_balance' => '0.000000',
+                    'current_balance' => '0.000000',
                     'metadata' => ['seed_source' => 'finance_module'],
                 ],
             );
         }
 
         $accounts = [
-            [self::ACCOUNT_CASH, 'Cash', self::TYPE_ASSET, 'CASH', true, false, false],
-            [self::ACCOUNT_BANK, 'Bank', self::TYPE_ASSET, 'BANK', false, true, false],
-            [self::ACCOUNT_RECEIVABLE, 'Accounts Receivable', self::TYPE_ASSET, 'AR', false, false, false],
-            [self::ACCOUNT_INVENTORY, 'Inventory', self::TYPE_ASSET, 'INVENTORY', false, false, false],
-            [self::ACCOUNT_TAX_RECEIVABLE, 'Tax Receivable', self::TYPE_ASSET, 'TAX_RECEIVABLE', false, false, true],
-            [self::ACCOUNT_SUPPLIER_ADVANCE, 'Supplier Advances', self::TYPE_ASSET, 'SUPPLIER_ADVANCE', false, false, false],
-            [self::ACCOUNT_PAYABLE, 'Accounts Payable', self::TYPE_LIABILITY, 'AP', false, false, false],
-            [self::ACCOUNT_GRNI, 'Goods Received Not Invoiced', self::TYPE_LIABILITY, 'GRNI', false, false, false],
-            [self::ACCOUNT_TAX_PAYABLE, 'Tax Payable', self::TYPE_LIABILITY, 'TAX_PAYABLE', false, false, true],
-            [self::ACCOUNT_CUSTOMER_ADVANCE, 'Customer Advances', self::TYPE_LIABILITY, 'CUSTOMER_ADVANCE', false, false, false],
-            [FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT, 'Customer Security Deposits', self::TYPE_LIABILITY, 'CUSTOMER_DEPOSIT', false, false, false],
-            [self::ACCOUNT_SALES_REVENUE, 'Sales Revenue', self::TYPE_REVENUE, 'SALES', false, false, false],
-            [self::ACCOUNT_SERVICE_REVENUE, 'Service Revenue', self::TYPE_REVENUE, 'SERVICE', false, false, false],
-            [FinanceSystemAccountCode::REALIZED_FX_GAIN, 'Realized FX Gain', self::TYPE_REVENUE, 'FX_GAIN', false, false, false],
-            [self::ACCOUNT_PURCHASE_EXPENSE, 'Purchase Expense', self::TYPE_EXPENSE, 'PURCHASE', false, false, false],
-            [self::ACCOUNT_COST_OF_GOODS_SOLD, 'Cost of Goods Sold', self::TYPE_EXPENSE, 'COGS', false, false, false],
-            [self::ACCOUNT_OPERATING_EXPENSE, 'Operating Expense', self::TYPE_EXPENSE, 'OPERATING_EXPENSE', false, false, false],
-            [FinanceSystemAccountCode::REALIZED_FX_LOSS, 'Realized FX Loss', self::TYPE_EXPENSE, 'FX_LOSS', false, false, false],
-        ];
-        $controlCategories = [
-            'AR',
-            'AP',
-            'GRNI',
-            'INVENTORY',
-            'SUPPLIER_ADVANCE',
-            'CUSTOMER_ADVANCE',
-            'CUSTOMER_DEPOSIT',
+            ['1010', 'Cash', 'ASSET', 'CASH', true, false, false],
+            ['1020', 'Bank', 'ASSET', 'BANK', false, true, false],
+            ['1100', 'Accounts Receivable', 'ASSET', 'AR', false, false, false],
+            ['1200', 'Inventory', 'ASSET', 'INVENTORY', false, false, false],
+            ['1300', 'Tax Receivable', 'ASSET', 'TAX_RECEIVABLE', false, false, true],
+            ['2100', 'Accounts Payable', 'LIABILITY', 'AP', false, false, false],
+            ['2200', 'Tax Payable', 'LIABILITY', 'TAX_PAYABLE', false, false, true],
+            ['4100', 'Sales Revenue', 'REVENUE', 'SALES', false, false, false],
+            ['4200', 'Service Revenue', 'REVENUE', 'SERVICE', false, false, false],
+            ['5100', 'Purchase Expense', 'EXPENSE', 'PURCHASE', false, false, false],
+            ['5200', 'Cost of Goods Sold', 'EXPENSE', 'COGS', false, false, false],
         ];
 
         foreach ($accounts as [$code, $name, $typeCode, $categoryCode, $isCash, $isBank, $isTax]) {
-            $accountOrganizationUnitId = in_array(
-                $code,
-                [
-                    FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
-                    FinanceSystemAccountCode::REALIZED_FX_GAIN,
-                    FinanceSystemAccountCode::REALIZED_FX_LOSS,
-                ],
-                true,
-            ) ? null : $organizationUnitId;
-
             FinanceAccount::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
                 [
-                    'organization_unit_id' => $accountOrganizationUnitId,
+                    'organization_unit_id' => $organizationUnitId,
                     'account_type_id' => $types[$typeCode]->getKey(),
                     'account_category_id' => $categories[$categoryCode]->getKey(),
-                    'parent_id' => $accountOrganizationUnitId === null ? null : $roots[$typeCode]->getKey(),
+                    'parent_id' => $roots[$typeCode]->getKey(),
                     'name' => $name,
                     'normal_balance' => $types[$typeCode]->normal_balance->value,
-                    'is_control_account' => in_array($categoryCode, $controlCategories, true),
+                    'is_control_account' => in_array($categoryCode, ['AR', 'AP', 'INVENTORY'], true),
                     'is_posting_account' => true,
                     'is_cash_account' => $isCash,
                     'is_bank_account' => $isBank,
                     'is_tax_account' => $isTax,
                     'is_system' => true,
                     'is_active' => true,
+                    'opening_balance' => '0.000000',
+                    'current_balance' => '0.000000',
                     'metadata' => ['seed_source' => 'finance_module'],
                 ],
             );
@@ -267,134 +200,48 @@ final class FinanceSeeder extends Seeder
         }
 
         $definitions = [
-            FinancePostingProfileCode::SalesInvoice->value => [
+            'sales_invoice' => [
                 'name' => 'Sales Invoice',
-                'rules' => [
-                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
-                    FinanceAccountRoleCode::Revenue->value => self::ACCOUNT_SALES_REVENUE,
-                    FinanceAccountRoleCode::TaxPayable->value => self::ACCOUNT_TAX_PAYABLE,
-                    FinanceAccountRoleCode::WithholdingReceivable->value => self::ACCOUNT_TAX_RECEIVABLE,
-                ],
+                'rules' => ['receivable' => '1100', 'revenue' => '4100', 'tax_payable' => '2200', 'withholding_receivable' => '1300'],
             ],
-            FinancePostingProfileCode::PurchaseInvoice->value => [
+            'purchase_invoice' => [
                 'name' => 'Purchase Invoice',
-                'rules' => [
-                    FinanceAccountRoleCode::Expense->value => self::ACCOUNT_PURCHASE_EXPENSE,
-                    FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => self::ACCOUNT_GRNI,
-                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
-                    FinanceAccountRoleCode::TaxReceivable->value => self::ACCOUNT_TAX_RECEIVABLE,
-                    FinanceAccountRoleCode::WithholdingPayable->value => self::ACCOUNT_TAX_PAYABLE,
-                ],
+                'rules' => ['expense' => '5100', 'payable' => '2100', 'tax_receivable' => '1300', 'withholding_payable' => '2200'],
             ],
-            FinancePostingProfileCode::CustomerReceipt->value => [
-                'name' => 'Customer Receipt',
-                'rules' => [
-                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
-                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
-                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
-                    FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
-                ],
+            'payment_received' => [
+                'name' => 'Payment Received',
+                'rules' => ['cash' => '1010', 'bank' => '1020', 'receivable' => '1100', 'withholding_receivable' => '1300'],
             ],
-            FinancePostingProfileCode::SupplierPayment->value => [
-                'name' => 'Supplier Payment',
-                'rules' => [
-                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
-                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
-                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
-                    FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
-                ],
+            'payment_made' => [
+                'name' => 'Payment Made',
+                'rules' => ['cash' => '1010', 'bank' => '1020', 'payable' => '2100', 'withholding_payable' => '2200'],
             ],
-            FinancePostingProfileCode::CustomerAdvance->value => [
-                'name' => 'Customer Advance Receipt',
-                'rules' => [
-                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
-                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
-                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
-                    FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
-                ],
-            ],
-            FinancePostingProfileCode::SupplierAdvance->value => [
-                'name' => 'Supplier Advance Payment',
-                'rules' => [
-                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
-                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
-                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
-                    FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
-                ],
-            ],
-            FinancePostingProfileCode::RentalDeposit->value => [
-                'name' => 'Rental Security Deposit',
-                'rules' => [
-                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
-                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
-                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
-                    FinanceAccountRoleCode::CustomerDeposit->value => FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
-                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
-                ],
-            ],
-            FinancePostingProfileCode::ExpensePayment->value => [
-                'name' => 'Expense Payment',
-                'rules' => [
-                    FinanceAccountRoleCode::OperatingExpense->value => self::ACCOUNT_OPERATING_EXPENSE,
-                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
-                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
-                ],
-            ],
-            FinancePostingProfileCode::InventoryReceipt->value => [
+            'inventory_receipt' => [
                 'name' => 'Inventory Receipt',
-                'rules' => [
-                    FinanceAccountRoleCode::Inventory->value => self::ACCOUNT_INVENTORY,
-                    FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => self::ACCOUNT_GRNI,
-                ],
+                'rules' => ['inventory' => '1200', 'payable' => '2100'],
             ],
-            FinancePostingProfileCode::InventoryIssue->value => [
+            'inventory_issue' => [
                 'name' => 'Inventory Issue',
-                'rules' => [
-                    FinanceAccountRoleCode::CostOfGoodsSold->value => self::ACCOUNT_COST_OF_GOODS_SOLD,
-                    FinanceAccountRoleCode::Inventory->value => self::ACCOUNT_INVENTORY,
-                ],
+                'rules' => ['cost_of_goods_sold' => '5200', 'inventory' => '1200'],
             ],
-            FinancePostingProfileCode::InternalConsumption->value => [
-                'name' => 'Consumable Usage',
-                'rules' => [
-                    FinanceAccountRoleCode::OperatingExpense->value => self::ACCOUNT_OPERATING_EXPENSE,
-                    FinanceAccountRoleCode::Inventory->value => self::ACCOUNT_INVENTORY,
-                ],
-            ],
-            FinancePostingProfileCode::VehicleServiceInvoice->value => [
+            'vehicle_service_invoice' => [
                 'name' => 'Vehicle Service Invoice',
-                'rules' => [
-                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
-                    FinanceAccountRoleCode::ServiceRevenue->value => self::ACCOUNT_SERVICE_REVENUE,
-                    FinanceAccountRoleCode::TaxPayable->value => self::ACCOUNT_TAX_PAYABLE,
-                ],
+                'rules' => ['receivable' => '1100', 'service_revenue' => '4200', 'tax_payable' => '2200'],
             ],
-            FinancePostingProfileCode::SalesReturn->value => [
+            'sales_return' => [
                 'name' => 'Sales Return',
-                'rules' => [
-                    FinanceAccountRoleCode::SalesRevenue->value => self::ACCOUNT_SALES_REVENUE,
-                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
-                ],
+                'rules' => ['sales_revenue' => '4100', 'receivable' => '1100'],
             ],
-            FinancePostingProfileCode::PurchaseReturn->value => [
+            'purchase_return' => [
                 'name' => 'Purchase Return',
-                'rules' => [
-                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
-                    FinanceAccountRoleCode::PurchaseExpense->value => self::ACCOUNT_PURCHASE_EXPENSE,
-                ],
+                'rules' => ['payable' => '2100', 'purchase_expense' => '5100'],
             ],
         ];
 
-        $accounts = FinanceAccount::query()->where('tenant_id', $tenantId)->get()->keyBy('code');
+        $accounts = FinanceAccount::query()
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy('code');
 
         foreach ($definitions as $code => $definition) {
             $profile = FinancePostingProfile::query()->updateOrCreate(
@@ -425,27 +272,16 @@ final class FinanceSeeder extends Seeder
                     ],
                 );
 
-                $assignmentOrganizationUnitId = in_array(
-                    $lineKey,
-                    [
-                        FinanceAccountRoleCode::CustomerDeposit->value,
-                        FinanceAccountRoleCode::RealizedFxGain->value,
-                        FinanceAccountRoleCode::RealizedFxLoss->value,
-                    ],
-                    true,
-                ) ? null : $organizationUnitId;
-                $this->seedAccountAssignment($tenantId, $assignmentOrganizationUnitId, $role, $account);
+                $this->seedAccountAssignment($tenantId, $organizationUnitId, $role, $account);
+
                 FinancePostingProfileRule::query()->updateOrCreate(
                     [
                         'tenant_id' => $tenantId,
                         'posting_profile_id' => $profile->getKey(),
                         'line_key' => $lineKey,
-                        'effective_from' => FinancePostingProfileRule::OPENING_EFFECTIVE_DATE,
                     ],
                     [
                         'account_role_id' => $role->getKey(),
-                        'effective_to' => null,
-                        'is_active' => true,
                         'description' => $definition['name'].' '.$lineKey,
                     ],
                 );

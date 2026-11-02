@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useApi } from '@/shared/hooks/useApi';
-import { notifySuccess } from '@/shared/notifications/appToast';
 import type { ApiCollection } from '@/shared/types/api';
 
 export function useItemRelationCrud<T extends { id: number }, P>({
@@ -52,13 +51,10 @@ export function useItemRelationCrud<T extends { id: number }, P>({
             setSubmitting(true);
             setActionError(null);
             try {
-                const saved = editing
-                    ? await update(itemId, editing.id, payload)
-                    : await create(itemId, payload);
+                if (editing) await update(itemId, editing.id, payload);
+                else await create(itemId, payload);
                 setOpen(false);
-                setEditing(null);
-                result.setData((current) => upsertRelationCollection(current, saved, !editing && page === 1));
-                notifySuccess(editing ? 'Record updated successfully.' : 'Record created successfully.');
+                result.reload();
             } catch (error) {
                 setActionError(toApiError(error));
             } finally {
@@ -72,68 +68,10 @@ export function useItemRelationCrud<T extends { id: number }, P>({
             setActionError(null);
             try {
                 await remove(itemId, row.id);
-                result.setData((current) => removeRelationFromCollection(current, row.id));
-                notifySuccess('Record deleted successfully.');
+                result.reload();
             } catch (error) {
                 setActionError(toApiError(error));
             }
         },
-    };
-}
-
-function upsertRelationCollection<T extends { id: number }>(
-    collection: ApiCollection<T> | null,
-    saved: T,
-    prependWhenMissing: boolean,
-) {
-    if (collection === null) return collection;
-
-    const rows = collection.data ?? [];
-    const currentIndex = rows.findIndex((row) => row.id === saved.id);
-
-    if (currentIndex >= 0) {
-        return {
-            ...collection,
-            data: rows.map((row) => row.id === saved.id ? saved : row),
-        };
-    }
-
-    if (!prependWhenMissing) {
-        return collection;
-    }
-
-    const perPage = collection.meta?.per_page ?? rows.length + 1;
-    const nextRows = [saved, ...rows].slice(0, perPage);
-
-    return {
-        ...collection,
-        data: nextRows,
-        meta: collection.meta ? {
-            ...collection.meta,
-            total: collection.meta.total + 1,
-            from: nextRows.length > 0 ? 1 : null,
-            to: nextRows.length === 0 ? null : nextRows.length,
-        } : collection.meta,
-    };
-}
-
-function removeRelationFromCollection<T extends { id: number }>(
-    collection: ApiCollection<T> | null,
-    id: number,
-) {
-    if (collection === null) return collection;
-
-    const rows = collection.data ?? [];
-    const nextRows = rows.filter((row) => row.id !== id);
-    if (nextRows.length === rows.length) return collection;
-
-    return {
-        ...collection,
-        data: nextRows,
-        meta: collection.meta ? {
-            ...collection.meta,
-            total: Math.max(0, collection.meta.total - 1),
-            to: nextRows.length === 0 ? null : nextRows.length,
-        } : collection.meta,
     };
 }

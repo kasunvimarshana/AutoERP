@@ -6,7 +6,6 @@ namespace Modules\Payment\Services;
 
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\PaymentBalanceResult;
-use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Enums\UnappliedBalanceStatus;
 use Modules\Payment\Models\Payment;
@@ -103,8 +102,8 @@ final class PaymentUnappliedBalanceService
 
     private function balanceType(Payment $payment, string $allocatedAmount): string
     {
-        $sourceType = PaymentSourceType::tryFrom((string) $payment->source_type);
-        if ($sourceType?->isRentalDeposit() === true) {
+        $sourceType = strtolower((string) $payment->source_type);
+        if (str_contains($sourceType, 'deposit')) {
             return 'deposit';
         }
 

@@ -32,7 +32,6 @@ final class FastPurchaseDocumentBuilder
         private readonly DecimalMath $math,
         private readonly PurchaseOrderService $purchaseOrders,
         private readonly GoodsReceiptNoteService $goodsReceipts,
-        private readonly PurchaseGoodsReceiptPostingCoordinator $goodsReceiptPosting,
         private readonly PurchaseInvoiceIntegrationService $purchaseInvoices,
         private readonly PurchasePaymentIntegrationService $purchasePayments,
     ) {}
@@ -138,7 +137,7 @@ final class FastPurchaseDocumentBuilder
             lines: $lines,
         ));
 
-        return $this->goodsReceiptPosting->post($grn, $resolved['current_user_id'])
+        return $this->goodsReceipts->post($grn, $resolved['current_user_id'])
             ->load(['lines.inventoryMovement', 'supplier', 'warehouse', 'warehouseLocation']);
     }
 
@@ -193,7 +192,7 @@ final class FastPurchaseDocumentBuilder
             status: InvoiceStatus::Posted,
             directLines: [],
             adjustments: $adjustments,
-        ))->load(['lines', 'sources', 'sourceLines', 'adjustments', 'balance', 'supplier', 'postingPlan']);
+        ))->load(['lines', 'sources', 'sourceLines', 'adjustments', 'balance', 'supplier']);
     }
 
     public function createSupplierPayment(array $resolved, Invoice $invoice): Payment

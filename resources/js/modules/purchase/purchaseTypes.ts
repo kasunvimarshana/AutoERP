@@ -30,7 +30,7 @@ export interface PurchaseOrderLine {
     id?: number;
     line_number?: number;
     item_id?: number | null;
-    item?: (NamedResource & { tracking_type?: string }) | null;
+    item?: NamedResource | null;
     item_variant_id?: number | null;
     item_variant?: NamedResource | null;
     description?: string | null;
@@ -317,18 +317,6 @@ export interface GoodsReceiptLine {
     line_subtotal?: string;
     line_total?: string;
     status?: string;
-    batch_allocations?: GoodsReceiptBatchAllocation[];
-}
-
-export interface GoodsReceiptBatchAllocation {
-    id?: number;
-    batch?: (NamedResource & { batch_number?: string; lot_number?: string }) | null;
-    batch_id?: number;
-    batch_number?: string;
-    lot_number?: string;
-    manufacture_date?: string;
-    expiry_date?: string;
-    quantity: string;
 }
 
 export interface GoodsReceipt {
@@ -339,7 +327,6 @@ export interface GoodsReceipt {
     status?: GoodsReceiptStatus | string;
     workflow_status?: GoodsReceiptStatus | string;
     invoice_status?: InvoiceProgressStatus;
-    linked_invoices?: Array<{ id: number; number: string; status: string; url: string }>;
     return_status?: ReturnProgressStatus;
     capabilities?: PurchaseCapabilityDetails<'can_post' | 'can_invoice' | 'can_return' | 'can_reverse' | 'read_only'> & {
         can_post?: boolean;
@@ -382,14 +369,6 @@ export interface GoodsReceiptPayload {
         uom_id?: number;
         ordered_uom_id?: number;
         ordered_quantity?: string;
-        batch_allocations?: Array<{
-            batch_id?: number;
-            batch_number?: string;
-            lot_number?: string;
-            manufacture_date?: string;
-            expiry_date?: string;
-            quantity: string;
-        }>;
     }>;
 }
 
@@ -401,8 +380,6 @@ export interface InvoiceableGoodsReceiptLine extends GoodsReceiptLine {
 
 export interface PurchaseDebitNote {
     id: number;
-    currency_id?: number | null;
-    currency?: NamedResource | null;
     row_version: number;
     debit_note_number?: string;
     debit_note_date?: string;
@@ -429,7 +406,6 @@ export interface PurchaseDebitNote {
 
 export interface PurchaseDebitNotePayload {
     debit_note_date: string;
-    currency_id: number;
     debit_note_number?: string;
     supplier_type?: string;
     supplier_id: number;

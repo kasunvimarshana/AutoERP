@@ -1,10 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import {
-    parseEnabledTenantModules,
-    TENANT_MODULE_CODE,
-    TENANT_MODULES,
-    type TenantModuleCode,
-} from '@/app/access/tenantModules';
+import { TENANT_MODULES, type TenantModuleCode } from '@/app/access/tenantModules';
 import type { ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';
 import { ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -16,7 +11,7 @@ import { Textarea } from '@/shared/components/Textarea';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import { compareDecimalStrings, isNonNegativeDecimal } from '@/shared/utils/decimal';
 import { formatLimitLabel, formatPlanMoney, humanize } from '../tenantPresentation';
-import type { NamedReference, TenantPlan, TenantPlanLimits, TenantPlanRevision } from '../tenantTypes';
+import type { NamedReference, TenantPlan, TenantPlanLimits } from '../tenantTypes';
 
 interface Props {
     plan: TenantPlan | null;
@@ -37,11 +32,10 @@ const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: s
 ];
 
 const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
-    { label: 'Master data', modules: [TENANT_MODULE_CODE.CUSTOMER, TENANT_MODULE_CODE.SUPPLIER, TENANT_MODULE_CODE.ITEM, TENANT_MODULE_CODE.WAREHOUSE, TENANT_MODULE_CODE.VEHICLE] },
-    { label: 'People', modules: [TENANT_MODULE_CODE.HR] },
-    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.SELLING, TENANT_MODULE_CODE.VEHICLE_SERVICE, TENANT_MODULE_CODE.VEHICLE_RENTAL] },
-    { label: 'Billing and finance', modules: [TENANT_MODULE_CODE.INVOICE, TENANT_MODULE_CODE.PAYMENT, TENANT_MODULE_CODE.FINANCE] },
-    { label: 'Insights', modules: [TENANT_MODULE_CODE.REPORTING] },
+    { label: 'Master data', modules: ['customer', 'supplier', 'item', 'warehouse', 'vehicle'] },
+    { label: 'Operations', modules: ['inventory', 'purchase', 'vehicle-service', 'vehicle-rental'] },
+    { label: 'Billing and finance', modules: ['invoice', 'payment', 'finance'] },
+    { label: 'Insights', modules: ['reporting'] },
 ];
 
 export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, onSubmit }: Props) {
@@ -53,7 +47,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
         price: revision?.price ?? '0.000000',
         currencyId: revision?.currency_id ? String(revision.currency_id) : '',
         interval: revision?.billing_interval ?? 'month',
-        enabledModules: [...revisionModules(revision)],
+        enabledModules: revision?.features.enabled_modules ?? [],
         limits: {
             max_users: toLimitValue(revision?.limits.max_users),
             max_organization_units: toLimitValue(revision?.limits.max_organization_units),
@@ -204,7 +198,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
                 />
 
                 <fieldset>
-                    <legend className="text-sm font-semibold text-slate-900">Enabled commercial modules</legend>
+                    <legend className="text-sm font-semibold text-slate-900">Enabled business modules</legend>
                     <p className="mt-1 text-sm text-slate-500">Foundation capabilities are always available. These controls manage commercial feature access only.</p>
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                         {MODULE_GROUPS.map((group) => (
@@ -306,10 +300,7 @@ function buildPlanUpdatePayload(plan: TenantPlan, draft: DraftValues): Record<st
     if (!current || compareDecimalStrings(current.price, draft.price) !== 0) payload.price = draft.price;
     if (!current || current.currency_id !== draft.currencyId) payload.currency_id = draft.currencyId;
     if (!current || current.billing_interval !== draft.interval) payload.billing_interval = draft.interval;
-    const currentModules = current
-        ? [...revisionModules(current)]
-        : [];
-    if (!current || !sameStringSet(currentModules, draft.enabledModules)) {
+    if (!current || !sameStringSet(current.features.enabled_modules, draft.enabledModules)) {
         payload.features = { enabled_modules: draft.enabledModules };
     }
     if (!current || !sameLimits(current.limits, draft.limits)) payload.limits = draft.limits;
@@ -345,7 +336,7 @@ function describeChanges(plan: TenantPlan | null, draft: DraftValues): ChangeSum
         };
     }
     const current = plan.latest_revision;
-    const currentModules = revisionModules(current);
+    const currentModules = new Set(current.features.enabled_modules);
     const nextModules = new Set(draft.enabledModules);
     const modulesAdded = [...nextModules].filter((module) => !currentModules.has(module)).map(humanize);
     const modulesRemoved = [...currentModules].filter((module) => !nextModules.has(module)).map(humanize);
@@ -447,15 +438,4 @@ function currencyLabel(currencies: ReferenceRecord[], currencyId: number | null)
     if (currencyId === null) return '';
     const currency = currencies.find((candidate) => candidate.id === currencyId);
     return currency?.code ?? currency?.name ?? 'Selected currency';
-}
-
-// Persisted retired entries are not consent to enable the rebuilt Rental module.
-const FRESH_RENTAL_FEATURE_SCHEMA_VERSION = 4;
-
-function revisionModules(revision: TenantPlanRevision | null): Set<TenantModuleCode> {
-    const modules = parseEnabledTenantModules(revision?.features.enabled_modules ?? null) ?? new Set<TenantModuleCode>();
-    if (!revision || revision.features_schema_version < FRESH_RENTAL_FEATURE_SCHEMA_VERSION) {
-        modules.delete(TENANT_MODULE_CODE.VEHICLE_RENTAL);
-    }
-    return modules;
 }

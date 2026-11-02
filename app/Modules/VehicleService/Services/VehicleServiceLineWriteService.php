@@ -18,24 +18,21 @@ final class VehicleServiceLineWriteService
 {
     use AssertsVehicleServiceExpectedVersion;
 
-    private const ZERO_AMOUNT = '0.000000';
-
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceValidationService $jobValidator,
         private readonly VehicleServiceLineValidator $lineValidator,
         private readonly VehicleServiceLineRuleService $rules,
         private readonly VehicleServiceLineCalculationService $calculations,
-        private readonly VehicleServiceInventoryIntegrationService $inventory,
     ) {}
 
     public function create(
         VehicleServiceJob $job,
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
-        ?int $actorId = null,
-    ): VehicleServiceJobLine {
-        return DB::transaction(function () use ($job, $data, $expectedVersion, $actorId): VehicleServiceJobLine {
+    ): VehicleServiceJobLine
+    {
+        return DB::transaction(function () use ($job, $data, $expectedVersion): VehicleServiceJobLine {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->jobValidator->assertMutable($job);
@@ -44,10 +41,9 @@ final class VehicleServiceLineWriteService
             if ($data->lineSourceType === VehicleServiceLineSourceType::ComboParent && $data->expandCombo) {
                 $this->expandCombo($job, $line);
             }
-            $this->inventory->reserveLineTree($job, $line, $actorId);
             $this->calculations->recalculateJob($job);
 
-            return $line->refresh()->load(['item', 'variant', 'uom', 'batch', 'children.item', 'children.uom']);
+            return $line->refresh()->load(['item', 'variant', 'uom', 'children.item', 'children.uom']);
         });
     }
 
@@ -56,9 +52,8 @@ final class VehicleServiceLineWriteService
         VehicleServiceJobLine $line,
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
-        ?int $actorId = null,
     ): VehicleServiceJobLine {
-        return DB::transaction(function () use ($job, $line, $data, $expectedVersion, $actorId): VehicleServiceJobLine {
+        return DB::transaction(function () use ($job, $line, $data, $expectedVersion): VehicleServiceJobLine {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $line = $job->lines()->with('job')->findOrFail($line->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
@@ -66,8 +61,6 @@ final class VehicleServiceLineWriteService
             $this->jobValidator->assertMutable($job);
             $this->rules->assertCanUpdate($line, $data);
 
-            $this->inventory->releaseLineTree($job, $line, $actorId);
-            $originalQuantity = (string) $line->quantity;
             $item = $this->lineValidator->validate($job, $data);
             $attributes = $this->calculations->attributes($data, $item);
             if ($line->employeeAssignments()->exists() && ! $attributes['is_employee_assignable']) {
@@ -78,18 +71,16 @@ final class VehicleServiceLineWriteService
 
             $line->fill($attributes);
             $line->save();
-            $this->rescaleComboChildren($line, $originalQuantity, (string) $line->quantity);
             $this->calculations->recalculateAssignments($line);
-            $this->inventory->reserveLineTree($job, $line->refresh(), $actorId);
             $this->calculations->recalculateJob($job);
 
-            return $line->refresh()->load(['item', 'variant', 'uom', 'batch', 'children.item', 'children.uom']);
+            return $line->refresh()->load(['item', 'variant', 'uom', 'children.item', 'children.uom']);
         });
     }
 
-    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null, ?int $actorId = null): void
+    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null): void
     {
-        DB::transaction(function () use ($job, $line, $expectedVersion, $actorId): void {
+        DB::transaction(function () use ($job, $line, $expectedVersion): void {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $line = $job->lines()->with('job')->findOrFail($line->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
@@ -97,7 +88,6 @@ final class VehicleServiceLineWriteService
             $this->jobValidator->assertMutable($job);
             $this->rules->assertCanDelete($line);
 
-            $this->inventory->releaseLineTree($job, $line, $actorId);
             $line->delete();
             $this->renumber($job);
             $this->calculations->recalculateJob($job);
@@ -137,39 +127,14 @@ final class VehicleServiceLineWriteService
                 lineSourceType: VehicleServiceLineSourceType::ComboChild,
                 description: (string) $child->name,
                 quantity: $this->math->mul((string) $parent->quantity, (string) $bundleLine->quantity),
-                unitPrice: self::ZERO_AMOUNT,
+                unitPrice: '0.000000',
                 parentLineId: (int) $parent->getKey(),
                 itemId: (int) $child->getKey(),
                 itemVariantId: $bundleLine->child_variant_id,
                 uomId: $bundleLine->uom_id ?? $child->base_uom_id,
-                unitCost: (string) $bundleLine->unit_cost,
-                usesJobSupervisor: (bool) $bundleLine->uses_job_supervisor,
                 isBillable: false,
                 expandCombo: false,
             ));
-        }
-    }
-
-    private function rescaleComboChildren(
-        VehicleServiceJobLine $parent,
-        string $originalParentQuantity,
-        string $nextParentQuantity,
-    ): void {
-        if ($parent->line_source_type !== VehicleServiceLineSourceType::ComboParent
-            || $this->math->compare($originalParentQuantity, $nextParentQuantity) === 0) {
-            return;
-        }
-
-        $children = $parent->children()->with(['item', 'employeeAssignments'])->get();
-        foreach ($children as $child) {
-            $quantityPerParent = $this->math->div(
-                (string) $child->quantity,
-                $originalParentQuantity,
-                DecimalMath::MAX_SCALE,
-            );
-            $child->quantity = $this->math->mul($quantityPerParent, $nextParentQuantity);
-            $child->save();
-            $this->calculations->recalculateComboChildAssignments($child);
         }
     }
 

@@ -4,8 +4,10 @@ import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';
-import { saveVehicleServiceInspection } from '../vehicleServiceApi';
+import { useApi } from '@/shared/hooks/useApi';
+import { getVehicleServiceInspection, saveVehicleServiceInspection } from '../vehicleServiceApi';
 import type { VehicleServiceInspection, VehicleServiceInspectionPayload } from '../vehicleServiceTypes';
 
 const emptyInspection: VehicleServiceInspectionPayload = {
@@ -29,39 +31,39 @@ function inspectionPayload(inspection: VehicleServiceInspection | null): Vehicle
     };
 }
 
-function inspectionFormKey(inspection: VehicleServiceInspection | null): string {
-    return JSON.stringify(inspectionPayload(inspection));
-}
-
 export default function VehicleServiceInspectionTab({
     jobId,
     expectedVersion,
-    initialValue,
-    onSaved,
+    onChanged,
 }: {
     jobId: number;
     expectedVersion: number;
-    initialValue?: VehicleServiceInspection | null;
-    onSaved: (inspection: VehicleServiceInspection, nextVersion: number) => void;
+    onChanged?: () => void;
 }) {
-    const resolvedInitialValue = initialValue ?? null;
+    const result = useApi((signal) => getVehicleServiceInspection(jobId, signal), [jobId]);
+
+    if (result.loading) return <LoadingState />;
 
     return (
         <VehicleServiceInspectionEditor
-            key={inspectionFormKey(resolvedInitialValue)}
+            key={result.data?.id ?? `new-${jobId}`}
             jobId={jobId}
             expectedVersion={expectedVersion}
-            initialValue={resolvedInitialValue}
-            onJobSaved={onSaved}
+            initialValue={result.data}
+            loadError={result.error}
+            onSaved={result.setData}
+            onChanged={onChanged}
         />
     );
 }
 
-function VehicleServiceInspectionEditor({ jobId, expectedVersion, initialValue, onJobSaved }: {
+function VehicleServiceInspectionEditor({ jobId, expectedVersion, initialValue, loadError, onSaved, onChanged }: {
     jobId: number;
     expectedVersion: number;
     initialValue: VehicleServiceInspection | null;
-    onJobSaved: (inspection: VehicleServiceInspection, nextVersion: number) => void;
+    loadError: ApiError | null;
+    onSaved: (inspection: VehicleServiceInspection) => void;
+    onChanged?: () => void;
 }) {
     const [form, setForm] = useState<VehicleServiceInspectionPayload>(() => inspectionPayload(initialValue));
     const [saving, setSaving] = useState(false);
@@ -73,16 +75,15 @@ function VehicleServiceInspectionEditor({ jobId, expectedVersion, initialValue, 
             setSaving(true);
             setError(null);
             try {
-                const inspection = await saveVehicleServiceInspection(jobId, { ...form, expected_version: expectedVersion });
-                setForm(inspectionPayload(inspection));
-                onJobSaved(inspection, expectedVersion + 1);
+                onSaved(await saveVehicleServiceInspection(jobId, { ...form, expected_version: expectedVersion }));
+                onChanged?.();
             } catch (requestError) {
                 setError(toApiError(requestError));
             } finally {
                 setSaving(false);
             }
         }}>
-            <ErrorAlert error={error} />
+            <ErrorAlert error={error ?? loadError} />
             <div className="grid gap-4 lg:grid-cols-2">
                 <Textarea label="Customer complaint" value={form.customer_complaint ?? ''} error={fieldError(error, 'customer_complaint')} onChange={(event) => setForm({ ...form, customer_complaint: event.target.value })} />
                 <Textarea label="Inspection notes" value={form.inspection_notes ?? ''} error={fieldError(error, 'inspection_notes')} onChange={(event) => setForm({ ...form, inspection_notes: event.target.value })} />

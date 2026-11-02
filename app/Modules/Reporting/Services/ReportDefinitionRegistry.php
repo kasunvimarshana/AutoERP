@@ -11,12 +11,9 @@ final class ReportDefinitionRegistry
 {
     public function __construct(
         private readonly ReportCatalog $catalog,
-        private readonly ExpenseReportService $expenses,
         private readonly DetailedPurchaseReportService $detailedPurchase,
-        private readonly GrnPayablesReportService $grnPayables,
-        private readonly GoodsReceiptSummaryReportService $goodsReceiptSummary,
-        private readonly StockBalanceReportService $stockBalance,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
+        private readonly VehicleRentalReportDefinitionService $vehicleRental,
     ) {}
 
     /**
@@ -54,13 +51,12 @@ final class ReportDefinitionRegistry
      */
     private function specializedDefinitions(): array
     {
-        return [
-            $this->expenses->definition(),
-            $this->detailedPurchase->definition(),
-            $this->grnPayables->definition(),
-            $this->goodsReceiptSummary->definition(),
-            $this->stockBalance->definition(),
-            $this->detailedVehicleService->definition(),
-        ];
+        return array_merge(
+            [
+                $this->detailedPurchase->definition(),
+                $this->detailedVehicleService->definition(),
+            ],
+            $this->vehicleRental->definitions(),
+        );
     }
 }

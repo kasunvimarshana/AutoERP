@@ -6,10 +6,8 @@ namespace Modules\Vehicle\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
-use Modules\Vehicle\Data\CreateVehicleOwnershipData;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\Models\Vehicle;
-use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Modules\Vehicle\Validators\VehicleValidationService;
 use Throwable;
 
@@ -21,23 +19,21 @@ final class VehicleCreationService
         private readonly VehicleNumberService $numbers,
         private readonly VehicleDocumentService $documents,
         private readonly VehicleAttributeService $attributes,
-        private readonly VehicleOwnershipCommandService $ownerships,
         private readonly VehicleStatusService $statuses,
     ) {}
 
     public function create(CreateVehicleData $data): Vehicle
     {
-        $code = $data->code ?? $this->numbers->nextCode($data->tenantId);
-        $this->validator->validateCreate($data, $code);
+        $this->validator->validateCreate($data);
         $storedDocumentPaths = [];
 
         try {
-            return DB::transaction(function () use ($data, $code, &$storedDocumentPaths): Vehicle {
+            return DB::transaction(function () use ($data, &$storedDocumentPaths): Vehicle {
                 $vehicle = Vehicle::query()->create([
                     'tenant_id' => $data->tenantId,
                     'organization_unit_id' => $data->organizationUnitId,
                     'vehicle_number' => $data->vehicleNumber ?? $this->numbers->next($data->tenantId),
-                    'code' => $code,
+                    'code' => $data->code,
                     'vehicle_make_id' => $data->vehicleMakeId,
                     'vehicle_model_id' => $data->vehicleModelId,
                     'vehicle_type_id' => $data->vehicleTypeId,
@@ -51,9 +47,7 @@ final class VehicleCreationService
                     'color' => $data->color,
                     'fuel_type' => $data->fuelType,
                     'transmission_type' => $data->transmissionType,
-                    'odometer_reading' => $data->odometerReading === null
-                        ? null
-                        : $this->math->normalize($data->odometerReading),
+                    'odometer_reading' => $this->math->normalize($data->odometerReading),
                     'odometer_unit' => $data->odometerUnit,
                     'fuel_level' => $data->fuelLevel,
                     'status' => $data->status,
@@ -68,24 +62,8 @@ final class VehicleCreationService
                         $storedDocumentPaths[] = $path;
                     });
                 }
-                foreach ($data->attributes as $attribute) {
+                    foreach ($data->attributes as $attribute) {
                     $this->attributes->create($vehicle, $attribute);
-                }
-                foreach ($data->ownerships as $ownership) {
-                    $this->ownerships->create(
-                        new CreateVehicleOwnershipData(
-                            vehicleId: (int) $vehicle->getKey(),
-                            ownerType: $ownership->ownerType,
-                            ownerId: $ownership->ownerId,
-                            ownershipType: $ownership->ownershipType,
-                            startedAt: $ownership->startedAt,
-                            endedAt: $ownership->endedAt,
-                            isCurrent: $ownership->isCurrent,
-                            notes: $ownership->notes,
-                        ),
-                        $data->tenantId,
-                        $data->organizationUnitId,
-                    );
                 }
                 $this->statuses->recordInitial($vehicle, $data->createdBy);
 

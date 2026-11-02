@@ -4,17 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Database\Seeders;
 
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Customer\DTOs\CustomerCreditProfileData;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\Customer\Models\CustomerCategoryAssignment;
-use Modules\Customer\Services\CustomerCreditProfileService;
-use Modules\Sequence\Models\SequenceModel;
-use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 
 final class CustomerSeeder extends Seeder
 {
@@ -25,6 +21,7 @@ final class CustomerSeeder extends Seeder
         if (! Schema::hasTable('customers')) {
             return;
         }
+
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -56,6 +53,9 @@ final class CustomerSeeder extends Seeder
                     'status' => 'active',
                     'email' => 'customer@example.com',
                     'default_currency_id' => $this->defaultCurrency()?->getKey(),
+                    'credit_limit' => '0.000000',
+                    'is_credit_allowed' => false,
+                    'is_advance_allowed' => true,
                     'is_tax_exempt' => false,
                     'marketing_consent' => false,
                     'preferred_communication_channel' => 'email',
@@ -63,13 +63,6 @@ final class CustomerSeeder extends Seeder
                     'metadata' => ['seed_source' => 'customer_module'],
                 ],
             );
-
-            $creditProfiles = app(CustomerCreditProfileService::class);
-            if ($creditProfiles->get($customer) === null) {
-                $creditProfiles->set($customer, new CustomerCreditProfileData(
-                    creditAllowed: false,
-                ));
-            }
 
             if (Schema::hasTable('customer_category_assignments')) {
                 CustomerCategoryAssignment::query()->updateOrCreate(
@@ -83,29 +76,7 @@ final class CustomerSeeder extends Seeder
                     ],
                 );
             }
-
-            if (Schema::hasTable('sequences')) {
-                $scopeKey = app(SequenceDomainServiceInterface::class)->scopeKey(null, null);
-
-                SequenceModel::query()->updateOrCreate(
-                    [
-                        'tenant_id' => $tenant->getKey(),
-                        'document_type' => 'customer',
-                        'scope_key' => $scopeKey,
-                    ],
-                    [
-                        'organization_unit_id' => null,
-                        'prefix' => 'CUS-',
-                        'suffix' => '',
-                        'padding' => 6,
-                        'next_number' => 2,
-                        'period_type' => 'infinite',
-                        'period_value' => null,
-                        'row_version' => 1,
-                        'metadata' => ['seed_source' => 'customer_module'],
-                    ],
-                );
-            }
         }, 3);
     }
+
 }

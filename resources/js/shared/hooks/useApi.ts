@@ -7,8 +7,6 @@ interface ApiState<T> {
     loading: boolean;
 }
 
-type ApiDataUpdate<T> = T | ((current: T | null) => T | null);
-
 /**
  * Loads an API resource and reloads it whenever a serializable dependency changes.
  * Dependency values must be primitives, null, or JSON-serializable value objects.
@@ -66,14 +64,8 @@ export function useApi<T>(
         return () => controller.abort();
     }, [clearOnLoad, dependencyKey, enabled, version]);
 
-    const setData = useCallback((update: ApiDataUpdate<T>) => {
-        setState((current) => ({
-            data: typeof update === 'function'
-                ? (update as (current: T | null) => T | null)(current.data)
-                : update,
-            error: null,
-            loading: false,
-        }));
+    const setData = useCallback((data: T) => {
+        setState({ data, error: null, loading: false });
     }, []);
 
     return { ...state, reload, setData };

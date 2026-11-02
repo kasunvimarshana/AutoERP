@@ -20,7 +20,6 @@ use Modules\Payment\Services\PaymentMethodService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Validators\PaymentValidationService;
 use Modules\Purchase\DTOs\PurchasePaymentPreviewData;
-use Modules\Tenant\Models\TenantModel;
 
 final class PurchasePaymentIntegrationService
 {
@@ -36,7 +35,6 @@ final class PurchasePaymentIntegrationService
 
     public function context(int $tenantId, ?int $organizationUnitId, string $search = '', int $limit = 100): array
     {
-        $currency = TenantModel::query()->with('baseCurrency')->findOrFail($tenantId)->baseCurrency;
         $methods = $this->paymentMethods
             ->effectiveActiveForDirection($tenantId, $organizationUnitId, PaymentDirection::Outbound)
             ->filter(static fn ($method): bool => $search === ''
@@ -54,15 +52,7 @@ final class PurchasePaymentIntegrationService
             ->values()
             ->all();
 
-        return [
-            'default_currency' => $currency === null ? null : [
-                'id' => (int) $currency->getKey(),
-                'code' => $currency->code,
-                'name' => $currency->name,
-                'symbol' => $currency->symbol,
-            ],
-            'payment_methods' => $methods,
-        ];
+        return ['payment_methods' => $methods];
     }
 
     public function prepareSupplierPayment(
@@ -253,14 +243,7 @@ final class PurchasePaymentIntegrationService
                 throw new InvalidArgumentException('Payment can only allocate once to the same supplier invoice.');
             }
             $seen[$allocation->invoiceId] = true;
-            $balance = $this->invoiceBalances->validatePayableState(
-                invoiceId: $allocation->invoiceId,
-                tenantId: $tenantId,
-                organizationUnitId: $organizationUnitId,
-                partyType: $supplierType,
-                partyId: $supplierId,
-                currencyId: $currencyId,
-            );
+            $balance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
             if ($balance->tenantId !== $tenantId || $balance->organizationUnitId !== $organizationUnitId) {
                 throw new InvalidArgumentException('Selected supplier invoice is outside the payment scope.');
             }

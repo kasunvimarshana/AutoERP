@@ -16,7 +16,6 @@ final readonly class UpdateVehicleData
      * @param list<string> $provided
      */
     public function __construct(
-        public int $rowVersion,
         public ?int $organizationUnitId = null,
         public ?string $code = null,
         public ?int $vehicleMakeId = null,

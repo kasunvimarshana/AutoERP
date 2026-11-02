@@ -38,7 +38,6 @@ final class PurchaseDocumentCapabilityService
         $remainingInvoiceable = $this->sumRemaining($order->lines, fn (PurchaseOrderLine $line): string => $this->balances->remainingInvoiceableForPurchaseOrderLine($line));
 
         $approved = $status === PurchaseOrderStatus::Approved->value;
-        $hasReceived = $this->positive($received);
         $hasReceivedOrInvoiced = $this->positive($received) || $this->positive($invoiced);
 
         $closeBlocker = $approved ? $this->blockers->purchaseOrderCloseBlocker($order) : null;
@@ -48,15 +47,7 @@ final class PurchaseDocumentCapabilityService
             'can_submit' => $this->result($status === PurchaseOrderStatus::Draft->value, 'not_draft', 'Only draft purchase orders can be submitted.'),
             'can_approve' => $this->result($status === PurchaseOrderStatus::PendingApproval->value, 'not_pending_approval', 'Only submitted purchase orders can be approved.'),
             'can_receive' => $this->result($approved && $this->positive($remainingReceivable), $approved ? 'fully_received' : 'not_approved', $approved ? 'Purchase order has no remaining receivable quantity.' : 'Only approved purchase orders can be received.'),
-            'can_invoice' => $this->result(
-                $approved && $hasReceived && $this->positive($remainingInvoiceable),
-                ! $approved ? 'not_approved' : (! $hasReceived ? 'not_received' : 'fully_invoiced'),
-                ! $approved
-                    ? 'Only approved purchase orders can be invoiced.'
-                    : (! $hasReceived
-                        ? 'Purchase order must have received quantity before supplier invoicing.'
-                        : 'Purchase order has no remaining invoiceable quantity.'),
-            ),
+            'can_invoice' => $this->result($approved && $this->positive($remainingInvoiceable), $approved ? 'fully_invoiced' : 'not_approved', $approved ? 'Purchase order has no remaining invoiceable quantity.' : 'Only approved purchase orders can be invoiced.'),
             'can_close' => $this->result($approved && $closeBlocker === null, $closeBlocker['code'] ?? 'not_approved', $closeBlocker['reason'] ?? 'Only approved purchase orders can be closed.'),
             'can_force_close' => $this->result(false, 'unsupported_workflow', 'Force close is not supported.'),
             'can_cancel' => $this->result(in_array($status, [PurchaseOrderStatus::Draft->value, PurchaseOrderStatus::PendingApproval->value, PurchaseOrderStatus::Approved->value], true) && ! $hasReceivedOrInvoiced, $hasReceivedOrInvoiced ? 'has_activity' : 'invalid_lifecycle', $hasReceivedOrInvoiced ? 'Purchase orders with received or invoiced quantities cannot be cancelled.' : 'Purchase order cannot be cancelled in its current lifecycle state.'),
@@ -123,19 +114,11 @@ final class PurchaseDocumentCapabilityService
     {
         $status = $this->statusValue($note->status);
         $hasRemaining = $this->positive((string) $note->remaining_amount);
-        $hasCurrency = $note->currency_id !== null;
-        $isPosted = $status === PurchaseDebitNoteStatus::Posted->value;
-        $allocationBlockCode = ! $isPosted ? 'not_posted' : (! $hasRemaining ? 'fully_allocated' : 'currency_unresolved');
-        $allocationBlockReason = ! $isPosted
-            ? 'Only posted purchase debit notes can be allocated.'
-            : (! $hasRemaining
-                ? 'Purchase debit note has no remaining amount to allocate.'
-                : 'Debit note currency must be verified before allocation.');
 
         return $this->resource([
             'can_approve' => $this->result($status === PurchaseDebitNoteStatus::Draft->value, 'not_draft', 'Only draft purchase debit notes can be approved.'),
             'can_post' => $this->result($status === PurchaseDebitNoteStatus::Approved->value, 'not_approved', 'Only approved purchase debit notes can be posted.'),
-            'can_allocate' => $this->result($isPosted && $hasRemaining && $hasCurrency, $allocationBlockCode, $allocationBlockReason),
+            'can_allocate' => $this->result($status === PurchaseDebitNoteStatus::Posted->value && $hasRemaining, $status === PurchaseDebitNoteStatus::Posted->value ? 'fully_allocated' : 'not_posted', $status === PurchaseDebitNoteStatus::Posted->value ? 'Purchase debit note has no remaining amount to allocate.' : 'Only posted purchase debit notes can be allocated.'),
             'read_only' => $this->result($status === PurchaseDebitNoteStatus::Posted->value, 'editable', 'Draft and approved purchase debit notes are editable.'),
         ]);
     }

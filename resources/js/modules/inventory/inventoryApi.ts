@@ -7,17 +7,11 @@ import { compactObject, readableRelation } from '@/shared/utils/object';
 import type {
     AllocationPayload,
     AdjustmentPayload,
-    BatchNumberResult,
     CostAdjustmentPayload,
     InventoryAvailability,
-    InventoryBatchPayload,
-    InventoryBatchPricePayload,
-    InventoryBatchPrice,
     InventoryRecord,
-    OpeningStockImportPreview,
     ReservationPayload,
     StockBalance,
-    StockBalanceSummary,
     StockCountPayload,
     TransferPayload,
 } from './inventoryTypes';
@@ -28,61 +22,14 @@ export type {
     CostAdjustmentPayload,
     InventoryAvailability,
     InventoryRecord,
-    OpeningStockImportPreview,
     ReservationPayload,
     StockBalance,
     StockCountPayload,
     TransferPayload,
 } from './inventoryTypes';
 
-export type StockBalanceCollection = ApiCollection<StockBalance> & { summary: StockBalanceSummary };
-
-export interface StockCardFilters {
-    item_id: number;
-    warehouse_id: number;
-    warehouse_location_id?: number;
-    date_from: string;
-    date_to: string;
-    timezone: string;
-}
-
-export interface StockCardResult {
-    item: { name: string; code: string; uom: string | null };
-    warehouse: { name: string; code: string };
-    location: { name: string; code: string } | null;
-    date_from: string;
-    date_to: string;
-    timezone: string;
-    snapshot_at: string;
-    opening: string;
-    total_in: string;
-    total_out: string;
-    closing: string;
-    rows: Array<{
-        posted_at: string;
-        document_date: string | null;
-        movement_number: string;
-        description: string | null;
-        type: string;
-        document: { label: string; url: string | null } | null;
-        quantity_in: string;
-        quantity_out: string;
-        balance: string;
-    }>;
-}
-
-export const getStockCard = (filters: StockCardFilters, signal?: AbortSignal) =>
-    apiClient.get<ApiResource<StockCardResult>>(`${endpoints.inventory}/stock-card`, { params: filters, signal }).then((response) => response.data.data);
-
-export const downloadStockCard = (filters: StockCardFilters, format: 'csv' | 'xls' | 'pdf') =>
-    apiClient.get<Blob>(`${endpoints.inventory}/stock-card/export`, { params: { ...filters, format }, responseType: 'blob' }).then((response) => response.data);
-
 export const listStockBalances = (params: ListParams, signal?: AbortSignal) =>
-    apiClient.get<StockBalanceCollection>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
-
-export const downloadStockBalancesCsv = (params: ListParams) =>
-    apiClient.get<Blob>(`${endpoints.inventory}/stock-balances/export`, { params, responseType: 'blob' })
-        .then((response) => response.data);
+    apiClient.get<ApiCollection<StockBalance>>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
 
 export const getAvailability = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiResource<InventoryAvailability>>(`${endpoints.inventory}/availability`, { params, signal }).then((response) => response.data.data);
@@ -116,18 +63,6 @@ export const createAdjustment = (payload: AdjustmentPayload) =>
 
 export const postAdjustment = (id: number) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments/${id}/post`, {}).then((response) => response.data.data);
-
-export const downloadOpeningStockTemplate = () =>
-    apiClient.get<Blob>(`${endpoints.inventory}/opening-stock-import/template`, { responseType: 'blob' })
-        .then((response) => response.data);
-
-export const previewOpeningStockImport = (payload: FormData) =>
-    apiClient.post<ApiResource<OpeningStockImportPreview>>(`${endpoints.inventory}/opening-stock-import/preview`, payload)
-        .then((response) => response.data.data);
-
-export const createOpeningStockImport = (payload: FormData) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/opening-stock-import`, payload)
-        .then((response) => response.data.data);
 
 export const listTransfers = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/transfers`, { params, signal }).then((response) => response.data);
@@ -170,21 +105,6 @@ export const postStockCount = (id: number) =>
 
 export const listBatches = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/batches`, { params, signal }).then((response) => response.data);
-
-export const createInventoryBatch = (payload: InventoryBatchPayload) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/batches`, payload).then((response) => response.data.data);
-
-export const generateInventoryBatchNumber = () =>
-    apiClient.post<ApiResource<BatchNumberResult>>(`${endpoints.inventory}/batches/generate-number`, {}).then((response) => response.data.data);
-
-export const listBatchPrices = (params: ListParams, signal?: AbortSignal) =>
-    apiClient.get<ApiCollection<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices`, { params, signal }).then((response) => response.data);
-
-export const createBatchPrice = (payload: InventoryBatchPricePayload) =>
-    apiClient.post<ApiResource<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices`, payload).then((response) => response.data.data);
-
-export const supersedeBatchPrice = (id: number, payload: InventoryBatchPricePayload) =>
-    apiClient.post<ApiResource<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices/${id}/supersede`, payload).then((response) => response.data.data);
 
 export const listSerials = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/serials`, { params, signal }).then((response) => response.data);
@@ -247,10 +167,7 @@ function toNamedResource(row: InventoryRecord, primaryKey: string, fallbackKey?:
     const code = String(row[primaryKey] ?? (fallbackKey ? row[fallbackKey] : '') ?? '');
     const item = readableRelation(row.item);
     const variant = readableRelation(row.variant);
-    const lot = primaryKey === 'batch_number' && typeof row.lot_number === 'string' && row.lot_number.trim()
-        ? `Lot ${row.lot_number.trim()}`
-        : null;
-    const context = [item, variant, lot].filter((value) => value !== '-' && value !== null).join(' / ');
+    const context = [item, variant].filter((value) => value !== '-').join(' / ');
 
     return {
         id: Number(row.id),

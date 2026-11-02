@@ -28,7 +28,6 @@ use Modules\Hr\Services\HrDesignationService;
 use Modules\Hr\Services\HrEmploymentTypeService;
 use Modules\Hr\Services\HrSkillService;
 use Modules\User\Models\UserModel;
-use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class HrEngineTest extends TestCase
@@ -62,11 +61,10 @@ final class HrEngineTest extends TestCase
             ));
 
             app(EmployeeRateService::class)->create($employee, new EmployeeRateData(EmployeeRateType::Service, '40.000000', $currencyId, '2026-01-01'));
-            app(EmployeeStatusService::class)->change($employee, new EmployeeStatusChangeData(EmployeeStatus::OnLeave, (int) $employee->row_version, 'Annual leave', null));
+            app(EmployeeStatusService::class)->change($employee, new EmployeeStatusChangeData(EmployeeStatus::OnLeave, 'Annual leave', null));
 
             $this->assertSame(EmployeeStatus::OnLeave, $employee->refresh()->status);
             $this->assertSame(EmployeeAvailabilityStatus::OnLeave, $employee->availability_status);
-            $this->assertSame(2, (int) $employee->row_version);
             $this->assertCount(2, $employee->statusHistories);
             $this->assertSame('25.500000', (string) $employee->default_hourly_rate);
             $this->assertTrue(app(EmployeeLookupService::class)->employeesByDepartment($tenantId, (int) $department->getKey(), $organizationId)->contains($employee));
@@ -127,19 +125,14 @@ final class HrEngineTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.employee_number', 'EMP-API-1')
-            ->assertJsonPath('data.row_version', 1)
             ->assertJsonPath('data.department.name', $department->name)
             ->assertJsonPath('data.skills.0.skill.name', $skill->name)
             ->assertJsonPath('data.rates.0.amount', '50.000000')
-            ->assertJsonStructure(['data' => ['id', 'row_version', 'name', 'employee_number', 'department', 'designation', 'contacts', 'addresses', 'documents', 'skills', 'rates', 'availability', 'status_history']]);
+            ->assertJsonStructure(['data' => ['id', 'name', 'employee_number', 'department', 'designation', 'contacts', 'addresses', 'documents', 'skills', 'rates', 'availability', 'status_history']]);
 
         $id = (int) $response->json('data.id');
         $this->tenantGetJson($tenantId, "/api/v1/hr/employees/lookup/service-available?tenant_id={$tenantId}&organization_unit_id={$organizationId}&skill_id={$skill->getKey()}")
             ->assertOk()->assertJsonFragment(['employee_number' => 'EMP-API-1']);
-        $this->tenantGetJson($tenantId, "/api/v1/hr/employees/lookup/available?tenant_id={$tenantId}&organization_unit_id={$organizationId}&designation_code={$designation->code}")
-            ->assertOk()->assertJsonFragment(['employee_number' => 'EMP-API-1']);
-        $this->tenantGetJson($tenantId, "/api/v1/hr/employees/lookup/available?tenant_id={$tenantId}&organization_unit_id={$organizationId}&exclude_designation_code={$designation->code}")
-            ->assertOk()->assertJsonMissing(['employee_number' => 'EMP-API-1']);
         $this->tenantGetJson($tenantId, "/api/v1/hr/employees/{$id}/contacts?tenant_id={$tenantId}&organization_unit_id={$organizationId}")
             ->assertOk()->assertJsonPath('data.0.contact_name', 'Emergency Contact');
     }
@@ -161,46 +154,14 @@ final class HrEngineTest extends TestCase
             ->assertCreated()->json('data');
         $this->withTenantExecutionContext($tenantId, fn () => $this->putJson("/api/v1/hr/employees/{$id}/contacts/{$contact['id']}", ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationId, 'contact_name' => 'Updated Primary', 'is_primary' => true]))
             ->assertOk()->assertJsonPath('data.contact_name', 'Updated Primary');
-        $employee = $this->tenantPatchJson($tenantId, "/api/v1/hr/employees/{$id}/status", ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationId, 'row_version' => $employee['row_version'], 'status' => 'active', 'reason' => 'Approved'])
-            ->assertOk()->assertJsonPath('data.status', 'active')->json('data');
-        $this->withTenantExecutionContext($tenantId, fn () => $this->putJson("/api/v1/hr/employees/{$id}", ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationId, 'row_version' => $employee['row_version'], 'mobile' => '0771234567']))
-            ->assertOk()->assertJsonPath('data.mobile', '0771234567')->assertJsonPath('data.row_version', $employee['row_version'] + 1);
+        $this->tenantPatchJson($tenantId, "/api/v1/hr/employees/{$id}/status", ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationId, 'status' => 'active', 'reason' => 'Approved'])
+            ->assertOk()->assertJsonPath('data.status', 'active');
+        $this->withTenantExecutionContext($tenantId, fn () => $this->putJson("/api/v1/hr/employees/{$id}", ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationId, 'mobile' => '0771234567']))
+            ->assertOk()->assertJsonPath('data.mobile', '0771234567');
         $this->tenantGetJson($tenantId, "/api/v1/hr/employees/{$id}/status-history?tenant_id={$tenantId}&organization_unit_id={$organizationId}")
             ->assertOk()->assertJsonCount(2, 'data');
         $this->tenantPostJson($tenantId, '/api/v1/hr/employees', ['tenant_id' => $tenantId, 'first_name' => '', 'status' => 'invalid', 'default_hourly_rate' => '-1'])
             ->assertUnprocessable()->assertJsonValidationErrors(['first_name', 'status', 'default_hourly_rate']);
-    }
-
-    public function test_employee_mutations_reject_stale_row_versions(): void
-    {
-        $this->withoutMiddleware();
-        [$tenantId, $organizationId] = $this->scope();
-        [$department] = $this->masters($tenantId, $organizationId);
-        $this->actingAsHrUser($tenantId);
-
-        $employee = $this->tenantPostJson($tenantId, '/api/v1/hr/employees', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationId,
-            'employee_number' => 'EMP-VERSION',
-            'first_name' => 'Versioned',
-            'display_name' => 'Versioned Employee',
-            'department_id' => $department->getKey(),
-            'status' => 'pending_approval',
-        ])->assertCreated()->json('data');
-
-        $this->tenantPatchJson($tenantId, "/api/v1/hr/employees/{$employee['id']}/status", [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationId,
-            'row_version' => $employee['row_version'],
-            'status' => 'active',
-        ])->assertOk()->assertJsonPath('data.row_version', $employee['row_version'] + 1);
-
-        $this->withTenantExecutionContext($tenantId, fn () => $this->putJson("/api/v1/hr/employees/{$employee['id']}", [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationId,
-            'row_version' => $employee['row_version'],
-            'mobile' => '0770000000',
-        ]))->assertConflict();
     }
 
     public function test_all_master_and_assignment_endpoints(): void
@@ -297,10 +258,7 @@ final class HrEngineTest extends TestCase
     private function scope(): array
     {
         $suffix = Str::upper(Str::random(8));
-        $currencyId = CurrencyFixture::create([
-            'name' => "HR Currency {$suffix}",
-            'symbol' => 'H',
-        ]);
+        $currencyId = (int) DB::table('currencies')->insertGetId(['row_version' => 1, 'code' => 'H'.substr($suffix, 0, 4), 'name' => "HR Currency {$suffix}", 'symbol' => 'H', 'decimal_places' => 2, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
         $tenantId = (int) DB::table('tenants')->insertGetId(['uuid' => (string) Str::uuid(), 'code' => "TEN-HR-{$suffix}", 'name' => "HR Tenant {$suffix}", 'slug' => 'hr-'.Str::lower($suffix), 'status' => 'active', 'status_changed_at' => now(), 'base_currency_id' => $currencyId, 'created_at' => now(), 'updated_at' => now()]);
         $organizationId = (int) \Tests\Support\OrganizationUnitFixture::create(['tenant_id' => $tenantId, 'name' => "HR Org {$suffix}", 'code' => "ORG-{$suffix}", 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
         return [$tenantId, $organizationId, $currencyId];

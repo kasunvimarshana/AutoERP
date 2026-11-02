@@ -7,7 +7,9 @@ import { Panel } from '@/shared/components/Panel';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
+import { lookupApi } from '@/shared/api/lookupApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
@@ -15,9 +17,7 @@ import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupS
 import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary, HrDepartment } from '@/modules/hr/hrTypes';
 import { HrDepartmentSelect } from '@/modules/hr/components/HrDepartmentSelect';
-import { ItemLookupSelect } from '@/modules/purchase/components/PurchaseLookups';
-import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
-import type { CustomerSummary } from '@/modules/customer/customerTypes';
+import { ItemLookupSelect, SupplierLookupSelect } from '@/modules/purchase/components/PurchaseLookups';
 import { ExportActions } from '../components/ExportActions';
 import { ReportDataGrid } from '../components/ReportDataGrid';
 import { runOperationalReport } from '../reportingApi';
@@ -28,9 +28,17 @@ import type {
 } from '../reportingTypes';
 
 interface OperationalReportPageProps {
-    reportKey: 'vehicle-service/detailed' | 'vehicle-service/employee-incentives';
+    reportKey: 'purchase/detailed' | 'vehicle-service/detailed' | 'vehicle-service/employee-incentives';
     kind: OperationalReportKind;
 }
+
+const PURCHASE_STATUSES = [
+    ['draft', 'Draft'],
+    ['pending_approval', 'Pending approval'],
+    ['approved', 'Approved'],
+    ['closed', 'Closed'],
+    ['cancelled', 'Cancelled'],
+] as const;
 
 const JOB_STATUSES = [
     ['draft', 'Draft'],
@@ -65,8 +73,9 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
     const [result, setResult] = useState<OperationalReportResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [item, setItem] = useState<NamedResource | null>(null);
-    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
+    const [customer, setCustomer] = useState<NamedResource | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
     const [employee, setEmployee] = useState<EmployeeSummary | null>(null);
     const [department, setDepartment] = useState<HrDepartment | null>(null);
@@ -98,6 +107,7 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
     };
 
     const reset = () => {
+        setSupplier(null);
         setItem(null);
         setCustomer(null);
         setVehicle(null);
@@ -136,28 +146,52 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
                         <Input label="Search" value={draft.search ?? ''} onChange={(event) => setDraft((current) => ({ ...current, search: event.target.value }))} />
                         <Input label="From" type="date" value={draft.date_from ?? ''} onChange={(event) => setDraft((current) => ({ ...current, date_from: event.target.value || undefined }))} />
                         <Input label="To" type="date" value={draft.date_to ?? ''} onChange={(event) => setDraft((current) => ({ ...current, date_to: event.target.value || undefined }))} />
-                        <Select
+                        {kind === 'purchase' && <Select
+                            label="PO status"
+                            value={draft.purchase_status ?? ''}
+                            options={[{ value: '', label: 'All statuses' }, ...PURCHASE_STATUSES.map(([value, label]) => ({ value, label }))]}
+                            onChange={(event) => setDraft((current) => ({ ...current, purchase_status: event.target.value || undefined }))}
+                        />}
+                        {kind !== 'purchase' && <Select
                             label="Job status"
                             value={draft.job_status ?? ''}
                             options={[{ value: '', label: 'All statuses' }, ...JOB_STATUSES.map(([value, label]) => ({ value, label }))]}
                             onChange={(event) => setDraft((current) => ({ ...current, job_status: event.target.value || undefined }))}
-                        />
-                        <CustomerLookupSelect
+                        />}
+                        {kind === 'purchase' && <SupplierLookupSelect
+                            value={supplier}
+                            onChange={(value) => {
+                                setSupplier(value);
+                                setDraft((current) => ({ ...current, supplier_id: value?.id ?? null }));
+                            }}
+                            loadOnOpen
+                            minSearchLength={0}
+                        />}
+                        {kind === 'purchase' && <ItemLookupSelect
+                            value={item}
+                            onChange={(value) => {
+                                setItem(value);
+                                setDraft((current) => ({ ...current, item_id: value?.id ?? null }));
+                            }}
+                        />}
+                        {kind !== 'purchase' && <LookupSelect
+                            label="Customer"
                             value={customer}
                             onChange={(value) => {
                                 setCustomer(value);
                                 setDraft((current) => ({ ...current, customer_id: value?.id ?? null }));
                             }}
+                            search={lookupApi.customers}
                             placeholder="Search customers..."
-                        />
-                        <VehicleLookupSelect
+                        />}
+                        {kind !== 'purchase' && <VehicleLookupSelect
                             kind="all"
                             value={vehicle}
                             onChange={(value) => {
                                 setVehicle(value);
                                 setDraft((current) => ({ ...current, vehicle_id: value?.id ?? null }));
                             }}
-                        />
+                        />}
                         {kind === 'vehicle-service' && <Select
                             label="Line source"
                             value={draft.line_source_type ?? ''}
@@ -254,6 +288,7 @@ function formatSummary(value: string | number): string {
 
 function titleFor(kind: OperationalReportKind): string {
     return {
+        purchase: 'Detailed Purchase Report',
         'vehicle-service': 'Detailed Vehicle Service Report',
         'employee-incentive': 'Employee Incentive Report',
     }[kind];
@@ -261,6 +296,7 @@ function titleFor(kind: OperationalReportKind): string {
 
 function descriptionFor(kind: OperationalReportKind): string {
     return {
+        purchase: 'Line-level purchase quantities, progress and financial values.',
         'vehicle-service': 'Line-level service revenue, recorded cost and financial progress.',
         'employee-incentive': 'Technician and supervisor incentives from Vehicle Service jobs.',
     }[kind];

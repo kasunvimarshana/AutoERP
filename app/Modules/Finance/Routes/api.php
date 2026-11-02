@@ -34,9 +34,6 @@ Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.'
 
     Route::middleware($requires(FinancePermission::POSTING_PROFILES_VIEW))->group(function (): void {
         Route::get('posting-profiles', [FinanceConfigurationController::class, 'postingProfiles'])->name('posting-profiles.index');
-        Route::post('posting-profiles/{profile}/simulate', [FinanceConfigurationController::class, 'simulatePostingProfile'])
-            ->whereNumber('profile')
-            ->name('posting-profiles.simulate');
         Route::get('account-roles', [FinanceConfigurationController::class, 'accountRoles'])->name('account-roles.index');
         Route::get('account-assignments', [FinanceConfigurationController::class, 'accountAssignments'])->name('account-assignments.index');
     });

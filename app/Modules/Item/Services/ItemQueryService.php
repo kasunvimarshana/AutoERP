@@ -7,138 +7,37 @@ namespace Modules\Item\Services;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
-use Modules\Core\Services\DecimalMath;
-use Modules\Item\Enums\ItemType;
-use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 
 final class ItemQueryService
 {
-    public function __construct(
-        private readonly ItemPriceResolutionService $prices,
-        private readonly DecimalMath $math,
-    ) {}
-
-    public function paginate(
-        array $criteria,
-        int $tenantId,
-        ?int $organizationUnitId,
-        int $perPage,
-        ?string $relevanceSearch = null,
-        ?int $page = null,
-    ): LengthAwarePaginator
+    public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
         $query = $this->baseQuery($tenantId, $organizationUnitId)->with($this->summaryRelations());
         $this->applyCriteria($query, $criteria);
-        if (! empty($criteria['require_available_stock'])) {
-            $query->whereIn('items.id', function (QueryBuilder $balances) use ($tenantId, $organizationUnitId): void {
-                $balances->from('inventory_stock_balances')
-                    ->select('item_id')
-                    ->where('tenant_id', $tenantId);
-                if ($organizationUnitId === null) {
-                    $balances->whereNull('organization_unit_id');
-                } else {
-                    $balances->where(function (QueryBuilder $scope) use ($organizationUnitId): void {
-                        $scope->whereNull('organization_unit_id')
-                            ->orWhere('organization_unit_id', $organizationUnitId);
-                    });
-                }
-                $balances->groupBy('item_id')
-                    ->havingRaw('SUM(quantity_available) > 0');
-            });
-        }
-
-        if ($relevanceSearch !== null && trim($relevanceSearch) !== '') {
-            $this->applySearchRelevance($query, $relevanceSearch);
-        }
 
         $sort = in_array(($criteria['sort'] ?? null), ['code', 'name', 'item_type', 'created_at'], true)
             ? (string) $criteria['sort']
             : 'name';
         $direction = ($criteria['direction'] ?? null) === 'desc' ? 'desc' : 'asc';
 
-        $query->orderBy($sort, $direction);
-        if ($relevanceSearch !== null && trim($relevanceSearch) !== '') {
-            $query->orderBy('id');
-        }
-
-        return $query->paginate($perPage, ['*'], 'page', $page);
+        return $query->orderBy($sort, $direction)->paginate($perPage);
     }
 
-    public function lookup(
-        array $criteria,
-        int $tenantId,
-        ?int $organizationUnitId,
-        int $perPage,
-        string $kind,
-        bool $prioritizeSearch = false,
-        ?int $page = null,
-        bool $requireAvailableStock = false,
-    ): LengthAwarePaginator
+    public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage, string $kind): LengthAwarePaginator
     {
         $criteria['is_active'] = true;
         match ($kind) {
-            'stock' => [$criteria['item_type'] = ItemType::Stock->value, $criteria['is_stockable'] = true],
-            'purchase-stock' => [$criteria['item_types'] = [ItemType::Stock->value, ItemType::Consumable->value], $criteria['is_stockable'] = true],
             'stockable' => $criteria['is_stockable'] = true,
-            'consumable' => [$criteria['item_type'] = ItemType::Consumable->value, $criteria['is_stockable'] = true],
-            'untracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_type'] = TrackingType::None->value],
-            'batch-tracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_types'] = [TrackingType::Batch->value, TrackingType::Lot->value]],
-            'bundle-child' => $criteria['bundle_child'] = true,
             'service', 'labour', 'combo', 'package' => $criteria['item_type'] = $kind,
             default => null,
         };
-        if ($requireAvailableStock) {
-            $criteria['require_available_stock'] = true;
-        }
 
-        $paginator = $this->paginate(
-            $criteria,
-            $tenantId,
-            $organizationUnitId,
-            min($perPage, 50),
-            $prioritizeSearch ? (string) ($criteria['search'] ?? '') : null,
-            $page,
-        );
-        $duplicateNames = $this->duplicateNames($paginator->getCollection(), $tenantId, $organizationUnitId);
-
-        $paginator->getCollection()->each(function (Item $item) use ($duplicateNames): void {
-            $item->setAttribute('has_duplicate_name', in_array(mb_strtolower(trim((string) $item->name)), $duplicateNames, true));
-        });
-
-        return $this->resolveLookupServicePrices($paginator, $organizationUnitId);
-    }
-
-    /** @param iterable<Item> $items
-     * @return list<string>
-     */
-    public function duplicateNames(iterable $items, int $tenantId, ?int $organizationUnitId): array
-    {
-        $names = collect($items)
-            ->map(fn (Item $item): string => (string) $item->name)
-            ->unique()
-            ->values();
-
-        if ($names->isEmpty()) {
-            return [];
-        }
-
-        return Item::query()
-            ->forTenant($tenantId, $organizationUnitId)
-            ->active()
-            ->whereIn('name', $names)
-            ->select('name')
-            ->groupBy('name')
-            ->havingRaw('COUNT(*) > 1')
-            ->pluck('name')
-            ->map(fn (string $name): string => mb_strtolower(trim($name)))
-            ->all();
+        return $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
     }
 
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Item
@@ -148,11 +47,11 @@ final class ItemQueryService
             ->find($id);
 
         if ($item instanceof Item) {
-            return $this->resolveSummaryPrices($item, $organizationUnitId);
+            return $item;
         }
 
         $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException)->setModel(Item::class, [$id]);
+        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
     }
 
     public function item(int $id, int $tenantId, ?int $organizationUnitId): Item
@@ -164,7 +63,7 @@ final class ItemQueryService
         }
 
         $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException)->setModel(Item::class, [$id]);
+        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
     }
 
     public function delete(Item $item): void
@@ -186,27 +85,6 @@ final class ItemQueryService
         return ['category', 'brand', 'tenant.baseCurrency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup'];
     }
 
-    private function resolveSummaryPrices(Item $item, ?int $organizationUnitId): Item
-    {
-        $item->setAttribute('resolved_sales_unit_price', $this->prices->resolvePrice(
-            item: $item,
-            context: ItemPriceResolutionService::CONTEXT_SALES,
-            organizationUnitId: $organizationUnitId,
-        )->amount);
-        $item->setAttribute('resolved_service_unit_price', $this->prices->resolvePrice(
-            item: $item,
-            context: ItemPriceResolutionService::CONTEXT_SERVICE,
-            organizationUnitId: $organizationUnitId,
-        )->amount);
-        $item->setAttribute('resolved_purchase_unit_price', $this->prices->resolvePrice(
-            item: $item,
-            context: ItemPriceResolutionService::CONTEXT_PURCHASE,
-            organizationUnitId: $organizationUnitId,
-        )->amount);
-
-        return $item;
-    }
-
     private function applyCriteria(Builder $query, array $criteria): void
     {
         $search = trim((string) ($criteria['search'] ?? ''));
@@ -219,25 +97,10 @@ final class ItemQueryService
             });
         }
 
-        foreach (['item_type', 'tracking_type', 'is_stockable', 'is_active'] as $filter) {
+        foreach (['item_type', 'is_stockable', 'is_active'] as $filter) {
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
             }
-        }
-        if (! empty($criteria['item_types'])) {
-            $query->whereIn('item_type', $criteria['item_types']);
-        }
-        if (! empty($criteria['bundle_child'])) {
-            $query->where(function (Builder $items): void {
-                $items->where(function (Builder $stockItems): void {
-                    $stockItems->where('is_stockable', true)
-                        ->whereIn('item_type', ['stock', 'consumable']);
-                })
-                    ->orWhereIn('item_type', ['service', 'labour', 'non_stock']);
-            });
-        }
-        if (! empty($criteria['tracking_types'])) {
-            $query->whereIn('tracking_type', $criteria['tracking_types']);
         }
         if (! empty($criteria['category_id'])) {
             $query->where('item_category_id', (int) $criteria['category_id']);
@@ -250,110 +113,6 @@ final class ItemQueryService
                 ->where('module_code', (string) $criteria['module_code'])
                 ->where('is_enabled', true));
         }
-    }
-
-    private function applySearchRelevance(Builder $query, string $search): void
-    {
-        $term = mb_strtolower(trim($search));
-        $prefix = $term.'%';
-        $query->orderByRaw(
-            'CASE WHEN LOWER(name) = ? OR LOWER(code) = ? OR LOWER(sku) = ? OR LOWER(barcode) = ? THEN 0 '
-            .'WHEN LOWER(name) LIKE ? OR LOWER(code) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(barcode) LIKE ? THEN 1 '
-            .'ELSE 2 END',
-            [$term, $term, $term, $term, $prefix, $prefix, $prefix, $prefix],
-        );
-    }
-
-    private function resolveLookupServicePrices(
-        LengthAwarePaginator $paginator,
-        ?int $organizationUnitId,
-    ): LengthAwarePaginator {
-        /** @var Collection<int, Item> $items */
-        $items = $paginator->getCollection();
-        $tenantId = $items->first()?->tenant_id;
-        $stockByItemId = $tenantId === null
-            ? []
-            : $this->stockSummaryByItemIds(
-                $items->modelKeys(),
-                (int) $tenantId,
-                $organizationUnitId,
-            );
-
-        $items->each(function (Item $item) use ($organizationUnitId, $stockByItemId): void {
-            $resolvedServicePrice = $this->prices->resolvePrice(
-                item: $item,
-                context: ItemPriceResolutionService::CONTEXT_SERVICE,
-                organizationUnitId: $organizationUnitId,
-            );
-            $resolvedPurchasePrice = $this->prices->resolvePrice(
-                item: $item,
-                context: ItemPriceResolutionService::CONTEXT_PURCHASE,
-                organizationUnitId: $organizationUnitId,
-            );
-
-            $item->setAttribute('resolved_service_unit_price', $resolvedServicePrice->amount ?? $this->math->normalize('0'));
-            $item->setAttribute('has_service_price', $resolvedServicePrice->amount !== null);
-            $item->setAttribute('resolved_purchase_unit_price', $resolvedPurchasePrice->amount);
-            $item->setAttribute(
-                'available_stock_quantity',
-                $item->is_stockable
-                    ? ($stockByItemId[(int) $item->getKey()]['available'] ?? '0.000000')
-                    : null,
-            );
-            $item->setAttribute(
-                'reserved_stock_quantity',
-                $item->is_stockable
-                    ? ($stockByItemId[(int) $item->getKey()]['reserved'] ?? '0.000000')
-                    : null,
-            );
-        });
-
-        return $paginator->setCollection($items);
-    }
-
-    /** @param list<int> $itemIds
-     * @return array<int, string>
-     */
-    public function availableStockByItemIds(array $itemIds, int $tenantId, ?int $organizationUnitId): array
-    {
-        return array_map(
-            static fn (array $stock): string => $stock['available'],
-            $this->stockSummaryByItemIds($itemIds, $tenantId, $organizationUnitId),
-        );
-    }
-
-    /** @param list<int> $itemIds
-     * @return array<int, array{available: string, reserved: string}>
-     */
-    public function stockSummaryByItemIds(array $itemIds, int $tenantId, ?int $organizationUnitId): array
-    {
-        $itemIds = array_values(array_unique(array_map('intval', $itemIds)));
-        if ($itemIds === []) {
-            return [];
-        }
-
-        $query = DB::table('inventory_stock_balances')
-            ->selectRaw('item_id, SUM(quantity_available) as available_stock_quantity, SUM(quantity_reserved) as reserved_stock_quantity')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('item_id', $itemIds)
-            ->groupBy('item_id');
-
-        if ($organizationUnitId === null) {
-            $query->whereNull('organization_unit_id');
-        } else {
-            $query->where(function ($scope) use ($organizationUnitId): void {
-                $scope->whereNull('organization_unit_id')
-                    ->orWhere('organization_unit_id', $organizationUnitId);
-            });
-        }
-
-        return $query
-            ->get()
-            ->mapWithKeys(fn ($row): array => [(int) $row->item_id => [
-                'available' => $this->math->normalize((string) $row->available_stock_quantity),
-                'reserved' => $this->math->normalize((string) $row->reserved_stock_quantity),
-            ]])
-            ->all();
     }
 
     private function assertUnused(Item $item): void

@@ -36,6 +36,8 @@ final class FinanceAccount extends TenantOwnedModel
             'is_tax_account' => 'boolean',
             'is_system' => 'boolean',
             'is_active' => 'boolean',
+            'opening_balance' => 'decimal:6',
+            'current_balance' => 'decimal:6',
             'metadata' => 'array',
         ]);
     }

@@ -31,6 +31,5 @@ final readonly class CreatePaymentData
         public ?string $chequeDate = null,
         public ?string $payeeName = null,
         public ?array $metadata = null,
-        public ?string $idempotencyKey = null,
     ) {}
 }

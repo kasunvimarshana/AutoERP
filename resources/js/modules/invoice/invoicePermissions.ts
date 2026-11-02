@@ -6,7 +6,6 @@ export const invoicePermissions = {
     create: 'invoices.create',
     approve: 'invoices.approve',
     post: 'invoices.post',
-    reverse: 'invoices.reverse',
     cancel: 'invoices.cancel',
     balanceView: 'invoices.balance.view',
     sourcesView: 'invoices.sources.view',

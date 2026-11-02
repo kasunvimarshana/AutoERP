@@ -6,8 +6,8 @@ import { formatDate } from '@/shared/utils/formatDate';
 import { listVehicleServiceStatusHistory } from '../vehicleServiceApi';
 import { VehicleServiceStatusBadge } from './VehicleServiceStatusBadge';
 
-export default function VehicleServiceStatusHistoryTab({ jobId, refreshKey = 0 }: { jobId: number; refreshKey?: number }) {
-    const result = useApi((signal) => listVehicleServiceStatusHistory(jobId, signal), [jobId, refreshKey], true, false);
+export default function VehicleServiceStatusHistoryTab({ jobId }: { jobId: number }) {
+    const result = useApi((signal) => listVehicleServiceStatusHistory(jobId, signal), [jobId]);
     if (result.loading) return <LoadingState />;
 
     return (

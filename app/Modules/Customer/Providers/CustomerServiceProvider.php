@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Modules\Customer\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Customer\Console\Commands\AuditCustomerPhoneNumbersCommand;
-use Modules\Customer\Services\CustomerAuthorizationService;
-use Modules\Customer\Services\CustomerTaxPartyResolver;
-use Modules\Customer\Services\CustomerVehicleOwnerResolver;
-use Modules\Tax\Contracts\TaxPartyResolverInterface;
 use Modules\Vehicle\Contracts\VehicleOwnerResolverInterface;
+use Modules\Customer\Services\CustomerVehicleOwnerResolver;
+use Modules\Customer\Services\CustomerTaxPartyResolver;
+use Modules\Tax\Contracts\TaxPartyResolverInterface;
+use Modules\Customer\Services\CustomerAuthorizationService;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class CustomerServiceProvider extends ServiceProvider
 {
@@ -28,9 +27,6 @@ final class CustomerServiceProvider extends ServiceProvider
             ->register('customer', CustomerAuthorizationService::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([__DIR__.'/../Database/Migrations', __DIR__.'/../Database/UpgradeMigrations']);
-        if ($this->app->runningInConsole()) {
-            $this->commands([AuditCustomerPhoneNumbersCommand::class]);
-        }
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

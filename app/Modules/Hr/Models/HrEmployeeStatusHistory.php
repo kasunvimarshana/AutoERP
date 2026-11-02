@@ -8,6 +8,16 @@ final class HrEmployeeStatusHistory extends TenantOwnedModel
 {
     protected $table = 'hr_employee_status_histories';
     protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id',
+        'organization_unit_id',
+        'employee_id',
+        'old_status',
+        'new_status',
+        'reason',
+        'changed_by',
+        'changed_at',
+    ];
     protected function casts(): array { return array_merge(parent::casts(), ['tenant_id' => 'integer', 'organization_unit_id' => 'integer', 'employee_id' => 'integer', 'old_status' => EmployeeStatus::class, 'new_status' => EmployeeStatus::class, 'changed_by' => 'integer', 'changed_at' => 'datetime']); }
     public function employee(): BelongsTo { return $this->belongsTo(HrEmployee::class, 'employee_id'); }
 }

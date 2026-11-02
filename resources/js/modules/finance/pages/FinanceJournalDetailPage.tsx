@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { hasPermission } from '@/modules/auth/accessControl';
-import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -18,12 +16,10 @@ import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { Textarea } from '@/shared/components/Textarea';
 import { formatDate } from '@/shared/utils/formatDate';
 import { cancelJournal, getJournal, postJournal, reverseJournal, type JournalEntry } from '../financeApi';
-import { financePermissions } from '../financePermissions';
 
 type Action = 'post' | 'cancel' | null;
 
 export default function FinanceJournalDetailPage() {
-    const auth = useAuth();
     const journalId = Number(useParams().id);
     const [journal, setJournal] = useState<JournalEntry | null>(null);
     const [loading, setLoading] = useState(true);
@@ -50,13 +46,8 @@ export default function FinanceJournalDetailPage() {
     if (loading) return <LoadingState />;
     if (!journal) return <ErrorAlert error={error} />;
 
-    const canEdit = Boolean(journal.can_edit) && hasPermission(auth, financePermissions.journalsUpdate);
-    const canPost = Boolean(journal.can_post) && hasPermission(auth, financePermissions.journalsPost);
-    const canCancel = Boolean(journal.can_cancel) && hasPermission(auth, financePermissions.journalsCancel);
-    const canReverse = Boolean(journal.can_reverse) && hasPermission(auth, financePermissions.journalsReverse);
-
     async function executeAction() {
-        if (!action || (action === 'post' && !canPost) || (action === 'cancel' && !canCancel)) return;
+        if (!action) return;
         setSubmitting(true);
         setError(null);
         try {
@@ -72,7 +63,6 @@ export default function FinanceJournalDetailPage() {
     }
 
     async function reverse() {
-        if (!canReverse) return;
         setSubmitting(true);
         setError(null);
         try {
@@ -87,18 +77,16 @@ export default function FinanceJournalDetailPage() {
         }
     }
 
-    const actions = canEdit || canPost || canCancel || canReverse ? <div className="flex flex-wrap gap-2">
-        {canEdit && <LinkButton to={`/finance/journals/${journal.id}/edit`} variant="secondary">Edit draft</LinkButton>}
-        {canPost && <Button type="button" onClick={() => setAction('post')}>Post journal</Button>}
-        {canCancel && <Button type="button" variant="danger" onClick={() => setAction('cancel')}>Cancel draft</Button>}
-        {canReverse && <Button type="button" variant="danger" onClick={() => setShowReversal(true)}>Reverse</Button>}
-    </div> : undefined;
-
     return <>
         <ContentHeader
             title={journal.journal_number}
-            description="Journal entry preserves transaction-currency evidence; ledger base amounts and balance after are the functional-currency projection."
-            actions={actions}
+            description="Journal entry and immutable ledger impact."
+            actions={<div className="flex flex-wrap gap-2">
+                {journal.can_edit && <LinkButton to={`/finance/journals/${journal.id}/edit`} variant="secondary">Edit draft</LinkButton>}
+                {journal.can_post && <Button type="button" onClick={() => setAction('post')}>Post journal</Button>}
+                {journal.can_cancel && <Button type="button" variant="danger" onClick={() => setAction('cancel')}>Cancel draft</Button>}
+                {journal.can_reverse && <Button type="button" variant="danger" onClick={() => setShowReversal(true)}>Reverse</Button>}
+            </div>}
         />
         <ErrorAlert error={error} />
         <Panel title="Journal summary">
@@ -110,7 +98,6 @@ export default function FinanceJournalDetailPage() {
                 { label: 'Description', value: journal.description ?? '-' },
                 { label: 'Total debit', value: <MoneyDisplay value={journal.total_debit} /> },
                 { label: 'Total credit', value: <MoneyDisplay value={journal.total_credit} /> },
-                { label: 'Exchange rate', value: journal.exchange_rate },
                 { label: 'Reversal reason', value: journal.reversal_reason ?? '-' },
             ]} />
         </Panel>
@@ -127,15 +114,13 @@ export default function FinanceJournalDetailPage() {
             <DataTable rows={journal.ledger_entries ?? []} rowKey={(row) => row.id} columns={[
                 { key: 'date', header: 'Date', render: (row) => formatDate(row.entry_date) },
                 { key: 'account', header: 'Account', render: (row) => row.account ? `${row.account.code} - ${row.account.name}` : '-' },
-                { key: 'debit', header: 'Transaction debit', render: (row) => <MoneyDisplay value={row.debit} /> },
-                { key: 'credit', header: 'Transaction credit', render: (row) => <MoneyDisplay value={row.credit} /> },
-                { key: 'base_debit', header: 'Base debit', render: (row) => <MoneyDisplay value={row.base_debit} /> },
-                { key: 'base_credit', header: 'Base credit', render: (row) => <MoneyDisplay value={row.base_credit} /> },
-                { key: 'balance', header: 'Base balance after', render: (row) => <MoneyDisplay value={row.balance_after} /> },
+                { key: 'debit', header: 'Debit', render: (row) => <MoneyDisplay value={row.debit} /> },
+                { key: 'credit', header: 'Credit', render: (row) => <MoneyDisplay value={row.credit} /> },
+                { key: 'balance', header: 'Balance after', render: (row) => <MoneyDisplay value={row.balance_after} /> },
             ]} />
         </Panel>
 
-        {canReverse && showReversal && <Panel title="Reverse journal" className="mt-5">
+        {showReversal && <Panel title="Reverse journal" className="mt-5">
             <div className="grid gap-4 md:grid-cols-2">
                 <Input label="Reversal date" type="date" value={reversalDate} onChange={(event) => setReversalDate(event.target.value)} />
                 <Textarea label="Reason" value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} />

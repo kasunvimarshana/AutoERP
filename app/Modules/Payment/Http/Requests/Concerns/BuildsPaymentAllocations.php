@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Http\Requests\Concerns;
 
-use Illuminate\Validation\Rule;
 use Modules\Payment\DTOs\PaymentAllocationData;
-use Modules\Payment\Enums\PaymentAllocationMethod;
 
 trait BuildsPaymentAllocations
 {
@@ -22,7 +20,7 @@ trait BuildsPaymentAllocations
             'allocations.*.allocated_amount' => ['required', 'decimal:0,6', 'gt:0'],
             'allocations.*.allocation_date' => ['required', 'date'],
             'allocations.*.allow_overpayment' => ['nullable', 'boolean'],
-            'allocations.*.allocation_method' => ['nullable', Rule::enum(PaymentAllocationMethod::class)],
+            'allocations.*.allocation_method' => ['nullable', 'string', 'in:manual,specific_invoice,fifo'],
             'allocations.*.metadata' => ['nullable', 'array'],
         ];
     }
@@ -39,7 +37,7 @@ trait BuildsPaymentAllocations
             allocatedAmount: (string) $row['allocated_amount'],
             allocationDate: (string) $row['allocation_date'],
             allowOverpayment: (bool) ($row['allow_overpayment'] ?? false),
-            allocationMethod: (string) ($row['allocation_method'] ?? PaymentAllocationMethod::SpecificInvoice->value),
+            allocationMethod: (string) ($row['allocation_method'] ?? 'specific_invoice'),
             metadata: isset($row['metadata']) && is_array($row['metadata']) ? $row['metadata'] : null,
         ), is_array($rows) ? $rows : []);
     }

@@ -13,13 +13,11 @@ use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Services\ChartOfAccountsService;
-use Modules\Payment\Constants\PaymentPostingMetadata;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\DTOs\PaymentPostingContext;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentMethodType;
-use Modules\Payment\Enums\PaymentPostingRole;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentCreationService;
@@ -35,7 +33,7 @@ final class PaymentFinanceIntegrationTest extends TestCase
         [$tenantId] = $this->createChart();
         $payment = $this->withTenantExecutionContext($tenantId, fn () => app(PaymentCreationService::class)->create(new CreatePaymentData(
             tenantId: $tenantId,
-            paymentType: PaymentType::Manual,
+            paymentType: PaymentType::Advance,
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
             lines: [
@@ -43,10 +41,6 @@ final class PaymentFinanceIntegrationTest extends TestCase
                     amount: '1000.000000',
                     paymentMethodId: (int) $this->paymentMethod($tenantId)->getKey(),
                 ),
-            ],
-            metadata: [
-                PaymentPostingMetadata::PROFILE_CODE => 'payment_posting',
-                PaymentPostingMetadata::COUNTERPARTY_ROLE => PaymentPostingRole::Payable->value,
             ],
         )));
 

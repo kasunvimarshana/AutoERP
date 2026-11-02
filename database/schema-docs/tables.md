@@ -109,13 +109,6 @@ No database tables. PrivateObject owns the private-storage capability and canoni
 | `warehouse_locations` | Stores warehouse location records used by the owning module. | `parent_id` -> `warehouse_locations`; `warehouse_id` -> `warehouses`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,warehouse_id,name`; tenant scoped; organization-unit aware; soft deletes |
 | `warehouses` | Stores tenant warehouses and their organization-unit ownership. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; organization-unit aware; soft deletes |
 
-## Expense
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `expense_types` | Stores tenant-wide, user-managed expense classifications reused by every branch. | `tenant_id` -> `tenants`; `created_by` -> `users` | unique `tenant_id,code`; tenant scoped; soft deletes; version checked |
-| `expenses` | Stores immutable branch-paid expense source documents and Cash/Bank posting traceability. | `expense_type_id` -> `expense_types`; `organization_unit_id` -> `organization_units`; `currency_id` -> `currencies`; `tenant_id` -> `tenants` | unique `tenant_id,expense_number`; tenant scoped; organization-unit required; posted records corrected by reversal |
-
 ## Finance
 
 | Table | Business purpose | Key relationships | Important constraints |
@@ -131,7 +124,7 @@ No database tables. PrivateObject owns the private-storage capability and canoni
 | `finance_dimensions` | Stores finance dimension records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware |
 | `finance_journal_entries` | Stores balanced accounting journal headers and posting traceability. | `posting_profile_id` -> `finance_posting_profiles`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `reversal_of_id` -> `finance_journal_entries`; `currency_id` -> `currencies`; polymorphic `source_type`/`source_id` source | unique `tenant_id,journal_number`; tenant scoped; organization-unit aware; soft deletes |
 | `finance_journal_lines` | Stores line-level detail and traceability for finance journal line. | `organization_unit_id` -> `organization_units`; `account_id` -> `finance_accounts`; `journal_entry_id` -> `finance_journal_entries`; `tenant_id` -> `tenants`; `dimension_id` -> `finance_dimensions` | tenant scoped; organization-unit aware |
-| `finance_ledger_entries` | Stores immutable posted transaction-currency debit/credit evidence plus frozen-rate base-currency debit/credit and the rebuildable base-currency running balance by account and dimension. | `organization_unit_id` -> `organization_units`; `dimension_id` -> `finance_dimensions`; `journal_line_id` -> `finance_journal_lines`; `tenant_id` -> `tenants`; `account_id` -> `finance_accounts`; `journal_entry_id` -> `finance_journal_entries`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware; transaction and base amounts remain distinct |
+| `finance_ledger_entries` | Stores immutable posted debit and credit entries by account and dimension. | `organization_unit_id` -> `organization_units`; `dimension_id` -> `finance_dimensions`; `journal_line_id` -> `finance_journal_lines`; `tenant_id` -> `tenants`; `account_id` -> `finance_accounts`; `journal_entry_id` -> `finance_journal_entries`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
 | `finance_posting_profile_rules` | Stores finance posting profile rule records used by the owning module. | `account_id` -> `finance_accounts`; `posting_profile_id` -> `finance_posting_profiles` | unique `posting_profile_id,line_key` |
 | `finance_posting_profiles` | Stores finance posting profile records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,organization_unit_id,code`; tenant scoped; organization-unit aware |
 

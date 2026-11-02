@@ -7,16 +7,12 @@ namespace Modules\Purchase\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Invoice\Enums\InvoiceDirection;
-use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
-use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseDebitNote;
-use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Services\Concerns\AssertsPurchaseExpectedVersion;
 use Modules\Purchase\Validators\PurchaseValidationService;
@@ -43,23 +39,18 @@ final class PurchaseDebitNoteService
         if ($data->supplierId === null) {
             throw new InvalidArgumentException('Purchase debit note supplier is required.');
         }
-        if ($data->supplierType !== null && $data->supplierType !== InvoicePartyType::Supplier->value) {
-            throw new InvalidArgumentException('Purchase debit notes must reference a supplier party.');
-        }
         if (trim((string) $data->reason) === '') {
             throw new InvalidArgumentException('Purchase debit note reason is required.');
         }
 
         $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
-        $sourceReturn = $this->assertSourceContract($data);
-        $currencyId = $this->resolveCurrencyId($data, $sourceReturn);
+        $this->assertSourceContract($data);
 
         return PurchaseDebitNote::query()->create([
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
-            'supplier_type' => InvoicePartyType::Supplier->value,
+            'supplier_type' => $data->supplierType,
             'supplier_id' => $data->supplierId,
-            'currency_id' => $currencyId,
             'purchase_return_id' => $data->purchaseReturnId,
             'source_type' => $data->sourceType,
             'source_id' => $data->sourceId,
@@ -73,14 +64,14 @@ final class PurchaseDebitNoteService
         ]);
     }
 
-    private function assertSourceContract(CreatePurchaseDebitNoteData $data): ?PurchaseReturn
+    private function assertSourceContract(CreatePurchaseDebitNoteData $data): void
     {
         if ($data->purchaseReturnId === null) {
             if ($data->sourceType !== null || $data->sourceId !== null) {
                 throw new InvalidArgumentException('Manual purchase debit notes cannot carry arbitrary source references.');
             }
 
-            return null;
+            return;
         }
 
         if ($data->sourceType !== self::SOURCE_PURCHASE_RETURN || $data->sourceId !== $data->purchaseReturnId) {
@@ -95,85 +86,10 @@ final class PurchaseDebitNoteService
         if ((int) $purchaseReturn->tenant_id !== $data->tenantId
             || $returnOrganizationUnitId !== $data->organizationUnitId
             || (int) $purchaseReturn->supplier_id !== $data->supplierId
-            || (string) $purchaseReturn->supplier_type !== InvoicePartyType::Supplier->value
+            || (string) $purchaseReturn->supplier_type !== (string) ($data->supplierType ?? 'supplier')
         ) {
             throw new InvalidArgumentException('Purchase debit note source return is outside the debit note scope.');
         }
-
-        // A purchase return owns a single debit note, including one retained as
-        // historical evidence after soft deletion. The database unique constraint
-        // is authoritative for concurrent creators.
-        if (PurchaseDebitNote::withTrashed()
-            ->where('tenant_id', $data->tenantId)
-            ->where('purchase_return_id', $data->purchaseReturnId)
-            ->exists()
-        ) {
-            throw new InvalidArgumentException('Purchase return already has a debit note.');
-        }
-
-        return $purchaseReturn;
-    }
-
-    /**
-     * Manual notes require explicit currency. A referenced return can only inherit
-     * currency from a provable purchase order, never a tenant default or invoice.
-     * Returns without monetary provenance remain reviewable but unallocatable.
-     */
-    private function resolveCurrencyId(CreatePurchaseDebitNoteData $data, ?PurchaseReturn $purchaseReturn): ?int
-    {
-        if ($purchaseReturn === null) {
-            if ($data->currencyId === null) {
-                throw new InvalidArgumentException('Currency is required for manual purchase debit notes.');
-            }
-
-            $this->validator->currency($data->tenantId, $data->organizationUnitId, $data->currencyId);
-
-            return $data->currencyId;
-        }
-
-        if ($data->currencyId !== null) {
-            throw new InvalidArgumentException('Purchase return debit note currency is determined by the source.');
-        }
-        $returnCurrencyId = $purchaseReturn->currency_id === null
-            ? null
-            : (int) $purchaseReturn->currency_id;
-        if ((string) $purchaseReturn->source_type !== 'goods_receipt_note') {
-            return $returnCurrencyId;
-        }
-        if ($purchaseReturn->source_id === null) {
-            throw new InvalidArgumentException('Referenced purchase return has no source receipt.');
-        }
-
-        // Validate the entire referenced source chain even when the return
-        // already has a currency. A stored currency must not conceal a foreign
-        // supplier/organization receipt or a conflicting purchase order.
-        $receipt = GoodsReceiptNote::query()->findOrFail((int) $purchaseReturn->source_id);
-        if ((int) $receipt->tenant_id !== $data->tenantId
-            || $receipt->organization_unit_id !== $data->organizationUnitId
-            || (int) $receipt->supplier_id !== $data->supplierId
-        ) {
-            throw new InvalidArgumentException('Purchase debit note source receipt is outside the return scope.');
-        }
-        if ($receipt->purchase_order_id === null) {
-            return $returnCurrencyId;
-        }
-
-        $order = PurchaseOrder::query()->findOrFail((int) $receipt->purchase_order_id);
-        if ((int) $order->tenant_id !== $data->tenantId
-            || $order->organization_unit_id !== $data->organizationUnitId
-            || (int) $order->supplier_id !== $data->supplierId
-        ) {
-            throw new InvalidArgumentException('Purchase debit note source order is outside the return scope.');
-        }
-
-        $orderCurrencyId = $order->currency_id === null ? null : (int) $order->currency_id;
-        if ($returnCurrencyId !== null && $orderCurrencyId !== null
-            && $returnCurrencyId !== $orderCurrencyId
-        ) {
-            throw new InvalidArgumentException('Purchase return currency conflicts with its source purchase order.');
-        }
-
-        return $returnCurrencyId ?? $orderCurrencyId;
     }
 
     public function approve(PurchaseDebitNote $note, ?int $approvedBy = null, ?int $expectedVersion = null): PurchaseDebitNote
@@ -222,8 +138,6 @@ final class PurchaseDebitNoteService
         string $amount,
         ?int $expectedVersion = null,
     ): PurchaseDebitNote {
-        $amount = $this->math->normalize($amount);
-
         return DB::transaction(function () use ($note, $invoice, $amount, $expectedVersion): PurchaseDebitNote {
             $lockedInvoice = Invoice::query()
                 ->lockForUpdate()
@@ -243,7 +157,6 @@ final class PurchaseDebitNoteService
             if ($this->math->compare($amount, '0.000000') <= 0) {
                 throw new InvalidArgumentException('Debit allocation amount must be greater than zero.');
             }
-            $this->assertAllocationBalanceIntegrity($lockedNote);
             if ($this->math->compare($amount, (string) $lockedNote->remaining_amount) > 0) {
                 throw new InvalidArgumentException(
                     'Debit allocation cannot exceed purchase debit note remaining amount.',
@@ -271,21 +184,6 @@ final class PurchaseDebitNoteService
         });
     }
 
-    private function assertAllocationBalanceIntegrity(PurchaseDebitNote $note): void
-    {
-        $faceValue = $this->math->normalize((string) $note->amount);
-        $allocated = $this->math->normalize((string) $note->allocated_amount);
-        $remaining = $this->math->normalize((string) $note->remaining_amount);
-
-        if ($this->math->isNegative($faceValue) || $this->math->isZero($faceValue)
-            || $this->math->isNegative($allocated)
-            || $this->math->isNegative($remaining)
-            || $this->math->compare($this->math->add($allocated, $remaining), $faceValue) !== 0
-        ) {
-            throw new InvalidArgumentException('Purchase debit note allocation balances are inconsistent.');
-        }
-    }
-
     private function assertAllocationScope(PurchaseDebitNote $note, Invoice $invoice): void
     {
         $invoiceStatus = $invoice->status instanceof InvoiceStatus
@@ -305,27 +203,13 @@ final class PurchaseDebitNoteService
         }
 
         if ((int) $note->supplier_id !== (int) $invoice->party_id
-            || (string) $invoice->party_type !== InvoicePartyType::Supplier->value
+            || (string) $invoice->party_type !== 'supplier'
         ) {
             throw new InvalidArgumentException('Purchase debit note and invoice supplier does not match.');
         }
 
-        if ($invoice->direction !== InvoiceDirection::Inbound) {
-            throw new InvalidArgumentException('Purchase debit notes can only be allocated to inbound supplier invoices.');
-        }
-        if ($note->supplier_type !== InvoicePartyType::Supplier->value) {
-            throw new InvalidArgumentException('Purchase debit note supplier type does not match the invoice party.');
-        }
-
         if (! in_array($invoiceStatus, [InvoiceStatus::Posted, InvoiceStatus::PartiallyPaid], true)) {
             throw new InvalidArgumentException('Purchase debit notes can only be allocated to posted supplier invoices.');
-        }
-
-        if ($note->currency_id === null || $invoice->currency_id === null) {
-            throw new InvalidArgumentException('Purchase debit note and supplier invoice must have verified currencies before allocation.');
-        }
-        if ((int) $note->currency_id !== (int) $invoice->currency_id) {
-            throw new InvalidArgumentException('Purchase debit note currency must match supplier invoice currency.');
         }
     }
 }

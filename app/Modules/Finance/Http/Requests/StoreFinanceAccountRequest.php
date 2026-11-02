@@ -41,8 +41,7 @@ final class StoreFinanceAccountRequest extends TenantScopedRequest
             'is_bank_account' => ['nullable', 'boolean'],
             'is_tax_account' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
-            'opening_balance' => ['prohibited'],
-            'current_balance' => ['prohibited'],
+            'opening_balance' => ['nullable', 'decimal:0,6', 'min:0'],
             'metadata' => ['nullable', 'array'],
         ];
     }
@@ -65,6 +64,7 @@ final class StoreFinanceAccountRequest extends TenantScopedRequest
             isBankAccount: $this->boolean('is_bank_account'),
             isTaxAccount: $this->boolean('is_tax_account'),
             isActive: $this->boolean('is_active', true),
+            openingBalance: (string) $this->input('opening_balance', '0.000000'),
             metadata: $this->input('metadata'),
         );
     }

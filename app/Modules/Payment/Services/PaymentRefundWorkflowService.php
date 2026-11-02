@@ -13,7 +13,6 @@ use Modules\Payment\DTOs\PaymentRefundData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
-use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
@@ -25,8 +24,10 @@ final class PaymentRefundWorkflowService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentCreationService $payments,
+        private readonly PaymentDocumentLifecycleService $lifecycle,
+        private readonly PaymentPostingService $posting,
         private readonly PaymentValidationService $validator,
-        private readonly PaymentRefundPolicyService $refundPolicy,
+        private readonly PaymentBalanceSynchronizer $balances,
     ) {}
 
     public function refund(PaymentRefundData $data): PaymentRefund
@@ -38,25 +39,13 @@ final class PaymentRefundWorkflowService
                 || $this->postingStatus($original) !== PaymentPostingStatus::Posted) {
                 throw new InvalidArgumentException('Only approved and posted payments can be refunded.');
             }
-            $originalType = $original->payment_type instanceof PaymentType
-                ? $original->payment_type
-                : PaymentType::from((string) $original->payment_type);
-            if ($originalType === PaymentType::Refund) {
-                throw new InvalidArgumentException('A refund payment cannot be refunded again.');
-            }
-            $originalDate = $original->payment_date?->toDateString();
-            if ($originalDate !== null && $data->refundDate < $originalDate) {
-                throw new InvalidArgumentException('Refund date cannot be before the original payment date.');
-            }
-
             $this->validator->assertPositive($data->amount, 'Refund amount');
-            $available = $this->refundPolicy->availableUnappliedAmount($original);
-            if ($this->math->compare($data->amount, $available) > 0) {
-                throw new InvalidArgumentException('Refund cannot exceed the unreserved payment amount.');
+            if ($this->math->compare($data->amount, (string) $original->unapplied_amount) > 0) {
+                throw new InvalidArgumentException('Refund cannot exceed the payment unapplied amount.');
             }
 
-            $paymentMethodId = $data->paymentMethodId;
-            $method = PaymentMethod::query()->find($paymentMethodId);
+            $paymentMethodId = $data->paymentMethodId ?? $original->lines->first()?->payment_method_id;
+            $method = $paymentMethodId === null ? null : PaymentMethod::query()->find($paymentMethodId);
             $hasInstrumentDetails = trim((string) $data->instrumentNumber) !== ''
                 || trim((string) $data->externalBankName) !== ''
                 || trim((string) $data->instrumentDate) !== '';
@@ -78,11 +67,11 @@ final class PaymentRefundWorkflowService
                 organizationUnitId: $original->organization_unit_id,
                 partyType: $original->party_type,
                 partyId: $original->party_id,
-                sourceType: PaymentSourceType::PaymentRefund->value,
+                sourceType: 'payment_refund',
                 sourceId: (int) $original->getKey(),
                 originalPaymentId: (int) $original->getKey(),
                 currencyId: $original->currency_id,
-                exchangeRate: $data->exchangeRate,
+                exchangeRate: (string) $original->exchange_rate,
                 referenceNumber: $data->referenceNumber,
                 notes: $data->reason,
                 createdBy: $data->refundedBy,
@@ -100,6 +89,10 @@ final class PaymentRefundWorkflowService
                 metadata: ['original_payment_id' => (int) $original->getKey()],
             ));
 
+            $refundPayment = $this->lifecycle->submit($refundPayment, (int) $refundPayment->row_version, $data->refundedBy);
+            $refundPayment = $this->lifecycle->approve($refundPayment, (int) $refundPayment->row_version, $data->refundedBy);
+            $refundPayment = $this->posting->post($refundPayment, (int) $refundPayment->row_version, $data->refundedBy);
+
             $refund = PaymentRefund::query()->create([
                 'tenant_id' => $original->tenant_id,
                 'organization_unit_id' => $original->organization_unit_id,
@@ -113,6 +106,7 @@ final class PaymentRefundWorkflowService
             ]);
 
             $original->forceFill(['row_version' => (int) $original->row_version + 1])->save();
+            $this->balances->sync($original->refresh(), 'Payment refund recorded.', $data->refundedBy);
 
             return $refund->refresh()->load('refundPayment');
         });

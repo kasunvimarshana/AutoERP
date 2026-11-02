@@ -10,17 +10,6 @@ export type VehicleServiceJobStatus =
     | 'paid'
     | 'cancelled';
 
-export type VehicleServiceJobType = 'full_service' | 'body_wash' | 'oil_change' | 'wheel_alignment' | 'accessories';
-
-const MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES: readonly VehicleServiceJobType[] = [
-    'full_service',
-    'oil_change',
-    'wheel_alignment',
-];
-
-export const tracksVehicleServiceMileage = (jobType: VehicleServiceJobType | ''): boolean =>
-    jobType !== '' && MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES.includes(jobType);
-
 export type VehicleServiceLineSourceType =
     | 'inventory_item'
     | 'external_item'
@@ -91,6 +80,7 @@ export interface VehicleServiceEmployeeAssignment {
 export interface VehicleServiceEmployeeAssignmentPayload {
     expected_version?: number;
     employee_id: number;
+    role_type: string;
     assigned_hours?: string;
     rate?: string;
     commission_type?: CommissionType;
@@ -98,37 +88,20 @@ export interface VehicleServiceEmployeeAssignmentPayload {
     status?: 'assigned' | 'completed' | 'cancelled';
 }
 
-export interface VehicleServiceEmployeeAssignmentBatchPayload {
-    expected_version: number;
-    lines: Array<{
-        line_id: number;
-        employee_ids: number[];
-    }>;
-}
-
 export interface VehicleServiceJobLine {
     id: number;
     parent_line_id?: number | null;
-    parent_line?: {
-        id: number;
-        line_number: number;
-        description: string;
-    } | null;
     line_number: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number | null;
     item?: NamedResource | null;
     item_variant_id?: number | null;
     item_variant?: NamedResource | null;
-    batch_id?: number | null;
-    batch?: (NamedResource & { batch_number?: string; lot_number?: string }) | null;
-    batch_price_revision_id?: number | null;
     uom_id?: number | null;
     uom?: NamedResource | null;
     description: string;
     quantity: string;
     unit_cost: string;
-    uses_job_supervisor?: boolean;
     unit_price: string;
     discount_calculation_type?: 'fixed' | 'percentage' | null;
     discount_rate: string;
@@ -146,10 +119,6 @@ export interface VehicleServiceJobLine {
     is_billable: boolean;
     is_employee_assignable: boolean;
     inventory_movement_id?: number | null;
-    inventory_movement?: { id: number; status: string; reversed_at: string | null } | null;
-    available_stock_quantity?: string | null;
-    reserved_stock_quantity?: string | null;
-    reorder_level?: string | null;
     stock_on_hand?: string;
     stock_available?: string;
     issue_eligible?: boolean;
@@ -195,8 +164,6 @@ export interface VehicleServiceJob {
     job_number: string;
     job_date: string;
     expected_delivery_date?: string | null;
-    type: VehicleServiceJobType;
-    type_label?: string;
     customer_id: number;
     customer?: NamedResource | null;
     bill_to_customer_id?: number | null;
@@ -211,71 +178,25 @@ export interface VehicleServiceJob {
     status: VehicleServiceJobStatus;
     status_label?: string;
     odometer_reading?: string | null;
-    next_service_mileage?: string | null;
-    manual_job_card?: string | null;
     fuel_level?: string | null;
     priority?: string | null;
     subtotal: string;
-    line_discount_total: string;
-    job_discount_base: string;
-    job_discount_amount: string;
     discount_total: string;
     tax_total: string;
     charge_total: string;
     grand_total: string;
-    commission_cost_total: string;
-    net_after_commission: string;
     notes?: string | null;
     completed_at?: string | null;
-    job_discount?: VehicleServiceJobDiscount | null;
     inspection?: VehicleServiceInspection | null;
     lines?: VehicleServiceJobLine[];
     invoice_links?: VehicleServiceInvoiceLink[];
     payment_links?: VehicleServicePaymentLink[];
 }
 
-export type VehicleServiceDiscountCalculationType = 'fixed' | 'percentage';
-
-export interface VehicleServiceJobDiscount {
-    id: number;
-    revision: number;
-    action: 'set' | 'removed';
-    calculation_type: VehicleServiceDiscountCalculationType;
-    rate: string;
-    fixed_amount: string;
-    calculation_base: string;
-    calculated_amount: string;
-    reason: string;
-    changed_by?: NamedResource | null;
-    changed_at?: string | null;
-}
-
-export interface VehicleServiceJobDiscountPayload {
-    expected_version: number;
-    calculation_type: VehicleServiceDiscountCalculationType;
-    rate: string;
-    fixed_amount: string;
-    reason: string;
-}
-
-export interface VehicleServiceJobTotals {
-    subtotal: string;
-    line_discount_total: string;
-    job_discount_base: string;
-    job_discount_amount: string;
-    discount_total: string;
-    tax_total: string;
-    charge_total: string;
-    grand_total: string;
-    commission_cost_total: string;
-    net_after_commission: string;
-}
-
 export interface VehicleServiceJobPayload {
     expected_version?: number;
     job_date: string;
     expected_delivery_date?: string;
-    type: VehicleServiceJobType;
     customer_id: number;
     bill_to_customer_id?: number;
     vehicle_id: number;
@@ -283,22 +204,16 @@ export interface VehicleServiceJobPayload {
     supervisor_commission_type?: CommissionType;
     supervisor_commission_value?: string;
     odometer_reading?: string;
-    next_service_mileage?: string;
-    manual_job_card?: string;
     fuel_level?: string;
     priority?: string;
     notes?: string;
     customer_complaint?: string;
-    lines?: VehicleServiceLinePayload[];
 }
 
 export interface VehicleServiceLinePayload {
     expected_version?: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number;
-    item_variant_id?: number;
-    batch_id?: number;
-    batch_price_revision_id?: number;
     uom_id?: number;
     description: string;
     quantity: string;
@@ -317,7 +232,6 @@ export interface VehicleServiceLinePayload {
     is_billable?: boolean;
     expand_combo?: boolean;
 }
-
 
 export interface VehicleServiceInvoicePreview {
     subtotal: string;
@@ -371,36 +285,21 @@ export interface VehicleServicePaymentMethod {
 export interface VehicleServicePaymentOptions {
     job_version: number;
     methods: VehicleServicePaymentMethod[];
-    credit_allowed: boolean;
-    credit_assessment: VehicleServiceCreditAssessment;
-}
-
-export interface VehicleServiceCreditAssessment {
-    available: boolean;
-    can_keep_on_credit: boolean;
-    currency_code: string | null;
-    credit_limit: string;
-    open_exposure: string;
-    remaining_credit: string;
-    warning: string | null;
 }
 
 export interface VehicleServicePaymentPayload {
     expected_version: number;
     invoice_id: number;
     payment_date: string;
-    lines: Array<{
-        amount: string;
-        payment_method_id: number;
-        card_brand?: 'visa' | 'master' | 'amex';
-        reference_number?: string;
-        external_bank_name?: string;
-        external_bank_branch?: string;
-        instrument_number?: string;
-        instrument_date?: string;
-    }>;
+    amount: string;
+    payment_method_id: number;
     currency_id?: number;
     exchange_rate?: string;
+    reference_number?: string;
+    external_bank_name?: string;
+    external_bank_branch?: string;
+    instrument_number?: string;
+    instrument_date?: string;
 }
 
 export interface VehicleServicePaymentCreated {
@@ -413,6 +312,22 @@ export interface VehicleServicePaymentCreated {
     instrument_status?: string | null;
     total_amount?: string | null;
     allocated_amount?: string | null;
+}
+
+export interface PreparedVehicleServicePayment {
+    paymentType: string;
+    direction: string;
+    paymentDate: string;
+    referenceNumber?: string | null;
+    lines: Array<{
+        amount: string;
+        paymentMethodId?: number | null;
+        externalBankName?: string | null;
+        externalBankBranch?: string | null;
+        instrumentNumber?: string | null;
+        instrumentDate?: string | null;
+    }>;
+    allocations: Array<{ invoiceId: number; allocatedAmount: string }>;
 }
 
 export interface VehicleServiceStatusHistory {
@@ -439,12 +354,4 @@ export interface VehicleServiceDocument {
     description?: string | null;
     uploaded_by?: number | null;
     created_at?: string | null;
-}
-export interface VehicleServiceCancellationPreview {
-    row_version: number;
-    can_cancel: boolean;
-    blockers: string[];
-    stock_returns: { description: string; quantity: string; uom: string | null; warehouse: string | null; location: string | null }[];
-    inventory_value: string;
-    commission_amount: string;
 }

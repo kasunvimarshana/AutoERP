@@ -1,6 +1,5 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import { createLocallyFilteredLookupLoader } from '@/shared/api/lookupCache';
 import { mapLookupResult, requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
@@ -40,11 +39,7 @@ export async function deactivateUom(id: number): Promise<UnitOfMeasure> {
 }
 
 export async function searchUoms(params: LookupLoadParams): Promise<LookupResult<UomSummary>> {
-    const loader = createLocallyFilteredLookupLoader<UnitOfMeasure>({
-        key: 'lookup:uoms',
-        load: (lookupParams) => requestLookup<UnitOfMeasure>(`${endpoints.uoms}/lookup`, lookupParams),
-    });
-    const result = await loader(params);
+    const result = await requestLookup<UnitOfMeasure>(`${endpoints.uoms}/lookup`, params);
     return mapLookupResult(result, (uom) => ({
         id: uom.id,
         code: uom.code,

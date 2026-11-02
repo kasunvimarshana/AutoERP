@@ -6,11 +6,10 @@ use Modules\Auth\Providers\AuthServiceProvider;
 use Modules\Configuration\Providers\ConfigurationServiceProvider;
 use Modules\Core\Providers\CoreServiceProvider;
 use Modules\Customer\Providers\CustomerServiceProvider;
-use Modules\Expense\Providers\ExpenseServiceProvider;
 use Modules\Finance\Providers\FinanceServiceProvider;
 use Modules\Hr\Providers\HrServiceProvider;
-use Modules\Idempotency\Providers\IdempotencyServiceProvider;
 use Modules\Inventory\Providers\InventoryServiceProvider;
+use Modules\Idempotency\Providers\IdempotencyServiceProvider;
 use Modules\Invoice\Providers\InvoiceServiceProvider;
 use Modules\Item\Providers\ItemServiceProvider;
 use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
@@ -19,7 +18,6 @@ use Modules\PrivateObject\Providers\PrivateObjectServiceProvider;
 use Modules\Purchase\Providers\PurchaseServiceProvider;
 use Modules\ReferenceData\Providers\ReferenceDataServiceProvider;
 use Modules\Reporting\Providers\ReportingServiceProvider;
-use Modules\Selling\Providers\SellingServiceProvider;
 use Modules\Sequence\Providers\SequenceServiceProvider;
 use Modules\Supplier\Providers\SupplierServiceProvider;
 use Modules\Tax\Providers\TaxServiceProvider;
@@ -47,20 +45,18 @@ return [
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
     FinanceServiceProvider::class,
-    ExpenseServiceProvider::class,
     VoucherServiceProvider::class,
     ReportingServiceProvider::class,
     HrServiceProvider::class,
     ItemServiceProvider::class,
     InventoryServiceProvider::class,
     PurchaseServiceProvider::class,
-    SellingServiceProvider::class,
     SupplierServiceProvider::class,
     TaxServiceProvider::class,
     CustomerServiceProvider::class,
     VehicleServiceProvider::class,
-    VehicleServiceServiceProvider::class,
     VehicleRentalServiceProvider::class,
+    VehicleServiceServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,
     WarehouseServiceProvider::class,

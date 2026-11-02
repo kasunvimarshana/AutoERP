@@ -7,7 +7,6 @@ namespace Modules\Vehicle\DTOs;
 use Modules\Vehicle\Enums\VehicleFuelType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Enums\VehicleTransmissionType;
-use Modules\Vehicle\Data\VehicleOwnershipDraftData;
 
 final readonly class CreateVehicleData
 {
@@ -15,7 +14,6 @@ final readonly class CreateVehicleData
      * @param array<string, mixed>|null $metadata
      * @param list<VehicleDocumentData> $documents
      * @param list<VehicleAttributeData> $attributes
-     * @param list<VehicleOwnershipDraftData> $ownerships
      */
     public function __construct(
         public int $tenantId,
@@ -35,7 +33,7 @@ final readonly class CreateVehicleData
         public ?string $color = null,
         public ?VehicleFuelType $fuelType = null,
         public ?VehicleTransmissionType $transmissionType = null,
-        public ?string $odometerReading = null,
+        public string $odometerReading = '0.000000',
         public ?string $odometerUnit = null,
         public ?string $fuelLevel = null,
         public VehicleStatus $status = VehicleStatus::Active,
@@ -44,6 +42,5 @@ final readonly class CreateVehicleData
         public ?int $createdBy = null,
         public array $documents = [],
         public array $attributes = [],
-        public array $ownerships = [],
     ) {}
 }

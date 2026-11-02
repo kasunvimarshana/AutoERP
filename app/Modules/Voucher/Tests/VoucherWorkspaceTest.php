@@ -59,8 +59,7 @@ final class VoucherWorkspaceTest extends TestCase
                 'requires_instrument_details' => false,
                 'is_active' => true,
             ]);
-            $payment = new Payment();
-            $payment->forceFill([
+            $payment = Payment::query()->create([
                 'tenant_id' => $tenantId,
                 'payment_number' => 'RV-2026-0001',
                 'payment_type' => PaymentType::CustomerReceipt->value,
@@ -85,9 +84,7 @@ final class VoucherWorkspaceTest extends TestCase
                 'refunded_amount' => '0.000000',
                 'finance_posting_reference' => 'JV-RV-2026-0001',
             ]);
-            $payment->save();
-            $line = new PaymentLine();
-            $line->forceFill([
+            PaymentLine::query()->create([
                 'tenant_id' => $tenantId,
                 'payment_id' => $payment->getKey(),
                 'line_number' => 1,
@@ -101,7 +98,6 @@ final class VoucherWorkspaceTest extends TestCase
                 'cleared_amount' => '1000.000000',
                 'status' => 'cleared',
             ]);
-            $line->save();
 
             return $payment->refresh();
         });

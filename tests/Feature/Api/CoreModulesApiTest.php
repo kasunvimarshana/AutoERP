@@ -9,12 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Finance\Constants\FinancePermission;
-use Modules\Finance\Services\FinanceStatementService;
-use Modules\Inventory\DTOs\StockMovementData;
-use Modules\Inventory\Enums\InventoryDirection;
-use Modules\Inventory\Enums\InventoryMovementType;
-use Modules\Inventory\Services\ConsumableUsageService;
-use Modules\Inventory\Services\StockMovementService;
 use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Models\Invoice;
 use Modules\Item\DTOs\CreateItemData;
@@ -23,7 +17,6 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCreationService;
-use Modules\Payment\Constants\PaymentIdempotency;
 use Modules\Payment\Constants\PaymentPermission;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
@@ -31,12 +24,10 @@ use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseOrderService;
-use Modules\Reporting\Services\ExpenseReportService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
 use Modules\User\Models\UserModel;
-use Tests\Support\FinancePostingFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
@@ -76,7 +67,6 @@ final class CoreModulesApiTest extends TestCase
         $this->tenantPatchJson($tenantId, '/api/v1/suppliers/'.$created['id'], [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
-            'row_version' => $created['row_version'],
             'name' => 'Updated API Supplier',
         ])->assertSuccessful()->assertJsonPath('data.name', 'Updated API Supplier');
 
@@ -172,7 +162,6 @@ final class CoreModulesApiTest extends TestCase
     public function test_invoice_preview_create_and_lifecycle_api(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
-        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId, $organizationUnitId);
         $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
             InvoicePermission::PREVIEW,
             InvoicePermission::CREATE,
@@ -246,8 +235,6 @@ final class CoreModulesApiTest extends TestCase
                 'payment_method_id' => $paymentMethodId,
                 'amount' => '80.000000',
             ]],
-        ], [
-            PaymentIdempotency::REQUEST_HEADER => 'payment-'.Str::uuid()->toString(),
         ])->assertSuccessful()->json('data');
 
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
@@ -276,6 +263,125 @@ final class CoreModulesApiTest extends TestCase
             fn (): string => (string) $invoice->refresh()->balance_due,
         );
         $this->assertSame('20.000000', $balanceDue);
+    }
+
+    public function test_single_payment_can_settle_multiple_invoices_api(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
+            InvoicePermission::VIEW,
+            PaymentPermission::PAYMENTS_CREATE,
+            PaymentPermission::PAYMENTS_SUBMIT,
+            PaymentPermission::PAYMENTS_APPROVE,
+            PaymentPermission::PAYMENTS_POST,
+            PaymentPermission::PAYMENTS_ALLOCATE,
+        ], 'Payment');
+        $this->paymentFinanceContext($tenantId, $organizationUnitId);
+        $customerId = $this->customer($tenantId, $organizationUnitId);
+        $invoice1 = $this->createPostedInvoice($tenantId, $organizationUnitId, $customerId);
+        $invoice2 = $this->createPostedInvoice($tenantId, $organizationUnitId, $customerId);
+        $paymentMethodId = $this->paymentMethod($tenantId);
+
+        $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
+        $openInvoices = $this->tenantGetJson($tenantId, '/api/v1/invoices?'.http_build_query($scope + [
+            'party_id' => $customerId,
+            'has_balance_due' => 1,
+        ]))
+            ->assertSuccessful()
+            ->json('data');
+        $this->assertCount(2, $openInvoices);
+
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments', [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'payment_type' => 'customer_receipt',
+            'direction' => 'inbound',
+            'payment_date' => '2026-06-06',
+            'party_type' => 'customer',
+            'party_id' => $customerId,
+            'lines' => [[
+                'payment_method_id' => $paymentMethodId,
+                'amount' => '160.000000',
+            ]],
+            'allocations' => [
+                [
+                    'invoice_id' => $invoice1->getKey(),
+                    'allocated_amount' => '100.000000',
+                    'allocation_date' => '2026-06-06',
+                ],
+                [
+                    'invoice_id' => $invoice2->getKey(),
+                    'allocated_amount' => '60.000000',
+                    'allocation_date' => '2026-06-06',
+                ],
+            ],
+        ])->assertSuccessful()->json('data');
+
+        $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment['id'].'/submit-approval', $scope + [
+            'expected_version' => $payment['row_version'],
+        ])->assertSuccessful()->json('data');
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment['id'].'/approve', $scope + [
+            'expected_version' => $payment['row_version'],
+        ])->assertSuccessful()->json('data');
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment['id'].'/post', $scope + [
+            'expected_version' => $payment['row_version'],
+        ])->assertSuccessful()->json('data');
+
+        $this->assertSame('0.000000', (string) $invoice1->refresh()->balance_due);
+        $this->assertSame('paid', $invoice1->status instanceof \BackedEnum ? $invoice1->status->value : (string) $invoice1->status);
+        $this->assertSame('40.000000', (string) $invoice2->refresh()->balance_due);
+        $this->assertSame('partially_paid', $invoice2->status instanceof \BackedEnum ? $invoice2->status->value : (string) $invoice2->status);
+
+        $this->assertSame('160.000000', (string) $payment['allocated_amount']);
+        $this->assertSame('0.000000', (string) $payment['unapplied_amount']);
+        $this->assertSame('fully_allocated', (string) $payment['allocation_status']);
+
+        $payment2 = $this->tenantPostJson($tenantId, '/api/v1/payments', [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'payment_type' => 'customer_receipt',
+            'direction' => 'inbound',
+            'payment_date' => '2026-06-06',
+            'party_type' => 'customer',
+            'party_id' => $customerId,
+            'lines' => [[
+                'payment_method_id' => $paymentMethodId,
+                'amount' => '40.000000',
+            ]],
+        ])->assertSuccessful()->json('data');
+
+        $payment2 = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment2['id'].'/submit-approval', $scope + [
+            'expected_version' => $payment2['row_version'],
+        ])->assertSuccessful()->json('data');
+        $payment2 = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment2['id'].'/approve', $scope + [
+            'expected_version' => $payment2['row_version'],
+        ])->assertSuccessful()->json('data');
+        $payment2 = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment2['id'].'/post', $scope + [
+            'expected_version' => $payment2['row_version'],
+        ])->assertSuccessful()->json('data');
+
+        $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment2['id'].'/allocations', $scope + [
+            'expected_version' => $payment2['row_version'],
+            'allocations' => [[
+                'invoice_id' => $invoice2->getKey(),
+                'allocated_amount' => '40.000000',
+                'allocation_date' => '2026-06-06',
+            ]],
+        ])->assertSuccessful()
+            ->assertJsonPath('data.allocated_amount', '40.000000')
+            ->assertJsonPath('data.unapplied_amount', '0.000000');
+
+        $this->assertSame('0.000000', (string) $invoice2->refresh()->balance_due);
+        $this->assertSame('paid', $invoice2->status instanceof \BackedEnum ? $invoice2->status->value : (string) $invoice2->status);
+
+        $remainingOpen = $this->tenantGetJson($tenantId, '/api/v1/invoices?'.http_build_query($scope + [
+            'party_id' => $customerId,
+            'has_balance_due' => 1,
+        ]))
+            ->assertSuccessful()
+            ->json('data');
+        $this->assertCount(0, $remainingOpen);
     }
 
     public function test_finance_account_and_journal_posting_api(): void
@@ -311,90 +417,6 @@ final class CoreModulesApiTest extends TestCase
             ->assertJsonPath('data.ledgerEntryCount', 2);
     }
 
-    public function test_consumable_usage_posts_once_and_reverses_stock_and_finance_together(): void
-    {
-        [$tenantId, $organizationUnitId] = $this->scope();
-        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [], 'Inventory');
-        $warehouseId = $this->warehouse($tenantId, $organizationUnitId);
-        $uomId = $this->uom($tenantId, $organizationUnitId);
-        $actorId = (int) auth()->id();
-        FinancePostingFixture::seedConsumableUsageProfile($tenantId, $organizationUnitId);
-
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $organizationUnitId, $warehouseId, $uomId, $actorId): void {
-            $item = app(ItemCreationService::class)->create(new CreateItemData(
-                tenantId: $tenantId,
-                code: 'CONSUMABLE-TEST',
-                name: 'Test shampoo',
-                itemType: ItemType::Consumable,
-                trackingType: TrackingType::None,
-                costingMethod: CostingMethod::Fifo,
-                baseUomId: $uomId,
-                organizationUnitId: $organizationUnitId,
-                isStockable: true,
-            ));
-            $this->tenantGetJson($tenantId, '/api/v1/inventory/consumable-usage/items?'.http_build_query([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-            ]))->assertSuccessful()->assertJsonPath('data.0.name', 'Test shampoo');
-            app(StockMovementService::class)->record(new StockMovementData(
-                tenantId: $tenantId,
-                movementDate: now()->toDateString(),
-                movementType: InventoryMovementType::Receipt,
-                direction: InventoryDirection::In,
-                itemId: (int) $item->getKey(),
-                warehouseId: $warehouseId,
-                quantity: '5.000000',
-                organizationUnitId: $organizationUnitId,
-                unitCost: '10.000000',
-            ), $actorId);
-
-            $data = [
-                'usage_date' => now()->toDateString(),
-                'item_id' => (int) $item->getKey(),
-                'warehouse_id' => $warehouseId,
-                'quantity' => '2.000000',
-            ];
-            $service = app(ConsumableUsageService::class);
-            $usage = $service->post($data, $tenantId, $organizationUnitId, $actorId, 'test-usage-key');
-            self::assertSame('20.000000', (string) $usage->total_cost);
-            self::assertSame((int) $usage->getKey(), (int) $service->post($data, $tenantId, $organizationUnitId, $actorId, 'test-usage-key')->getKey());
-            self::assertEquals(3, (float) DB::table('inventory_stock_balances')->where('item_id', $item->getKey())->value('quantity_available'));
-            self::assertSame(1, DB::table('finance_journal_entries')->where('source_type', 'internal_consumption')->where('source_id', $usage->getKey())->count());
-            $reportParams = [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'date_from' => now()->startOfMonth()->toDateString(),
-                'date_to' => now()->toDateString(),
-            ];
-            $report = app(ExpenseReportService::class)->run($reportParams);
-            self::assertSame('20.000000', $report['summary']['net_amount']);
-            self::assertSame('consumable', $report['by_source'][0]['source']);
-            self::assertSame('Test shampoo', $report['by_consumable_item'][0]['name']);
-            self::assertSame('2.000000', $report['by_consumable_item'][0]['quantity']);
-            self::assertSame([], $report['by_expense_type']);
-            self::assertSame([], $report['by_payment_method']);
-            self::assertSame('20.000000', app(FinanceStatementService::class)->profitAndLoss(
-                $tenantId, $organizationUnitId, $reportParams['date_from'], $reportParams['date_to'],
-            )['total_expenses']);
-            self::assertSame('20.000000', app(ExpenseReportService::class)->exportRows($reportParams)->first()['net_amount']);
-            $history = $this->tenantGetJson($tenantId, '/api/v1/inventory/consumable-usage?'.http_build_query([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'from' => now()->startOfMonth()->toDateString(),
-                'to' => now()->toDateString(),
-            ]))->assertSuccessful();
-            self::assertSame(0, bccomp((string) $history->json('summary.items.0.quantity'), '2', 6));
-
-            $service->reverse($tenantId, $organizationUnitId, (int) $usage->getKey(), $actorId, 'Entered twice');
-            self::assertEquals(5, (float) DB::table('inventory_stock_balances')->where('item_id', $item->getKey())->value('quantity_available'));
-            self::assertSame('reversed', (string) DB::table('inventory_movements')->where('id', $usage->getKey())->value('status'));
-            self::assertSame(1, DB::table('finance_journal_entries')->where('source_type', 'internal_consumption')->whereNotNull('reversal_of_id')->count());
-            $reversedReport = app(ExpenseReportService::class)->run($reportParams);
-            self::assertSame('0.000000', $reversedReport['summary']['net_amount']);
-            self::assertSame('0.000000', $reversedReport['by_consumable_item'][0]['quantity']);
-        });
-    }
-
     private function scope(): array
     {
         $suffix = Str::upper(Str::random(8));
@@ -406,8 +428,7 @@ final class CoreModulesApiTest extends TestCase
             'status' => 'active',
             'status_changed_at' => now(),
             'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'updated_at' => now()]);
         $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
@@ -582,9 +603,9 @@ final class CoreModulesApiTest extends TestCase
         ]);
     }
 
-    private function invoicePayload(int $tenantId, int $organizationUnitId): array
+    private function invoicePayload(int $tenantId, int $organizationUnitId, ?int $customerId = null): array
     {
-        $customerId = $this->customer($tenantId, $organizationUnitId);
+        $customerId ??= $this->customer($tenantId, $organizationUnitId);
 
         return [
             'tenant_id' => $tenantId,
@@ -600,9 +621,9 @@ final class CoreModulesApiTest extends TestCase
         ];
     }
 
-    private function createPostedInvoice(int $tenantId, int $organizationUnitId): Invoice
+    private function createPostedInvoice(int $tenantId, int $organizationUnitId, ?int $customerId = null): Invoice
     {
-        $payload = $this->invoicePayload($tenantId, $organizationUnitId) + [
+        $payload = $this->invoicePayload($tenantId, $organizationUnitId, $customerId) + [
             'idempotency_key' => 'invoice-'.Str::uuid()->toString(),
         ];
         $invoice = $this->tenantPostJson($tenantId, '/api/v1/invoices', $payload)
@@ -657,7 +678,97 @@ final class CoreModulesApiTest extends TestCase
 
     private function paymentFinanceContext(int $tenantId, int $organizationUnitId): void
     {
-        FinancePostingFixture::seedCustomerPaymentProfiles($tenantId, $organizationUnitId);
+        $assetTypeId = $this->accountType($tenantId, 'PAYMENT-ASSET', 'debit');
+        $cashAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'account_type_id' => $assetTypeId,
+            'code' => '1010',
+            'name' => 'Cash',
+            'normal_balance' => 'debit',
+            'is_posting_account' => true,
+            'is_cash_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $receivableAccountId = (int) DB::table('finance_accounts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'account_type_id' => $assetTypeId,
+            'code' => '1100',
+            'name' => 'Accounts Receivable',
+            'normal_balance' => 'debit',
+            'is_posting_account' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $profileId = (int) DB::table('finance_posting_profiles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'code' => 'payment_received',
+            'name' => 'Payment Received',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $cashRoleId = (int) DB::table('finance_account_roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'cash',
+            'name' => 'Cash',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $receivableRoleId = (int) DB::table('finance_account_roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'receivable',
+            'name' => 'Receivable',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_account_assignments')->insert([
+            [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'account_role_id' => $cashRoleId,
+                'account_id' => $cashAccountId,
+                'effective_from' => '2026-01-01',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'account_role_id' => $receivableRoleId,
+                'account_id' => $receivableAccountId,
+                'effective_from' => '2026-01-01',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        DB::table('finance_posting_profile_rules')->insert([
+            [
+                'tenant_id' => $tenantId,
+                'posting_profile_id' => $profileId,
+                'line_key' => 'cash',
+                'account_role_id' => $cashRoleId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => $tenantId,
+                'posting_profile_id' => $profileId,
+                'line_key' => 'receivable',
+                'account_role_id' => $receivableRoleId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
     }
 
     private function accountType(int $tenantId, string $code, string $normalBalance): int

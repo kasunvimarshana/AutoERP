@@ -23,7 +23,6 @@ final class InventoryBatch extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'item_id' => 'integer',
@@ -53,10 +52,5 @@ final class InventoryBatch extends TenantOwnedModel
     public function stockBalances(): HasMany
     {
         return $this->hasMany(InventoryStockBalance::class, 'batch_id');
-    }
-
-    public function priceRevisions(): HasMany
-    {
-        return $this->hasMany(InventoryBatchPriceRevision::class, 'batch_id');
     }
 }

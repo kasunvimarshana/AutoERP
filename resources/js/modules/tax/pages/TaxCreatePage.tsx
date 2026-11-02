@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { hasPermission } from '@/modules/auth/accessControl';
-import { useAuth } from '@/modules/auth/AuthProvider';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -10,10 +8,9 @@ import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
-import { useApi } from '@/shared/hooks/useApi';
 import { createTax, addTaxRate, getTaxLookups } from '../taxApi';
-import { taxPermissions } from '../taxPermissions';
 import type { TaxCalculationMethod, TaxPayload } from '../taxTypes';
+import { useApi } from '@/shared/hooks/useApi';
 
 const blank: TaxPayload = {
     code: '',
@@ -29,10 +26,8 @@ const blank: TaxPayload = {
 };
 
 export default function TaxCreatePage() {
-    const auth = useAuth();
-    const canViewLookups = hasPermission(auth, taxPermissions.lookupsView);
     const navigate = useNavigate();
-    const lookups = useApi((signal) => getTaxLookups(signal), [], canViewLookups);
+    const lookups = useApi((signal) => getTaxLookups(signal), []);
     const [form, setForm] = useState<TaxPayload>(blank);
     const [rate, setRate] = useState({ rate: '0.000000', effective_from: '', effective_to: '', active: true });
     const [error, setError] = useState<ApiError | null>(null);

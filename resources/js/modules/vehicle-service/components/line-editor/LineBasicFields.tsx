@@ -1,6 +1,7 @@
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { listUoms } from '@/shared/api/referenceApi';
 import { DecimalInput } from '@/shared/components/DecimalInput';
+import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import type { VehicleServiceLineFormValue } from './lineForm';
 
@@ -14,6 +15,12 @@ export function LineBasicFields({ value, error, set }: {
 }) {
     return (
         <>
+            <Input
+                label="Description"
+                value={value.description}
+                error={fieldError(error, 'description')}
+                onChange={(event) => set('description', event.target.value)}
+            />
             <DecimalInput
                 label="Quantity"
                 value={value.quantity}

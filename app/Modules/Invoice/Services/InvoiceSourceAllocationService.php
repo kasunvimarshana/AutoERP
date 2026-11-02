@@ -13,11 +13,6 @@ use Modules\Invoice\Models\InvoiceSourceLine;
 
 final class InvoiceSourceAllocationService
 {
-    private const ZERO = '0.000000';
-
-    // Multiplying two persisted decimals requires the sum of their scales.
-    private const PRODUCT_SCALE = DecimalMath::SCALE + DecimalMath::SCALE;
-
     public function __construct(private readonly DecimalMath $math) {}
 
     /**
@@ -31,8 +26,7 @@ final class InvoiceSourceAllocationService
         $rows = [];
 
         foreach ($data->sourceLines as $sourceLine) {
-            $previous = $this->previousAllocations($data, $sourceLine, $lockRows);
-            $previouslyInvoiced = $previous['quantity'];
+            $previouslyInvoiced = $this->previouslyInvoicedQuantity($data, $sourceLine, $lockRows);
             $remainingBeforeCurrent = $this->math->sub($sourceLine->sourceQuantity, $previouslyInvoiced);
 
             if ($this->math->compare($sourceLine->invoicedQuantity, $remainingBeforeCurrent) > 0) {
@@ -43,9 +37,8 @@ final class InvoiceSourceAllocationService
             $invoicedLineTotal = $sourceLine->invoicedLineTotal
                 ?? $this->proportionalAmount(
                     $sourceLine->sourceLineTotal,
-                    $this->math->add($previouslyInvoiced, $sourceLine->invoicedQuantity),
+                    $sourceLine->invoicedQuantity,
                     $sourceLine->sourceQuantity,
-                    $previous['amount'],
                 );
 
             $rows[] = [
@@ -78,7 +71,7 @@ final class InvoiceSourceAllocationService
         $totals = [];
         foreach ($sourceLineRows as $row) {
             $key = $this->sourceKey((string) $row['source_type'], (int) $row['source_id']);
-            $totals[$key] = $this->math->add($totals[$key] ?? self::ZERO, (string) $row['invoiced_line_total']);
+            $totals[$key] = $this->math->add($totals[$key] ?? '0.000000', (string) $row['invoiced_line_total']);
         }
 
         return $totals;
@@ -94,12 +87,12 @@ final class InvoiceSourceAllocationService
         return $sourceLineType.':'.$sourceLineId;
     }
 
-    /** @return array{quantity: string, amount: string} */
-    private function previousAllocations(
+    private function previouslyInvoicedQuantity(
         CreateInvoiceData $data,
         InvoiceSourceLineData $sourceLine,
         bool $lockRows,
-    ): array {
+    ): string
+    {
         $rows = InvoiceSourceLine::query()
             ->where('tenant_id', $data->tenantId)
             ->when(
@@ -114,34 +107,27 @@ final class InvoiceSourceAllocationService
             ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
                 InvoiceStatus::Cancelled->value,
                 InvoiceStatus::Void->value,
-                InvoiceStatus::Reversed->value,
             ]))
             ->when($lockRows, fn ($query) => $query->lockForUpdate())
-            ->get(['invoiced_quantity', 'invoiced_line_total']);
+            ->get(['invoiced_quantity']);
 
-        return [
-            'quantity' => $this->math->sum($rows->map(static fn (InvoiceSourceLine $row): string => (string) $row->invoiced_quantity)),
-            'amount' => $this->math->sum($rows->map(static fn (InvoiceSourceLine $row): string => (string) $row->invoiced_line_total)),
-        ];
+        return $this->math->sum(
+            $rows->map(static fn (InvoiceSourceLine $row): string => (string) $row->invoiced_quantity)->all(),
+        );
     }
 
-    private function proportionalAmount(string $sourceAmount, string $cumulativeQuantity, string $sourceQuantity, string $previousAmount): string
+    private function proportionalAmount(string $sourceAmount, string $selectedQuantity, string $sourceQuantity): string
     {
-        if ($this->math->compare($sourceQuantity, self::ZERO) <= 0) {
+        if ($this->math->isZero($sourceQuantity)) {
+            if ($this->math->isZero($selectedQuantity)) {
+                return '0.000000';
+            }
+
             throw new InvalidArgumentException('Source quantity must be greater than zero when invoicing quantity.');
         }
 
-        // Quantize once, after multiplication and division. Subtract surviving
-        // monetary allocations so final quantities reconcile even after reversal.
-        $cumulativeAmount = $this->math->div(
-            $this->math->mul($sourceAmount, $cumulativeQuantity, self::PRODUCT_SCALE),
-            $sourceQuantity,
-        );
-        $amount = $this->math->sub($cumulativeAmount, $previousAmount);
-        if ($this->math->isNegative($amount)) {
-            throw new InvalidArgumentException('Provide an explicit invoiced line total after reviewing earlier nonproportional allocations.');
-        }
+        $ratio = $this->math->div($selectedQuantity, $sourceQuantity, 12);
 
-        return $amount;
+        return $this->math->mul($sourceAmount, $ratio);
     }
 }

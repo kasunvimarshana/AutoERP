@@ -78,7 +78,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const mountedRef = useRef(true);
     const unmountCancelTimerRef = useRef<number | null>(null);
     const [supplier, setSupplierState] = useState<NamedResource | null>(null);
-    const [currencyOverride, setCurrencyOverride] = useState<NamedResource | null | undefined>(undefined);
+    const [currency, setCurrencyState] = useState<NamedResource | null>(null);
     const [paymentDate, setPaymentDate] = useState(todayDate());
     const [referenceNumber, setReferenceNumber] = useState('');
     const [amount, setAmount] = useState('0.000000');
@@ -93,8 +93,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const [busy, setBusy] = useState(false);
     const debouncedInvoiceSearch = useDebounce(invoiceSearch);
     const paymentContext = useApi((signal) => getPurchasePaymentContext(signal), []);
-    const defaultCurrency = paymentContext.data?.default_currency ?? null;
-    const currency = currencyOverride === undefined ? defaultCurrency : currencyOverride;
     const invoiceResult = useApi((signal) => listOutstandingSupplierInvoices({
         supplier_id: supplier?.id,
         search: debouncedInvoiceSearch || undefined,
@@ -146,7 +144,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 setAmount(balance);
                 setPaymentRows([blankPaymentMethodRow(balance)]);
                 setSupplierState(namedResourceFromInvoiceSnapshot(invoice.party));
-                setCurrencyOverride(namedResourceFromInvoiceSnapshot(invoice.currency));
+                setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
                 setSourceNotice(`Loaded supplier invoice ${invoice.invoice_number ?? 'Invoice number unavailable'}.`);
                 return;
             }
@@ -155,7 +153,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
 
             setSupplierState(order.supplier ?? null);
-            setCurrencyOverride(order.currency ?? null);
+            setCurrencyState(order.currency ?? null);
             setSourceNotice(`${order.purchase_order_number ?? 'Selected purchase order'} is selected. Create payment from an eligible supplier invoice generated from this purchase flow.`);
         } catch (requestError) {
             if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
@@ -214,7 +212,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         if (next?.id !== supplier?.id) {
             setAllocations({});
             setAllocatedInvoices({});
-            setCurrencyOverride(undefined);
+            setCurrencyState(null);
         }
     };
 
@@ -231,7 +229,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         } else if (next?.id !== currency?.id) {
             cancelSourceRequest();
         }
-        setCurrencyOverride(next);
+        setCurrencyState(next);
     };
 
     const updateAllocation = async (invoice: Invoice, nextAmount: string) => {
@@ -248,7 +246,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             const nextAllocations = { [invoice.id]: nextAmount };
             setAllocations(nextAllocations);
             setAllocatedInvoices({ [invoice.id]: invoice });
-            setCurrencyOverride(namedResourceFromInvoiceSnapshot(invoice.currency));
+            setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
             syncAmountWithAllocations(nextAllocations);
             return;
         }
@@ -258,7 +256,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         if (isPositiveDecimal(nextAmount)) {
             nextAllocatedInvoices[invoice.id] = invoice;
             if (invoice.currency && (!currency || currency.id !== invoice.currency.id)) {
-                setCurrencyOverride(namedResourceFromInvoiceSnapshot(invoice.currency));
+                setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
             }
         } else {
             delete nextAllocatedInvoices[invoice.id];
@@ -327,7 +325,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             }
 
             const payment = await createPurchasePayment(paymentPayload());
-            navigate(`/purchase/payments/${payment.id}`);
+            navigate(`/payments/${payment.id}?from=purchase`);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -394,7 +392,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                                 <div className="grid gap-3 p-3 md:hidden">
                                     {(invoiceResult.data?.data ?? []).map((invoice) => (
                                         <article key={invoice.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                                            <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link>
+                                            <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${invoice.id}?from=purchase`}>{invoice.invoice_number ?? 'Invoice'}</Link>
                                             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                                                 <Summary label="Date" value={formatDate(invoice.invoice_date)} />
                                                 <Summary label="Status" value={invoice.status ?? '-'} />
@@ -477,7 +475,7 @@ function AllocationRow({ invoice, value, error, onChange }: {
 }) {
     return (
         <tr>
-            <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
+            <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${invoice.id}?from=purchase`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
             <td className="px-4 py-3">{formatDate(invoice.invoice_date)}</td>
             <td className="px-4 py-3">{invoice.status ? <StatusBadge status={invoice.status} /> : '-'}</td>
             <td className="px-4 py-3"><MoneyDisplay value={balanceOf(invoice)} currency={invoice.currency?.code ?? undefined} /></td>

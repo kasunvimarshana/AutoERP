@@ -7,23 +7,21 @@ namespace Modules\Invoice\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Invoice\Enums\InvoiceStatus;
-use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceStatusService
 {
-    private const TRANSACTION_ATTEMPTS = 3;
-
     public function __construct(
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly InvoiceSourceRestorationService $sourceRestoration,
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
-        private readonly InvoicePostingPlanService $postingPlans,
     ) {}
 
-    /** @return array<string, list<string>> */
+    /**
+     * @return array<string, list<string>>
+     */
     private function transitions(): array
     {
         return [
@@ -41,21 +39,12 @@ final class InvoiceStatusService
                 InvoiceStatus::PartiallyPaid->value,
                 InvoiceStatus::Paid->value,
             ],
-            InvoiceStatus::PartiallyPaid->value => [InvoiceStatus::Paid->value],
+            InvoiceStatus::PartiallyPaid->value => [
+                InvoiceStatus::Paid->value,
+            ],
             InvoiceStatus::Paid->value => [],
-            InvoiceStatus::Reversed->value => [],
             InvoiceStatus::Cancelled->value => [],
             InvoiceStatus::Void->value => [],
-        ];
-    }
-
-    /** @return list<string> */
-    public function settlementStatuses(): array
-    {
-        return [
-            InvoiceStatus::Posted->value,
-            InvoiceStatus::PartiallyPaid->value,
-            InvoiceStatus::Paid->value,
         ];
     }
 
@@ -63,6 +52,7 @@ final class InvoiceStatusService
     {
         $fromValue = $from instanceof InvoiceStatus ? $from->value : $from;
         $toValue = $to instanceof InvoiceStatus ? $to->value : $to;
+
         if (! in_array($toValue, $this->transitions()[$fromValue] ?? [], true)) {
             throw new InvalidArgumentException(sprintf('Invoice status cannot transition from %s to %s.', $fromValue, $toValue));
         }
@@ -99,7 +89,10 @@ final class InvoiceStatusService
         ?string $reason,
     ): Invoice {
         return DB::transaction(function () use ($invoice, $to, $expectedVersion, $actorId, $reason): Invoice {
-            $invoice = Invoice::query()->lockForUpdate()->findOrFail($invoice->getKey());
+            $invoice = Invoice::query()
+                ->lockForUpdate()
+                ->findOrFail($invoice->getKey());
+
             if ($expectedVersion !== null && $expectedVersion !== (int) $invoice->row_version) {
                 throw new InvalidArgumentException(
                     'Invoice was changed by another request. Reload it before performing this action.',
@@ -109,19 +102,6 @@ final class InvoiceStatusService
             $from = $invoice->status instanceof InvoiceStatus
                 ? $invoice->status
                 : InvoiceStatus::from((string) $invoice->status);
-            $type = $invoice->invoice_type instanceof InvoiceType
-                ? $invoice->invoice_type
-                : InvoiceType::from((string) $invoice->invoice_type);
-            if (
-                $type->belongsToRetiredSourceModule()
-                && ! in_array($to, [InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid], true)
-            ) {
-                throw new InvalidArgumentException(sprintf(
-                    'Historical %s invoices are read-only except for settlement updates.',
-                    $type->retiredSourceLabel(),
-                ));
-            }
-
             $this->assertCanTransition($from, $to);
 
             $updates = ['status' => $to->value];
@@ -140,17 +120,19 @@ final class InvoiceStatusService
             }
 
             $invoice->forceFill($updates)->save();
+
             if (in_array($to, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
-                $this->sourceRestoration->restore($invoice, $to, $actorId, $reason);
+                $this->sourceRestoration->restore($invoice);
             }
             if ($to === InvoiceStatus::Posted) {
-                $postedInvoice = $invoice->refresh();
-                $this->taxDocuments->post($this->taxDocumentMapper->map($postedInvoice));
-                $this->postingPlans->post($postedInvoice, $actorId);
+                // TaxDocumentIntegrationService reuses the draft snapshot and only
+                // calculates one when no snapshot exists. Recalculating here could
+                // make posted tax differ from the immutable invoice totals.
+                $this->taxDocuments->post($this->taxDocumentMapper->map($invoice->refresh()));
             }
 
             return $invoice->refresh();
-        }, self::TRANSACTION_ATTEMPTS);
+        });
     }
 
     public function assertEditable(Invoice $invoice): void
@@ -158,6 +140,7 @@ final class InvoiceStatusService
         $status = $invoice->status instanceof InvoiceStatus
             ? $invoice->status
             : InvoiceStatus::from((string) $invoice->status);
+
         if ($status !== InvoiceStatus::Draft) {
             throw new InvalidArgumentException('Only draft invoices can be edited directly.');
         }
@@ -168,7 +151,12 @@ final class InvoiceStatusService
         $status = $invoice->status instanceof InvoiceStatus
             ? $invoice->status
             : InvoiceStatus::from((string) $invoice->status);
-        if (! in_array($status->value, $this->settlementStatuses(), true)) {
+
+        if (! in_array($status, [
+            InvoiceStatus::Posted,
+            InvoiceStatus::PartiallyPaid,
+            InvoiceStatus::Paid,
+        ], true)) {
             throw new InvalidArgumentException('Only posted invoices can be settled.');
         }
     }
@@ -178,6 +166,7 @@ final class InvoiceStatusService
         if ($reason === null) {
             return null;
         }
+
         $reason = trim($reason);
 
         return $reason === '' ? null : $reason;

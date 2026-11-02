@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -11,94 +11,22 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
-import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
-import { compareDecimalStrings, nonNegativeDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
-import { formatMoney } from '@/shared/utils/formatMoney';
-import { getInvoiceSignedPrintLink, getInvoiceWhatsAppShare } from '@/modules/invoice/invoiceApi';
-import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
+import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { PaymentMethodFields } from '@/modules/payment/components/PaymentMethodFields';
 import {
     createVehicleServicePayment,
-    checkVehicleServiceCredit,
-    keepVehicleServiceInvoiceOnCredit,
     getVehicleServiceJob,
     getVehicleServicePaymentOptions,
+    prepareVehicleServicePayment,
 } from '../vehicleServiceApi';
 import type {
-    VehicleServiceInvoiceLink,
-    VehicleServicePaymentCreated,
+    PreparedVehicleServicePayment,
     VehicleServicePaymentMethod,
     VehicleServicePaymentPayload,
 } from '../vehicleServiceTypes';
 
-const ZERO_AMOUNT = '0.000000';
-const NO_PAYMENT_METHODS: VehicleServicePaymentMethod[] = [];
-
-interface PaymentRow {
-    kind: DirectPaymentKind;
-    paymentMethodId: string;
-    amount: string;
-    cashReceivedAmount: string;
-    reference: string;
-    details: Record<string, string>;
-}
-
-type DirectPaymentKind = 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'wallet' | 'other';
-
-const DIRECT_PAYMENT_KINDS: Array<{ kind: DirectPaymentKind; label: string }> = [
-    { kind: 'cash', label: 'Cash' },
-    { kind: 'card', label: 'Card' },
-    { kind: 'bank_transfer', label: 'Bank transfer' },
-    { kind: 'cheque', label: 'Cheque' },
-    { kind: 'wallet', label: 'Wallet' },
-    { kind: 'other', label: 'Other method' },
-];
-
-const PAYMENT_METHOD_STYLES: Record<DirectPaymentKind, { section: string; label: string }> = {
-    cash: { section: 'border-emerald-500 bg-emerald-50/60', label: 'bg-emerald-100 text-emerald-900' },
-    card: { section: 'border-blue-500 bg-blue-50/60', label: 'bg-blue-100 text-blue-900' },
-    bank_transfer: { section: 'border-violet-500 bg-violet-50/60', label: 'bg-violet-100 text-violet-900' },
-    cheque: { section: 'border-amber-200 border-l-amber-500 bg-amber-50/30', label: 'bg-amber-100 text-amber-900' },
-    wallet: { section: 'border-indigo-200 border-l-indigo-500 bg-indigo-50/30', label: 'bg-indigo-100 text-indigo-900' },
-    other: { section: 'border-slate-200 border-l-slate-500 bg-slate-50/30', label: 'bg-slate-100 text-slate-900' },
-};
-
-type PaymentMode = 'direct' | 'credit';
-
-const CARD_BRANDS = [
-    { value: 'visa', label: 'VISA' },
-    { value: 'master', label: 'MASTER' },
-    { value: 'amex', label: 'AMEX' },
-] as const;
-
-function isCashMethod(method?: VehicleServicePaymentMethod): boolean {
-    return paymentMethodKind(method) === 'cash';
-}
-
-function calculateAppliedAmounts(
-    rows: PaymentRow[],
-    methods: VehicleServicePaymentMethod[],
-    outstanding: string,
-): string[] {
-    const nonCashTotal = sumDecimals(rows.map((row) => {
-        const method = methods.find((candidate) => String(candidate.id) === row.paymentMethodId);
-        return row.kind === 'cash' || isCashMethod(method) ? ZERO_AMOUNT : row.amount || ZERO_AMOUNT;
-    }));
-    let cashAvailable = nonNegativeDecimal(subtractDecimal(outstanding, nonCashTotal));
-
-    return rows.map((row) => {
-        const method = methods.find((candidate) => String(candidate.id) === row.paymentMethodId);
-        if (row.kind !== 'cash' && !isCashMethod(method)) return row.amount || ZERO_AMOUNT;
-
-        const applied = compareDecimalStrings(row.cashReceivedAmount || ZERO_AMOUNT, cashAvailable) < 0
-            ? row.cashReceivedAmount || ZERO_AMOUNT
-            : cashAvailable;
-        cashAvailable = nonNegativeDecimal(subtractDecimal(cashAvailable, applied));
-
-        return applied;
-    });
-}
+const today = businessDateInputValue;
 
 function paymentMethodKind(method?: VehicleServicePaymentMethod): string {
     const type = method?.method_type ?? '';
@@ -107,8 +35,13 @@ function paymentMethodKind(method?: VehicleServicePaymentMethod): string {
     return type || 'other';
 }
 
-function methodReference(reference: string, kind: string, details: Record<string, string>): string | undefined {
-    if (reference.trim()) return reference.trim();
+function methodReference(
+    reference: string,
+    kind: string,
+    details: Record<string, string>,
+): string | undefined {
+    const explicit = reference.trim();
+    if (explicit) return explicit;
 
     const derived = kind === 'cheque'
         ? details.cheque_number
@@ -123,7 +56,15 @@ function methodReference(reference: string, kind: string, details: Record<string
     return derived?.trim() || undefined;
 }
 
-function methodPayload(kind: string, details: Record<string, string>, reference = '') {
+function methodPayload(
+    kind: string,
+    details: Record<string, string>,
+): Pick<VehicleServicePaymentPayload,
+    | 'external_bank_name'
+    | 'external_bank_branch'
+    | 'instrument_number'
+    | 'instrument_date'
+> {
     if (kind === 'cheque') {
         return {
             instrument_number: details.cheque_number?.trim() || undefined,
@@ -133,14 +74,14 @@ function methodPayload(kind: string, details: Record<string, string>, reference 
     }
     if (kind === 'bank_transfer') {
         return {
-            instrument_number: reference.trim() || details.transfer_reference?.trim() || undefined,
+            instrument_number: details.transfer_reference?.trim() || undefined,
             instrument_date: details.transfer_date || undefined,
             external_bank_name: details.bank_account?.trim() || undefined,
         };
     }
     if (kind === 'card') {
         return {
-            instrument_number: reference.trim() || details.card_reference?.trim() || details.authorization_code?.trim() || undefined,
+            instrument_number: details.card_reference?.trim() || details.authorization_code?.trim() || undefined,
             external_bank_name: details.terminal?.trim() || undefined,
         };
     }
@@ -154,206 +95,67 @@ function methodPayload(kind: string, details: Record<string, string>, reference 
     return {};
 }
 
-function methodsForKind(methods: VehicleServicePaymentMethod[], kind: DirectPaymentKind): VehicleServicePaymentMethod[] {
-    return methods.filter((method) => paymentMethodKind(method) === kind);
-}
-
-function soleNonCashMethodKind(methods: VehicleServicePaymentMethod[]): DirectPaymentKind | null {
-    const directMethods = methods.filter((method) =>
-        DIRECT_PAYMENT_KINDS.some(({ kind }) => paymentMethodKind(method) === kind),
-    );
-    if (directMethods.length !== 1) return null;
-
-    const kind = paymentMethodKind(directMethods[0]);
-    return kind === 'cash' ? null : kind as DirectPaymentKind;
-}
-
-function selectedMethodForRow(row: PaymentRow, methods: VehicleServicePaymentMethod[]): VehicleServicePaymentMethod | undefined {
-    const available = methodsForKind(methods, row.kind);
-
-    return available.find((method) => String(method.id) === row.paymentMethodId)
-        ?? (available.length === 1 ? available[0] : undefined);
-}
-
 function hasInstrumentDetails(payload: ReturnType<typeof methodPayload>): boolean {
-    return Boolean(payload.instrument_number || payload.instrument_date || payload.external_bank_name);
-}
-
-function focusNextPaymentField(form: HTMLFormElement | null, current: HTMLElement): void {
-    if (!form) return;
-
-    const controls = Array.from(form.querySelectorAll<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), summary',
-    )).filter((control) => control.getClientRects().length > 0);
-    const currentIndex = controls.indexOf(current);
-    controls[currentIndex + 1]?.focus();
+    return Boolean(
+        payload.instrument_number
+        || payload.instrument_date
+        || payload.external_bank_name
+        || payload.external_bank_branch,
+    );
 }
 
 export default function VehicleServicePaymentPreparePage() {
     const jobId = Number(useParams().id);
-    const [searchParams] = useSearchParams();
-    const requestedInvoiceId = Number(searchParams.get('invoice_id'));
+    const navigate = useNavigate();
     const job = useApi((signal) => getVehicleServiceJob(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
-    const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
-    const [date, setDate] = useState(businessDateInputValue());
-    const [paymentMode, setPaymentMode] = useState<PaymentMode>('direct');
-    const [rows, setRows] = useState<PaymentRow[]>(DIRECT_PAYMENT_KINDS.map(({ kind }) => ({
-        kind,
-        paymentMethodId: '',
-        amount: ZERO_AMOUNT,
-        cashReceivedAmount: '',
-        reference: '',
-        details: {},
-    })));
-    const [createdPayment, setCreatedPayment] = useState<VehicleServicePaymentCreated | null>(null);
-    const [settledInvoice, setSettledInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
-    const [creditedInvoice, setCreditedInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
-    const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
-    const [whatsAppShareError, setWhatsAppShareError] = useState<ApiError | null>(null);
+    const [invoiceId, setInvoiceId] = useState('');
+    const [paymentMethodId, setPaymentMethodId] = useState('');
+    const [date, setDate] = useState(today());
+    const [amount, setAmount] = useState('0.000000');
+    const [reference, setReference] = useState('');
+    const [methodDetails, setMethodDetails] = useState<Record<string, string>>({});
+    const [prepared, setPrepared] = useState<PreparedVehicleServicePayment | null>(null);
     const [busy, setBusy] = useState(false);
-    const [creditCheckFeedback, setCreditCheckFeedback] = useState<{ kind: 'blocked' | 'warning'; message: string } | null>(null);
-    const [acknowledgedCreditWarning, setAcknowledgedCreditWarning] = useState<string | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
 
-    const paymentMethods = useMemo(() => options.data?.methods ?? NO_PAYMENT_METHODS, [options.data?.methods]);
+    const paymentMethods = options.data?.methods ?? [];
+    const selectedMethod = paymentMethods.find((method) => String(method.id) === paymentMethodId);
+    const kind = paymentMethodKind(selectedMethod);
+    const instrumentPayload = methodPayload(kind, methodDetails);
+    const resolvedReference = methodReference(reference, kind, methodDetails);
     const eligibleInvoices = useMemo(
         () => (job.data?.invoice_links ?? []).filter((link) =>
             link.status === 'active'
             && Boolean(link.can_receive_payment)
-            && compareDecimalStrings(link.balance_due ?? ZERO_AMOUNT, ZERO_AMOUNT) > 0,
+            && compareDecimalStrings(link.balance_due ?? '0', '0') > 0,
         ),
         [job.data?.invoice_links],
     );
-    const requestedInvoice = eligibleInvoices.find((link) => link.invoice_id === requestedInvoiceId);
-    const invoiceId = selectedInvoiceId ?? String(requestedInvoice?.invoice_id ?? (eligibleInvoices.length === 1 ? eligibleInvoices[0].invoice_id : ''));
-    useEffect(() => {
-        const directMethods = paymentMethods.filter((method) =>
-            DIRECT_PAYMENT_KINDS.some(({ kind }) => paymentMethodKind(method) === kind),
-        );
-        const soleMethod = directMethods.length === 1 ? directMethods[0] : undefined;
-        const soleKind = paymentMethodKind(soleMethod);
-        const soleInvoice = eligibleInvoices.find((candidate) => candidate.invoice_id === Number(invoiceId));
-        const prefillNonCash = Boolean(soleKind && soleInvoice);
-        if (!prefillNonCash) return;
-
-        let cancelled = false;
-        queueMicrotask(() => {
-            if (cancelled) return;
-
-            if (prefillNonCash && soleInvoice) {
-                setRows((current) => current.map((row) => row.kind === soleKind && row.amount === ZERO_AMOUNT
-                    ? { ...row, amount: soleInvoice.balance_due ?? soleInvoice.invoice_total }
-                    : row));
-            }
-        });
-
-        return () => { cancelled = true; };
-    }, [eligibleInvoices, invoiceId, paymentMethods]);
     const invoice = eligibleInvoices.find((link) => link.invoice_id === Number(invoiceId));
-    const outstanding = invoice?.balance_due ?? ZERO_AMOUNT;
-    const completedInvoice = settledInvoice ?? creditedInvoice;
-    const displayedInvoice = completedInvoice ?? invoice;
-    const submissionLocked = busy || Boolean(createdPayment || creditedInvoice);
-    const paymentEntryDisabled = submissionLocked || !invoice;
-    const appliedAmounts = invoice
-        ? calculateAppliedAmounts(rows, paymentMethods, outstanding)
-        : rows.map(() => ZERO_AMOUNT);
-    const paymentTotal = sumDecimals(appliedAmounts);
-    const remainingAfterPayment = nonNegativeDecimal(subtractDecimal(outstanding, paymentTotal));
-    const displayedPaymentTotal = createdPayment?.allocated_amount ?? paymentTotal;
-    const postedBalanceAfterPayment = createdPayment && settledInvoice
-        ? nonNegativeDecimal(subtractDecimal(
-            settledInvoice.balance_due ?? settledInvoice.invoice_total,
-            createdPayment.allocated_amount ?? paymentTotal,
-        ))
-        : null;
+    const amountValid = compareDecimalStrings(amount || '0', '0') > 0
+        && (!invoice?.balance_due || compareDecimalStrings(amount, invoice.balance_due) <= 0);
+    const methodRequirementsSatisfied = Boolean(selectedMethod)
+        && (!selectedMethod?.requires_reference || Boolean(resolvedReference))
+        && (!selectedMethod?.requires_instrument_details || hasInstrumentDetails(instrumentPayload));
+    const canSubmit = Boolean(
+        options.data?.job_version
+        && invoiceId
+        && amountValid
+        && methodRequirementsSatisfied
+        && !busy,
+    );
 
-    const updateRow = (kind: DirectPaymentKind, update: Partial<PaymentRow>) => {
-        setRows((current) => current.map((row) => row.kind === kind ? { ...row, ...update } : row));
-    };
-    const printInvoice = async (targetInvoiceId: number) => {
-        try {
-            const json = await getInvoiceSignedPrintLink(targetInvoiceId);
-            if (json.print_url) {
-                openSameOriginUrl(json.print_url);
-                return;
-            }
-        } catch {
-            // Use the invoice print page when a signed link is unavailable.
-        }
-        openSameOriginUrl(`/invoices/${targetInvoiceId}/print`);
-    };
-    const shareInvoiceViaWhatsApp = async () => {
-        if (!completedInvoice) return;
-
-        const pendingWindow = openPendingWhatsAppWindow();
-        setSharingWhatsApp(true);
-        setWhatsAppShareError(null);
-        try {
-            const share = await getInvoiceWhatsAppShare(completedInvoice.invoice_id);
-            if (share.recipient.verification_status !== 'verified'
-                && !confirmPendingWhatsAppShare(pendingWindow, 'This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
-                closePendingWhatsAppWindow(pendingWindow);
-                return;
-            }
-
-            if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
-                throw new Error('The server returned an invalid WhatsApp link.');
-            }
-        } catch (requestError) {
-            closePendingWhatsAppWindow(pendingWindow);
-            setWhatsAppShareError(toApiError(requestError));
-        } finally {
-            setSharingWhatsApp(false);
-        }
-    };
+    const clearPrepared = () => setPrepared(null);
     const payload = (): VehicleServicePaymentPayload => ({
         expected_version: options.data?.job_version ?? 0,
         invoice_id: Number(invoiceId),
         payment_date: date,
-        lines: rows.flatMap((row, index) => {
-            if (compareDecimalStrings(appliedAmounts[index] ?? ZERO_AMOUNT, ZERO_AMOUNT) <= 0) return [];
-            const method = selectedMethodForRow(row, paymentMethods);
-            if (!method) return [];
-            const kind = paymentMethodKind(method);
-
-            return [{
-                amount: appliedAmounts[index] ?? ZERO_AMOUNT,
-                payment_method_id: Number(method?.id),
-                ...(kind === 'card' && row.details.card_brand
-                    ? { card_brand: row.details.card_brand as 'visa' | 'master' | 'amex' }
-                    : {}),
-                reference_number: methodReference(row.reference, kind, row.details),
-                ...methodPayload(kind, row.details, row.reference),
-            }];
-        }),
+        amount,
+        payment_method_id: Number(paymentMethodId),
+        reference_number: resolvedReference,
+        ...instrumentPayload,
     });
-    const activeRows = rows.filter((row, index) => compareDecimalStrings(appliedAmounts[index] ?? ZERO_AMOUNT, ZERO_AMOUNT) > 0);
-    const rowsValid = activeRows.length > 0 && activeRows.every((row) => {
-        const method = selectedMethodForRow(row, paymentMethods);
-        if (!method || !method.id) return false;
-
-        const kind = paymentMethodKind(method);
-        const instrument = methodPayload(kind, row.details, row.reference);
-        const appliedAmount = appliedAmounts[rows.indexOf(row)] ?? ZERO_AMOUNT;
-
-        return compareDecimalStrings(appliedAmount, ZERO_AMOUNT) > 0
-            && (kind !== 'card' || CARD_BRANDS.some((brand) => brand.value === row.details.card_brand))
-            && (!method.requires_reference || Boolean(methodReference(row.reference, kind, row.details)))
-            && (!method.requires_instrument_details || hasInstrumentDetails(instrument));
-    });
-    const canFinalize = Boolean(
-        options.data?.job_version
-        && invoice
-        && paymentMode === 'direct'
-        && rowsValid
-        && compareDecimalStrings(paymentTotal, ZERO_AMOUNT) > 0
-        && compareDecimalStrings(paymentTotal, outstanding) <= 0
-        && !busy
-        && !createdPayment
-        && !creditedInvoice,
-    );
 
     if (job.loading || options.loading) return <LoadingState />;
     if (!job.data) return <ErrorAlert error={job.error} />;
@@ -361,421 +163,143 @@ export default function VehicleServicePaymentPreparePage() {
     return (
         <>
             <ContentHeader
-                title="Record payment"
-                description={`Settle an invoice for service job ${job.data.job_number}.`}
+                title={`Payment for ${job.data.job_number}`}
+                description="Receive, post, and allocate a customer payment through the Payment module."
                 actions={<LinkButton to="/payments/methods" variant="secondary">Manage payment methods</LinkButton>}
             />
             <ErrorAlert error={error ?? options.error} />
-            <form onSubmit={async (event) => {
-                event.preventDefault();
-                if (!canFinalize || !invoice) return;
-                setBusy(true);
-                setError(null);
-                try {
-                    const payment = await createVehicleServicePayment(jobId, payload());
-                    setSettledInvoice(invoice);
-                    setCreatedPayment(payment);
-                    options.reload();
-                    job.reload();
-                } catch (requestError) {
-                    setError(toApiError(requestError));
-                } finally {
-                    setBusy(false);
-                }
-            }}>
-                <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_306px]">
-                    <Panel className="space-y-5">
-                        <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_1fr]">
-                            <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-4 sm:px-5">
-                                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-700">Invoice number</p>
-                                {completedInvoice ? (
-                                    <p className="mt-2 text-xl font-bold text-slate-950 sm:text-2xl">{completedInvoice.invoice_number ?? 'Invoice'}</p>
-                                ) : <Select
-                                    aria-label="Invoice number"
-                                    className="border-blue-200 bg-white/80 font-semibold text-slate-950"
-                                    value={invoiceId}
-                                    error={fieldError(error, 'invoice_id')}
-                                    options={eligibleInvoices.map((link) => ({
-                                        value: link.invoice_id,
-                                        label: link.invoice_number ?? 'Invoice',
-                                    }))}
-                                    placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
-                                    disabled={submissionLocked}
-                                    onChange={(event) => {
-                                        const selectedInvoice = eligibleInvoices.find((candidate) => String(candidate.invoice_id) === event.target.value);
-                                        const prefillKind = soleNonCashMethodKind(paymentMethods);
-                                        setSelectedInvoiceId(event.target.value);
-                                        setRows((current) => current.map((row) => ({
-                                            ...row,
-                                            amount: selectedInvoice && row.kind === prefillKind
-                                                ? (selectedInvoice.balance_due ?? selectedInvoice.invoice_total)
-                                                : ZERO_AMOUNT,
-                                            cashReceivedAmount: '',
-                                        })));
-                                        setCreditCheckFeedback(null);
-                                        setAcknowledgedCreditWarning(null);
-                                    }}
-                                />}
-                                {!completedInvoice && eligibleInvoices.length === 0 && (
-                                    <p className="mt-2 text-sm text-amber-700">
-                                        {job.data.invoice_links?.some((link) => link.status === 'active')
-                                            ? 'No linked invoice has an outstanding balance. A payment cannot be recorded.'
-                                            : 'There are no active posted invoices to receive a payment.'}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="rounded-lg bg-blue-600 px-4 py-4 text-white sm:px-5">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">Invoice total</p>
-                                <p className="mt-3 text-2xl font-bold tabular-nums sm:text-3xl">{displayedInvoice ? formatMoney(displayedInvoice.invoice_total) : '—'}</p>
-                            </div>
-                            <div className="rounded-lg bg-amber-50 px-4 py-4 text-amber-900 sm:px-5">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Outstanding balance</p>
-                                <p className="mt-3 text-2xl font-bold tabular-nums sm:text-3xl">{displayedInvoice ? formatMoney(displayedInvoice.balance_due ?? displayedInvoice.invoice_total) : '—'}</p>
-                            </div>
-                        </div>
+            <Panel>
+                <form className="grid gap-4 md:grid-cols-2" onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (!canSubmit) return;
+                    setBusy(true);
+                    setError(null);
+                    try {
+                        setPrepared(await prepareVehicleServicePayment(jobId, payload()));
+                    } catch (requestError) {
+                        setError(toApiError(requestError));
+                    } finally {
+                        setBusy(false);
+                    }
+                }}>
+                    <Select
+                        label="Invoice"
+                        value={invoiceId}
+                        error={fieldError(error, 'invoice_id')}
+                        options={eligibleInvoices.map((link) => ({
+                            value: link.invoice_id,
+                            label: `${link.invoice_number ?? 'Invoice'} / balance ${link.balance_due ?? link.invoice_total}`,
+                        }))}
+                        placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
+                        onChange={(event) => {
+                            const value = event.target.value;
+                            setInvoiceId(value);
+                            clearPrepared();
+                            const link = eligibleInvoices.find((entry) => entry.invoice_id === Number(value));
+                            setAmount(link?.balance_due ?? '0.000000');
+                        }}
+                    />
+                    <Select
+                        label="Payment method"
+                        value={paymentMethodId}
+                        error={fieldError(error, 'payment_method_id')}
+                        options={paymentMethods.map((method) => ({
+                            value: method.id ?? '',
+                            label: `${method.name}${method.method_type ? ` / ${method.method_type.replaceAll('_', ' ')}` : ''}`,
+                        }))}
+                        placeholder={paymentMethods.length > 0 ? 'Select payment method' : 'No active inbound methods'}
+                        onChange={(event) => {
+                            setPaymentMethodId(event.target.value);
+                            setReference('');
+                            setMethodDetails({});
+                            clearPrepared();
+                        }}
+                    />
+                    <Input
+                        label="Payment date"
+                        type="date"
+                        value={date}
+                        error={fieldError(error, 'payment_date')}
+                        onChange={(event) => { setDate(event.target.value); clearPrepared(); }}
+                    />
+                    <DecimalInput
+                        label="Amount"
+                        value={amount}
+                        error={fieldError(error, 'amount')}
+                        onChange={(event) => { setAmount(event.target.value); clearPrepared(); }}
+                    />
+                    <Input
+                        label={selectedMethod?.requires_reference ? 'Reference *' : 'Reference'}
+                        value={reference}
+                        error={fieldError(error, 'reference_number')}
+                        onChange={(event) => { setReference(event.target.value); clearPrepared(); }}
+                    />
 
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Input
-                                label="Payment date"
-                                type="date"
-                                value={date}
-                                error={fieldError(error, 'payment_date')}
-                                disabled={submissionLocked}
-                                onChange={(event) => { setDate(event.target.value); }}
+                    {selectedMethod && (
+                        <div className="md:col-span-2">
+                            <PaymentMethodFields
+                                kind={kind}
+                                metadata={methodDetails}
+                                onChange={(field, value) => {
+                                    setMethodDetails((current) => ({ ...current, [field]: value }));
+                                    clearPrepared();
+                                }}
                             />
-                            <fieldset>
-                                <legend className="mb-1.5 text-sm font-medium text-slate-700">Payment type</legend>
-                                <div className="flex flex-wrap gap-2">
-                                    <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-900">
-                                        <input
-                                            type="radio"
-                                            name="payment-mode"
-                                            value="direct"
-                                            checked={paymentMode === 'direct'}
-                                            disabled={submissionLocked}
-                                            onChange={() => { setPaymentMode('direct'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
-                                        />
-                                        Direct payment
-                                    </label>
-                                    {options.data?.credit_allowed && (
-                                        <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-900">
-                                            <input
-                                                type="radio"
-                                                name="payment-mode"
-                                                value="credit"
-                                                checked={paymentMode === 'credit'}
-                                                disabled={submissionLocked}
-                                                onChange={() => { setPaymentMode('credit'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
-                                            />
-                                            Credit payment
-                                        </label>
-                                    )}
-                                </div>
-                            </fieldset>
-                        </div>
-
-                        {paymentMode === 'direct' ? <>
-                            <div>
-                                <h2 className="text-lg font-semibold text-slate-950">Payment amounts</h2>
-                                <p className="mt-1 text-sm text-slate-600">Enter amounts for the methods you use. Press Enter or Tab to move through the fields.</p>
-                            </div>
-
-                            <div className="space-y-3">
-                                {rows.map((row, index) => {
-                                    const availableMethods = methodsForKind(paymentMethods, row.kind);
-                                    if (availableMethods.length === 0) return null;
-                                    const selectedMethod = selectedMethodForRow(row, paymentMethods);
-                                    const kind = selectedMethod ? paymentMethodKind(selectedMethod) : row.kind;
-                                    const label = DIRECT_PAYMENT_KINDS.find((paymentKind) => paymentKind.kind === row.kind)?.label ?? row.kind;
-                                    const instrument = methodPayload(kind, row.details, row.reference);
-                                    const appliedAmount = appliedAmounts[index] ?? ZERO_AMOUNT;
-                                    const lineIndex = activeRows.indexOf(row);
-                                    const amountValue = row.kind === 'cash' ? row.cashReceivedAmount : row.amount;
-
-                                    return (
-                                        <section key={row.kind} className={`rounded-lg border-l-4 p-4 ${PAYMENT_METHOD_STYLES[row.kind].section}`}>
-                                            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,1.3fr)] sm:items-end">
-                                                <div>
-                                                    <h3 className={`inline-flex rounded-md px-3 py-1 text-sm font-semibold ${PAYMENT_METHOD_STYLES[row.kind].label}`}>{label}</h3>
-                                                    {availableMethods.length > 1 ? (
-                                                        <Select
-                                                            label={`${label} method`}
-                                                            value={row.paymentMethodId}
-                                                            error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.payment_method_id`) : undefined}
-                                                            disabled={paymentEntryDisabled}
-                                                            options={availableMethods.map((method) => ({
-                                                                value: method.id ?? '',
-                                                                label: method.name,
-                                                            }))}
-                                                            placeholder="Select method"
-                                                            onChange={(event) => updateRow(row.kind, {
-                                                                paymentMethodId: event.target.value,
-                                                                reference: '',
-                                                                details: {},
-                                                            })}
-                                                        />
-                                                    ) : selectedMethod ? (
-                                                        <p className="mt-1 text-sm text-slate-600">{selectedMethod.name}</p>
-                                                    ) : (
-                                                        <p className="mt-1 text-sm text-slate-500">No active {row.kind.replace('_', ' ')} payment method.</p>
-                                                    )}
-                                                </div>
-
-                                                <DecimalInput
-                                                    label={row.kind === 'cash' ? 'Cash received' : `${label} amount`}
-                                                    value={amountValue}
-                                                    className="text-right text-lg font-semibold tabular-nums"
-                                                    error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.amount`) : undefined}
-                                                    disabled={paymentEntryDisabled || availableMethods.length === 0}
-                                                    onFocus={(event) => event.currentTarget.select()}
-                                                    onKeyDown={(event) => {
-                                                        if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
-                                                        event.preventDefault();
-                                                        focusNextPaymentField(event.currentTarget.form, event.currentTarget);
-                                                    }}
-                                                    onChange={(event) => updateRow(row.kind, row.kind === 'cash'
-                                                        ? { cashReceivedAmount: event.target.value }
-                                                        : { amount: event.target.value })}
-                                                />
-                                            </div>
-
-                                            {row.kind === 'card' && (
-                                                <fieldset className="mt-4 space-y-2">
-                                                    <legend className="text-sm font-medium text-slate-700">Card type</legend>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {CARD_BRANDS.map((brand) => (
-                                                            <label key={brand.value} className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="card-brand"
-                                                                    value={brand.value}
-                                                                    checked={row.details.card_brand === brand.value}
-                                                                    disabled={paymentEntryDisabled || availableMethods.length === 0}
-                                                                    onChange={() => updateRow(row.kind, {
-                                                                        details: { ...row.details, card_brand: brand.value },
-                                                                    })}
-                                                                />
-                                                                {brand.label}
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                </fieldset>
-                                            )}
-
-                                            {(row.kind === 'card' || row.kind === 'bank_transfer' || selectedMethod?.requires_reference) && (
-                                                <div className="mt-4">
-                                                    <Input
-                                                        label="Reference details"
-                                                        maxLength={150}
-                                                        value={row.reference}
-                                                        error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.reference_number`) : undefined}
-                                                        disabled={paymentEntryDisabled || availableMethods.length === 0}
-                                                        onChange={(event) => updateRow(row.kind, { reference: event.target.value })}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {selectedMethod && (kind === 'card' || kind === 'bank_transfer' || kind === 'cheque' || kind === 'wallet') && (
-                                                <details className="mt-3 rounded-md bg-white/70 px-3 py-2">
-                                                    <summary className="cursor-pointer text-sm font-medium text-slate-700">Additional transaction details</summary>
-                                                    <PaymentMethodFields
-                                                        kind={kind}
-                                                        metadata={row.details}
-                                                        disabled={paymentEntryDisabled}
-                                                        hideReferenceFields
-                                                        onChange={(field, value) => updateRow(row.kind, {
-                                                            details: { ...row.details, [field]: value },
-                                                        })}
-                                                    />
-                                                </details>
-                                            )}
-
-                                            {compareDecimalStrings(appliedAmount, ZERO_AMOUNT) > 0
-                                                && selectedMethod?.requires_instrument_details
-                                                && !hasInstrumentDetails(instrument) && (
-                                                <p className="mt-3 text-sm text-amber-700">Enter transaction details for this method.</p>
-                                            )}
-
-                                            {row.kind === 'cash' && (
-                                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                                    <div className="rounded-md bg-white/70 px-4 py-2">
-                                                        <p className="text-xs text-slate-600">Cash amount applied</p>
-                                                        <p className="mt-1 font-semibold tabular-nums text-slate-950">{formatMoney(appliedAmount)}</p>
-                                                    </div>
-                                                    <div className="rounded-md bg-white/70 px-4 py-2">
-                                                        <p className="text-xs text-slate-600">Change to return</p>
-                                                        <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(invoice ? nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)) : ZERO_AMOUNT)}</p>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </section>
-                                    );
-                                })}
-                            </div>
-                        </> : (
-                            <div className="space-y-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-                                <p>No payment will be collected now. The outstanding invoice balance will remain on this customer account.</p>
-                                {options.data?.credit_assessment?.available && (
-                                    <DetailGrid items={[
-                                        { label: 'Open invoice exposure', value: formatMoney(options.data.credit_assessment.open_exposure, options.data.credit_assessment.currency_code ?? 'LKR') },
-                                        { label: 'Credit limit', value: formatMoney(options.data.credit_assessment.credit_limit, options.data.credit_assessment.currency_code ?? 'LKR') },
-                                        { label: 'Remaining credit', value: formatMoney(options.data.credit_assessment.remaining_credit, options.data.credit_assessment.currency_code ?? 'LKR') },
-                                    ]} />
-                                )}
-                                {options.data?.credit_assessment?.warning && (
-                                    <p role="alert" className="font-medium text-amber-800">
-                                        {options.data.credit_assessment.warning}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {createdPayment && settledInvoice && (
-                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                                <p className="text-sm font-semibold text-emerald-900">Payment created and allocated successfully</p>
-                                <p className="mt-1 text-sm text-emerald-800">
-                                    {createdPayment.payment_number ?? 'Payment'} was posted for invoice {settledInvoice.invoice_number ?? 'the selected invoice'}.
-                                </p>
-                                <div className="mt-4">
-                                    <DetailGrid items={[
-                                        { label: 'Payment', value: createdPayment.payment_number ?? '-' },
-                                        { label: 'Posting status', value: createdPayment.posting_status ?? '-' },
-                                        { label: 'Allocated amount', value: formatMoney(createdPayment.allocated_amount ?? paymentTotal) },
-                                    ]} />
-                                </div>
-                            </div>
-                        )}
-                        {creditedInvoice && (
-                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                                <p className="text-sm font-semibold text-emerald-900">Invoice kept on customer credit</p>
-                                <p className="mt-1 text-sm text-emerald-800">
-                                    {creditedInvoice.invoice_number ?? 'Invoice'} remains outstanding on the customer account.
-                                </p>
-                                <div className="mt-4">
-                                    <DetailGrid items={[
-                                        { label: 'Invoice', value: creditedInvoice.invoice_number ?? '-' },
-                                        { label: 'Invoice total', value: formatMoney(creditedInvoice.invoice_total) },
-                                        { label: 'Outstanding balance', value: formatMoney(creditedInvoice.balance_due ?? creditedInvoice.invoice_total) },
-                                    ]} />
-                                </div>
-                            </div>
-                        )}
-                    </Panel>
-
-                    <aside className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm xl:sticky xl:top-5">
-                        <ErrorAlert error={whatsAppShareError} />
-                        <h2 className="text-lg font-semibold text-slate-950">Payment summary</h2>
-                        <div className="mt-4 border-t border-blue-200 pt-4">
-                            <p className="text-sm text-slate-700">Outstanding balance</p>
-                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{displayedInvoice ? formatMoney(displayedInvoice.balance_due ?? displayedInvoice.invoice_total) : '—'}</p>
-                        </div>
-                        <div className="mt-5 border-t border-blue-200 pt-4">
-                            <p className="text-sm text-slate-700">Payment total</p>
-                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{formatMoney(paymentMode === 'direct' ? displayedPaymentTotal : ZERO_AMOUNT)}</p>
-                            {paymentMode === 'direct' && (
-                                <p className="mt-1 text-xs text-slate-600">Across {activeRows.length} {activeRows.length === 1 ? 'method' : 'methods'}</p>
+                            {selectedMethod.requires_instrument_details && !hasInstrumentDetails(instrumentPayload) && (
+                                <p className="mt-2 text-sm text-amber-700">This method requires transaction instrument details.</p>
                             )}
                         </div>
-                        <div className={`mt-5 rounded-lg border px-4 py-4 ${paymentMode === 'credit'
-                            ? 'border-sky-200 bg-sky-50 text-sky-900'
-                            : 'border-emerald-100 bg-emerald-50 text-emerald-900'}`}>
-                            <p className="text-sm font-medium">{paymentMode === 'credit' ? 'Credit amount' : 'Balance after payment'}</p>
-                            <p className="mt-1 text-2xl font-bold tabular-nums">
-                                {formatMoney(paymentMode === 'credit'
-                                    ? displayedInvoice?.balance_due ?? displayedInvoice?.invoice_total ?? ZERO_AMOUNT
-                                    : postedBalanceAfterPayment ?? remainingAfterPayment)}
-                            </p>
-                            <p className="mt-1 text-xs">{paymentMode === 'credit'
-                                ? 'Remains due on the customer account'
-                                : compareDecimalStrings(postedBalanceAfterPayment ?? remainingAfterPayment, ZERO_AMOUNT) === 0
-                                    ? 'Fully settled after finalizing'
-                                    : 'Remaining balance after finalizing'}</p>
-                        </div>
-                        {paymentMode === 'direct' && invoice && !createdPayment && compareDecimalStrings(paymentTotal, outstanding) > 0 && (
-                            <p className="mt-2 text-sm text-red-700">Payment total exceeds the outstanding balance.</p>
-                        )}
-                        {paymentMode === 'credit' && creditCheckFeedback && (
-                            <p
-                                role="alert"
-                                aria-live="assertive"
-                                className={`mt-4 rounded-md border p-3 text-sm font-medium ${creditCheckFeedback.kind === 'blocked'
-                                    ? 'border-red-200 bg-red-50 text-red-800'
-                                    : 'border-amber-200 bg-amber-50 text-amber-800'}`}
-                            >
-                                {creditCheckFeedback.message}
-                            </p>
-                        )}
-                        <div className="mt-6 flex flex-col gap-2">
-                            {paymentMode === 'direct' ? (
-                                createdPayment && settledInvoice ? (
-                                    <>
-                                        <Button type="button" onClick={() => void printInvoice(settledInvoice.invoice_id)}>
-                                            Print bill
-                                        </Button>
-                                        <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={() => void shareInvoiceViaWhatsApp()}>
-                                            Share via WhatsApp
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <Button type="submit" loading={busy} disabled={!canFinalize}>
-                                        Finalize payment
-                                    </Button>
-                                )
-                            ) : creditedInvoice ? (
-                                <>
-                                    <Button type="button" onClick={() => void printInvoice(creditedInvoice.invoice_id)}>
-                                        Print bill
-                                    </Button>
-                                    <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={() => void shareInvoiceViaWhatsApp()}>
-                                        Share via WhatsApp
-                                    </Button>
-                                </>
-                            ) : (
-                                <Button type="button" loading={busy} disabled={!invoice || !options.data || busy} onClick={async () => {
-                                    const targetInvoice = invoice;
-                                    if (!targetInvoice) return;
+                    )}
 
-                                    setBusy(true);
-                                    setCreditCheckFeedback(null);
-                                    try {
-                                        const assessment = await checkVehicleServiceCredit(jobId);
-                                        if (!assessment.can_keep_on_credit) {
-                                            setCreditCheckFeedback({
-                                                kind: 'blocked',
-                                                message: assessment.warning ?? 'Credit cannot be used for this customer. Choose Direct Payment to continue.',
-                                            });
-                                            setAcknowledgedCreditWarning(null);
-                                            return;
-                                        }
-                                        if (assessment.warning && acknowledgedCreditWarning !== assessment.warning) {
-                                            setCreditCheckFeedback({ kind: 'warning', message: `${assessment.warning} Click confirm to continue.` });
-                                            setAcknowledgedCreditWarning(assessment.warning);
-                                            return;
-                                        }
-                                        await keepVehicleServiceInvoiceOnCredit(jobId, {
-                                            invoice_id: targetInvoice.invoice_id,
-                                            expected_version: options.data?.job_version ?? 0,
-                                        });
-                                        setCreditedInvoice(targetInvoice);
-                                        options.reload();
-                                        job.reload();
-                                    } catch (requestError) {
-                                        setCreditCheckFeedback({
-                                            kind: 'blocked',
-                                            message: toApiError(requestError).message,
-                                        });
-                                    } finally {
-                                        setBusy(false);
-                                    }
-                                }}>
-                                    {acknowledgedCreditWarning ? 'Confirm credit payment' : 'Keep invoice on credit'}
-                                </Button>
-                            )}
-                            <LinkButton to={`/vehicle-service/jobs/${jobId}`} variant="secondary">{createdPayment || creditedInvoice ? 'Return to service job' : 'Cancel'}</LinkButton>
+                    {invoice && (
+                        <div className="rounded-lg border border-sky-100 bg-sky-50 p-4 md:col-span-2">
+                            <DetailGrid items={[
+                                { label: 'Invoice', value: invoice.invoice_number ?? 'Invoice' },
+                                { label: 'Invoice total', value: invoice.invoice_total },
+                                { label: 'Outstanding balance', value: invoice.balance_due ?? '-' },
+                                { label: 'Invoice status', value: invoice.invoice_status ?? '-' },
+                                { label: 'Settlement amount', value: amount },
+                                { label: 'Method', value: selectedMethod?.name ?? '-' },
+                            ]} />
                         </div>
-                    </aside>
-                </div>
-            </form>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 md:col-span-2">
+                        <Button type="submit" variant="secondary" loading={busy} disabled={!canSubmit}>
+                            Review payment
+                        </Button>
+                        <Button type="button" loading={busy} disabled={!canSubmit} onClick={async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                                const payment = await createVehicleServicePayment(jobId, payload());
+                                navigate(`/payments/${payment.id}`);
+                            } catch (requestError) {
+                                setError(toApiError(requestError));
+                            } finally {
+                                setBusy(false);
+                            }
+                        }}>
+                            Receive, post and allocate
+                        </Button>
+                    </div>
+                </form>
+
+                {prepared && (
+                    <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                        <p className="mb-4 text-sm font-semibold text-emerald-900">Payment validation completed successfully</p>
+                        <DetailGrid items={[
+                            { label: 'Type', value: prepared.paymentType },
+                            { label: 'Direction', value: prepared.direction },
+                            { label: 'Payment date', value: prepared.paymentDate },
+                            { label: 'Method', value: selectedMethod?.name ?? '-' },
+                            { label: 'Reference', value: prepared.referenceNumber ?? resolvedReference ?? '-' },
+                            { label: 'Amount', value: prepared.lines[0]?.amount ?? amount },
+                            { label: 'Invoice', value: invoice?.invoice_number ?? '-' },
+                        ]} />
+                    </div>
+                )}
+            </Panel>
         </>
     );
 }

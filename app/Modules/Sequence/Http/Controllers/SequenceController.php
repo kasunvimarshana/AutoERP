@@ -7,7 +7,6 @@ namespace Modules\Sequence\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
-use Modules\Sequence\Constants\SequenceErrorCode;
 use Modules\Sequence\Http\Requests\GenerateSequenceNumberRequest;
 use Modules\Sequence\Http\Requests\ListSequenceRequest;
 use Modules\Sequence\Http\Requests\PreviewSequenceNumberRequest;
@@ -69,7 +68,7 @@ final class SequenceController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === SequenceErrorCode::CONFLICT ? 409 : 422;
+            $status = $error->code === 'SEQUENCE_CONFLICT' ? 409 : 422;
 
             return response()->json(['message' => $error->message], $status);
         }
@@ -84,8 +83,8 @@ final class SequenceController extends Controller
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
             $status = match ($error->code) {
-                SequenceErrorCode::NOT_FOUND => 404,
-                SequenceErrorCode::CONFLICT => 409,
+                'SEQUENCE_NOT_FOUND' => 404,
+                'SEQUENCE_CONFLICT' => 409,
                 default => 422,
             };
 
@@ -123,15 +122,12 @@ final class SequenceController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = match ($error->code) {
-                SequenceErrorCode::CONCURRENCY_CONFLICT => 409,
-                SequenceErrorCode::INTERNAL_ERROR => 500,
-                default => 422,
-            };
+            $status = $error->code === 'SEQUENCE_CONCURRENCY_CONFLICT' ? 409 : 422;
 
             return response()->json(['message' => $error->message], $status);
         }
 
         return response()->json($result->valueOrFail());
     }
+
 }

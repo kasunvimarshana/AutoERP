@@ -10,7 +10,6 @@ import VehicleEditPage from './VehicleEditPage';
 import type { Vehicle } from './vehicleTypes';
 const apiMocks = vi.hoisted(() => ({
     createVehicle: vi.fn(),
-    generateVehicleCode: vi.fn(),
     createVehicleWithRelations: vi.fn(),
     getVehicle: vi.fn(),
     listVehicleAttributes: vi.fn(),
@@ -48,7 +47,6 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
 }));
 const vehicle: Vehicle = {
     id: 10,
-    row_version: 1,
     vehicle_number: 'VEH-10',
     code: 'VEH-CODE',
     registration_number: 'CAR-1000',
@@ -65,7 +63,6 @@ describe('Vehicle route pages', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         apiMocks.createVehicle.mockResolvedValue(vehicle);
-        apiMocks.generateVehicleCode.mockResolvedValue('VEH-000123');
         apiMocks.getVehicle.mockResolvedValue(vehicle);
         apiMocks.listVehicleDocuments.mockResolvedValue(collection([
             { id: 1, document_type: 'registration', document_number: 'REG-1', issued_date: '2026-06-01', expiry_date: '2027-06-01', file_name: 'reg.pdf', has_file: true, status: 'active', notes: null },
@@ -78,12 +75,14 @@ describe('Vehicle route pages', () => {
         apiMocks.searchVehicleCategories.mockResolvedValue(collection([]));
         apiMocks.updateVehicle.mockResolvedValue(vehicle);
     });
-    it('loads a generated code into the focused vehicle creation form without inventing mileage', async () => {
+    it('renders create as a separate page with only Basic, Documents, and Attributes tabs', async () => {
         renderPage(<VehicleCreatePage />, ['/vehicles/create']);
-        expect(await screen.findByRole('button', { name: 'Create Vehicle' })).toBeInTheDocument();
-        expect(screen.getByDisplayValue('VEH-000123')).toBeInTheDocument();
-        expect(screen.queryByRole('tab')).not.toBeInTheDocument();
-        expect(screen.queryByLabelText('Odometer')).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Create Vehicle' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Basic' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Documents' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Attributes' })).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Ownership' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Review' })).not.toBeInTheDocument();
     });
     it('prevents duplicate create submissions', async () => {
         const user = userEvent.setup();
@@ -92,10 +91,9 @@ describe('Vehicle route pages', () => {
             resolveCreate = resolve;
         }));
         renderPage(<VehicleCreatePage />, ['/vehicles/create']);
-        await user.click(await screen.findByRole('button', { name: 'Create Vehicle' }));
+        await user.click(screen.getByRole('button', { name: 'Create Vehicle' }));
         await user.click(screen.getByRole('button', { name: /Create Vehicle/ }));
         expect(apiMocks.createVehicle).toHaveBeenCalledOnce();
-        expect(apiMocks.createVehicle).toHaveBeenCalledWith(expect.objectContaining({ odometer_reading: '' }));
         await act(async () => {
             resolveCreate?.(vehicle);
         });
@@ -145,4 +143,9 @@ function renderPage(page: ReactElement, initialEntries: string[]) {
         </TestRouter>,
     );
 }
-function collection(data: unknown[]) { return { data, links: {}, meta: { current_page: 1, per_page: data.length || 1, total: data.length } }; }
+function collection<T>(data: T[]) {
+    return {
+        data,
+        meta: { current_page: 1, from: data.length ? 1 : null, last_page: 1, per_page: 25, to: data.length, total: data.length },
+    };
+}

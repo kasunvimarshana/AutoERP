@@ -11,15 +11,11 @@ use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
-use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 
 final class PaymentCapabilityService
 {
-    public function __construct(
-        private readonly DecimalMath $math,
-        private readonly PaymentRefundPolicyService $refundPolicy,
-    ) {}
+    public function __construct(private readonly DecimalMath $math) {}
 
     public function capabilities(Payment $payment): array
     {
@@ -36,7 +32,6 @@ final class PaymentCapabilityService
         $posted = $document === PaymentDocumentStatus::Approved && $posting === PaymentPostingStatus::Posted;
         $hasPostingReference = trim((string) $payment->finance_posting_reference) !== '';
         $terminal = in_array($document, [PaymentDocumentStatus::Voided, PaymentDocumentStatus::Reversed], true);
-        $isRefund = $payment->payment_type === PaymentType::Refund;
         $hasActiveAllocations = $payment->relationLoaded('allocations')
             ? $payment->allocations->contains(fn ($row): bool => $this->stateValue($row->status) === AllocationStatus::Active->value)
             : $payment->allocations()->where('status', AllocationStatus::Active->value)->exists();
@@ -45,10 +40,6 @@ final class PaymentCapabilityService
                 ->where('document_status', PaymentDocumentStatus::Approved->value)
                 ->where('posting_status', PaymentPostingStatus::Posted->value))
             ->exists();
-        $availableUnapplied = $this->refundPolicy->availableUnappliedAmount($payment);
-        $paymentType = $payment->payment_type instanceof PaymentType
-            ? $payment->payment_type
-            : PaymentType::from((string) $payment->payment_type);
         $hasChequeLine = $payment->relationLoaded('lines')
             ? $payment->lines->contains(fn ($line): bool => (string) $line->payment_method_type_snapshot === PaymentMethodType::Cheque->value)
             : $payment->lines()->where('payment_method_type_snapshot', PaymentMethodType::Cheque->value)->exists();
@@ -63,19 +54,12 @@ final class PaymentCapabilityService
                 $payment->lines()->count() < 1 ? 'Payment requires at least one line.' : null,
             ])),
             'can_allocate' => array_values(array_filter([
-                $isRefund ? 'Refund payments cannot be allocated to invoices.' : null,
                 ! $posted ? 'Only posted payments can be allocated to invoices.' : null,
-                $this->math->compare($availableUnapplied, '0.000000') <= 0 ? 'Payment has no unreserved unapplied amount.' : null,
-            ])),
-            'can_reverse_allocation' => array_values(array_filter([
-                ! $posted ? 'Only posted payments can reverse allocations.' : null,
-                ! $hasActiveAllocations ? 'Payment has no active allocation to reverse.' : null,
+                $this->math->compare((string) $payment->unapplied_amount, '0.000000') <= 0 ? 'Payment has no unapplied amount.' : null,
             ])),
             'can_refund' => array_values(array_filter([
-                $isRefund ? 'A refund payment cannot be refunded again.' : null,
                 ! $posted ? 'Only posted payments can be refunded.' : null,
-                $paymentType === PaymentType::Refund ? 'Refund payments cannot be refunded again.' : null,
-                $this->math->compare($availableUnapplied, '0.000000') <= 0 ? 'Payment has no refundable unreserved amount.' : null,
+                $this->math->compare((string) $payment->unapplied_amount, '0.000000') <= 0 ? 'Payment has no refundable unapplied amount.' : null,
             ])),
             'can_void' => array_values(array_filter([
                 ! in_array($document, [PaymentDocumentStatus::Draft, PaymentDocumentStatus::Submitted, PaymentDocumentStatus::Approved], true)
@@ -89,10 +73,7 @@ final class PaymentCapabilityService
                 $payment->reversals()->exists() ? 'Payment already has a reversal.' : null,
                 $hasActiveRefunds ? 'Reverse active refund payments before reversing the original payment.' : null,
             ])),
-            'can_settle' => array_values(array_filter([
-                ! $posted ? 'Only approved and posted payments can be settled.' : null,
-                $terminal ? 'Terminal payment documents cannot be settled.' : null,
-            ])), 
+            'can_settle' => $this->reasons($terminal, 'Terminal payment documents cannot be settled.'),
             'can_preview_cheque' => array_values(array_filter([
                 ! $hasChequeLine ? 'Payment has no cheque-capable line.' : null,
                 $document !== PaymentDocumentStatus::Approved ? 'Only approved payments can be previewed.' : null,

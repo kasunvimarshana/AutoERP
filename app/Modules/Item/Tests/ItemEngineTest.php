@@ -29,8 +29,6 @@ use Modules\Item\Models\ItemCategory;
 use Modules\Item\Services\ItemBundleService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemLookupService;
-use Modules\Item\Services\ItemQueryService;
-use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class ItemEngineTest extends TestCase
@@ -167,35 +165,6 @@ final class ItemEngineTest extends TestCase
         ));
     }
 
-    public function test_labour_bundle_line_stores_combo_specific_cost_and_supervisor_assignment_source(): void
-    {
-        $tenantId = $this->createTenant();
-        $uomId = $this->createUom($tenantId, null, 'JOB');
-        $labour = $this->createBasicItem($tenantId, 'BODY-WASH', ItemType::Labour, false, $uomId);
-
-        $combo = $this->createItem(new CreateItemData(
-            tenantId: $tenantId,
-            code: 'FULL-WASH',
-            name: 'Full Wash',
-            itemType: ItemType::Combo,
-            isStockable: false,
-            bundles: [
-                new ItemBundleData(
-                    childItemId: (int) $labour->getKey(),
-                    quantity: '1.000000',
-                    lineType: ItemType::Labour->value,
-                    uomId: $uomId,
-                    unitCost: '150.000000',
-                    usesJobSupervisor: true,
-                ),
-            ],
-        ));
-
-        $line = $combo->bundleLines->firstOrFail();
-        $this->assertSame('150.000000', (string) $line->unit_cost);
-        $this->assertTrue((bool) $line->uses_job_supervisor);
-    }
-
     public function test_it_rejects_invalid_item_rules(): void
     {
         $tenantId = $this->createTenant();
@@ -239,117 +208,6 @@ final class ItemEngineTest extends TestCase
             $this->assertCount(1, $lookup->stockItems($tenantId));
             $this->assertCount(1, $lookup->serviceItems($tenantId));
             $this->assertCount(1, $lookup->labourItems($tenantId));
-        });
-    }
-
-    public function test_lookup_exposes_service_only_unit_price_and_purchase_price_for_service_context(): void
-    {
-        $tenantId = $this->createTenant();
-        $currencyId = $this->createCurrency('LKR');
-        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
-        $uomId = $this->createUom($tenantId, null, 'PCS');
-        $warehouseId = $this->createWarehouse($tenantId);
-
-        $servicePriced = $this->createItem(new CreateItemData(
-            tenantId: $tenantId,
-            code: 'STOCK-SERVICE-PRICE',
-            name: 'Stock with service price',
-            itemType: ItemType::Stock,
-            baseUomId: $uomId,
-            isStockable: true,
-            prices: [
-                new ItemPriceData(
-                    priceType: ItemPriceType::Purchase,
-                    amount: '90.000000',
-                    currencyId: $currencyId,
-                    uomId: $uomId,
-                    organizationUnitId: null,
-                    effectiveFrom: '2026-01-01',
-                ),
-                new ItemPriceData(
-                    priceType: ItemPriceType::Service,
-                    amount: '150.000000',
-                    currencyId: $currencyId,
-                    uomId: $uomId,
-                    organizationUnitId: null,
-                    effectiveFrom: '2026-01-01',
-                ),
-                new ItemPriceData(
-                    priceType: ItemPriceType::Sales,
-                    amount: '175.000000',
-                    currencyId: $currencyId,
-                    uomId: $uomId,
-                    organizationUnitId: null,
-                    effectiveFrom: '2026-01-01',
-                ),
-            ],
-        ));
-
-        $salesOnly = $this->createItem(new CreateItemData(
-            tenantId: $tenantId,
-            code: 'STOCK-SALES-ONLY',
-            name: 'Stock with sales price only',
-            itemType: ItemType::Stock,
-            baseUomId: $uomId,
-            isStockable: true,
-            prices: [
-                new ItemPriceData(
-                    priceType: ItemPriceType::Purchase,
-                    amount: '130.000000',
-                    currencyId: $currencyId,
-                    uomId: $uomId,
-                    organizationUnitId: null,
-                    effectiveFrom: '2026-01-01',
-                ),
-                new ItemPriceData(
-                    priceType: ItemPriceType::Sales,
-                    amount: '220.000000',
-                    currencyId: $currencyId,
-                    uomId: $uomId,
-                    organizationUnitId: null,
-                    effectiveFrom: '2026-01-01',
-                ),
-            ],
-        ));
-
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId, $servicePriced, $salesOnly): void {
-            DB::table('inventory_stock_balances')->insert([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => null,
-                'item_id' => $servicePriced->getKey(),
-                'base_uom_id' => $servicePriced->base_uom_id,
-                'item_variant_id' => null,
-                'warehouse_id' => $warehouseId,
-                'warehouse_location_id' => null,
-                'batch_id' => null,
-                'dimension_key' => 'stock-service-priced',
-                'quantity_on_hand' => '18.000000',
-                'quantity_reserved' => '2.000000',
-                'quantity_allocated' => '1.000000',
-                'quantity_available' => '15.000000',
-                'quantity_returned' => '0.000000',
-                'quantity_in_transit' => '0.000000',
-                'quantity_damaged' => '0.000000',
-                'quantity_quarantine' => '0.000000',
-                'quantity_expired' => '0.000000',
-                'quantity_scrapped' => '0.000000',
-                'average_cost' => '90.000000',
-                'total_value' => '1620.000000',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $lookup = app(ItemQueryService::class)->lookup([], $tenantId, null, 50, 'stockable');
-
-            $servicePricedLookup = $lookup->getCollection()->firstWhere('id', $servicePriced->getKey());
-            $salesOnlyLookup = $lookup->getCollection()->firstWhere('id', $salesOnly->getKey());
-
-            $this->assertSame('150.000000', $servicePricedLookup?->getAttribute('resolved_service_unit_price'));
-            $this->assertSame('90.000000', $servicePricedLookup?->getAttribute('resolved_purchase_unit_price'));
-            $this->assertSame('15.000000', $servicePricedLookup?->getAttribute('available_stock_quantity'));
-            $this->assertSame('0.000000', $salesOnlyLookup?->getAttribute('resolved_service_unit_price'));
-            $this->assertSame('130.000000', $salesOnlyLookup?->getAttribute('resolved_purchase_unit_price'));
-            $this->assertSame('0.000000', $salesOnlyLookup?->getAttribute('available_stock_quantity'));
         });
     }
 
@@ -420,22 +278,6 @@ final class ItemEngineTest extends TestCase
         ));
     }
 
-    private function createWarehouse(int $tenantId, ?int $organizationUnitId = null): int
-    {
-        return (int) DB::table('warehouses')->insertGetId([
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'row_version' => 1,
-            'name' => 'Main Warehouse',
-            'code' => 'MAIN',
-            'type' => 'standard',
-            'is_active' => true,
-            'is_default' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-    }
-
     private function createTenant(string $suffix = ''): int
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(4));
@@ -457,9 +299,15 @@ final class ItemEngineTest extends TestCase
 
     private function createCurrency(string $code): int
     {
-        return CurrencyFixture::create([
+        return (int) DB::table('currencies')->insertGetId([
+            'code' => $code.'-'.Str::upper(Str::random(4)),
             'name' => $code.' Currency',
             'symbol' => $code,
+            'decimal_places' => 2,
+            'is_active' => true,
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 

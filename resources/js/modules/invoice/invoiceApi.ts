@@ -1,8 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import type { ReversalFacts } from '@/shared/components/ReversalDialog';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
-import type { WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 import type {
     Invoice,
     InvoiceAdjustment,
@@ -17,55 +15,25 @@ export type {
     InvoiceSourcesResult,
 } from './invoiceTypes';
 
-export interface InvoiceReversalPayload extends ReversalFacts {
-    expected_version: number;
-}
-export interface WhatsAppDocumentShare {
-    recipient: {
-        name: string;
-        phone: string;
-        verification_status: WhatsAppVerificationStatus;
-    };
-    document_url: string;
-    whatsapp_url: string;
-    expires_at: string;
+export interface ListInvoiceParams extends ListParams {
+    party_id?: number;
+    party_type?: string;
+    direction?: string;
+    invoice_type?: string;
+    status?: string;
+    has_balance_due?: boolean;
+    balance_status?: string;
+    date_from?: string;
+    date_to?: string;
 }
 
-
-export async function listInvoices(params: ListParams, signal?: AbortSignal) {
+export async function listInvoices(params: ListInvoiceParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<Invoice>>(endpoints.invoices, { params, signal });
     return response.data;
 }
 
 export async function getInvoice(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<Invoice>>(`${endpoints.invoices}/${id}`, { signal });
-    return response.data.data;
-}
-
-export async function approveInvoice(id: number, expectedVersion: number) {
-    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/approve`, {
-        expected_version: expectedVersion,
-    });
-    return response.data.data;
-}
-
-export async function postInvoice(id: number, expectedVersion: number) {
-    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/post`, {
-        expected_version: expectedVersion,
-    });
-    return response.data.data;
-}
-
-export async function reverseInvoice(id: number, payload: InvoiceReversalPayload) {
-    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/reverse`, payload);
-    return response.data.data;
-}
-
-export async function cancelInvoice(id: number, expectedVersion: number, reason: string) {
-    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/cancel`, {
-        expected_version: expectedVersion,
-        reason: reason.trim(),
-    });
     return response.data.data;
 }
 
@@ -84,19 +52,24 @@ export async function getInvoiceAdjustments(id: number, signal?: AbortSignal) {
     return response.data.data;
 }
 
-export async function getInvoiceWhatsAppShare(id: number) {
-    const response = await apiClient.post<ApiResource<WhatsAppDocumentShare>>(
-        `${endpoints.invoices}/${id}/whatsapp-share`,
-    );
+export async function approveInvoice(id: number, expectedVersion: number) {
+    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/approve`, {
+        expected_version: expectedVersion,
+    });
     return response.data.data;
 }
 
+export async function postInvoice(id: number, expectedVersion: number) {
+    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/post`, {
+        expected_version: expectedVersion,
+    });
+    return response.data.data;
+}
 
-export async function getInvoiceSignedPrintLink(id: number, signal?: AbortSignal) {
-    const response = await apiClient.post<ApiResource<{ print_url: string; pdf_url: string }>>(
-        `${endpoints.invoices}/${id}/signed-print`,
-        null,
-        { signal },
-    );
+export async function cancelInvoice(id: number, expectedVersion: number, reason: string) {
+    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/cancel`, {
+        expected_version: expectedVersion,
+        reason,
+    });
     return response.data.data;
 }

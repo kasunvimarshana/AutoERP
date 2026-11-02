@@ -1,8 +1,6 @@
-import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
-import { LookupSelect } from '@/shared/components/LookupSelect';
-import { lookupApi, type ItemLookupResource } from '@/shared/api/lookupApi';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -10,12 +8,10 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { compactObject, humanize } from '@/shared/utils/object';
 import {
     createCostAdjustment,
-    createInventoryBatch,
-    generateInventoryBatchNumber,
     listBatches,
     listSerials,
     listStateChanges,
@@ -44,14 +40,10 @@ export function CostingTab({
     loading,
     error,
     reload,
-    canManage,
-    canPost,
 }: WorkflowProps & {
     layers: InventoryRecord[];
     layersLoading: boolean;
     layersError: ApiError | null;
-    canManage: boolean;
-    canPost: boolean;
 }) {
     const [form, setForm] = useState({
         adjustment_date: localToday(),
@@ -78,26 +70,22 @@ export function CostingTab({
     return (
         <div className="space-y-5">
             <WorkflowPanel title="Inventory cost adjustments" loading={loading} error={error} actionError={actionError}>
-                {canManage && (
-                    <form className="grid gap-4 xl:grid-cols-[1fr_10rem_1fr_1fr_auto]" onSubmit={submit}>
-                        <Select
-                            label="Valuation layer"
-                            value={form.valuation_layer}
-                            error={fieldError(actionError, 'lines.0.valuation_layer_id')}
-                            options={layers.map((layer) => ({ value: String(layer.id), label: valuationLayerLabel(layer) }))}
-                            onChange={(event) => setForm({ ...form, valuation_layer: event.target.value })}
-                        />
-                        <DecimalInput label="Adjustment" value={form.adjustment_amount} error={fieldError(actionError, 'lines.0.adjustment_amount')} onChange={(event) => setForm({ ...form, adjustment_amount: event.target.value })} />
-                        <Input label="Reason" value={form.reason} error={fieldError(actionError, 'reason')} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
-                        <Input label="Date" type="date" value={form.adjustment_date} error={fieldError(actionError, 'adjustment_date')} onChange={(event) => setForm({ ...form, adjustment_date: event.target.value })} />
-                        <div className="flex items-end">
-                            <Button type="submit" loading={busy} disabled={!form.valuation_layer}>Create</Button>
-                        </div>
-                    </form>
-                )}
+                <form className="grid gap-4 xl:grid-cols-[1fr_10rem_1fr_1fr_auto]" onSubmit={submit}>
+                    <Select
+                        label="Valuation layer"
+                        value={form.valuation_layer}
+                        error={fieldError(actionError, 'lines.0.valuation_layer_id')}
+                        options={layers.map((layer) => ({ value: String(layer.id), label: valuationLayerLabel(layer) }))}
+                        onChange={(event) => setForm({ ...form, valuation_layer: event.target.value })}
+                    />
+                    <DecimalInput label="Adjustment" value={form.adjustment_amount} error={fieldError(actionError, 'lines.0.adjustment_amount')} onChange={(event) => setForm({ ...form, adjustment_amount: event.target.value })} />
+                    <Input label="Reason" value={form.reason} error={fieldError(actionError, 'reason')} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+                    <Input label="Date" type="date" value={form.adjustment_date} error={fieldError(actionError, 'adjustment_date')} onChange={(event) => setForm({ ...form, adjustment_date: event.target.value })} />
+                    <div className="flex items-end">
+                        <Button type="submit" loading={busy} disabled={!form.valuation_layer}>Create</Button>
+                    </div>
+                </form>
                 <RecordList rows={data} columns={costAdjustmentColumns((row) => {
-                    if (!canPost) return null;
-
                     const key = `post-cost-adjustment:${row.id}`;
 
                     return (
@@ -123,84 +111,12 @@ export function CostingTab({
 export function TrackingTab({
     batches,
     serials,
-    canManage,
-    reload,
 }: {
     batches: ApiResult<Awaited<ReturnType<typeof listBatches>>>;
     serials: ApiResult<Awaited<ReturnType<typeof listSerials>>>;
-    canManage: boolean;
-    reload: () => void;
 }) {
-    const [item, setItem] = useState<ItemLookupResource | null>(null);
-    const [form, setForm] = useState({ batch_number: '', lot_number: '', manufacture_date: '', expiry_date: '' });
-    const [busy, setBusy] = useState(false);
-    const [generatingBatchNumber, setGeneratingBatchNumber] = useState(false);
-    const [actionError, setActionError] = useState<ApiError | null>(null);
-    const batchNumberRequest = useRef(0);
-
-    const changeItem = (next: ItemLookupResource | null) => {
-        const request = ++batchNumberRequest.current;
-        setItem(next);
-        setForm((current) => ({ ...current, batch_number: '' }));
-        setActionError(null);
-
-        if (!next) {
-            setGeneratingBatchNumber(false);
-            return;
-        }
-
-        setGeneratingBatchNumber(true);
-        void generateInventoryBatchNumber()
-            .then(({ batch_number }) => {
-                if (batchNumberRequest.current === request) {
-                    setForm((current) => ({ ...current, batch_number }));
-                }
-            })
-            .catch((requestError) => {
-                if (batchNumberRequest.current === request) {
-                    setActionError(toApiError(requestError));
-                }
-            })
-            .finally(() => {
-                if (batchNumberRequest.current === request) {
-                    setGeneratingBatchNumber(false);
-                }
-            });
-    };
-
-    const submit = async (event: FormEvent) => {
-        if (!item) return;
-        await runFormAction(event, setBusy, setActionError, async () => {
-            await createInventoryBatch({
-                item_id: item.id,
-                batch_number: form.batch_number.trim(),
-                lot_number: form.lot_number.trim() || undefined,
-                manufacture_date: form.manufacture_date || undefined,
-                expiry_date: form.expiry_date || undefined,
-            });
-            setItem(null);
-            setForm({ batch_number: '', lot_number: '', manufacture_date: '', expiry_date: '' });
-            reload();
-        });
-    };
-
     return (
-        <div className="space-y-5">
-            {canManage && <WorkflowPanel title="Create batch or lot" loading={false} error={null} actionError={actionError}>
-                <form className="space-y-4" onSubmit={submit}>
-                    <p className="text-sm text-slate-600">Register a tracking reference before stock entry, or create it while receiving a purchase.</p>
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <LookupSelect<ItemLookupResource> label="Tracked item" value={item} onChange={changeItem} search={lookupApi.batchTrackedStockableItems} placeholder="Search batch-tracked items..." error={fieldError(actionError, 'item_id')} required />
-                        <Input label="Batch / tracking number" value={form.batch_number} disabled={generatingBatchNumber} onChange={(event) => setForm({ ...form, batch_number: event.target.value })} error={fieldError(actionError, 'batch_number')} required />
-                        <Input label="Supplier lot number" value={form.lot_number} onChange={(event) => setForm({ ...form, lot_number: event.target.value })} error={fieldError(actionError, 'lot_number')} />
-                        <Input label="Manufacture date" type="date" value={form.manufacture_date} onChange={(event) => setForm({ ...form, manufacture_date: event.target.value })} error={fieldError(actionError, 'manufacture_date')} />
-                        <Input label="Expiry date" type="date" value={form.expiry_date} onChange={(event) => setForm({ ...form, expiry_date: event.target.value })} error={fieldError(actionError, 'expiry_date')} />
-                    </div>
-                    <p className="text-xs text-slate-500">Generated automatically after selecting an item. You can edit it before creating the batch.</p>
-                    <Button type="submit" loading={busy} disabled={!item || generatingBatchNumber || !form.batch_number.trim()}>Create batch</Button>
-                </form>
-            </WorkflowPanel>}
-            <div className="grid gap-5 xl:grid-cols-2">
+        <div className="grid gap-5 xl:grid-cols-2">
             <Panel title="Batches and lots">
                 <ErrorAlert error={batches.error} />
                 {batches.loading ? <LoadingState /> : <RecordList rows={batches.data?.data ?? []} columns={[
@@ -220,7 +136,6 @@ export function TrackingTab({
                     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={String(row.status ?? '')} /> },
                 ]} />}
             </Panel>
-            </div>
         </div>
     );
 }
@@ -252,7 +167,6 @@ export function ReportsTab() {
         ['Inventory Aging Report', 'inventory.aging'],
         ['Reservation Report', 'inventory.reservation'],
         ['Allocation Report', 'inventory.allocation'],
-        ['Batch Price Revision Report', 'inventory.batch-price'],
         ['Batch Expiry Report', 'inventory.batch-expiry'],
         ['Serial Tracking Report', 'inventory.serial'],
         ['Low Stock Report', 'inventory.low-stock'],

@@ -23,8 +23,6 @@ final readonly class ReportData
         public DateTimeImmutable $generatedAt,
         public string $template,
         public string $mode = 'preview',
-        public ?int $rowLimit = null,
-        public bool $truncated = false,
     ) {}
 
     public function orientation(): string
@@ -48,8 +46,6 @@ final readonly class ReportData
             $this->generatedAt,
             $this->template,
             $mode,
-            $this->rowLimit,
-            $this->truncated,
         );
     }
 
@@ -68,8 +64,6 @@ final readonly class ReportData
             'generatedAt' => $this->generatedAt,
             'mode' => $this->mode,
             'orientation' => $this->orientation(),
-            'rowLimit' => $this->rowLimit,
-            'truncated' => $this->truncated,
         ];
     }
 }

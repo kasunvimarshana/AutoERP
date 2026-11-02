@@ -33,12 +33,10 @@ final class ReportingFrameworkTest extends TestCase
         $reports = array_keys($this->app->make(ReportDefinitionRegistry::class)->all());
 
         foreach ([
-            'expenses',
             'inventory.stock-balance',
             'inventory.stock-movement',
             'purchase.orders',
             'purchase.grns',
-            'purchase/grn-payables',
             'purchase.returns',
             'masters.supplier',
             'masters.customer',
@@ -175,13 +173,13 @@ final class ReportingFrameworkTest extends TestCase
         $templates = $this->app->make(ReportTemplateResolver::class);
         $exporter = $this->app->make(PdfExporter::class);
         $reports = [
-            'invoice.register' => ['reports.finance.report', 'landscape'],
+            'invoice.register' => ['reports.finance.report', 'portrait'],
             'payment.register' => ['reports.finance.report', 'landscape'],
             'finance.ledger' => ['reports.finance.report', 'landscape'],
             'inventory.stock-balance' => ['reports.inventory.report', 'landscape'],
             'purchase.orders' => ['reports.purchase.report', 'portrait'],
             'vehicle-service.jobs' => ['reports.vehicle-service.report', 'portrait'],
-            'vehicle-service.employee-commissions' => ['reports.vehicle-service.report', 'landscape'],
+            'vehicle-service.employee-commissions' => ['reports.vehicle-service.report', 'portrait'],
             'vehicle-service.profitability' => ['reports.vehicle-service.report', 'landscape'],
         ];
 

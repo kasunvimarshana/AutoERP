@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -17,7 +17,6 @@ import { formatMoney } from '@/shared/utils/formatMoney';
 import { approvePurchaseReturn, cancelPurchaseReturn, getPurchaseReturn, postPurchaseReturn, type PurchaseReturnLine } from '../purchaseApi';
 import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
 import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
-import { useDetailResourceStore } from '@/shared/state/useDetailResourceStore';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
@@ -26,22 +25,14 @@ export default function PurchaseReturnDetailPage() {
     const id = Number(useParams().id);
     const auth = useAuth();
     const result = useApi((signal) => getPurchaseReturn(id, signal), [id]);
-    const returnState = useDetailResourceStore(result.data);
     const [tab, setTab] = useState<Tab>('summary');
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
-
-    useEffect(() => {
-        if (result.data !== null) {
-            returnState.setData(result.data);
-        }
-    }, [result.data, returnState]);
-
-    if (result.loading && returnState.data === null) return <LoadingState />;
-    if (!returnState.data) return <ErrorAlert error={result.error} />;
-    const row = returnState.data;
+    if (result.loading) return <LoadingState />;
+    if (!result.data) return <ErrorAlert error={result.error} />;
+    const row = result.data;
     const capabilities = row.capabilities ?? {};
-    const can = (permission: string) => hasPurchasePermission(auth, permission);
+    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     const run = async (action: 'approve' | 'post' | 'cancel') => {
         if (busy) return;
         if (!await confirm({
@@ -54,12 +45,12 @@ export default function PurchaseReturnDetailPage() {
         setActionError(null);
         try {
             const payload = { expected_version: row.row_version };
-            if (action === 'approve') returnState.setData(await approvePurchaseReturn(row.id, payload));
+            if (action === 'approve') result.setData(await approvePurchaseReturn(row.id, payload));
             if (action === 'post') {
                 await postPurchaseReturn(row.id, payload);
-                returnState.setData(await getPurchaseReturn(row.id));
+                result.reload();
             }
-            if (action === 'cancel') returnState.setData(await cancelPurchaseReturn(row.id, payload));
+            if (action === 'cancel') result.setData(await cancelPurchaseReturn(row.id, payload));
         } catch (requestError) {
             setActionError(toApiError(requestError));
         } finally {
@@ -92,7 +83,6 @@ export default function PurchaseReturnDetailPage() {
                         { label: 'Status', value: <StatusBadge status={row.status} /> },
                         { label: 'Type', value: row.return_type?.replaceAll('_', ' ') ?? '-' },
                         { label: 'Supplier', value: row.supplier?.name ?? '-' },
-                        { label: 'Currency', value: row.currency?.code ?? (row.currency_id ? 'Currency code unavailable' : 'Unresolved') },
                         { label: 'Warehouse', value: row.warehouse?.name ?? '-' },
                         { label: 'Affects payable', value: row.affects_supplier_balance ? 'Yes' : 'No' },
                         { label: 'Grand total', value: formatMoney(row.grand_total) },

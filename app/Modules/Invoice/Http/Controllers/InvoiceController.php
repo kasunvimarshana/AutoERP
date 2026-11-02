@@ -4,21 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Http\Controllers;
 
-use DateTimeImmutable;
-use Dompdf\Dompdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\URL;
-use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
-use InvalidArgumentException;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Invoice\Data\InvoicePrintContext;
-use Modules\Invoice\Enums\InvoiceCopyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Http\Requests\InvoiceActionRequest;
 use Modules\Invoice\Http\Requests\ListInvoiceRequest;
@@ -29,43 +18,32 @@ use Modules\Invoice\Http\Resources\InvoiceSourceLineResource;
 use Modules\Invoice\Http\Resources\InvoiceSourceResource;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
-use Modules\Invoice\Services\InvoicePrintIssuanceService;
-use Modules\Invoice\Services\InvoicePrintService;
-use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
-use Modules\Invoice\Services\InvoiceWhatsAppShareService;
 use Modules\Invoice\Services\ManualInvoiceService;
 
 final class InvoiceController
 {
-    public function __construct(
-        private readonly InvoicePrintService $prints,
-        private readonly InvoicePrintIssuanceService $printIssuance,
-    ) {}
-
-    public function index(
-        ListInvoiceRequest $request,
-        InvoiceStatusService $statuses,
-    ): AnonymousResourceCollection {
+    public function index(ListInvoiceRequest $request): AnonymousResourceCollection
+    {
         $query = $this->scope(Invoice::query(), $request);
         if ($request->filled('search')) {
             $query->where('invoice_number', 'like', '%'.trim((string) $request->input('search')).'%');
         }
-        foreach (['invoice_type', 'direction', 'status', 'party_id', 'currency_id'] as $filter) {
+        foreach (['invoice_type', 'direction', 'status', 'party_id', 'party_type'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }
         }
+        if ($request->boolean('has_balance_due')) {
+            $query->where('balance_due', '>', 0)
+                ->whereNotIn('status', [
+                    InvoiceStatus::Cancelled->value,
+                    InvoiceStatus::Void->value,
+                    InvoiceStatus::Paid->value,
+                ]);
+        }
         if ($request->filled('balance_status')) {
             $query->whereHas('balance', fn (Builder $scope): Builder => $scope->where('status', $request->input('balance_status')));
-        }
-        if ($request->boolean('settlement_eligible')) {
-            $query
-                ->whereIn('status', $statuses->settlementStatuses())
-                ->whereHas(
-                    'balance',
-                    fn (Builder $scope): Builder => $scope->where('remaining_amount', '>', 0),
-                );
         }
         if ($request->filled('date_from')) {
             $query->whereDate('invoice_date', '>=', $request->input('date_from'));
@@ -80,7 +58,7 @@ final class InvoiceController
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
     {
         return new InvoiceResource($this->scope(Invoice::query(), $request)
-            ->with(['lines', 'sources', 'postingPlan'])
+            ->with('lines')
             ->findOrFail($invoice));
     }
 
@@ -112,20 +90,6 @@ final class InvoiceController
             $this->find($request, $invoice),
             InvoiceStatus::Posted,
             $request->expectedVersion(),
-            $request->currentUserId(),
-        ));
-    }
-
-    public function reverse(
-        InvoiceActionRequest $request,
-        int $invoice,
-        InvoiceReversalService $service,
-    ): InvoiceResource {
-        return new InvoiceResource($service->reverse(
-            $this->find($request, $invoice),
-            $request->expectedVersion(),
-            $request->reversalDate(),
-            $request->reason() ?? '',
             $request->currentUserId(),
         ));
     }
@@ -203,257 +167,5 @@ final class InvoiceController
         return $request->organizationUnitId() === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $request->organizationUnitId());
-    }
-
-    public function printView(Request $request, int $invoice): View|Response
-    {
-        $model = $this->prints->findScoped(
-            $invoice,
-            $this->currentTenantId($request),
-            $this->currentOrganizationUnitId($request),
-        );
-
-        if ($model === null) {
-            return $this->notFound($invoice);
-        }
-
-        $context = $this->printIssuance->issue($model);
-
-        return view('invoice.print', $this->prints->viewData(
-            $model,
-            $this->signedPdfUrl($model, $context),
-            printContext: $context,
-        ));
-    }
-
-    public function pdf(Request $request, int $invoice): Response
-    {
-        $model = $this->prints->findScoped(
-            $invoice,
-            $this->currentTenantId($request),
-            $this->currentOrganizationUnitId($request),
-        );
-
-        if ($model === null) {
-            return $this->notFound($invoice);
-        }
-
-        return $this->pdfResponse($model, $this->printIssuance->issue($model));
-    }
-
-    public function signedPrintLink(Request $request, int $invoice): JsonResponse
-    {
-        $tenantId = $this->currentTenantId($request);
-        $organizationUnitId = $this->currentOrganizationUnitId($request);
-        $model = $this->prints->findScoped($invoice, $tenantId, $organizationUnitId);
-
-        if ($model === null) {
-            abort(404);
-        }
-
-        $context = $this->printIssuance->issue($model);
-        $routeParameters = $this->publicRouteParameters($model, $context);
-        $printUrl = URL::temporarySignedRoute(
-            'invoices.public.print',
-            now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
-            $routeParameters,
-        );
-        $pdfUrl = URL::temporarySignedRoute(
-            'invoices.public.pdf',
-            now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
-            $routeParameters,
-        );
-
-        return response()->json(['data' => ['print_url' => $printUrl, 'pdf_url' => $pdfUrl]]);
-    }
-
-    public function whatsappShare(
-        Request $request,
-        int $invoice,
-        InvoiceWhatsAppShareService $shares,
-    ): JsonResponse {
-        $model = $this->prints->findScoped(
-            $invoice,
-            $this->currentTenantId($request),
-            $this->currentOrganizationUnitId($request),
-        );
-        if ($model === null) {
-            abort(404);
-        }
-
-        try {
-            return response()->json(['data' => $shares->create($model)]);
-        } catch (InvalidArgumentException $exception) {
-            throw ValidationException::withMessages([
-                'whatsapp' => [$exception->getMessage()],
-            ]);
-        }
-    }
-
-    public function publicPrint(Request $request, int $invoice, int $tenant, TenantExecutionContextInterface $executionContext): View|Response
-    {
-        $organizationUnitId = $this->signedOrganizationUnitId($request);
-        $model = $executionContext->runForTenant(
-            $tenant,
-            fn (): ?Invoice => $this->prints->findScoped($invoice, $tenant, $organizationUnitId),
-        );
-        if ($model === null) {
-            return $this->notFound($invoice);
-        }
-
-        $context = $this->signedPrintContext($request);
-
-        return view('invoice.print', $this->prints->viewData(
-            $model,
-            $this->signedPdfUrl($model, $context),
-            printContext: $context,
-        ));
-    }
-
-    public function publicPdf(Request $request, int $invoice, int $tenant, TenantExecutionContextInterface $executionContext): Response
-    {
-        $organizationUnitId = $this->signedOrganizationUnitId($request);
-        $model = $executionContext->runForTenant(
-            $tenant,
-            fn (): ?Invoice => $this->prints->findScoped($invoice, $tenant, $organizationUnitId),
-        );
-        if ($model === null) {
-            return $this->notFound($invoice);
-        }
-
-        return $this->pdfResponse($model, $this->signedPrintContext($request));
-    }
-
-    public function publicSharedPdf(
-        Request $request,
-        int $invoice,
-        int $tenant,
-        TenantExecutionContextInterface $executionContext,
-        InvoiceWhatsAppShareService $shares,
-    ): Response {
-        $organizationUnitId = $this->signedOrganizationUnitId($request);
-        $model = $executionContext->runForTenant(
-            $tenant,
-            fn (): ?Invoice => $this->prints->findScoped($invoice, $tenant, $organizationUnitId),
-        );
-        if ($model === null || ! $shares->isShareable($model)) {
-            return $this->notFound($invoice);
-        }
-
-        return $this->pdfResponse($model);
-    }
-
-    private function pdfResponse(Invoice $invoice, ?InvoicePrintContext $context = null): Response
-    {
-        $html = view('invoice.print', $this->prints->viewData(
-            $invoice,
-            mode: 'pdf',
-            printContext: $context,
-        ))->render();
-        $layout = $this->prints->layout($invoice);
-        $dompdf = new Dompdf;
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper($layout->pdfPaper(), $layout->orientation());
-        $dompdf->render();
-
-        return response($dompdf->output(), 200)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="'.$this->prints->filename($invoice).'"');
-    }
-
-    private function signedPdfUrl(Invoice $invoice, ?InvoicePrintContext $context): string
-    {
-        return URL::temporarySignedRoute(
-            'invoices.public.pdf',
-            now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
-            $this->publicRouteParameters($invoice, $context),
-        );
-    }
-
-    /** @return array<string, int|string> */
-    private function publicRouteParameters(
-        Invoice $invoice,
-        ?InvoicePrintContext $context = null,
-    ): array {
-        $parameters = [
-            'invoice' => (int) $invoice->getKey(),
-            'tenant' => (int) $invoice->tenant_id,
-            ...$this->printContextParameters($context),
-        ];
-
-        if ($invoice->organization_unit_id !== null) {
-            $parameters['organization_unit'] = (int) $invoice->organization_unit_id;
-        }
-
-        return $parameters;
-    }
-
-    /** @return array<string, string> */
-    private function printContextParameters(?InvoicePrintContext $context): array
-    {
-        if ($context === null) {
-            return [];
-        }
-
-        $parameters = [
-            'printed_at' => $context->printedAt->format(DATE_ATOM),
-            'printed_by' => $context->printedBy,
-        ];
-
-        if ($context->copyType !== null) {
-            $parameters['copy_type'] = $context->copyType->value;
-        }
-
-        return $parameters;
-    }
-
-    private function signedPrintContext(Request $request): ?InvoicePrintContext
-    {
-        if (! $request->hasValidSignature()) {
-            return null;
-        }
-
-        $printedAt = trim((string) $request->query('printed_at', ''));
-        $printedBy = trim((string) $request->query('printed_by', ''));
-        $copyTypeValue = trim((string) $request->query('copy_type', ''));
-        $copyType = $copyTypeValue === '' ? null : InvoiceCopyType::tryFrom($copyTypeValue);
-        if ($printedAt === '' || $printedBy === '' || ($copyTypeValue !== '' && $copyType === null)) {
-            return null;
-        }
-
-        try {
-            return new InvoicePrintContext(new DateTimeImmutable($printedAt), $printedBy, $copyType);
-        } catch (\Exception) {
-            return null;
-        }
-    }
-
-    private function currentTenantId(Request $request): int
-    {
-        $value = $request->attributes->get((string) config('core.current_tenant.id_attribute', 'current_tenant_id'));
-        if (! is_numeric($value) || (int) $value < 1) {
-            abort(404);
-        }
-
-        return (int) $value;
-    }
-
-    private function currentOrganizationUnitId(Request $request): ?int
-    {
-        $value = $request->attributes->get((string) config('core.current_organization_unit.id_attribute', 'current_organization_unit_id'));
-
-        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
-    }
-
-    private function signedOrganizationUnitId(Request $request): ?int
-    {
-        $value = $request->query('organization_unit');
-
-        return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
-    }
-
-    private function notFound(int $invoice): Response
-    {
-        return response(view('invoice.notfound', ['id' => $invoice]), 404);
     }
 }

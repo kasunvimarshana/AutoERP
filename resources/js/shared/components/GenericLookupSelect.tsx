@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { toApiError } from '@/shared/api/apiError';
-import { useLookupCacheStore } from '@/shared/state/lookupCacheStore';
 import { Input } from '@/shared/components/Input';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { NamedResource } from '@/shared/types/common';
@@ -17,18 +16,13 @@ interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehavi
     onChange: (resource: T | null) => void | boolean;
     search: LookupLoader<T>;
     formatLabel: (resource: T) => string;
-    renderOption?: (resource: T, state: { active: boolean; selected: boolean }) => ReactNode;
-    renderEmptyState?: (state: { searchText: string; meta: PaginationMeta | undefined }) => ReactNode;
     excludeId?: number | null;
     excludeIds?: Array<number | string>;
     error?: string;
     placeholder?: string;
     disabled?: boolean;
     required?: boolean;
-    autoFocus?: boolean;
     id?: string;
-    recentResultsKey?: string;
-    dropdownPlacement?: 'top' | 'bottom';
 }
 
 export function GenericLookupSelect<T extends NamedResource>({
@@ -37,18 +31,13 @@ export function GenericLookupSelect<T extends NamedResource>({
     onChange,
     search,
     formatLabel,
-    renderOption,
-    renderEmptyState,
     excludeId,
     excludeIds,
     error,
     placeholder = 'Search by code or name',
     disabled = false,
     required = false,
-    autoFocus = false,
     id,
-    recentResultsKey,
-    dropdownPlacement = 'bottom',
     minSearchLength = DEFAULT_MIN_SEARCH_LENGTH,
     loadOnOpen = false,
     perPage = DEFAULT_PER_PAGE,
@@ -64,11 +53,6 @@ export function GenericLookupSelect<T extends NamedResource>({
     const searchRef = useRef(search);
     const requestSeqRef = useRef(0);
     const inFlightKeyRef = useRef<string | null>(null);
-    const recentResultsEntry = useLookupCacheStore((state) =>
-        recentResultsKey ? state.recentEntries[recentResultsKey] : undefined,
-    );
-    const recentResultsRef = useRef(recentResultsEntry);
-    const setRecentEntry = useLookupCacheStore((state) => state.setRecentEntry);
     const excludedKey = normalizeExcludedIds(excludeId, excludeIds).join('|');
     const excludedIds = useMemo(() => new Set(excludedKey ? excludedKey.split('|') : []), [excludedKey]);
 
@@ -96,7 +80,6 @@ export function GenericLookupSelect<T extends NamedResource>({
         : undefined;
     const canLoadCurrentSearch = canLoad(searchText, minSearchLength, loadOnOpen);
     const minimumMessage = open && !canLoadCurrentSearch
-        && !(recentResultsEntry && searchText === '')
         ? charactersRequiredMessage(minSearchLength - searchText.length)
         : '';
     const waitingForDebounce = open
@@ -108,10 +91,6 @@ export function GenericLookupSelect<T extends NamedResource>({
     useEffect(() => {
         searchRef.current = search;
     }, [search]);
-
-    useEffect(() => {
-        recentResultsRef.current = recentResultsEntry;
-    }, [recentResultsEntry]);
 
     const cancelRequest = useCallback(() => {
         requestRef.current?.abort();
@@ -183,9 +162,6 @@ export function GenericLookupSelect<T extends NamedResource>({
                 setMeta(result.meta);
                 setLoadedSearch(term);
                 setHasLoaded(true);
-                if (mode === 'replace' && recentResultsKey && term !== '') {
-                    setRecentEntry(recentResultsKey, nextOptions);
-                }
                 if (mode === 'replace') setActiveIndex(-1);
             } catch (requestError: unknown) {
                 if (controller.signal.aborted || requestSeqRef.current !== requestSeq) return;
@@ -209,7 +185,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 }
             }
         })();
-    }, [perPage, recentResultsKey, setRecentEntry]);
+    }, [perPage]);
 
     useEffect(() => {
         if (!open || disabled) return;
@@ -251,18 +227,6 @@ export function GenericLookupSelect<T extends NamedResource>({
 
         if (!canLoadCurrentSearch) {
             cancelRequest();
-            if (recentResultsRef.current && searchText === '') {
-                queueMicrotask(() => {
-                    setOptions(recentResultsRef.current?.options as T[]);
-                    setMeta(undefined);
-                    setLoadedSearch('');
-                    setHasLoaded(true);
-                    setSearchError('');
-                    setLoadMoreError('');
-                    setActiveIndex(-1);
-                });
-                return;
-            }
             queueMicrotask(clearResults);
             return;
         }
@@ -292,7 +256,6 @@ export function GenericLookupSelect<T extends NamedResource>({
                 error={error ?? (value === null ? selectionError : '')}
                 disabled={disabled}
                 required={required}
-                autoFocus={autoFocus}
                 role="combobox"
                 autoComplete="off"
                 aria-expanded={open}
@@ -339,7 +302,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                     id={listboxId}
                     role="listbox"
                     aria-label={`${label} options`}
-                    className={`absolute z-30 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg ${dropdownPlacement === 'top' ? 'bottom-full mb-1' : 'mt-1'}`}
+                    className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
                 >
                     {minimumMessage && <LookupMessage>{minimumMessage}</LookupMessage>}
                     {(loading || waitingForDebounce) && visibleOptions.length === 0 && (
@@ -359,29 +322,24 @@ export function GenericLookupSelect<T extends NamedResource>({
                         </div>
                     )}
                     {!loading && !waitingForDebounce && hasLoaded && visibleOptions.length === 0 && !searchError && (
-                        renderEmptyState?.({ searchText, meta }) ?? <LookupMessage>No matching {label.toLowerCase()} found.</LookupMessage>
+                        <LookupMessage>No matching {label.toLowerCase()} found.</LookupMessage>
                     )}
 
-                    {visibleOptions.map((option, index) => {
-                        const selected = Number(option.id) === Number(value?.id);
-                        const active = normalizedActiveIndex === index;
-
-                        return (
+                    {visibleOptions.map((option, index) => (
                         <button
                             key={option.id}
                             id={`${listboxId}-option-${option.id}`}
                             type="button"
                             role="option"
-                            aria-selected={selected}
-                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${active ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
+                            aria-selected={Number(option.id) === Number(value?.id)}
+                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${normalizedActiveIndex === index ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
                             onMouseDown={(event) => event.preventDefault()}
                             onMouseEnter={() => setActiveIndex(index)}
                             onClick={() => selectOption(option)}
                         >
-                            {renderOption ? renderOption(option, { active, selected }) : formatLabel(option)}
+                            {formatLabel(option)}
                         </button>
-                        );
-                    })}
+                    ))}
 
                     {visibleOptions.length > 0 && hasMore && !searchError && (
                         <div className="mt-1 border-t border-slate-100 pt-1">
@@ -462,10 +420,9 @@ export function GenericLookupSelect<T extends NamedResource>({
             return;
         }
 
-        const hadUnselectedText = hasUserInput && inputValue.trim() !== '';
         setInputValue('');
         setHasUserInput(false);
-        if (required && hadUnselectedText) setSelectionError(requiredSelectionMessage(label));
+        if (required) setSelectionError(requiredSelectionMessage(label));
     }
 }
 

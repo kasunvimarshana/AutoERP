@@ -56,8 +56,7 @@ const revision: TenantPlanRevision = {
     created_at: '2026-06-01T00:00:00Z',
 };
 
-// These form inputs are local datetime values, so the comparison clock must be local too.
-const now = new Date('2026-06-26T10:00:00');
+const now = new Date('2026-06-26T10:00:00Z');
 
 describe('tenant subscription form rules', () => {
     it('does not offer the generic extend command for trials or open-ended contracts', () => {

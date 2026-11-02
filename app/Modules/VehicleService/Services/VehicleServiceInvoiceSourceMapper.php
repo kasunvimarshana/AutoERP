@@ -7,24 +7,15 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Finance\Enums\FinanceAccountRoleCode;
-use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\DTOs\CreateInvoiceData;
-use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
-use Modules\Invoice\Enums\AdjustmentEffect;
-use Modules\Invoice\Enums\AdjustmentType;
-use Modules\Invoice\Enums\AllocationMethod;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
-use Modules\Invoice\Models\InvoiceAdjustmentAllocation;
 use Modules\Invoice\Models\InvoiceSourceLine;
-use Modules\Invoice\Services\InvoicePostingPlanFactory;
-use Modules\VehicleService\Enums\VehicleServiceDiscountRevisionAction;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
@@ -33,12 +24,7 @@ use Modules\VehicleService\Models\VehicleServiceJobLine;
 
 final class VehicleServiceInvoiceSourceMapper
 {
-    private const ZERO = '0.000000';
-
-    public function __construct(
-        private readonly DecimalMath $math,
-        private readonly InvoicePostingPlanFactory $postingPlans,
-    ) {}
+    public function __construct(private readonly DecimalMath $math) {}
 
     /** @return Collection<int, VehicleServiceJobLine> */
     public function billableLines(VehicleServiceJob $job): Collection
@@ -52,7 +38,7 @@ final class VehicleServiceInvoiceSourceMapper
                 $invoiced = $this->invoicedQuantity((int) $job->tenant_id, (int) $line->getKey());
                 $remaining = $this->math->sub((string) $line->quantity, $invoiced);
                 if ($this->math->isNegative($remaining)) {
-                    $remaining = self::ZERO;
+                    $remaining = '0.000000';
                 }
 
                 $line->setAttribute('invoiced_quantity', $invoiced);
@@ -75,7 +61,6 @@ final class VehicleServiceInvoiceSourceMapper
         ?int $createdBy = null,
     ): CreateInvoiceData {
         $this->assertInvoiceable($job);
-        $job->loadMissing('vehicle');
 
         $lines = $job->lines()
             ->where('is_billable', true)
@@ -84,12 +69,7 @@ final class VehicleServiceInvoiceSourceMapper
             ->get();
         $invoiceLines = [];
         $sourceLines = [];
-        $selectedTotal = self::ZERO;
-        $baseAmount = self::ZERO;
-        $taxAmount = self::ZERO;
-        $selectedDiscountBase = self::ZERO;
-        $allocatedJobDiscount = self::ZERO;
-        $allRemainingSelected = true;
+        $selectedTotal = '0.000000';
         $lineNumber = 1;
         $selectionProvided = $lineQuantities !== [];
         $validLineIds = $lines->pluck('id')->map(fn ($id): int => (int) $id)->all();
@@ -101,18 +81,16 @@ final class VehicleServiceInvoiceSourceMapper
         }
 
         foreach ($lines as $line) {
+            if ($selectionProvided && ! array_key_exists((int) $line->getKey(), $lineQuantities)) {
+                continue;
+            }
+
             $previouslyInvoiced = $this->invoicedQuantity(
                 (int) $job->tenant_id,
                 (int) $line->getKey(),
             );
             $remaining = $this->math->sub((string) $line->quantity, $previouslyInvoiced);
-            if ($this->math->compare($remaining, self::ZERO) <= 0) {
-                continue;
-            }
-
-            if ($selectionProvided && ! array_key_exists((int) $line->getKey(), $lineQuantities)) {
-                $allRemainingSelected = false;
-
+            if ($this->math->compare($remaining, '0.000000') <= 0) {
                 continue;
             }
 
@@ -120,8 +98,6 @@ final class VehicleServiceInvoiceSourceMapper
                 $lineQuantities[(int) $line->getKey()] ?? $remaining,
             );
             if ($this->math->isZero($quantity)) {
-                $allRemainingSelected = false;
-
                 continue;
             }
             if ($this->math->compare($quantity, $remaining) > 0) {
@@ -129,32 +105,19 @@ final class VehicleServiceInvoiceSourceMapper
                     'Invoice quantity cannot exceed service job line remaining quantity.',
                 );
             }
-            if ($this->math->compare($quantity, $remaining) < 0) {
-                $allRemainingSelected = false;
-            }
 
             $ratio = $this->math->div($quantity, (string) $line->quantity, 12);
             $discount = $this->math->mul((string) $line->discount_amount, $ratio);
             $tax = $this->math->mul((string) $line->tax_amount, $ratio);
             $charge = $this->math->mul((string) $line->charge_amount, $ratio);
-            $selectedDiscountBase = $this->math->add(
-                $selectedDiscountBase,
+            $lineTotal = $this->math->add(
                 $this->math->sub(
                     $this->math->mul($quantity, (string) $line->unit_price),
                     $discount,
                 ),
+                $this->math->add($tax, $charge),
             );
-            $lineBase = $this->math->add(
-                $this->math->sub(
-                    $this->math->mul($quantity, (string) $line->unit_price),
-                    $discount,
-                ),
-                $charge,
-            );
-            $lineTotal = $this->math->add($lineBase, $tax);
             $selectedTotal = $this->math->add($selectedTotal, $lineTotal);
-            $baseAmount = $this->math->add($baseAmount, $lineBase);
-            $taxAmount = $this->math->add($taxAmount, $tax);
 
             $invoiceLines[] = new InvoiceLineData(
                 lineNumber: $lineNumber++,
@@ -191,44 +154,6 @@ final class VehicleServiceInvoiceSourceMapper
             throw new InvalidArgumentException('No billable service job lines remain to invoice.');
         }
 
-        $adjustments = [];
-        $discountRevision = $job->discountRevisions()->first();
-        if ($discountRevision !== null
-            && $discountRevision->action === VehicleServiceDiscountRevisionAction::Set
-            && $this->math->compare((string) $job->job_discount_amount, self::ZERO) > 0) {
-            $previouslyAllocated = $this->previouslyAllocatedDiscount(
-                (int) $job->tenant_id,
-                (int) $discountRevision->getKey(),
-            );
-            $remainingDiscount = $this->math->sub((string) $job->job_discount_amount, $previouslyAllocated);
-            $allocatedJobDiscount = $allRemainingSelected
-                ? $remainingDiscount
-                : $this->math->mul(
-                    (string) $job->job_discount_amount,
-                    $this->math->div($selectedDiscountBase, (string) $job->job_discount_base, 12),
-                );
-            if ($this->math->compare($allocatedJobDiscount, $remainingDiscount) > 0) {
-                $allocatedJobDiscount = $remainingDiscount;
-            }
-
-            $adjustments[] = new InvoiceAdjustmentData(
-                name: 'Vehicle service job discount',
-                adjustmentType: AdjustmentType::Discount,
-                effect: AdjustmentEffect::Decrease,
-                amount: $allocatedJobDiscount,
-                sourceAdjustmentType: 'vehicle_service_job_discount',
-                sourceAdjustmentId: (int) $discountRevision->getKey(),
-                sourceType: 'vehicle_service_job',
-                sourceId: (int) $job->getKey(),
-                calculationType: $discountRevision->calculation_type->value,
-                rate: (string) $discountRevision->rate,
-                sourceAmount: (string) $job->job_discount_amount,
-                allocationMethod: AllocationMethod::Manual,
-                isSystemGenerated: true,
-                description: (string) $discountRevision->reason,
-            );
-        }
-
         return new CreateInvoiceData(
             tenantId: (int) $job->tenant_id,
             invoiceType: InvoiceType::Service,
@@ -243,7 +168,6 @@ final class VehicleServiceInvoiceSourceMapper
             notes: $notes,
             createdBy: $createdBy,
             lines: $invoiceLines,
-            adjustments: $adjustments,
             sources: [new InvoiceSourceData(
                 tenantId: (int) $job->tenant_id,
                 sourceType: 'vehicle_service_job',
@@ -252,21 +176,10 @@ final class VehicleServiceInvoiceSourceMapper
                 sourceDocumentNumber: (string) $job->job_number,
                 sourceDocumentDate: $job->job_date->toDateString(),
                 sourceSubtotal: (string) $job->subtotal,
-                sourceAdjustmentTotal: (string) $job->job_discount_amount,
                 sourceGrandTotal: (string) $job->grand_total,
                 invoicedAmount: $selectedTotal,
-                allocatedAdjustmentAmount: $allocatedJobDiscount,
             )],
             sourceLines: $sourceLines,
-            postingPlan: $this->postingPlans->outbound(
-                FinancePostingProfileCode::VehicleServiceInvoice,
-                $invoiceDate,
-                FinanceAccountRoleCode::ServiceRevenue,
-                $this->math->sub($baseAmount, $allocatedJobDiscount),
-                $taxAmount,
-                description: 'Vehicle service invoice '.$job->job_number,
-            ),
-            purchaserReferenceFields: $this->purchaserReferenceFields($job),
         );
     }
 
@@ -296,23 +209,8 @@ final class VehicleServiceInvoiceSourceMapper
             ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
                 InvoiceStatus::Cancelled->value,
                 InvoiceStatus::Void->value,
-                InvoiceStatus::Reversed->value,
             ]))
             ->sum('invoiced_quantity'));
-    }
-
-    private function previouslyAllocatedDiscount(int $tenantId, int $discountRevisionId): string
-    {
-        return $this->math->normalize((string) InvoiceAdjustmentAllocation::query()
-            ->where('tenant_id', $tenantId)
-            ->where('source_adjustment_type', 'vehicle_service_job_discount')
-            ->where('source_adjustment_id', $discountRevisionId)
-            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
-                InvoiceStatus::Cancelled->value,
-                InvoiceStatus::Void->value,
-                InvoiceStatus::Reversed->value,
-            ]))
-            ->sum('allocated_amount'));
     }
 
     private function invoiceLineType(VehicleServiceLineSourceType $source): InvoiceLineType
@@ -332,61 +230,5 @@ final class VehicleServiceInvoiceSourceMapper
         ], true)) {
             throw new InvalidArgumentException('Only completed service jobs can be invoiced.');
         }
-    }
-
-    /** @return list<array{label: string, value: string}> */
-    private function purchaserReferenceFields(VehicleServiceJob $job): array
-    {
-        $fields = [[
-            'label' => 'Job No',
-            'value' => (string) $job->job_number,
-        ]];
-
-        $vehicleNumber = $this->nullableString($job->vehicle?->registration_number)
-            ?? $this->nullableString($job->vehicle?->vehicle_number);
-        if ($vehicleNumber !== null) {
-            $fields[] = ['label' => 'Vehicle No', 'value' => $vehicleNumber];
-        }
-
-        if ($job->odometer_reading !== null) {
-            $unit = $this->nullableString($job->vehicle?->odometer_unit);
-            $fields[] = [
-                'label' => 'Mileage',
-                'value' => trim($this->formatReferenceDecimal((string) $job->odometer_reading).' '.($unit ?? '')),
-            ];
-        }
-
-        if ($job->next_service_mileage !== null) {
-            $unit = $this->nullableString($job->vehicle?->odometer_unit);
-            $fields[] = [
-                'label' => 'Next Service Mileage',
-                'value' => trim($this->formatReferenceDecimal((string) $job->next_service_mileage).' '.($unit ?? '')),
-            ];
-        }
-
-        return $fields;
-    }
-
-    private function formatReferenceDecimal(string $value): string
-    {
-        $normalized = $this->math->normalize($value);
-        $negative = str_starts_with($normalized, '-');
-        $absolute = ltrim($normalized, '-');
-        [$whole, $fraction] = array_pad(explode('.', $absolute, 2), 2, '');
-        $whole = preg_replace('/\B(?=(\d{3})+(?!\d))/', ',', $whole) ?? $whole;
-        $fraction = rtrim($fraction, '0');
-
-        return ($negative ? '-' : '').$whole.($fraction === '' ? '' : '.'.$fraction);
-    }
-
-    private function nullableString(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        return $value === '' ? null : $value;
     }
 }

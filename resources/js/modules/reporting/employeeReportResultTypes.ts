@@ -75,30 +75,10 @@ export interface EmployeeCommissionGroup {
     key: string;
     label: string;
     resource: NamedResource | EmployeeCommissionEmployee | null;
-    designation_name?: string | null;
     total_jobs: number;
     total_hours: string;
     total_labour_value: string;
-    earned_commission: string;
-    pending_commission: string;
     total_commission: string;
-}
-
-export interface EmployeeCommissionJobRow {
-    job: { id: number; number: string };
-    job_date: string;
-    last_earned_at: string | null;
-    customer_name: string;
-    vehicle_label: string;
-    entry_count: number;
-    earned_commission: string;
-    pending_commission: string;
-    total_commission: string;
-}
-
-export interface EmployeeCommissionJobsResult {
-    data: EmployeeCommissionJobRow[];
-    meta: ApiCollection<EmployeeCommissionJobRow>['meta'];
 }
 
 export type EmployeeCommissionReportResult = ApiCollection<EmployeeCommissionReportRow> & {

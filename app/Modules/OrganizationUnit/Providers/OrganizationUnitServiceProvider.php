@@ -11,7 +11,6 @@ use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\OrganizationUnit\Constants\OrganizationUnitPermission;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitBrandingReaderInterface;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitHierarchyReaderInterface;
-use Modules\OrganizationUnit\Contracts\OrganizationUnitLegalProfileReaderInterface;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitOwnershipCheckerInterface;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitPopulationReaderInterface;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -22,7 +21,6 @@ use Modules\OrganizationUnit\Services\CurrentOrganizationUnitContextResolver;
 use Modules\OrganizationUnit\Services\Directory\OrganizationUnitDirectory;
 use Modules\OrganizationUnit\Services\Hierarchy\OrganizationUnitHierarchyReader;
 use Modules\OrganizationUnit\Services\Hierarchy\OrganizationUnitPopulationReader;
-use Modules\OrganizationUnit\Services\LegalProfile\OrganizationUnitLegalProfileReader;
 use Modules\OrganizationUnit\Services\Lifecycle\OrganizationUnitLifecycleGuard;
 use Modules\OrganizationUnit\Services\OrganizationUnitOwnershipChecker;
 use Modules\OrganizationUnit\Services\OrganizationUnits\OrganizationHierarchyService;
@@ -46,7 +44,6 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
         $this->app->singleton(OrganizationUnitHierarchyReaderInterface::class, OrganizationUnitHierarchyReader::class);
         $this->app->singleton(OrganizationUnitPopulationReaderInterface::class, OrganizationUnitPopulationReader::class);
         $this->app->singleton(OrganizationUnitBrandingReaderInterface::class, OrganizationUnitBrandingReader::class);
-        $this->app->singleton(OrganizationUnitLegalProfileReaderInterface::class, OrganizationUnitLegalProfileReader::class);
         $this->app->singleton(OrganizationUnitContext::class);
         $this->app->singleton(OrganizationHierarchyService::class);
         $this->app->singleton(

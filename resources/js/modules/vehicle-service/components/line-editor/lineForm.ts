@@ -1,4 +1,3 @@
-import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
 import { addDecimal, multiplyDecimal, percentageOfDecimal, subtractDecimal } from '@/shared/utils/decimal';
 import type {
@@ -11,7 +10,7 @@ export type CalculationType = 'fixed' | 'percentage';
 
 export interface VehicleServiceLineFormValue {
     source: VehicleServiceLineSourceType;
-    item: ItemLookupResource | null;
+    item: NamedResource | null;
     uom: NamedResource | null;
     description: string;
     quantity: string;
@@ -25,14 +24,11 @@ export interface VehicleServiceLineFormValue {
     charge_value: string;
     customer_supplied: boolean;
     billable: boolean;
-    issueWarehouse: NamedResource | null;
-    issueLocation: NamedResource | null;
 }
 
-export interface LineDialog {
-    lineId: number;
-    value: VehicleServiceLineFormValue;
-}
+export type LineDialog =
+    | { mode: 'create'; value: VehicleServiceLineFormValue }
+    | { mode: 'edit'; lineId: number; value: VehicleServiceLineFormValue };
 
 export const calculationOptions = [
     { value: 'fixed', label: 'Fixed' },
@@ -64,22 +60,13 @@ export function emptyLineForm(): VehicleServiceLineFormValue {
         charge_value: '0.000000',
         customer_supplied: false,
         billable: true,
-        issueWarehouse: null,
-        issueLocation: null,
     };
 }
 
 export function lineToForm(line: VehicleServiceJobLine): VehicleServiceLineFormValue {
     return {
         source: line.line_source_type,
-        item: line.item ? {
-            ...line.item,
-            item_id: line.item_id ?? line.item.id,
-            item_variant_id: line.item_variant_id,
-            batch: line.batch ?? null,
-            batch_price_revision_id: line.batch_price_revision_id,
-            is_stockable: line.is_inventory_tracked,
-        } : null,
+        item: line.item ?? null,
         uom: line.uom ?? null,
         description: line.description,
         quantity: line.quantity,
@@ -99,8 +86,6 @@ export function lineToForm(line: VehicleServiceJobLine): VehicleServiceLineFormV
             : line.charge_amount,
         customer_supplied: line.is_customer_supplied,
         billable: line.is_billable,
-        issueWarehouse: null,
-        issueLocation: null,
     };
 }
 
@@ -109,16 +94,12 @@ export function lineFormToPayload(form: VehicleServiceLineFormValue): VehicleSer
     const tax = valueByType(form.tax_type, form.tax_value);
     const charge = valueByType(form.charge_type, form.charge_value);
     const external = form.source === 'external_item';
-    const description = form.description.trim() || form.item?.name || lineTypeLabel(form.source);
 
     return {
         line_source_type: form.source,
-        item_id: external ? undefined : form.item?.item_id ?? form.item?.id,
-        item_variant_id: external ? undefined : form.item?.item_variant_id ?? undefined,
-        batch_id: external ? undefined : form.item?.batch?.id,
-        batch_price_revision_id: external ? undefined : form.item?.batch_price_revision_id ?? undefined,
+        item_id: external ? undefined : form.item?.id,
         uom_id: form.uom?.id,
-        description,
+        description: form.description || form.item?.name || '',
         quantity: form.quantity,
         unit_cost: form.unit_cost,
         unit_price: form.unit_price,
@@ -159,18 +140,9 @@ export function calculateLinePreview(line: VehicleServiceLineFormValue) {
 }
 
 export function formatLineItem(line: VehicleServiceJobLine): string {
-    const itemLabel = line.item
+    return line.item
         ? [line.item.code, line.item.name].filter(Boolean).join(' - ')
         : line.description || line.line_source_type.replaceAll('_', ' ');
-    const batchLabel = line.batch
-        ? `Batch ${line.batch.batch_number ?? line.batch.code}${line.batch.lot_number ? ` / Lot ${line.batch.lot_number}` : ''}`
-        : null;
-
-    return [itemLabel, batchLabel].filter(Boolean).join(' / ');
-}
-
-export function lineTypeLabel(source: VehicleServiceLineSourceType): string {
-    return lineTypeOptions.find((option) => option.value === source)?.label ?? source.replaceAll('_', ' ');
 }
 
 function valueByType(type: CalculationType, value: string): { rate: string; amount: string } {

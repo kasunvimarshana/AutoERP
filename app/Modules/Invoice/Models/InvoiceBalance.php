@@ -14,6 +14,8 @@ final class InvoiceBalance extends TenantOwnedModel
 {
     protected $table = 'invoice_balances';
 
+    protected $guarded = ['id'];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

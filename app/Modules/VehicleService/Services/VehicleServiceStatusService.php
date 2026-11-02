@@ -4,37 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\Vehicle\Enums\VehicleStatus;
-use Modules\Vehicle\Models\Vehicle;
-use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
-use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceStatusHistory;
-use Modules\VehicleService\Services\Availability\VehicleServiceAdmissionService;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceStatusService
 {
     use AssertsVehicleServiceExpectedVersion;
-
-    private const VEHICLE_SERVICE_STARTED_REASON_PREFIX = 'Vehicle service started for job ';
-
-    private const VEHICLE_SERVICE_RELEASED_REASON_PREFIX = 'Vehicle service completed or cancelled for job ';
-
-    private const CANCELLED_ASSIGNMENT_STATUS = 'cancelled';
-
-    private const WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee before marking this job as inspected.';
-
-    private const JOB_LINE_REQUIRED_MESSAGE = 'Add at least one active job line before starting this service job.';
-
-    private const INVENTORY_ISSUE_REQUIRED_MESSAGE = 'Issue all required stock items before completing this job.';
-
-    private const TRANSACTION_ATTEMPTS = 3;
 
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
@@ -48,15 +28,6 @@ final class VehicleServiceStatusService
         'cancelled' => [],
     ];
 
-    public function __construct(
-        private readonly VehicleStatusService $vehicleStatuses,
-        private readonly VehicleServiceAdmissionService $admission,
-        private readonly VehicleServiceLineRuleService $lineRules,
-        private readonly VehicleServiceJobCancellationService $cancellations,
-        private readonly VehicleServiceBillingProtection $billing,
-        private readonly VehicleServiceInventoryIntegrationService $inventory,
-    ) {}
-
     public function change(
         VehicleServiceJob $job,
         VehicleServiceJobStatus $status,
@@ -65,56 +36,15 @@ final class VehicleServiceStatusService
         ?int $expectedVersion = null,
     ): VehicleServiceJob {
         return DB::transaction(function () use ($job, $status, $changedBy, $reason, $expectedVersion): VehicleServiceJob {
-            $snapshot = VehicleServiceJob::query()
-                ->select(['id', 'tenant_id', 'organization_unit_id', 'vehicle_id'])
-                ->findOrFail($job->getKey());
-            $vehicle = Vehicle::query()
-                ->where('tenant_id', $snapshot->tenant_id)
-                ->lockForUpdate()
-                ->findOrFail($snapshot->vehicle_id);
-            $vehicleJobs = VehicleServiceJob::query()
-                // A branch's completed job must not release a shared vehicle still in service elsewhere.
-                ->forTenant((int) $snapshot->tenant_id)
-                ->where('vehicle_id', $snapshot->vehicle_id)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-            $job = $vehicleJobs->firstWhere('id', $snapshot->getKey());
-            if (! $job instanceof VehicleServiceJob) {
-                throw new InvalidArgumentException('Vehicle service job changed while its vehicle timeline was being locked.');
-            }
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
 
             $old = $job->status;
-            if ($status === VehicleServiceJobStatus::Cancelled) {
-                if ($expectedVersion === null) {
-                    throw new InvalidArgumentException('An expected job version is required for cancellation.');
-                }
-                $this->cancellations->reverse($job, $changedBy, $reason);
-                $this->inventory->releaseJobReservations($job, $changedBy);
-            }
             if ($old === $status) {
                 return $job;
             }
             if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
                 throw new InvalidArgumentException("Invalid service job status transition from {$old->value} to {$status->value}.");
-            }
-
-            if (in_array($status, [VehicleServiceJobStatus::Inspected, VehicleServiceJobStatus::InProgress], true)) {
-                $this->admission->assertAdmissible($job);
-            }
-            if ($status === VehicleServiceJobStatus::Inspected) {
-                $this->assertWorkforceReadyForInspection($job);
-            }
-
-            if ($status === VehicleServiceJobStatus::InProgress) {
-                $this->assertHasActiveJobLine($job);
-                $this->assertVehicleCanEnterService($vehicle);
-                $this->inventory->issueReservedOnStart($job, $changedBy);
-            }
-
-            if ($status === VehicleServiceJobStatus::Completed) {
-                $this->assertInventoryIssuedForCompletion($job);
             }
 
             $job->status = $status;
@@ -126,59 +56,19 @@ final class VehicleServiceStatusService
             }
             $job->save();
 
-            $this->synchronizeVehicleStatus(
-                $job,
-                $vehicle,
-                $vehicleJobs,
-                $old,
-                $status,
-                $changedBy,
-            );
-
-            $this->recordTransition($job, $old, $changedBy, $reason);
+            VehicleServiceStatusHistory::query()->create([
+                'tenant_id' => $job->tenant_id,
+                'organization_unit_id' => $job->organization_unit_id,
+                'vehicle_service_job_id' => $job->getKey(),
+                'old_status' => $old->value,
+                'new_status' => $status->value,
+                'reason' => $reason,
+                'changed_by' => $changedBy,
+                'changed_at' => now(),
+            ]);
 
             return $job->refresh();
-        }, self::TRANSACTION_ATTEMPTS);
-    }
-
-    /** Internal billing reconciliation, not a new completion or a job reopen action. */
-    public function restoreCompletedAfterBillingReversal(VehicleServiceJob $job, ?int $actorId, string $reason): VehicleServiceJob
-    {
-        return DB::transaction(function () use ($job, $actorId, $reason): VehicleServiceJob {
-            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
-            if (! in_array($job->status, [
-                VehicleServiceJobStatus::Invoiced, VehicleServiceJobStatus::PartiallyPaid, VehicleServiceJobStatus::Paid,
-            ], true)) {
-                // In particular, cancelled is terminal, even on repeated callbacks.
-                return $job;
-            }
-            if ($this->billing->blockers($job, true) !== []) {
-                return $job;
-            }
-
-            $old = $job->status;
-            $job->status = VehicleServiceJobStatus::Completed;
-            $job->save();
-            $this->recordTransition($job, $old, $actorId, $reason);
-
-            // Do not overwrite completion timestamps, lines, or vehicle state.
-            // The locked save increments the version and invalidates stale actions.
-            return $job->refresh();
-        }, self::TRANSACTION_ATTEMPTS);
-    }
-
-    private function recordTransition(VehicleServiceJob $job, VehicleServiceJobStatus $old, ?int $actorId, ?string $reason): void
-    {
-        VehicleServiceStatusHistory::query()->create([
-            'tenant_id' => $job->tenant_id,
-            'organization_unit_id' => $job->organization_unit_id,
-            'vehicle_service_job_id' => $job->getKey(),
-            'old_status' => $old->value,
-            'new_status' => $job->status->value,
-            'reason' => $reason,
-            'changed_by' => $actorId,
-            'changed_at' => now(),
-        ]);
+        });
     }
 
     public function recordCreated(VehicleServiceJob $job, ?int $changedBy = null): void
@@ -192,102 +82,5 @@ final class VehicleServiceStatusService
             'changed_by' => $changedBy,
             'changed_at' => now(),
         ]);
-    }
-
-    private function assertWorkforceReadyForInspection(VehicleServiceJob $job): void
-    {
-        $hasAssignableLabour = $job->lines()
-            ->where('is_employee_assignable', true)
-            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
-            ->exists();
-
-        if (! $hasAssignableLabour) {
-            return;
-        }
-
-        $hasActiveAssignment = $job->lines()
-            ->where('is_employee_assignable', true)
-            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
-            ->whereHas('employeeAssignments', fn ($query) => $query
-                ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS))
-            ->exists();
-
-        if (! $hasActiveAssignment) {
-            throw new InvalidArgumentException(self::WORKFORCE_REQUIRED_MESSAGE);
-        }
-    }
-
-    private function assertVehicleCanEnterService(Vehicle $vehicle): void
-    {
-        if (! in_array($vehicle->status, [VehicleStatus::Active, VehicleStatus::UnderService], true)) {
-            throw new InvalidArgumentException('Only an active vehicle can enter an in-progress service job.');
-        }
-    }
-
-    private function assertHasActiveJobLine(VehicleServiceJob $job): void
-    {
-        $hasActiveJobLine = $job->lines()
-            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
-            ->exists();
-
-        if (! $hasActiveJobLine) {
-            throw new InvalidArgumentException(self::JOB_LINE_REQUIRED_MESSAGE);
-        }
-    }
-
-    private function assertInventoryIssuedForCompletion(VehicleServiceJob $job): void
-    {
-        $hasUnissuedInventory = $job->lines()
-            ->with('item')
-            ->whereNull('inventory_movement_id')
-            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
-            ->get()
-            ->contains(fn (VehicleServiceJobLine $line): bool => $this->lineRules->isInventoryIssueLine($line));
-
-        if ($hasUnissuedInventory) {
-            throw new InvalidArgumentException(self::INVENTORY_ISSUE_REQUIRED_MESSAGE);
-        }
-    }
-
-    /** @param Collection<int, VehicleServiceJob> $vehicleJobs */
-    private function synchronizeVehicleStatus(
-        VehicleServiceJob $job,
-        Vehicle $vehicle,
-        Collection $vehicleJobs,
-        VehicleServiceJobStatus $from,
-        VehicleServiceJobStatus $to,
-        ?int $changedBy,
-    ): void {
-        if ($to === VehicleServiceJobStatus::InProgress && $vehicle->status === VehicleStatus::Active) {
-            $this->vehicleStatuses->changeTo(
-                $vehicle,
-                VehicleStatus::UnderService,
-                $changedBy,
-                self::VEHICLE_SERVICE_STARTED_REASON_PREFIX.$job->job_number,
-            );
-
-            return;
-        }
-
-        if ($from !== VehicleServiceJobStatus::InProgress
-            || ! in_array($to, [VehicleServiceJobStatus::Completed, VehicleServiceJobStatus::Cancelled], true)
-            || $vehicle->status !== VehicleStatus::UnderService) {
-            return;
-        }
-
-        $otherInProgressJobs = $vehicleJobs->contains(
-            fn (VehicleServiceJob $candidate): bool => (int) $candidate->getKey() !== (int) $job->getKey()
-                && $candidate->status === VehicleServiceJobStatus::InProgress,
-        );
-        if ($otherInProgressJobs) {
-            return;
-        }
-
-        $this->vehicleStatuses->changeTo(
-            $vehicle,
-            VehicleStatus::Active,
-            $changedBy,
-            self::VEHICLE_SERVICE_RELEASED_REASON_PREFIX.$job->job_number,
-        );
     }
 }

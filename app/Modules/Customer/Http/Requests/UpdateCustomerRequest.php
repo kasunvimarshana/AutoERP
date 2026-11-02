@@ -17,7 +17,6 @@ final class UpdateCustomerRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'row_version' => ['required', 'integer', 'min:0'],
             'code' => ['sometimes', 'string', 'max:80'],
             'name' => ['sometimes', 'string', 'max:255'],
             'customer_type' => ['sometimes', Rule::enum(CustomerType::class)],
@@ -33,10 +32,10 @@ final class UpdateCustomerRequest extends TenantScopedRequest
             'vat_number' => ['nullable', 'string', 'max:100'],
             'svat_number' => ['nullable', 'string', 'max:100'],
             'business_registration_number' => ['nullable', 'string', 'max:100'],
-            'credit_limit' => ['prohibited'],
-            'opening_balance' => ['prohibited'],
-            'is_credit_allowed' => ['prohibited'],
-            'is_advance_allowed' => ['prohibited'],
+            'credit_limit' => ['nullable', 'decimal:0,6', 'min:0'],
+            'opening_balance' => ['nullable', 'decimal:0,6'],
+            'is_credit_allowed' => ['nullable', 'boolean'],
+            'is_advance_allowed' => ['nullable', 'boolean'],
             'is_tax_exempt' => ['nullable', 'boolean'],
             'marketing_consent' => ['nullable', 'boolean'],
             'preferred_communication_channel' => ['nullable', Rule::enum(PreferredCommunicationChannel::class)],
@@ -48,7 +47,6 @@ final class UpdateCustomerRequest extends TenantScopedRequest
     public function toData(): UpdateCustomerData
     {
         return new UpdateCustomerData(
-            rowVersion: (int) $this->input('row_version'),
             organizationUnitId: $this->organizationUnitId(),
             code: $this->stringOrNull('code'),
             name: $this->stringOrNull('name'),
@@ -65,6 +63,10 @@ final class UpdateCustomerRequest extends TenantScopedRequest
             vatNumber: $this->stringOrNull('vat_number'),
             svatNumber: $this->stringOrNull('svat_number'),
             businessRegistrationNumber: $this->stringOrNull('business_registration_number'),
+            creditLimit: $this->filled('credit_limit') ? (string) $this->input('credit_limit') : null,
+            openingBalance: $this->filled('opening_balance') ? (string) $this->input('opening_balance') : null,
+            isCreditAllowed: $this->has('is_credit_allowed') ? $this->boolean('is_credit_allowed') : null,
+            isAdvanceAllowed: $this->has('is_advance_allowed') ? $this->boolean('is_advance_allowed') : null,
             isTaxExempt: $this->has('is_tax_exempt') ? $this->boolean('is_tax_exempt') : null,
             marketingConsent: $this->has('marketing_consent') ? $this->boolean('marketing_consent') : null,
             preferredCommunicationChannel: $this->filled('preferred_communication_channel')

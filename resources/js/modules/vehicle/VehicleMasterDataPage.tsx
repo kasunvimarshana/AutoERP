@@ -17,7 +17,6 @@ import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
-import { notifySuccess } from '@/shared/notifications/appToast';
 import type { ApiCollection, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import {
@@ -47,10 +46,6 @@ import type {
     VehicleType,
     VehicleTypePayload,
 } from './vehicleTypes';
-
-const VEHICLE_MASTER_PAGE_SIZE = 25;
-const FIRST_PRODUCTION_CAR_YEAR = 1886;
-const INTEGER_RADIX = 10;
 
 export type VehicleMasterKind = 'makes' | 'types' | 'categories' | 'models';
 
@@ -133,6 +128,7 @@ function VehicleMasterDataContent({ kind }: { kind: VehicleMasterKind }) {
     const [active, setActive] = useState('');
     const [makeFilter, setMakeFilter] = useState<VehicleMake | null>(null);
     const [page, setPage] = useState(1);
+    const [refreshKey, setRefreshKey] = useState(0);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busyId, setBusyId] = useState<number | null>(null);
     const [editing, setEditing] = useState<VehicleMasterRow | null>(null);
@@ -147,10 +143,8 @@ function VehicleMasterDataContent({ kind }: { kind: VehicleMasterKind }) {
         is_active: active === '' ? undefined : active === 'true',
         vehicle_make_id: kind === 'models' ? makeFilter?.id : undefined,
         page,
-        per_page: VEHICLE_MASTER_PAGE_SIZE,
-    }, signal), [active, debouncedSearch, kind, makeFilter?.id, page], true, true);
-    const collection = result.data;
-    const setCollection = result.setData;
+        per_page: 25,
+    }, signal), [active, debouncedSearch, kind, makeFilter?.id, page, refreshKey], true, true);
 
     const openCreate = () => {
         setFormDirty(false);
@@ -188,35 +182,22 @@ function VehicleMasterDataContent({ kind }: { kind: VehicleMasterKind }) {
     }, [closeForm, confirm, formDirty, formSubmitting]);
 
     const saveForm = useCallback(async (payload: VehicleMasterPayload) => {
-        const saved = editing
-            ? await api.update(editing.id, payload)
-            : await api.create(payload);
-
-        setCollection((current) => updateMasterCollection(current, saved, {
-            active,
-            makeId: makeFilter?.id ?? null,
-            kind,
-            page,
-        }, !editing));
-        notifySuccess(editing ? `${singularLabel(kind)} updated successfully.` : `${singularLabel(kind)} created successfully.`);
         if (editing) {
-            setEditing(null);
+            await api.update(editing.id, payload);
+        } else {
+            await api.create(payload);
         }
         setFormOpen(false);
-    }, [active, api, editing, kind, makeFilter?.id, page, setCollection]);
+        setEditing(null);
+        setRefreshKey((value) => value + 1);
+    }, [api, editing]);
 
     const toggleActive = async (row: VehicleMasterRow) => {
         setBusyId(row.id);
         setActionError(null);
         try {
-            const updated = await api.update(row.id, payloadFromRow(kind, row, { isActive: !row.is_active }));
-            setCollection((current) => updateMasterCollection(current, updated, {
-                active,
-                makeId: makeFilter?.id ?? null,
-                kind,
-                page,
-            }));
-            notifySuccess(updated.is_active ? `${singularLabel(kind)} activated successfully.` : `${singularLabel(kind)} deactivated successfully.`);
+            await api.update(row.id, payloadFromRow(kind, row, { isActive: !row.is_active }));
+            setRefreshKey((value) => value + 1);
         } catch (error) {
             setActionError(toApiError(error));
         } finally {
@@ -267,17 +248,17 @@ function VehicleMasterDataContent({ kind }: { kind: VehicleMasterKind }) {
                 </div>
             )}
             <ErrorAlert error={actionError ?? result.error} />
-            {result.loading && collection === null ? (
+            {result.loading ? (
                 <LoadingState label={`Loading ${config.title.toLowerCase()}...`} />
             ) : (
                 <>
                     <DataTable
-                        rows={collection?.data ?? []}
+                        rows={result.data?.data ?? []}
                         rowKey={(row) => row.id}
                         columns={columns}
                         emptyMessage={config.empty}
                     />
-                    <Pagination meta={collection?.meta} onPageChange={setPage} />
+                    <Pagination meta={result.data?.meta} onPageChange={setPage} />
                 </>
             )}
 
@@ -453,7 +434,7 @@ function VehicleMasterForm({
                         <Input
                             label="Year From"
                             type="number"
-                            min={FIRST_PRODUCTION_CAR_YEAR}
+                            min={1886}
                             value={form.year_from}
                             onChange={(event) => update('year_from', event.target.value)}
                             error={fieldError(error, 'year_from')}
@@ -461,7 +442,7 @@ function VehicleMasterForm({
                         <Input
                             label="Year To"
                             type="number"
-                            min={FIRST_PRODUCTION_CAR_YEAR}
+                            min={1886}
                             value={form.year_to}
                             onChange={(event) => update('year_to', event.target.value)}
                             error={fieldError(error, 'year_to')}
@@ -579,13 +560,13 @@ function nullableText(value: string): string | null {
 }
 
 function parsePositiveInteger(value: string): number {
-    const parsed = Number.parseInt(value, INTEGER_RADIX);
+    const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function parseNullableInteger(value: string): number | null {
     if (value.trim() === '') return null;
-    const parsed = Number.parseInt(value, INTEGER_RADIX);
+    const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -602,77 +583,4 @@ function yearRange(row: VehicleMasterRow): string {
     if (row.year_from) return `${row.year_from}+`;
     if (row.year_to) return `Up to ${row.year_to}`;
     return '-';
-}
-
-function updateMasterCollection(
-    collection: ApiCollection<VehicleMasterRow> | null,
-    updated: VehicleMasterRow,
-    filters: {
-        active: string;
-        makeId: number | null;
-        kind: VehicleMasterKind;
-        page: number;
-    },
-    isCreate = false,
-): ApiCollection<VehicleMasterRow> | null {
-    if (collection === null) return collection;
-
-    const rows = collection.data ?? [];
-    const currentIndex = rows.findIndex((row) => row.id === updated.id);
-    const matches = matchesMasterFilters(updated, filters);
-
-    if (!matches) {
-        if (currentIndex === -1) return collection;
-
-        const nextRows = rows.filter((row) => row.id !== updated.id);
-        return {
-            ...collection,
-            data: nextRows,
-            meta: collection.meta ? {
-                ...collection.meta,
-                total: Math.max(0, collection.meta.total - 1),
-                to: nextRows.length === 0 ? null : nextRows.length,
-            } : collection.meta,
-        };
-    }
-
-    if (currentIndex >= 0) {
-        return {
-            ...collection,
-            data: rows.map((row) => row.id === updated.id ? updated : row),
-        };
-    }
-
-    if (!isCreate || filters.page !== 1) {
-        return collection;
-    }
-
-    const perPage = collection.meta?.per_page ?? rows.length + 1;
-    const nextRows = [updated, ...rows].slice(0, perPage);
-
-    return {
-        ...collection,
-        data: nextRows,
-        meta: collection.meta ? {
-            ...collection.meta,
-            total: collection.meta.total + 1,
-            from: nextRows.length > 0 ? 1 : null,
-            to: nextRows.length === 0 ? null : nextRows.length,
-        } : collection.meta,
-    };
-}
-
-function matchesMasterFilters(
-    row: VehicleMasterRow,
-    filters: {
-        active: string;
-        makeId: number | null;
-        kind: VehicleMasterKind;
-        page: number;
-    },
-): boolean {
-    if (filters.active === 'true' && !row.is_active) return false;
-    if (filters.active === 'false' && row.is_active) return false;
-    if (filters.kind === 'models' && filters.makeId !== null && row.make?.id !== filters.makeId) return false;
-    return true;
 }

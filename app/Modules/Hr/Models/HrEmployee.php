@@ -23,10 +23,15 @@ final class HrEmployee extends TenantOwnedModel
     protected $table = 'hr_employees';
     protected $guarded = ['id'];
 
+    /**
+     * Virtual attributes populated during driver querying/enrichment
+     */
+    public ?array $current_assignment = null;
+    public ?array $recent_assignments = null;
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'department_id' => 'integer',

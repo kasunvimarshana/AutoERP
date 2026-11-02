@@ -8,10 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
-use Modules\Finance\Enums\FinanceAccountRoleCode;
-use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 use Modules\OrganizationUnit\Database\Seeders\OrganizationUnitSeeder;
 use Tests\TestCase;
@@ -19,11 +16,6 @@ use Tests\TestCase;
 final class FinanceSeederTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const ACCOUNT_INVENTORY = '1200';
-    private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
-    private const ACCOUNT_PAYABLE = '2100';
-    private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void
     {
@@ -34,125 +26,40 @@ final class FinanceSeederTest extends TestCase
             $this->seed(FinanceSeeder::class);
         });
 
-        $organizationUnitId = $this->rootOrganizationUnitId($tenantId);
-        self::assertGreaterThan(0, $organizationUnitId);
+        $organizationUnitId = (int) DB::table('organization_units')
+            ->where('tenant_id', $tenantId)
+            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
+            ->value('id');
 
-        foreach ([
-            FinancePostingProfileCode::InventoryReceipt->value,
-            FinancePostingProfileCode::InternalConsumption->value,
-            FinancePostingProfileCode::CustomerReceipt->value,
-            FinancePostingProfileCode::SupplierPayment->value,
-            FinancePostingProfileCode::CustomerAdvance->value,
-            FinancePostingProfileCode::SupplierAdvance->value,
-            FinancePostingProfileCode::RentalDeposit->value,
-        ] as $profileCode) {
-            $this->assertDatabaseHas('finance_posting_profiles', [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'code' => $profileCode,
-                'is_active' => true,
-            ]);
-        }
+        self::assertGreaterThan(0, $organizationUnitId);
+        $this->assertDatabaseHas('finance_posting_profiles', [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'code' => 'inventory_receipt',
+            'is_active' => true,
+        ]);
         $this->assertSame(0, DB::table('finance_posting_profiles')->whereNull('organization_unit_id')->count());
 
-        foreach ([
-            self::ACCOUNT_INVENTORY,
-            self::ACCOUNT_SUPPLIER_ADVANCE,
-            self::ACCOUNT_PAYABLE,
-            self::ACCOUNT_CUSTOMER_ADVANCE,
-        ] as $accountCode) {
-            $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
-        }
+        $inventoryAccountId = $this->accountId($tenantId, $organizationUnitId, '1200');
+        $payableAccountId = $this->accountId($tenantId, $organizationUnitId, '2100');
+        $inventoryRoleId = $this->roleId($tenantId, 'inventory');
+        $payableRoleId = $this->roleId($tenantId, 'payable');
 
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Inventory->value, self::ACCOUNT_INVENTORY);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
-
-        foreach ([
-            FinanceAccountRoleCode::CustomerDeposit->value => FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
-            FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
-            FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
-        ] as $roleCode => $accountCode) {
-            $this->assertGreaterThan(0, $this->accountId($tenantId, null, $accountCode));
-            $this->assertActiveAssignment($tenantId, null, $roleCode, $accountCode);
-        }
-    }
-
-    public function test_semantic_payment_and_withholding_profiles_have_complete_role_mappings(): void
-    {
-        $tenantId = $this->createTenant('AUTOERP');
-
-        app(TenantExecutionContextInterface::class)->runAsControlPlane(function (): void {
-            $this->seed(OrganizationUnitSeeder::class);
-            $this->seed(FinanceSeeder::class);
-        });
-
-        foreach ([
-            FinancePostingProfileCode::CustomerReceipt->value => [
-                FinanceAccountRoleCode::Cash->value,
-                FinanceAccountRoleCode::Bank->value,
-                FinanceAccountRoleCode::Receivable->value,
-                FinanceAccountRoleCode::CustomerAdvance->value,
-                FinanceAccountRoleCode::RealizedFxGain->value,
-                FinanceAccountRoleCode::RealizedFxLoss->value,
-            ],
-            FinancePostingProfileCode::SupplierPayment->value => [
-                FinanceAccountRoleCode::Cash->value,
-                FinanceAccountRoleCode::Bank->value,
-                FinanceAccountRoleCode::Payable->value,
-                FinanceAccountRoleCode::SupplierAdvance->value,
-                FinanceAccountRoleCode::RealizedFxGain->value,
-                FinanceAccountRoleCode::RealizedFxLoss->value,
-            ],
-            FinancePostingProfileCode::CustomerAdvance->value => [
-                FinanceAccountRoleCode::Cash->value,
-                FinanceAccountRoleCode::Bank->value,
-                FinanceAccountRoleCode::Receivable->value,
-                FinanceAccountRoleCode::CustomerAdvance->value,
-                FinanceAccountRoleCode::RealizedFxGain->value,
-                FinanceAccountRoleCode::RealizedFxLoss->value,
-            ],
-            FinancePostingProfileCode::SupplierAdvance->value => [
-                FinanceAccountRoleCode::Cash->value,
-                FinanceAccountRoleCode::Bank->value,
-                FinanceAccountRoleCode::Payable->value,
-                FinanceAccountRoleCode::SupplierAdvance->value,
-                FinanceAccountRoleCode::RealizedFxGain->value,
-                FinanceAccountRoleCode::RealizedFxLoss->value,
-            ],
-            FinancePostingProfileCode::RentalDeposit->value => [
-                FinanceAccountRoleCode::Cash->value,
-                FinanceAccountRoleCode::Bank->value,
-                FinanceAccountRoleCode::Receivable->value,
-                FinanceAccountRoleCode::CustomerDeposit->value,
-                FinanceAccountRoleCode::RealizedFxGain->value,
-                FinanceAccountRoleCode::RealizedFxLoss->value,
-            ],
-            FinancePostingProfileCode::PurchaseInvoice->value => [
-                FinanceAccountRoleCode::Expense->value,
-                FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value,
-                FinanceAccountRoleCode::Payable->value,
-                FinanceAccountRoleCode::TaxReceivable->value,
-                FinanceAccountRoleCode::WithholdingPayable->value,
-            ],
-        ] as $profileCode => $lineKeys) {
-            $profileId = (int) DB::table('finance_posting_profiles')
-                ->where('tenant_id', $tenantId)
-                ->where('code', $profileCode)
-                ->value('id');
-            $this->assertGreaterThan(0, $profileId);
-
-            $actualLineKeys = DB::table('finance_posting_profile_rules')
-                ->where('tenant_id', $tenantId)
-                ->where('posting_profile_id', $profileId)
-                ->where('is_active', true)
-                ->orderBy('line_key')
-                ->pluck('line_key')
-                ->all();
-            sort($lineKeys);
-            $this->assertSame($lineKeys, $actualLineKeys, 'Incomplete posting profile '.$profileCode.'.');
-        }
+        $this->assertDatabaseHas('finance_account_assignments', [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'account_role_id' => $inventoryRoleId,
+            'account_id' => $inventoryAccountId,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('finance_account_assignments', [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'account_role_id' => $payableRoleId,
+            'account_id' => $payableAccountId,
+            'is_active' => true,
+        ]);
+        $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
     }
 
     public function test_default_account_assignment_seeding_collapses_exact_duplicate_active_rows(): void
@@ -164,9 +71,12 @@ final class FinanceSeederTest extends TestCase
             $this->seed(FinanceSeeder::class);
         });
 
-        $organizationUnitId = $this->rootOrganizationUnitId($tenantId);
-        $inventoryAccountId = $this->accountId($tenantId, $organizationUnitId, self::ACCOUNT_INVENTORY);
-        $inventoryRoleId = $this->roleId($tenantId, FinanceAccountRoleCode::Inventory->value);
+        $organizationUnitId = (int) DB::table('organization_units')
+            ->where('tenant_id', $tenantId)
+            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
+            ->value('id');
+        $inventoryAccountId = $this->accountId($tenantId, $organizationUnitId, '1200');
+        $inventoryRoleId = $this->roleId($tenantId, 'inventory');
 
         $duplicateId = (int) DB::table('finance_account_assignments')->insertGetId([
             'tenant_id' => $tenantId,
@@ -204,21 +114,6 @@ final class FinanceSeederTest extends TestCase
         ]);
     }
 
-    private function assertActiveAssignment(
-        int $tenantId,
-        ?int $organizationUnitId,
-        string $roleCode,
-        string $accountCode,
-    ): void {
-        $this->assertDatabaseHas('finance_account_assignments', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'account_role_id' => $this->roleId($tenantId, $roleCode),
-            'account_id' => $this->accountId($tenantId, $organizationUnitId, $accountCode),
-            'is_active' => true,
-        ]);
-    }
-
     private function createTenant(string $code): int
     {
         return (int) DB::table('tenants')->insertGetId([
@@ -233,24 +128,13 @@ final class FinanceSeederTest extends TestCase
         ]);
     }
 
-    private function rootOrganizationUnitId(int $tenantId): int
+    private function accountId(int $tenantId, int $organizationUnitId, string $code): int
     {
-        return (int) DB::table('organization_units')
+        return (int) DB::table('finance_accounts')
             ->where('tenant_id', $tenantId)
-            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
+            ->where('organization_unit_id', $organizationUnitId)
+            ->where('code', $code)
             ->value('id');
-    }
-
-    private function accountId(int $tenantId, ?int $organizationUnitId, string $code): int
-    {
-        $query = DB::table('finance_accounts')
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code);
-        $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
-
-        return (int) $query->value('id');
     }
 
     private function roleId(int $tenantId, string $code): int

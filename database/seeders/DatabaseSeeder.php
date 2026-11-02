@@ -4,8 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Customer\Database\Seeders\CustomerSeeder;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
 use Modules\Hr\Database\Seeders\HrSeeder;

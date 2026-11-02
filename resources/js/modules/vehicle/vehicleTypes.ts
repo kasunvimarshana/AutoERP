@@ -69,7 +69,6 @@ export interface VehicleCategoryPayload {
 
 export interface VehicleSummary {
     id: number;
-    row_version: number;
     vehicle_number: string;
     code?: string | null;
     registration_number?: string | null;
@@ -84,7 +83,7 @@ export interface VehicleSummary {
     current_customer?: { relationship_id: number; id: number; code: string; name: string; started_at?: string | null } | null;
     current_supplier?: { relationship_id: number; id: number; code: string; name: string; started_at?: string | null } | null;
     status: VehicleStatus;
-    odometer_reading: string | null;
+    odometer_reading: string;
     odometer_unit?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
@@ -107,7 +106,6 @@ export interface Vehicle extends VehicleSummary {
 }
 
 export interface VehiclePayload {
-    row_version?: number;
     vehicle_number?: string | null;
     code?: string | null;
     vehicle_make_id?: number | null;

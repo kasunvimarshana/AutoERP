@@ -27,7 +27,6 @@ final class GoodsReceiptNoteResource extends PurchaseResource
             'return_status' => $returnStatus,
             'return_status_label' => $this->statusLabel($returnStatus),
             'capabilities' => $this->arrayAttribute('capabilities'),
-            'linked_invoices' => $this->arrayAttribute('linked_invoices'),
             'purchase_order' => $this->whenLoaded('purchaseOrder', fn () => $this->summary($this->purchaseOrder, ['purchase_order_number', 'status'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
@@ -58,15 +57,11 @@ final class GoodsReceiptNoteResource extends PurchaseResource
                 'tax_group_id' => $line->tax_group_id,
                 'line_total' => (string) $line->line_total,
                 'status' => $this->enumValue($line->status),
-                'batch_allocations' => $line->relationLoaded('batchAllocations') ? $line->batchAllocations->map(fn ($allocation): array => [
-                    'id' => (int) $allocation->getKey(),
-                    'batch' => $allocation->relationLoaded('batch') ? $this->summary($allocation->batch, ['batch_number', 'lot_number']) : null,
-                    'quantity' => (string) $allocation->quantity,
-                ])->all() : [],
             ])->all(), []),
             'adjustments' => $this->whenLoaded('adjustments', fn () => PurchaseHeaderAdjustmentResource::collection($this->adjustments)->resolve($request), []),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
+
 }

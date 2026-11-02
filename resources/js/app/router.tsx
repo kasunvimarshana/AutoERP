@@ -1,7 +1,3 @@
-import { USE_PERMISSION, USE_REGISTER_PATH } from '@/modules/vehicle-rental/vehicleUse';
-import { CHART_PERMISSION, CHART_REGISTER_PATH } from '@/modules/vehicle-rental/runningCharts';
-import { INCIDENT_PERMISSION, INCIDENT_REGISTER_PATH } from '@/modules/vehicle-rental/incidentEvidence';
-import { AgreementKind, agreementPermissions } from '@/modules/vehicle-rental/agreements';
 import { lazy } from "react";
 import { Route, RouterProvider, createBrowserRouter, createRoutesFromElements } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout";
@@ -17,8 +13,6 @@ import { PermissionRoute } from "@/modules/auth/PermissionRoute";
 import { PLATFORM_PERMISSION } from "./access/platformPermissions";
 import { RouteErrorPage } from "./errors/RouteErrorPage";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
-import { expensePermissions } from "@/modules/expense/expensePermissions";
-import { inventoryPermissions } from "@/modules/inventory/inventoryPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -94,10 +88,6 @@ const CustomerVehicleListPage = lazy(
 const CustomerVehicleFormPage = lazy(
     () => import("@/modules/customer/CustomerVehicleFormPage"),
 );
-const VehicleUseRegisterPage = lazy(() => import("@/modules/vehicle-rental/VehicleUseRegisterPage"));
-const RunningChartRegisterPage = lazy(() => import("@/modules/vehicle-rental/RunningChartRegisterPage"));
-const RentalAgreementsPage = lazy(() => import("@/modules/vehicle-rental/AgreementsPage"));
-const IncidentRegisterPage = lazy(() => import("@/modules/vehicle-rental/IncidentRegisterPage"));
 const VehicleListPage = lazy(() => import("@/modules/vehicle/VehicleListPage"));
 const VehicleCreatePage = lazy(
     () => import("@/modules/vehicle/VehicleCreatePage"),
@@ -140,9 +130,6 @@ const ItemBrandDetailPage = lazy(
 const InventoryPage = lazy(
     () => import("@/modules/inventory/pages/InventoryPage"),
 );
-const StockCardPage = lazy(
-    () => import("@/modules/inventory/pages/StockCardPage"),
-);
 const WarehouseListPage = lazy(
     () => import("@/modules/warehouse/WarehouseListPage"),
 );
@@ -169,9 +156,6 @@ const WarehouseLocationDetailPage = lazy(
 );
 const FastPurchasePage = lazy(
     () => import("@/modules/purchase/pages/FastPurchasePage"),
-);
-const SellingWorkspacePage = lazy(
-    () => import('@/modules/selling/pages/SellingWorkspacePage'),
 );
 const PurchaseOrderListPage = lazy(
     () => import("@/modules/purchase/pages/PurchaseOrderListPage"),
@@ -248,18 +232,6 @@ const PaymentMethodListPage = lazy(
 const PaymentMethodFormPage = lazy(
     () => import("@/modules/payment/pages/PaymentMethodFormPage"),
 );
-const ExpenseListPage = lazy(
-    () => import("@/modules/expense/pages/ExpenseListPage"),
-);
-const ExpenseCreatePage = lazy(
-    () => import("@/modules/expense/pages/ExpenseCreatePage"),
-);
-const ExpenseTypesPage = lazy(
-    () => import("@/modules/expense/pages/ExpenseTypesPage"),
-);
-const ConsumableUsagePage = lazy(
-    () => import("@/modules/expense/pages/ConsumableUsagePage"),
-);
 const ChequeTemplateListPage = lazy(
     () => import("@/modules/payment/cheque-print/ChequeTemplateListPage"),
 );
@@ -317,9 +289,6 @@ const FinanceReportsPage = lazy(
 const BankReconciliationPage = lazy(
     () => import("@/modules/finance/pages/BankReconciliationPage"),
 );
-const CustomerOutstandingReportPage = lazy(
-    () => import("@/modules/reporting/pages/CustomerOutstandingReportPage"),
-);
 const FinanceReversalsPage = lazy(
     () => import("@/modules/finance/pages/FinanceReversalsPage"),
 );
@@ -342,40 +311,11 @@ const ReportListPage = lazy(
     () => import("@/modules/reporting/pages/ReportListPage"),
 );
 const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
-const InventoryAgingReportPage = lazy(() => import("@/modules/reporting/pages/InventoryAgingReportPage"));
-const StockBalanceReportPage = lazy(() => import("@/modules/reporting/pages/StockBalanceReportPage"));
-const SummaryReportPage = lazy(
-    () => import("@/modules/reporting/pages/SummaryReportPage"),
-);
-const PaymentMethodWiseSummaryReportPage = lazy(
-    () => import("@/modules/reporting/pages/PaymentMethodWiseSummaryReportPage"),
-);
-const ExpenseReportPage = lazy(
-    () => import("@/modules/reporting/pages/ExpenseReportPage"),
-);
-const ConsumableUsageReportPage = lazy(
-    () => import("@/modules/expense/pages/ConsumableUsageReportPage"),
-);
-const GrnPayablesReportPage = lazy(
-    () => import("@/modules/reporting/pages/GrnPayablesReportPage"),
-);
-const GoodsReceiptSummaryReportPage = lazy(
-    () => import("@/modules/reporting/pages/GoodsReceiptSummaryReportPage"),
-);
-const PurchaseOrderDetailReportPage = lazy(
-    () => import("@/modules/reporting/pages/PurchaseOrderDetailReportPage"),
-);
 const TechnicianWorkReportPage = lazy(
     () => import("@/modules/reporting/pages/TechnicianWorkReportPage"),
 );
 const EmployeeCommissionReportPage = lazy(
     () => import("@/modules/reporting/pages/EmployeeCommissionReportPage"),
-);
-const VehicleServiceHistoryReportPage = lazy(
-    () => import("@/modules/reporting/pages/VehicleServiceHistoryReportPage"),
-);
-const VehicleServiceSalesSummaryReportPage = lazy(
-    () => import("@/modules/reporting/pages/VehicleServiceSalesSummaryReportPage"),
 );
 const OperationalReportPage = lazy(
     () => import("@/modules/reporting/pages/OperationalReportPage"),
@@ -388,6 +328,10 @@ const EmployeeEditPage = lazy(() => import("@/modules/hr/EmployeeEditPage"));
 const EmployeeDetailPage = lazy(
     () => import("@/modules/hr/EmployeeDetailPage"),
 );
+const DriverListPage = lazy(() => import("@/modules/hr/DriverListPage"));
+const DriverCreatePage = lazy(() => import("@/modules/hr/DriverCreatePage"));
+const DriverEditPage = lazy(() => import("@/modules/hr/DriverEditPage"));
+const DriverDetailPage = lazy(() => import("@/modules/hr/DriverDetailPage"));
 const VehicleServiceJobListPage = lazy(
     () => import("@/modules/vehicle-service/pages/VehicleServiceJobListPage"),
 );
@@ -407,6 +351,63 @@ const VehicleServiceInvoiceCreatePage = lazy(
 const VehicleServicePaymentPreparePage = lazy(
     () =>
         import("@/modules/vehicle-service/pages/VehicleServicePaymentPreparePage"),
+);
+const RentalDashboardPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalDashboardPage"),
+);
+const RentalReservationListPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalReservationListPage"),
+);
+const RentalReservationCreatePage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalReservationCreatePage"),
+);
+const RentalReservationDetailPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalReservationDetailPage"),
+);
+const RentalAgreementListPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalAgreementListPage"),
+);
+const RentalAgreementCreatePage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalAgreementCreatePage"),
+);
+const RentalAgreementDetailPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalAgreementDetailPage"),
+);
+const RentalAllocationPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalAllocationPage"),
+);
+const RentalAllocationDetailPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalAllocationDetailPage"),
+);
+const RentalReplacementPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalReplacementPage"),
+);
+const RentalCustodyPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalCustodyPage"),
+);
+const RentalRunningChartPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalRunningChartPage"),
+);
+const RentalRunningChartReportPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalRunningChartReportPage"),
+);
+const RentalExpensePage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalExpensePage"),
+);
+const RentalBillingPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalBillingPage"),
+);
+const RentalDepositPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalDepositPage"),
+);
+const VehicleFinancePage = lazy(
+    () => import("@/modules/vehicle-rental/pages/VehicleFinancePage"),
+);
+const VehicleAvailabilityPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/VehicleAvailabilityPage"),
+);
+const RentalReportsPage = lazy(
+    () => import("@/modules/vehicle-rental/pages/RentalReportsPage"),
 );
 const NotFoundPage = lazy(() => import("@/modules/not-found/NotFoundPage"));
 
@@ -654,7 +655,6 @@ const appRouter = createBrowserRouter(
                             element={<ItemBrandDetailPage />}
                         />
                         <Route path="/inventory" element={<InventoryPage />} />
-                        <Route path="/inventory/stock-card" element={<PermissionRoute permission={inventoryPermissions.stockView}><StockCardPage /></PermissionRoute>} />
                         <Route path="/warehouses" element={<WarehouseListPage />} />
                         <Route
                             path="/warehouses/create"
@@ -683,26 +683,6 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/warehouse-locations/:id"
                             element={<WarehouseLocationDetailPage />}
-                        />
-                        <Route
-                            path="/selling"
-                            element={<SellingWorkspacePage />}
-                        />
-                        <Route
-                            path="/selling/create"
-                            element={<SellingWorkspacePage />}
-                        />
-                        <Route
-                            path="/selling/returns"
-                            element={<SellingWorkspacePage />}
-                        />
-                        <Route
-                            path="/selling/sales"
-                            element={<SellingWorkspacePage />}
-                        />
-                        <Route
-                            path="/selling/sales/:id"
-                            element={<SellingWorkspacePage />}
                         />
                         <Route
                             path="/purchase/fast-purchase"
@@ -761,10 +741,6 @@ const appRouter = createBrowserRouter(
                             element={<PurchaseInvoiceCreatePage />}
                         />
                         <Route
-                            path="/purchase/invoices/:id"
-                            element={<InvoiceDetailPage />}
-                        />
-                        <Route
                             path="/purchase/payments"
                             element={<PurchasePaymentWorkspacePage />}
                         />
@@ -775,10 +751,6 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/purchase/payments/prepare"
                             element={<PurchasePaymentPreparePage />}
-                        />
-                        <Route
-                            path="/purchase/payments/:id"
-                            element={<PaymentDetailPage />}
                         />
                         <Route
                             path="/purchase/debit-notes"
@@ -836,22 +808,6 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/payments/:id"
                             element={<PaymentDetailPage />}
-                        />
-                        <Route
-                            path="/expenses"
-                            element={<PermissionRoute permission={expensePermissions.view}><ExpenseListPage /></PermissionRoute>}
-                        />
-                        <Route
-                            path="/expenses/create"
-                            element={<PermissionRoute permission={expensePermissions.create}><ExpenseCreatePage /></PermissionRoute>}
-                        />
-                        <Route
-                            path="/expenses/types"
-                            element={<PermissionRoute permission={expensePermissions.typesView}><ExpenseTypesPage /></PermissionRoute>}
-                        />
-                        <Route
-                            path="/expenses/consumable-usage"
-                            element={<PermissionRoute permission={inventoryPermissions.consumableUsageView}><ConsumableUsagePage /></PermissionRoute>}
                         />
                         <Route path="/vouchers" element={<VoucherListPage />} />
                         <Route
@@ -947,36 +903,11 @@ const appRouter = createBrowserRouter(
                             element={<ReportListPage />}
                         />
                         <Route
-                            path="/reports/customer-outstanding"
-                            element={<CustomerOutstandingReportPage />}
-                        />
-                        <Route
-                            path="/reports/summary"
-                            element={<SummaryReportPage />}
-                        />
-                        <Route
-                            path="/reports/payment-method-wise-summary"
-                            element={<PaymentMethodWiseSummaryReportPage />}
-                        />
-                        <Route
-                            path="/reports/expenses"
-                            element={<ExpenseReportPage />}
-                        />
-                        <Route
-                            path="/reports/consumable-usage"
-                            element={<PermissionRoute permission={inventoryPermissions.consumableUsageView}><ConsumableUsageReportPage /></PermissionRoute>}
-                        />
-                        <Route
                             path="/reports/purchase/detailed"
-                            element={<PurchaseOrderDetailReportPage />}
-                        />
-                        <Route
-                            path="/reports/purchase/grn-payables"
-                            element={<GrnPayablesReportPage />}
-                        />
-                        <Route
-                            path="/reports/purchase/goods-receipt-summary"
-                            element={<GoodsReceiptSummaryReportPage />}
+                            element={<OperationalReportPage
+                                    reportKey="purchase/detailed"
+                                    kind="purchase"
+                                />}
                         />
                         <Route
                             path="/reports/vehicle-service/detailed"
@@ -1001,22 +932,6 @@ const appRouter = createBrowserRouter(
                             element={<EmployeeCommissionReportPage />}
                         />
                         <Route
-                            path="/reports/vehicle-service/service-history"
-                            element={<VehicleServiceHistoryReportPage />}
-                        />
-                        <Route
-                            path="/reports/vehicle-service/sales-summary"
-                            element={<VehicleServiceSalesSummaryReportPage />}
-                        />
-                        <Route
-                            path="/reports/inventory.aging"
-                            element={<InventoryAgingReportPage />}
-                        />
-                        <Route
-                            path="/reports/inventory.stock-balance"
-                            element={<StockBalanceReportPage />}
-                        />
-                        <Route
                             path="/reports/:key"
                             element={<ReportPage />}
                         />
@@ -1036,11 +951,22 @@ const appRouter = createBrowserRouter(
                             path="/hr/employees/:id"
                             element={<EmployeeDetailPage />}
                         />
-                        <Route path={USE_REGISTER_PATH} element={<PermissionRoute permission={USE_PERMISSION.view}><VehicleUseRegisterPage /></PermissionRoute>} />
-                        <Route path={CHART_REGISTER_PATH} element={<PermissionRoute permission={CHART_PERMISSION.view}><RunningChartRegisterPage /></PermissionRoute>} />
-                        <Route path={INCIDENT_REGISTER_PATH} element={<PermissionRoute permission={INCIDENT_PERMISSION.view}><IncidentRegisterPage /></PermissionRoute>} />
-                        <Route path="/vehicle-rental/customer/agreements" element={<PermissionRoute permission={agreementPermissions.customer.view}><RentalAgreementsPage key={AgreementKind.Customer} kind={AgreementKind.Customer} /></PermissionRoute>} />
-                        <Route path="/vehicle-rental/owner/agreements" element={<PermissionRoute permission={agreementPermissions.owner.view}><RentalAgreementsPage key={AgreementKind.Owner} kind={AgreementKind.Owner} /></PermissionRoute>} />
+                        <Route
+                            path="/hr/drivers"
+                            element={<DriverListPage />}
+                        />
+                        <Route
+                            path="/hr/drivers/create"
+                            element={<DriverCreatePage />}
+                        />
+                        <Route
+                            path="/hr/drivers/:id/edit"
+                            element={<DriverEditPage />}
+                        />
+                        <Route
+                            path="/hr/drivers/:id"
+                            element={<DriverDetailPage />}
+                        />
                         <Route
                             path="/vehicle-service/jobs"
                             element={<VehicleServiceJobListPage />}
@@ -1064,6 +990,82 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/vehicle-service/jobs/:id"
                             element={<VehicleServiceJobDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental"
+                            element={<RentalDashboardPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reservations"
+                            element={<RentalReservationListPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reservations/create"
+                            element={<RentalReservationCreatePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reservations/:id"
+                            element={<RentalReservationDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/agreements"
+                            element={<RentalAgreementListPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/agreements/create"
+                            element={<RentalAgreementCreatePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/agreements/:id"
+                            element={<RentalAgreementDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/allocations"
+                            element={<RentalAllocationPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/allocations/:id"
+                            element={<RentalAllocationDetailPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/allocations/:id/replacement"
+                            element={<RentalReplacementPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/custody"
+                            element={<RentalCustodyPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/running-chart"
+                            element={<RentalRunningChartPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/running-chart/report"
+                            element={<RentalRunningChartReportPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/expenses"
+                            element={<RentalExpensePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/billing"
+                            element={<RentalBillingPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/deposits"
+                            element={<RentalDepositPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/finance-agreements"
+                            element={<VehicleFinancePage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/availability"
+                            element={<VehicleAvailabilityPage />}
+                        />
+                        <Route
+                            path="/vehicle-rental/reports"
+                            element={<RentalReportsPage />}
                         />
                             </Route>
                         </Route>

@@ -12,7 +12,7 @@ final class SupplierBlockerService
 {
     public function delete(Supplier $supplier): void
     {
-        foreach (['purchase_orders', 'goods_receipt_notes', 'purchase_returns', 'purchase_debit_notes', 'supplier_tax_profiles'] as $table) {
+        foreach (['purchase_orders', 'goods_receipt_notes', 'purchase_returns', 'purchase_debit_notes', 'supplier_tax_profiles', 'rental_agreements', 'vehicle_finance_agreements', 'rental_expenses', 'rental_usage_contexts', 'rental_expense_allocations'] as $table) {
             if ($this->referenced($table, 'supplier_id', (int) $supplier->getKey(), (int) $supplier->tenant_id)) {
                 throw new ConflictHttpException('Supplier is referenced by business history and cannot be deleted. Deactivate the supplier instead.');
             }

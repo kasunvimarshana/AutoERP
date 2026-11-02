@@ -2,7 +2,7 @@ import { useId, useRef, type ReactNode } from 'react';
 
 export interface TabItem<T extends string> {
     id: T;
-    label: ReactNode;
+    label: string;
 }
 
 export function Tabs<T extends string>({ tabs, active, onChange, id }: {
@@ -58,24 +58,20 @@ export function Tabs<T extends string>({ tabs, active, onChange, id }: {
     );
 }
 
-export function TabPanel<T extends string>({ tabsId, tabId, active, children, keepMounted = false }: {
+export function TabPanel<T extends string>({ tabsId, tabId, active, children }: {
     tabsId: string;
     tabId: T;
     active: T;
     children: ReactNode;
-    keepMounted?: boolean;
 }) {
-    const isActive = active === tabId;
-
-    if (!isActive && !keepMounted) return null;
+    if (active !== tabId) return null;
 
     return (
         <div
             id={`${tabsId}-${tabId}-panel`}
             role="tabpanel"
             aria-labelledby={`${tabsId}-${tabId}-tab`}
-            tabIndex={isActive ? 0 : -1}
-            hidden={!isActive}
+            tabIndex={0}
         >
             {children}
         </div>

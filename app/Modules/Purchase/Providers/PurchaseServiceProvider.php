@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Modules\Purchase\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
-use Modules\Purchase\Services\Invoice\PurchaseInvoiceRestorationHandler;
+use Modules\Invoice\Contracts\InvoiceSourceCancellationHandlerInterface;
+use Modules\Purchase\Services\Invoice\PurchaseInvoiceCancellationHandler;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class PurchaseServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->app->tag(
-            [PurchaseInvoiceRestorationHandler::class],
-            InvoiceSourceRestorationHandlerInterface::TAG,
+            [PurchaseInvoiceCancellationHandler::class],
+            InvoiceSourceCancellationHandlerInterface::TAG,
         );
     }
 
@@ -26,9 +26,6 @@ final class PurchaseServiceProvider extends ServiceProvider
             ->register('purchase', PurchaseAuthorizationService::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([
-            __DIR__.'/../Database/Migrations',
-            __DIR__.'/../Database/UpgradeMigrations',
-        ]);
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

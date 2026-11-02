@@ -14,9 +14,6 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
 {
     use HasExpectedVehicleServiceJobVersion;
 
-    private const DEFAULT_DECIMAL_VALUE = '0.000000';
-    private const DEFAULT_STATUS = 'assigned';
-
     public function rules(): array
     {
         return [
@@ -24,19 +21,11 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'expected_version' => $this->expectedVersionRules(),
             'employee_id' => ['required', 'integer', 'min:1'],
+            'role_type' => ['required', Rule::in(['technician', 'helper', 'inspector', 'custom'])],
             'assigned_hours' => ['nullable', 'decimal:0,6', 'min:0'],
             'rate' => ['nullable', 'decimal:0,6', 'min:0'],
-            'commission_type' => [
-                'nullable',
-                'required_with:commission_value',
-                Rule::enum(VehicleServiceCommissionType::class),
-            ],
-            'commission_value' => [
-                'nullable',
-                'required_with:commission_type',
-                'decimal:0,6',
-                'min:0',
-            ],
+            'commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
+            'commission_value' => ['nullable', 'decimal:0,6', 'min:0'],
             'status' => ['nullable', Rule::in(['assigned', 'completed', 'cancelled'])],
         ];
     }
@@ -45,20 +34,12 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
     {
         return new VehicleServiceEmployeeAssignmentData(
             employeeId: (int) $this->input('employee_id'),
-            assignedHours: $this->stringOrNull('assigned_hours') ?? self::DEFAULT_DECIMAL_VALUE,
-            rate: $this->stringOrNull('rate') ?? self::DEFAULT_DECIMAL_VALUE,
-            commissionType: $this->filled('commission_type')
-                ? VehicleServiceCommissionType::from((string) $this->input('commission_type'))
-                : null,
-            commissionValue: $this->filled('commission_value')
-                ? (string) $this->input('commission_value')
-                : null,
-            status: $this->stringOrNull('status') ?? self::DEFAULT_STATUS,
+            roleType: (string) $this->input('role_type'),
+            assignedHours: (string) $this->input('assigned_hours', '0.000000'),
+            rate: (string) $this->input('rate', '0.000000'),
+            commissionType: VehicleServiceCommissionType::from((string) $this->input('commission_type', 'none')),
+            commissionValue: (string) $this->input('commission_value', '0.000000'),
+            status: (string) $this->input('status', 'assigned'),
         );
-    }
-
-    private function stringOrNull(string $key): ?string
-    {
-        return $this->filled($key) ? (string) $this->input($key) : null;
     }
 }

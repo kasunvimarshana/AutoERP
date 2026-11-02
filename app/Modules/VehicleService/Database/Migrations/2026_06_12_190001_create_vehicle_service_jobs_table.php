@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\VehicleService\Enums\VehicleServiceJobType;
 
 return new class extends Migration
 {
@@ -17,12 +16,9 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_service_jobs_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('job_number', 100);
-            $table->string('manual_job_card', 100)->nullable();
             $table->date('job_date');
             $table->date('expected_delivery_date')->nullable();
-            $table->string('type', 30)->default(VehicleServiceJobType::FullService->value);
             $table->foreignId('customer_id');
-            $table->foreignId('bill_to_customer_id')->nullable();
             $table->foreignId('vehicle_id');
             $table->foreignId('supervisor_employee_id')->nullable();
             $table->string('supervisor_commission_type', 20)->default('none');
@@ -30,7 +26,6 @@ return new class extends Migration
             $table->decimal('supervisor_commission_amount', 20, 6)->default('0.000000');
             $table->string('status', 30)->default('draft');
             $table->decimal('odometer_reading', 20, 6)->nullable();
-            $table->decimal('next_service_mileage', 20, 6)->nullable();
             $table->string('fuel_level')->nullable();
             $table->string('priority', 30)->nullable();
             $table->decimal('subtotal', 20, 6)->default('0.000000');
@@ -38,8 +33,6 @@ return new class extends Migration
             $table->decimal('tax_total', 20, 6)->default('0.000000');
             $table->decimal('charge_total', 20, 6)->default('0.000000');
             $table->decimal('grand_total', 20, 6)->default('0.000000');
-            $table->decimal('commission_cost_total', 20, 6)->default('0.000000');
-            $table->decimal('net_after_commission', 20, 6)->default('0.000000');
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
@@ -52,7 +45,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'job_number'], 'vehicle_service_jobs_tenant_number_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_jobs_tenant_org_ix');
             $table->index(['customer_id', 'vehicle_id'], 'vehicle_service_jobs_party_vehicle_ix');
-            $table->index('bill_to_customer_id', 'vehicle_service_jobs_bill_to_customer_ix');
             $table->index(['status', 'job_date'], 'vehicle_service_jobs_status_date_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_jobs_id_tenant_uk');
@@ -61,10 +53,6 @@ return new class extends Migration
                 ->on('organization_units')
                 ->restrictOnDelete();
             $table->foreign(['customer_id', 'tenant_id'], 'vehicle_service_jobs_customer_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('customers')
-                ->restrictOnDelete();
-            $table->foreign(['bill_to_customer_id', 'tenant_id'], 'vehicle_service_jobs_bill_to_customer_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('customers')
                 ->restrictOnDelete();

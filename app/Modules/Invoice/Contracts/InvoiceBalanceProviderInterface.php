@@ -16,7 +16,6 @@ interface InvoiceBalanceProviderInterface
      *     invoice_number: string|null,
      *     invoice_date: string|null,
      *     currency_code: string|null,
-     *     exchange_rate: string,
      *     name: string
      * }>
      */
@@ -29,17 +28,6 @@ interface InvoiceBalanceProviderInterface
     public function getInvoiceStatus(int $invoiceId): string;
 
     /**
-     * @param  list<int>  $partyIds
-     * @return array<int, list<array{amount: string, currency_code: string|null}>>
-     */
-    public function getOutstandingTotalsForParties(
-        int $tenantId,
-        ?int $organizationUnitId,
-        string $partyType,
-        array $partyIds,
-    ): array;
-
-    /**
      * @return list<BalanceResultData>
      */
     public function getPayableBalancesForParty(
@@ -47,15 +35,7 @@ interface InvoiceBalanceProviderInterface
         ?int $organizationUnitId,
         string $partyType,
         int $partyId,
-        ?int $currencyId,
     ): array;
 
-    public function validatePayableState(
-        int $invoiceId,
-        int $tenantId,
-        ?int $organizationUnitId,
-        string $partyType,
-        int $partyId,
-        ?int $currencyId = null,
-    ): BalanceResultData;
+    public function validatePayableState(int $invoiceId): BalanceResultData;
 }

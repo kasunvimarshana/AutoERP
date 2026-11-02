@@ -4,24 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
-use Illuminate\Validation\ValidationException;
-use Modules\Core\Tenancy\TenantFeature;
 use Modules\Core\Tenancy\TenantPlanLimit;
+
+use Illuminate\Validation\ValidationException;
 
 final class TenantPlanSchema
 {
-    public const SCHEMA_VERSION = 4;
-
-    private const RETIRED_VEHICLE_RENTAL_MODULE = 'vehicle-rental';
-
-    /** @var array<int, list<string>> */
-    private const RETIRED_MODULES_BY_SCHEMA_VERSION = [
-        1 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
-        2 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
-        3 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
-    ];
-
-    /** @var list<string> */
+    public const SCHEMA_VERSION = 1;
+    /**
+     * Foundation capabilities are required for every tenant workspace and are
+     * never toggled by commercial subscriptions.
+     *
+     * @var list<string>
+     */
     public const ALWAYS_ON_MODULES = [
         'auth',
         'tenant',
@@ -32,23 +27,21 @@ final class TenantPlanSchema
         'audit',
     ];
 
-    /** @var array<string, string> */
+    /** Plan-controlled commercial feature modules. @var array<string, string> */
     public const SUPPORTED_MODULES = [
-        TenantFeature::CUSTOMER => 'Customers',
-        TenantFeature::SUPPLIER => 'Suppliers',
-        TenantFeature::HR => 'Human resources',
-        TenantFeature::ITEM => 'Items',
-        TenantFeature::WAREHOUSE => 'Warehouses',
-        TenantFeature::INVENTORY => 'Inventory',
-        TenantFeature::PURCHASE => 'Purchasing',
-        TenantFeature::SELLING => 'Selling',
-        TenantFeature::VEHICLE => 'Vehicles',
-        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
-        TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
-        TenantFeature::INVOICE => 'Invoicing',
-        TenantFeature::PAYMENT => 'Payments',
-        TenantFeature::FINANCE => 'Finance',
-        TenantFeature::REPORTING => 'Reporting',
+        'customer' => 'Customers',
+        'supplier' => 'Suppliers',
+        'item' => 'Items',
+        'warehouse' => 'Warehouses',
+        'inventory' => 'Inventory',
+        'purchase' => 'Purchasing',
+        'vehicle' => 'Vehicles',
+        'vehicle-service' => 'Vehicle service',
+        'vehicle-rental' => 'Vehicle rental',
+        'invoice' => 'Invoicing',
+        'payment' => 'Payments',
+        'finance' => 'Finance',
+        'reporting' => 'Reporting',
     ];
 
     /** @var list<string> */
@@ -58,6 +51,7 @@ final class TenantPlanSchema
         TenantPlanLimit::WAREHOUSES,
         TenantPlanLimit::STORAGE_MEGABYTES,
     ];
+
 
     /** @return list<array{code:string,label:string}> */
     public function commercialModuleCatalogue(): array
@@ -78,21 +72,6 @@ final class TenantPlanSchema
 
     /** @return array{enabled_modules:list<string>} */
     public function normalizeFeatures(mixed $features): array
-    {
-        return $this->normalizeFeaturePayload($features, []);
-    }
-
-    /** @return array{enabled_modules:list<string>} */
-    public function normalizePersistedFeatures(mixed $features, ?int $schemaVersion = null): array
-    {
-        return $this->normalizeFeaturePayload(
-            $features,
-            self::RETIRED_MODULES_BY_SCHEMA_VERSION[$schemaVersion ?? 1] ?? [],
-        );
-    }
-
-    /** @param list<string> $retiredModules @return array{enabled_modules:list<string>} */
-    private function normalizeFeaturePayload(mixed $features, array $retiredModules): array
     {
         $features = $features ?? [];
         if (! is_array($features)) {
@@ -124,10 +103,6 @@ final class TenantPlanSchema
             }
 
             $module = strtolower(trim($module));
-            if (in_array($module, $retiredModules, true)) {
-                continue;
-            }
-
             if (! array_key_exists($module, self::SUPPORTED_MODULES)) {
                 throw ValidationException::withMessages([
                     'features.enabled_modules' => ["Unsupported module [{$module}]."],

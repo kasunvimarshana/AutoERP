@@ -7,7 +7,6 @@ namespace Modules\VehicleService\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
-use Modules\VehicleService\Http\Requests\CancelVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceInspectionRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceJobRequest;
@@ -16,9 +15,7 @@ use Modules\VehicleService\Http\Resources\VehicleServiceInspectionResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceStatusHistoryResource;
 use Modules\VehicleService\Models\VehicleServiceJob;
-use Modules\VehicleService\Services\VehicleServiceCommissionPolicyService;
 use Modules\VehicleService\Services\VehicleServiceInspectionService;
-use Modules\VehicleService\Services\VehicleServiceJobCancellationService;
 use Modules\VehicleService\Services\VehicleServiceJobQueryService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
@@ -55,27 +52,9 @@ final class VehicleServiceJobController extends VehicleServiceController
         ])->all()]);
     }
 
-    public function createDefaults(
-        ListVehicleServiceJobRequest $request,
-        VehicleServiceCommissionPolicyService $commissionPolicies,
-    ): JsonResponse {
-        $default = $commissionPolicies->resolveSupervisorDefault(
-            $request->tenantId(),
-            (int) $request->organizationUnitId(),
-        );
-
-        return response()->json(['data' => [
-            'commission_type' => $default['type']->value,
-            'commission_value' => $default['value'],
-        ]]);
-    }
-
     public function store(StoreVehicleServiceJobRequest $request, VehicleServiceJobService $service): JsonResponse
     {
-        return (new VehicleServiceJobResource($service->create(
-            $request->toData(),
-            $request->lineData(),
-        )))
+        return (new VehicleServiceJobResource($service->create($request->toData())))
             ->response()->setStatusCode(201);
     }
 
@@ -136,19 +115,11 @@ final class VehicleServiceJobController extends VehicleServiceController
     }
 
     public function cancel(
-        CancelVehicleServiceJobRequest $request,
+        VehicleServiceActionRequest $request,
         int $job,
         VehicleServiceStatusService $service,
     ): VehicleServiceJobResource {
         return $this->changeStatus($request, $job, VehicleServiceJobStatus::Cancelled, $service);
-    }
-
-    public function cancellationPreview(
-        ListVehicleServiceJobRequest $request,
-        int $job,
-        VehicleServiceJobCancellationService $service,
-    ): JsonResponse {
-        return response()->json(['data' => $service->preview($this->job($request, $job), $request->currentUserId())]);
     }
 
     public function inspection(
@@ -182,7 +153,7 @@ final class VehicleServiceJobController extends VehicleServiceController
     }
 
     private function changeStatus(
-        VehicleServiceActionRequest|CancelVehicleServiceJobRequest $request,
+        VehicleServiceActionRequest $request,
         int $job,
         VehicleServiceJobStatus $status,
         VehicleServiceStatusService $service,

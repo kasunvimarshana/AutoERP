@@ -16,7 +16,6 @@ final class SettlePaymentLineRequest extends TenantScopedRequest
             'expected_payment_version' => ['required', 'integer', 'min:1'],
             'expected_line_version' => ['required', 'integer', 'min:1'],
             'status' => ['required', 'string', 'max:50'],
-            'event_date' => ['required', 'date_format:Y-m-d'],
             'reason' => ['nullable', 'string', 'max:1000'],
             'metadata' => ['prohibited'],
         ];
@@ -25,11 +24,6 @@ final class SettlePaymentLineRequest extends TenantScopedRequest
     public function settlementStatus(): string
     {
         return strtolower(trim((string) $this->input('status')));
-    }
-
-    public function eventDate(): string
-    {
-        return (string) $this->input('event_date');
     }
 
     public function expectedPaymentVersion(): int

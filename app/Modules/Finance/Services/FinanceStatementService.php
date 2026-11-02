@@ -47,8 +47,6 @@ final class FinanceStatementService
                 'account_code' => $balance->accountCode,
                 'account_name' => $balance->accountName,
                 'account_type' => $typeCode,
-                'account_category_code' => $account->accountCategory?->code,
-                'account_category_name' => $account->accountCategory?->name,
                 'amount' => $amount,
             ];
         }
@@ -125,7 +123,7 @@ final class FinanceStatementService
         StatementType $statementType,
     ) {
         $query = FinanceAccount::query()
-            ->with(['accountType', 'accountCategory'])
+            ->with('accountType')
             ->where('tenant_id', $tenantId)
             ->whereHas('accountType', fn ($scope) => $scope->where('statement_type', $statementType->value));
 

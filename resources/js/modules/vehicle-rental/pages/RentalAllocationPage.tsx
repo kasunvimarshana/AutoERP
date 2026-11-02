@@ -1,0 +1,546 @@
+import { useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { getVehicle } from '@/modules/vehicle/vehicleApi';
+import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
+import { listVehicleOwnerships as listPartyVehicleOwnerships } from '@/modules/vehicle/vehicleOwnershipApi';
+import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { Button, LinkButton } from '@/shared/components/Button';
+import { ContentHeader } from '@/shared/components/ContentHeader';
+import { DataTable, type DataColumn } from '@/shared/components/DataTable';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { Input } from '@/shared/components/Input';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { Pagination } from '@/shared/components/Pagination';
+import { Panel } from '@/shared/components/Panel';
+import { Select } from '@/shared/components/Select';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { useApi } from '@/shared/hooks/useApi';
+import type { NamedResource } from '@/shared/types/common';
+import { readableRelation } from '@/shared/utils/object';
+import { parsePositiveInteger } from '@/shared/utils/routeParams';
+import type { PartyVehicleRelationship } from '@/shared/types/partyVehicle';
+import { DriverLookupSelect } from '@/modules/hr/components/DriverLookupSelect';
+import type { DriverSummary } from '@/modules/hr/driverTypes';
+import {
+    RentalAgreementLookupSelect,
+    RentalAllocationLookupSelect,
+    RentalFinanceAgreementLookupSelect,
+} from '../components/RentalLookups';
+import { RentalPage } from '../components/RentalPage';
+import { RentalAssignDriverModal } from '../components/RentalAssignDriverModal';
+import {
+    createRentalAllocation,
+    getRentalAgreement,
+    listRentalAllocations,
+} from '../vehicleRentalApi';
+import type { RentalAgreement, RentalAllocation } from '../vehicleRentalTypes';
+
+interface AllocationForm {
+    vehicleSourceType: string;
+    allocatedFrom: string;
+    allocatedTo: string;
+    startOdometer: string;
+}
+
+const AGREEMENT_KIND_OWNER_SUPPLY = 'owner_supply';
+const SOURCE_TYPE_COMPANY_OWNED = 'company_owned';
+const SOURCE_TYPE_OWNER_SUPPLIED = 'owner_supplied';
+const SOURCE_TYPE_FINANCED = 'financed';
+const OWNERSHIP_LOOKUP_PAGE_SIZE = 100;
+
+const emptyForm = (): AllocationForm => ({
+    vehicleSourceType: SOURCE_TYPE_COMPANY_OWNED,
+    allocatedFrom: '',
+    allocatedTo: '',
+    startOdometer: '0',
+});
+
+function toDateTimeLocal(value: string | null | undefined): string {
+    if (!value) return '';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const offset = date.getTimezoneOffset() * 60_000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(value: string): string {
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+function agreementLookupValue(agreement: RentalAgreement): NamedResource {
+    return {
+        id: agreement.id,
+        code: agreement.agreement_number,
+        name: [
+            agreement.agreement_number,
+            agreement.customer?.name ?? agreement.supplier?.name,
+        ].filter(Boolean).join(' - '),
+    };
+}
+
+function sourceTypeForAgreement(agreement: RentalAgreement | null): string {
+    return agreement?.agreement_kind === AGREEMENT_KIND_OWNER_SUPPLY
+        ? SOURCE_TYPE_OWNER_SUPPLIED
+        : SOURCE_TYPE_COMPANY_OWNED;
+}
+
+function ownershipCoversAgreement(ownership: PartyVehicleRelationship, agreement: RentalAgreement): boolean {
+    const startedAt = new Date(ownership.started_at);
+    const endedAt = ownership.ended_at ? new Date(ownership.ended_at) : null;
+    const agreementStartsAt = new Date(agreement.starts_at);
+    const agreementEndsAt = new Date(agreement.ends_at);
+
+    if (
+        Number.isNaN(startedAt.getTime()) ||
+        Number.isNaN(agreementStartsAt.getTime()) ||
+        Number.isNaN(agreementEndsAt.getTime()) ||
+        (endedAt !== null && Number.isNaN(endedAt.getTime()))
+    ) {
+        return false;
+    }
+
+    return startedAt.getTime() <= agreementStartsAt.getTime()
+        && (endedAt === null || endedAt.getTime() >= agreementEndsAt.getTime());
+}
+
+function ownershipLabel(ownership: PartyVehicleRelationship | null): string {
+    if (ownership === null) return '';
+
+    return [
+        ownership.vehicle.registration_number ?? ownership.vehicle.number,
+        ownership.owner.name,
+        ownership.ownership_type?.replaceAll('_', ' '),
+    ].filter(Boolean).join(' - ');
+}
+
+export default function RentalAllocationPage() {
+    const [params] = useSearchParams();
+    const initialAgreementId = parsePositiveInteger(params.get('agreement_id'));
+    const initialVehicleId = parsePositiveInteger(params.get('vehicle_id'));
+    const [agreement, setAgreement] = useState<NamedResource | null>(null);
+    const [agreementDetails, setAgreementDetails] = useState<RentalAgreement | null>(null);
+    const [agreementIdToLoad, setAgreementIdToLoad] = useState<number | null>(initialAgreementId);
+    const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
+    const [sourceAllocation, setSourceAllocation] = useState<NamedResource | null>(null);
+    const [financeAgreement, setFinanceAgreement] = useState<NamedResource | null>(null);
+    const [ownerSupplyOwnership, setOwnerSupplyOwnership] = useState<PartyVehicleRelationship | null>(null);
+    const [ownershipLoading, setOwnershipLoading] = useState(false);
+    const [ownershipHint, setOwnershipHint] = useState<string | null>(null);
+    const [driver, setDriver] = useState<DriverSummary | null>(null);
+    const [form, setForm] = useState<AllocationForm>(emptyForm);
+    const [page, setPage] = useState(1);
+    const [refresh, setRefresh] = useState(0);
+    const [error, setError] = useState<ApiError | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [selectedAllocationForDriver, setSelectedAllocationForDriver] = useState<RentalAllocation | null>(null);
+    const isOwnerSupplyAgreement = agreementDetails?.agreement_kind === AGREEMENT_KIND_OWNER_SUPPLY;
+    const ownerSupplySupplierId = agreementDetails?.supplier?.id ?? null;
+
+    useEffect(() => {
+        setAgreementIdToLoad(initialAgreementId);
+    }, [initialAgreementId]);
+
+    useEffect(() => {
+        if (!agreementIdToLoad) {
+            setAgreementDetails(null);
+
+            return;
+        }
+
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setError(null);
+        });
+
+        void getRentalAgreement(agreementIdToLoad, controller.signal).then((resource) => {
+            setAgreement(agreementLookupValue(resource));
+            setAgreementDetails(resource);
+            setSourceAllocation(null);
+            setFinanceAgreement(null);
+            setForm((current) => ({
+                ...current,
+                vehicleSourceType: sourceTypeForAgreement(resource),
+                allocatedFrom: toDateTimeLocal(resource.starts_at),
+                allocatedTo: toDateTimeLocal(resource.ends_at),
+            }));
+        }).catch((requestError: unknown) => {
+            if (!controller.signal.aborted) setError(toApiError(requestError));
+        });
+
+        return () => controller.abort();
+    }, [agreementIdToLoad]);
+
+    useEffect(() => {
+        if (!initialVehicleId) return;
+
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setError(null);
+        });
+
+        void getVehicle(initialVehicleId, controller.signal)
+            .then(setVehicle)
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            });
+
+        return () => controller.abort();
+    }, [initialVehicleId]);
+
+    useEffect(() => {
+        setOwnerSupplyOwnership(null);
+        setOwnershipHint(null);
+
+        if (!isOwnerSupplyAgreement || !agreementDetails || !ownerSupplySupplierId || !vehicle) {
+            setOwnershipLoading(false);
+
+            return;
+        }
+
+        const selectedAgreement = agreementDetails;
+        const selectedVehicle = vehicle;
+        const controller = new AbortController();
+        setOwnershipLoading(true);
+
+        void listPartyVehicleOwnerships('supplier', {
+            supplier_id: ownerSupplySupplierId,
+            vehicle_id: selectedVehicle.id,
+            status: 'active',
+            per_page: OWNERSHIP_LOOKUP_PAGE_SIZE,
+        }, controller.signal).then((response) => {
+            if (controller.signal.aborted) return;
+
+            const ownership = response.data.find((row) => row.is_current && ownershipCoversAgreement(row, selectedAgreement))
+                ?? response.data.find((row) => ownershipCoversAgreement(row, selectedAgreement))
+                ?? null;
+
+            setOwnerSupplyOwnership(ownership);
+            setOwnershipHint(ownership === null
+                ? 'No active supplier ownership covers this agreement period.'
+                : null);
+        }).catch((requestError: unknown) => {
+            if (!controller.signal.aborted) setError(toApiError(requestError));
+        }).finally(() => {
+            if (!controller.signal.aborted) setOwnershipLoading(false);
+        });
+
+        return () => controller.abort();
+    }, [
+        agreementDetails,
+        isOwnerSupplyAgreement,
+        ownerSupplySupplierId,
+        vehicle,
+        vehicle?.id,
+    ]);
+
+    const result = useApi(
+        (signal) => listRentalAllocations(
+            { agreement_id: agreement?.id, page, per_page: 25 },
+            signal,
+        ),
+        [agreement?.id, page, refresh],
+    );
+
+    const changeSourceType = (vehicleSourceType: string) => {
+        setForm((current) => ({ ...current, vehicleSourceType }));
+        setSourceAllocation(null);
+        setFinanceAgreement(null);
+    };
+
+    const submit = async (event: FormEvent) => {
+        event.preventDefault();
+        if (!agreement || !vehicle) return;
+
+        const vehicleSourceType = isOwnerSupplyAgreement
+            ? SOURCE_TYPE_OWNER_SUPPLIED
+            : form.vehicleSourceType;
+        if (isOwnerSupplyAgreement && ownerSupplyOwnership === null) {
+            setOwnershipHint('No active supplier ownership covers this agreement period.');
+
+            return;
+        }
+
+        setSaving(true);
+        setError(null);
+        try {
+            await createRentalAllocation(agreement.id, {
+                vehicle_id: vehicle.id,
+                vehicle_ownership_id: isOwnerSupplyAgreement ? ownerSupplyOwnership?.id ?? null : null,
+                vehicle_source_type: vehicleSourceType,
+                source_allocation_id: !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED
+                    ? sourceAllocation?.id ?? null
+                    : null,
+                vehicle_finance_agreement_id: !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_FINANCED
+                    ? financeAgreement?.id ?? null
+                    : null,
+                allocated_from: toIsoDateTime(form.allocatedFrom),
+                allocated_to: form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null,
+                start_odometer: form.startOdometer,
+                drivers: driver ? [{
+                    employee_id: driver.id,
+                    assignment_role: 'primary',
+                    assigned_from: toIsoDateTime(form.allocatedFrom),
+                    assigned_to: form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null,
+                    is_primary: true,
+                }] : undefined,
+            });
+            setVehicle(null);
+            setDriver(null);
+            setSourceAllocation(null);
+            setFinanceAgreement(null);
+            setOwnerSupplyOwnership(null);
+            setForm({
+                ...emptyForm(),
+                vehicleSourceType: sourceTypeForAgreement(agreementDetails),
+                allocatedFrom: toDateTimeLocal(agreementDetails?.starts_at),
+                allocatedTo: toDateTimeLocal(agreementDetails?.ends_at),
+            });
+            setPage(1);
+            setRefresh((value) => value + 1);
+        } catch (requestError: unknown) {
+            setError(toApiError(requestError));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const columns: DataColumn<RentalAllocation>[] = [
+        { key: 'number', header: 'Allocation', render: (row) => row.allocation_number },
+        { key: 'agreement', header: 'Agreement', render: (row) => readableRelation(row.agreement) },
+        { key: 'vehicle', header: 'Vehicle', render: (row) => readableRelation(row.vehicle) },
+        {
+            key: 'driver',
+            header: 'Driver',
+            render: (row) => {
+                const primaryDriver = row.drivers?.find((d) => d.is_primary) ?? row.drivers?.[0];
+                return primaryDriver ? readableRelation(primaryDriver.employee) : '-';
+            },
+        },
+        {
+            key: 'source',
+            header: 'Source',
+            render: (row) => row.vehicle_source_type.replaceAll('_', ' '),
+        },
+        {
+            key: 'period',
+            header: 'Period',
+            render: (row) => `${row.allocated_from.slice(0, 10)} - ${row.allocated_to?.slice(0, 10) ?? 'open'}`,
+        },
+        {
+            key: 'status',
+            header: 'Status',
+            render: (row) => (
+                <div className="flex flex-wrap items-center gap-1">
+                    <StatusBadge status={row.status} />
+                    {row.replacement_allocation && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                            Replaced
+                        </span>
+                    )}
+                    {row.replaces_allocation && (
+                        <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[11px] font-semibold text-blue-800">
+                            Replacement
+                        </span>
+                    )}
+                </div>
+            ),
+        },
+        {
+            key: 'actions',
+            header: '',
+            render: (row) => (
+                <div className="flex items-center gap-2">
+                    <LinkButton variant="secondary" to={`/vehicle-rental/allocations/${row.id}`}>
+                        View
+                    </LinkButton>
+                    {row.status !== 'completed' && row.status !== 'returned' && (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setSelectedAllocationForDriver(row)}
+                        >
+                            {row.drivers && row.drivers.length > 0 ? 'Change driver' : '+ Driver'}
+                        </Button>
+                    )}
+                    {row.status === 'planned' && (
+                        <LinkButton variant="secondary" to={`/vehicle-rental/custody?allocation_id=${row.id}`}>
+                            Handover
+                        </LinkButton>
+                    )}
+                    {row.status === 'active' && (
+                        <>
+                            <LinkButton variant="secondary" to={`/vehicle-rental/running-chart?allocation_id=${row.id}`}>
+                                Running chart
+                            </LinkButton>
+                            <LinkButton variant="secondary" to={`/vehicle-rental/allocations/${row.id}/replacement`}>
+                                Replace
+                            </LinkButton>
+                        </>
+                    )}
+                </div>
+            ),
+        },
+    ];
+
+    const sourceSelectionValid = (() => {
+        if (isOwnerSupplyAgreement) return ownerSupplyOwnership !== null;
+        if (form.vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED) return sourceAllocation !== null;
+        if (form.vehicleSourceType === SOURCE_TYPE_FINANCED) return financeAgreement !== null;
+
+        return true;
+    })();
+    const agreementStartsAt = agreementDetails ? toDateTimeLocal(agreementDetails.starts_at) : '';
+    const agreementEndsAt = agreementDetails ? toDateTimeLocal(agreementDetails.ends_at) : '';
+    const vehicleSourceType = isOwnerSupplyAgreement ? SOURCE_TYPE_OWNER_SUPPLIED : form.vehicleSourceType;
+
+    return (
+        <RentalPage>
+            <ContentHeader
+                title="Vehicle allocations"
+                description="Assign a vehicle through guided agreement, vehicle and ownership controls. Internal database identifiers are never entered manually."
+            />
+            <ErrorAlert error={error ?? result.error} />
+            <Panel title="Create allocation">
+                <form onSubmit={submit}>
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <RentalAgreementLookupSelect
+                            value={agreement}
+                            onChange={(value) => {
+                                setAgreement(value);
+                                setAgreementDetails(null);
+                                setAgreementIdToLoad(value?.id ?? null);
+                                setSourceAllocation(null);
+                                setFinanceAgreement(null);
+                                setOwnerSupplyOwnership(null);
+                                setDriver(null);
+                                setPage(1);
+                                if (value === null) setForm(emptyForm());
+                            }}
+                            required
+                        />
+                        <VehicleLookupSelect
+                            value={vehicle}
+                            onChange={(value) => {
+                                setVehicle(value);
+                                setOwnerSupplyOwnership(null);
+                            }}
+                            required
+                        />
+                        <Select
+                            label="Vehicle source"
+                            value={vehicleSourceType}
+                            disabled={isOwnerSupplyAgreement}
+                            onChange={(event) => changeSourceType(event.target.value)}
+                            options={isOwnerSupplyAgreement
+                                ? [{ value: SOURCE_TYPE_OWNER_SUPPLIED, label: 'Owner supplied' }]
+                                : [
+                                    { value: SOURCE_TYPE_COMPANY_OWNED, label: 'Company owned' },
+                                    { value: SOURCE_TYPE_OWNER_SUPPLIED, label: 'Owner supplied' },
+                                    { value: SOURCE_TYPE_FINANCED, label: 'Financed' },
+                                ]}
+                        />
+                        {isOwnerSupplyAgreement && (
+                            <Input
+                                label="Owner vehicle ownership"
+                                value={ownershipLoading ? 'Checking ownership...' : ownershipLabel(ownerSupplyOwnership)}
+                                readOnly
+                                required
+                                hint={ownershipHint ?? undefined}
+                            />
+                        )}
+                        {!isOwnerSupplyAgreement && form.vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED && (
+                            <RentalAllocationLookupSelect
+                                value={sourceAllocation}
+                                onChange={setSourceAllocation}
+                                required
+                                excludeId={null}
+                            />
+                        )}
+                        {!isOwnerSupplyAgreement && form.vehicleSourceType === SOURCE_TYPE_FINANCED && (
+                            <RentalFinanceAgreementLookupSelect
+                                value={financeAgreement}
+                                onChange={setFinanceAgreement}
+                                required
+                            />
+                        )}
+                        <Input
+                            label="From"
+                            type="datetime-local"
+                            required
+                            value={form.allocatedFrom}
+                            min={agreementStartsAt || undefined}
+                            max={form.allocatedTo || agreementEndsAt || undefined}
+                            onChange={(event) => setForm({ ...form, allocatedFrom: event.target.value })}
+                        />
+                        <Input
+                            label="To"
+                            type="datetime-local"
+                            value={form.allocatedTo}
+                            min={form.allocatedFrom || agreementStartsAt || undefined}
+                            max={agreementEndsAt || undefined}
+                            onChange={(event) => setForm({ ...form, allocatedTo: event.target.value })}
+                        />
+                        <Input
+                            label="Start odometer"
+                            type="number"
+                            min="0"
+                            step="0.000001"
+                            required
+                            value={form.startOdometer}
+                            onChange={(event) => setForm({ ...form, startOdometer: event.target.value })}
+                        />
+                        <DriverLookupSelect
+                            value={driver}
+                            onChange={setDriver}
+                            label={
+                                agreementDetails?.rental_mode === 'with_driver'
+                                    ? "Assign Driver (Recommended for 'With driver')"
+                                    : 'Assign Driver (Optional)'
+                            }
+                        />
+                    </div>
+                    <div className="mt-4 flex justify-end">
+                        <Button
+                            type="submit"
+                            loading={saving}
+                            disabled={!agreement || !vehicle || !form.allocatedFrom || ownershipLoading || !sourceSelectionValid}
+                        >
+                            Create allocation
+                        </Button>
+                    </div>
+                </form>
+            </Panel>
+            <div className="mt-5">
+                {result.loading ? (
+                    <LoadingState />
+                ) : (
+                    <DataTable
+                        rows={result.data?.data ?? []}
+                        columns={columns}
+                        rowKey={(row) => row.id}
+                    />
+                )}
+                <Pagination meta={result.data?.meta} onPageChange={setPage} />
+            </div>
+
+            <RentalAssignDriverModal
+                open={Boolean(selectedAllocationForDriver)}
+                allocationId={selectedAllocationForDriver?.id ?? null}
+                allocationNumber={selectedAllocationForDriver?.allocation_number}
+                allocatedFrom={selectedAllocationForDriver?.allocated_from}
+                allocatedTo={selectedAllocationForDriver?.allocated_to}
+                initialRole="primary"
+                onClose={() => setSelectedAllocationForDriver(null)}
+                onSuccess={() => {
+                    setSelectedAllocationForDriver(null);
+                    setRefresh((value) => value + 1);
+                }}
+            />
+        </RentalPage>
+    );
+}

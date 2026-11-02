@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
-use Modules\Finance\Enums\FinanceAccountRoleCode;
-use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\ManualInvoiceData;
@@ -20,13 +18,8 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
-use Modules\Invoice\Services\InvoiceBalanceService;
-use Modules\Invoice\Services\InvoicePostingPlanFactory;
-use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\ManualInvoiceService;
-use Tests\Support\CurrencyFixture;
-use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class ManualInvoiceServiceTest extends TestCase
@@ -46,31 +39,6 @@ final class ManualInvoiceServiceTest extends TestCase
 
         $this->assertSame($first->getKey(), $second->getKey());
         $this->assertSame(1, $this->withTenantExecutionContext($tenantId, fn () => Invoice::query()->where('tenant_id', $tenantId)->count()));
-    }
-
-    public function test_base_currency_invoice_rejects_non_unit_exchange_rate(): void
-    {
-        $tenantId = $this->createTenant();
-        $currencyId = CurrencyFixture::create(['name' => 'Invoice Base Currency', 'symbol' => 'IB']);
-        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Tenant base currency invoices must use an exchange rate of 1.000000.');
-
-        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
-            tenantId: $tenantId,
-            invoiceType: InvoiceType::Manual,
-            direction: InvoiceDirection::Outbound,
-            invoiceDate: '2026-06-29',
-            currencyId: $currencyId,
-            exchangeRate: '2.000000',
-            lines: [new InvoiceLineData(
-                lineNumber: 1,
-                description: 'Invalid base-currency rate',
-                quantity: '1.000000',
-                unitPrice: '100.000000',
-            )],
-        )));
     }
 
     public function test_invoice_status_actions_reject_stale_versions(): void
@@ -118,72 +86,9 @@ final class ManualInvoiceServiceTest extends TestCase
         $this->withTenantExecutionContext($tenantId, fn () => $invoice->delete());
     }
 
-    public function test_retired_vehicle_finance_invoice_rejects_non_settlement_lifecycle_changes(): void
-    {
-        $tenantId = $this->createTenant();
-        $organizationUnitId = $this->createOrganizationUnit($tenantId);
-        $customerId = $this->createCustomer($tenantId, $organizationUnitId);
-        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
-            $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
-            'retired-vehicle-finance-lifecycle',
-        ));
-        DB::table('invoices')->where('id', $invoice->getKey())->update([
-            'invoice_type' => InvoiceType::VehicleFinance->value,
-        ]);
-        $invoice = $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh());
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Historical Vehicle Finance invoices are read-only except for settlement updates.',
-        );
-
-        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceStatusService::class)->transitionIfVersion(
-            $invoice,
-            InvoiceStatus::Cancelled,
-            (int) $invoice->row_version,
-        ));
-    }
-
-    public function test_retired_vehicle_finance_invoice_rejects_reversal_before_financial_mutation(): void
-    {
-        $tenantId = $this->createTenant();
-        $organizationUnitId = $this->createOrganizationUnit($tenantId);
-        $customerId = $this->createCustomer($tenantId, $organizationUnitId);
-        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
-            $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
-            'retired-vehicle-finance-reversal',
-        ));
-        DB::table('invoices')->where('id', $invoice->getKey())->update([
-            'invoice_type' => InvoiceType::VehicleFinance->value,
-            'status' => InvoiceStatus::Posted->value,
-            'posted_at' => now(),
-        ]);
-        $invoice = $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh());
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            'Historical Vehicle Finance invoices cannot be reversed after their source module was retired.',
-        );
-
-        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceReversalService::class)->reverse(
-            $invoice,
-            (int) $invoice->row_version,
-            now()->toDateString(),
-            'Retired source safety check.',
-        ));
-    }
-
     public function test_requested_posted_status_uses_governed_issuance_transitions(): void
     {
         $tenantId = $this->createTenant();
-        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
-        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
-            FinancePostingProfileCode::SalesInvoice,
-            '2026-06-29',
-            FinanceAccountRoleCode::Revenue,
-            '100.000000',
-            description: 'Governed issuance',
-        );
 
         $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
@@ -197,72 +102,12 @@ final class ManualInvoiceServiceTest extends TestCase
                 quantity: '1.000000',
                 unitPrice: '100.000000',
             )],
-            postingPlan: $postingPlan,
         )));
 
         $this->assertSame(InvoiceStatus::Posted, $invoice->status);
         $this->assertNotNull($invoice->approved_at);
         $this->assertNotNull($invoice->posted_at);
         $this->assertSame(3, (int) $invoice->row_version);
-    }
-
-    public function test_invoice_settlement_rejects_corrupt_persisted_balance_without_mutation(): void
-    {
-        $tenantId = $this->createTenant();
-        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
-        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
-            FinancePostingProfileCode::SalesInvoice,
-            '2026-06-29',
-            FinanceAccountRoleCode::Revenue,
-            '100.000000',
-            description: 'Balance conservation',
-        );
-        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
-            tenantId: $tenantId,
-            invoiceType: InvoiceType::Manual,
-            direction: InvoiceDirection::Outbound,
-            invoiceDate: '2026-06-29',
-            status: InvoiceStatus::Posted,
-            lines: [new InvoiceLineData(
-                lineNumber: 1,
-                description: 'Balance conservation',
-                quantity: '1.000000',
-                unitPrice: '100.000000',
-            )],
-            postingPlan: $postingPlan,
-        )));
-
-        $this->withTenantExecutionContext($tenantId, function () use ($invoice): void {
-            foreach ([
-                ['remaining_amount' => '150.000000'],
-                ['paid_amount' => '5.000000'],
-                ['credit_allocated_amount' => '5.000000'],
-            ] as $corruptBalance) {
-                DB::table('invoice_balances')
-                    ->where('invoice_id', $invoice->getKey())
-                    ->update($corruptBalance);
-                try {
-                    app(InvoiceBalanceService::class)->applyPayment($invoice, '10.000000');
-                    $this->fail('Settled an invoice with inconsistent historical balance.');
-                } catch (InvalidArgumentException $exception) {
-                    $this->assertSame(
-                        'Invoice balance is inconsistent with its persisted settlements.',
-                        $exception->getMessage(),
-                    );
-                } finally {
-                    DB::table('invoice_balances')->where('invoice_id', $invoice->getKey())->update([
-                        'invoice_total' => '100.000000',
-                        'paid_amount' => '0.000000',
-                        'credit_allocated_amount' => '0.000000',
-                        'remaining_amount' => '100.000000',
-                    ]);
-                }
-            }
-
-            $this->assertSame('100.000000', (string) $invoice->refresh()->balance_due);
-            $this->assertSame('0.000000', (string) $invoice->paid_total);
-            $this->assertSame('0.000000', (string) $invoice->credit_total);
-        });
     }
 
     public function test_invoice_keeps_party_snapshot_after_master_data_changes(): void

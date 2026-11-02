@@ -21,27 +21,29 @@ export function CustomerForm({ value, onChange, currency, onCurrencyChange, erro
     return <div className="space-y-5">
         <Panel title="Customer identity">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {!creating && <Input label="Customer number" value={value.customer_number ?? ''} onChange={(event) => set('customer_number', event.target.value || null)} error={fieldError(error, 'customer_number') ?? fieldError(error, 'customer.customer_number')} />}
+                <Input label="Customer number" value={value.customer_number ?? ''} onChange={(event) => set('customer_number', event.target.value || null)} error={fieldError(error, 'customer_number') ?? fieldError(error, 'customer.customer_number')} />
                 <Input label="Code" value={value.code} onChange={(event) => set('code', event.target.value)} error={fieldError(error, 'code') ?? fieldError(error, 'customer.code')} required />
                 <Input label="Name" value={value.name} onChange={(event) => set('name', event.target.value)} error={fieldError(error, 'name') ?? fieldError(error, 'customer.name')} required />
                 <Select label="Customer type" value={value.customer_type} onChange={(event) => set('customer_type', event.target.value)} options={options(customerTypes)} error={fieldError(error, 'customer_type') ?? fieldError(error, 'customer.customer_type')} />
                 {creating && <Select label="Initial status" value={value.status ?? 'pending_approval'} onChange={(event) => set('status', event.target.value)} options={options(customerStatuses)} error={fieldError(error, 'status') ?? fieldError(error, 'customer.status')} />}
-                {!creating && <Input label="Legal name" value={value.legal_name ?? ''} onChange={(event) => set('legal_name', event.target.value || null)} />}
+                <Input label="Legal name" value={value.legal_name ?? ''} onChange={(event) => set('legal_name', event.target.value || null)} />
                 <Input label="Display name" value={value.display_name ?? ''} onChange={(event) => set('display_name', event.target.value || null)} />
             </div>
         </Panel>
         <Panel title="Contact and commercial defaults">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Input label="Email" type="email" value={value.email ?? ''} onChange={(event) => set('email', event.target.value || null)} error={fieldError(error, 'email') ?? fieldError(error, 'customer.email')} />
-                <Input label="Phone" value={value.phone ?? ''} onChange={(event) => set('phone', event.target.value || null)} error={fieldError(error, 'phone') ?? fieldError(error, 'customer.phone')} />
-                <Input label="WhatsApp Number" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} error={fieldError(error, 'mobile') ?? fieldError(error, 'customer.mobile')} />
-                {!creating && <Input label="Website" type="url" value={value.website ?? ''} onChange={(event) => set('website', event.target.value || null)} />}
+                <Input label="Phone" value={value.phone ?? ''} onChange={(event) => set('phone', event.target.value || null)} />
+                <Input label="Mobile" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} />
+                <Input label="Website" type="url" value={value.website ?? ''} onChange={(event) => set('website', event.target.value || null)} />
                 <CustomerCurrencySelect value={currency} onChange={(next) => { onCurrencyChange(next); set('default_currency_id', next ? Number(next.id) : null); }} error={fieldError(error, 'default_currency_id') ?? fieldError(error, 'customer.default_currency_id')} />
+                <Input label="Reference credit limit" value={value.credit_limit ?? '0.000000'} onChange={(event) => set('credit_limit', event.target.value)} error={fieldError(error, 'credit_limit') ?? fieldError(error, 'customer.credit_limit')} />
+                <Input label="Opening balance" value={value.opening_balance ?? '0.000000'} onChange={(event) => set('opening_balance', event.target.value)} error={fieldError(error, 'opening_balance') ?? fieldError(error, 'customer.opening_balance')} />
                 <Select label="Preferred channel" value={value.preferred_communication_channel ?? ''} onChange={(event) => set('preferred_communication_channel', event.target.value || null)} options={options(preferredCommunicationChannels)} error={fieldError(error, 'preferred_communication_channel') ?? fieldError(error, 'customer.preferred_communication_channel')} />
             </div>
-            <p className="mt-2 text-sm text-slate-500">Enter a phone number or a WhatsApp number to save this customer.</p>
-            <p className="mt-3 text-sm text-slate-500">Credit and advance rules are maintained in the dedicated Credit Profile workspace. Opening balances are created through governed financial documents.</p>
             <div className="mt-4 flex flex-wrap gap-6 text-sm">
+                <label><input className="mr-2" type="checkbox" checked={value.is_credit_allowed} onChange={(event) => set('is_credit_allowed', event.target.checked)} />Credit allowed</label>
+                <label><input className="mr-2" type="checkbox" checked={value.is_advance_allowed} onChange={(event) => set('is_advance_allowed', event.target.checked)} />Advance allowed</label>
                 <label><input className="mr-2" type="checkbox" checked={value.is_tax_exempt} onChange={(event) => set('is_tax_exempt', event.target.checked)} />Tax exempt</label>
                 <label><input className="mr-2" type="checkbox" checked={value.marketing_consent} onChange={(event) => set('marketing_consent', event.target.checked)} />Marketing consent</label>
             </div>

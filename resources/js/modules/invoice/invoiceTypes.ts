@@ -1,8 +1,3 @@
-export enum InvoiceStatus {
-    Draft = 'draft', Approved = 'approved', Posted = 'posted', PartiallyPaid = 'partially_paid',
-    Paid = 'paid', Cancelled = 'cancelled', Void = 'void', Reversed = 'reversed',
-}
-
 export interface InvoicePartySnapshot extends Record<string, unknown> {
     id?: number | null;
     number?: string | null;
@@ -82,23 +77,9 @@ export interface InvoiceBalanceResult extends Record<string, unknown> {
     status: string;
 }
 
-export interface InvoicePostingPlan extends Record<string, unknown> {
-    row_version: number;
-    posting_profile_code: string;
-    posting_date: string;
-    description?: string | null;
-    status: 'prepared' | 'posted' | 'reversed' | string;
-    finance_posting_reference?: string | null;
-    finance_reversal_reference?: string | null;
-    posted_at?: string | null;
-    reversed_at?: string | null;
-    reversal_reason?: string | null;
-}
-
 export interface InvoiceSource extends Record<string, unknown> {
     id: number;
     source_type: string;
-    source_id: number;
     source_document_number?: string | null;
     source_document_date?: string | null;
     source_subtotal: string;
@@ -155,23 +136,23 @@ export interface Invoice extends Record<string, unknown> {
     due_date?: string | null;
     invoice_type?: string;
     direction?: string;
-    status?: 'draft' | 'approved' | 'posted' | 'partially_paid' | 'paid' | 'reversed' | 'cancelled' | 'void' | string;
+    status?: string;
     party_type?: string | null;
     party?: InvoicePartySnapshot | null;
     currency?: InvoiceCurrencySnapshot | null;
-    exchange_rate?: string;
+    subtotal?: string;
+    tax_total?: string;
     grand_total?: string;
     paid_total?: string;
     credit_total?: string;
     balance_due?: string;
+    notes?: string | null;
     approved_at?: string | null;
     posted_at?: string | null;
     cancelled_at?: string | null;
     cancellation_reason?: string | null;
     balance?: InvoiceBalance | null;
-    posting_plan?: InvoicePostingPlan | null;
     lines?: InvoiceLine[];
-    sources?: InvoiceSource[];
 }
 
 export interface InvoiceSourcesResult {

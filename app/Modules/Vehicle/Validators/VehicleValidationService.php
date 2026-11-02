@@ -13,6 +13,7 @@ use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\UpdateVehicleData;
 use Modules\Vehicle\DTOs\VehicleModelData;
+use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;
@@ -23,19 +24,17 @@ final class VehicleValidationService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
-    public function validateCreate(CreateVehicleData $data, string $resolvedCode): void
+    public function validateCreate(CreateVehicleData $data): void
     {
         if ($data->vehicleNumber !== null) {
             $this->assertNumberUnique($data->tenantId, $data->vehicleNumber);
         }
-        $this->assertUniqueNullable('code', $data->tenantId, $resolvedCode, 'Vehicle code already exists for this tenant.');
+        $this->assertUniqueNullable('code', $data->tenantId, $data->code, 'Vehicle code already exists for this tenant.');
         $this->assertUniqueNullable('registration_number', $data->tenantId, $data->registrationNumber, 'Vehicle registration number already exists for this tenant.');
         $this->assertUniqueNullable('chassis_number', $data->tenantId, $data->chassisNumber, 'Vehicle chassis number already exists for this tenant.');
         $this->assertUniqueNullable('engine_number', $data->tenantId, $data->engineNumber, 'Vehicle engine number already exists for this tenant.');
         $this->assertUniqueNullable('vin_number', $data->tenantId, $data->vinNumber, 'Vehicle VIN already exists for this tenant.');
-        if ($data->odometerReading !== null) {
-            $this->assertNonNegative($data->odometerReading, 'Vehicle odometer reading cannot be negative.');
-        }
+        $this->assertNonNegative($data->odometerReading, 'Vehicle odometer reading cannot be negative.');
         $this->assertManufactureYear($data->manufactureYear);
         $this->assertOrganizationUsable($data->tenantId, $data->organizationUnitId);
         $this->assertReferences($data->tenantId, $data->organizationUnitId, $data->vehicleMakeId, $data->vehicleModelId, $data->vehicleTypeId, $data->vehicleCategoryId);
@@ -207,7 +206,7 @@ final class VehicleValidationService
     }
 
     /**
-     * @param  class-string  $modelClass
+     * @param class-string $modelClass
      */
     private function missingTenantReference(
         string $table,
@@ -220,6 +219,6 @@ final class VehicleValidationService
             throw new InvalidArgumentException($message);
         }
 
-        throw (new ModelNotFoundException)->setModel($modelClass, [$id]);
+        throw (new ModelNotFoundException())->setModel($modelClass, [$id]);
     }
 }

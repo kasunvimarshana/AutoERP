@@ -17,9 +17,9 @@ use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Services\CustomerCreationService;
 use Modules\User\Models\UserModel;
+use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\Data\CreateVehicleOwnershipData;
 use Modules\Vehicle\Data\VersionedVehicleOwnershipCommand;
-use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\VehicleAttributeData;
 use Modules\Vehicle\DTOs\VehicleCategoryData;
 use Modules\Vehicle\DTOs\VehicleDocumentData;
@@ -30,8 +30,8 @@ use Modules\Vehicle\DTOs\VehicleTypeData;
 use Modules\Vehicle\Enums\VehicleAttributeDataType;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
-use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleOwnerType;
+use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
@@ -39,7 +39,6 @@ use Modules\Vehicle\Models\VehicleMake;
 use Modules\Vehicle\Models\VehicleModel;
 use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\Vehicle\Models\VehicleType;
-use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Modules\Vehicle\Services\VehicleAttributeService;
 use Modules\Vehicle\Services\VehicleAuthorizationService;
 use Modules\Vehicle\Services\VehicleCategoryService;
@@ -48,12 +47,10 @@ use Modules\Vehicle\Services\VehicleDocumentService;
 use Modules\Vehicle\Services\VehicleLookupService;
 use Modules\Vehicle\Services\VehicleMakeService;
 use Modules\Vehicle\Services\VehicleModelService;
+use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\Vehicle\Services\VehicleTypeService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
-use Tests\Support\CurrencyFixture;
-use Tests\Support\OrganizationUnitFixture;
-use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class VehicleEngineTest extends TestCase
@@ -183,6 +180,7 @@ final class VehicleEngineTest extends TestCase
             $this->assertSame(VehicleStatus::UnderService, $vehicle->refresh()->status);
             $this->assertCount(2, $vehicle->statusHistories()->get());
             $this->assertTrue(app(VehicleLookupService::class)->vehiclesAvailableForService($tenantId, $organizationUnitId)->contains($vehicle));
+            $this->assertFalse(app(VehicleLookupService::class)->vehiclesAvailableForRental($tenantId, $organizationUnitId)->contains($vehicle));
             $this->assertTrue(app(VehicleLookupService::class)->vehiclesByType($tenantId, (int) $type->getKey(), $organizationUnitId)->contains($vehicle));
             $this->assertTrue(app(VehicleLookupService::class)->vehiclesByCategory($tenantId, (int) $category->getKey(), $organizationUnitId)->contains($vehicle));
         });
@@ -250,13 +248,6 @@ final class VehicleEngineTest extends TestCase
             ],
             'documents' => [['document_type' => 'insurance', 'document_number' => 'INS-API']],
             'attributes' => [['attribute_key' => 'trim', 'attribute_value' => 'G', 'data_type' => 'text']],
-            'ownerships' => [[
-                'owner_type' => 'customer',
-                'owner_id' => (int) $customer->getKey(),
-                'ownership_type' => 'customer_owned',
-                'started_at' => now()->toDateString(),
-                'is_current' => true,
-            ]],
         ]);
 
         $create->assertCreated()
@@ -264,13 +255,11 @@ final class VehicleEngineTest extends TestCase
             ->assertJsonPath('data.make.name', $make->name)
             ->assertJsonPath('data.model.name', $model->name)
             ->assertJsonPath('data.documents.0.document_type', 'insurance')
-            ->assertJsonPath('data.current_customer.name', $customer->name)
-            ->assertJsonPath('data.current_ownerships.0.owner.name', $customer->name)
-            ->assertJsonStructure(['data' => ['id', 'row_version', 'vehicle_number', 'make', 'model', 'current_ownerships', 'documents', 'ownerships', 'attributes']]);
+            ->assertJsonStructure(['data' => ['id', 'vehicle_number', 'make', 'model', 'current_ownerships', 'documents', 'ownerships', 'attributes']]);
 
         $id = (int) $create->json('data.id');
-        $rowVersion = (int) $create->json('data.row_version');
-        $this->assertGreaterThanOrEqual(0, $rowVersion);
+        $vehicle = $this->runInTenant($tenantId, fn (): Vehicle => Vehicle::query()->findOrFail($id));
+        $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $customer->getKey(), VehicleOwnershipType::CustomerOwned, now()->toDateString(), $tenantId, $organizationUnitId);
 
         $this->tenantGetJson($tenantId, "/api/v1/vehicles/{$id}?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
@@ -279,29 +268,12 @@ final class VehicleEngineTest extends TestCase
         $this->tenantGetJson($tenantId, "/api/v1/vehicles/lookup/active?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonFragment(['vehicle_number' => 'VEH-API']);
-        $this->tenantGetJson($tenantId, "/api/v1/vehicles/lookup/service-available?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}&search=api%201234")
-            ->assertOk()
-            ->assertJsonFragment(['registration_number' => 'API-1234']);
-        $this->tenantGetJson($tenantId, "/api/v1/vehicles/lookup/service-available?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}&search=api1234")
-            ->assertOk()
-            ->assertJsonFragment(['registration_number' => 'API-1234']);
 
         $this->runInTenant($tenantId, fn () => $this->putJson("/api/v1/vehicles/{$id}", [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
-            'row_version' => $rowVersion,
             'color' => 'Blue',
-        ]))->assertOk()
-            ->assertJsonPath('data.color', 'Blue')
-            ->assertJsonPath('data.row_version', $rowVersion + 1);
-
-        $this->runInTenant($tenantId, fn () => $this->putJson("/api/v1/vehicles/{$id}", [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'row_version' => $rowVersion,
-            'color' => 'Red',
-        ]))->assertStatus(409)
-            ->assertJsonPath('message', 'Vehicle was changed by someone else. Reload before saving.');
+        ]))->assertOk()->assertJsonPath('data.color', 'Blue');
 
         $this->tenantPatchJson($tenantId, "/api/v1/vehicles/{$id}/status", [
             'tenant_id' => $tenantId,
@@ -313,55 +285,6 @@ final class VehicleEngineTest extends TestCase
         $this->tenantGetJson($tenantId, "/api/v1/vehicles/{$id}/status-history?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonCount(2, 'data');
-    }
-
-    public function test_vehicle_code_is_generated_visible_editable_and_manufacture_year_is_persisted(): void
-    {
-        $this->withoutMiddleware();
-        [$tenantId, $organizationUnitId] = $this->scopeContext();
-        $this->actingAsTenantUser($tenantId);
-
-        $generatedCode = $this->tenantPostJson($tenantId, '/api/v1/vehicles/code-reservations', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-        ])->assertOk()->json('data.code');
-
-        $this->assertIsString($generatedCode);
-        $this->assertMatchesRegularExpression('/^VEH-\d{6}$/', $generatedCode);
-
-        $created = $this->tenantPostJson($tenantId, '/api/v1/vehicles', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'code' => $generatedCode,
-            'registration_number' => 'REG-2024',
-            'manufacture_year' => 2024,
-            'status' => 'active',
-        ])->assertCreated()
-            ->assertJsonPath('data.code', $generatedCode)
-            ->assertJsonPath('data.registration_number', 'REG-2024')
-            ->assertJsonPath('data.manufacture_year', 2024)
-            ->assertJsonPath('data.odometer_reading', null);
-
-        $this->assertMatchesRegularExpression('/^VEH-\d{6}$/', (string) $created->json('data.vehicle_number'));
-
-        $this->tenantPostJson($tenantId, '/api/v1/vehicles', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'code' => 'CUSTOM-VEHICLE-CODE',
-            'registration_number' => 'REG-CUSTOM',
-            'status' => 'active',
-        ])->assertCreated()->assertJsonPath('data.code', 'CUSTOM-VEHICLE-CODE');
-
-        $fallbackCode = $this->tenantPostJson($tenantId, '/api/v1/vehicles', [
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'registration_number' => 'REG-FALLBACK',
-            'status' => 'active',
-        ])->assertCreated()->json('data.code');
-
-        $this->assertIsString($fallbackCode);
-        $this->assertMatchesRegularExpression('/^VEH-\d{6}$/', $fallbackCode);
-        $this->assertNotSame($generatedCode, $fallbackCode);
     }
 
     public function test_vehicle_document_store_and_update_endpoints_do_not_throw_type_error(): void
@@ -553,7 +476,7 @@ final class VehicleEngineTest extends TestCase
 
     private function actingAsTenantUser(int $tenantId): void
     {
-        $userId = (int) TenantUserFixture::create([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Vehicle',
             'last_name' => 'Tester',
@@ -637,7 +560,6 @@ final class VehicleEngineTest extends TestCase
             name: 'Customer '.$code,
             customerType: CustomerType::Company,
             status: CustomerStatus::Active,
-            mobile: sprintf('077%07d', abs(crc32($code)) % 10000000),
         )));
     }
 
@@ -668,9 +590,15 @@ final class VehicleEngineTest extends TestCase
     private function scopeContext(string $suffix = ''): array
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(5));
-        $currencyId = CurrencyFixture::create([
+        $currencyId = (int) DB::table('currencies')->insertGetId([
+            'row_version' => 1,
+            'code' => 'V'.Str::upper(Str::random(4)),
             'name' => 'Vehicle Currency '.$suffix,
             'symbol' => 'VC',
+            'decimal_places' => 2,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
         $tenantId = (int) DB::table('tenants')->insertGetId([
             'uuid' => (string) Str::uuid(),
@@ -682,7 +610,7 @@ final class VehicleEngineTest extends TestCase
             'base_currency_id' => $currencyId,
             'created_at' => now(),
             'updated_at' => now()]);
-        $organizationUnitId = (int) OrganizationUnitFixture::create([
+        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,

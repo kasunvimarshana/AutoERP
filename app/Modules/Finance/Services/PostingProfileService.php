@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Services;
 
-use DateTimeImmutable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Finance\DTOs\PostingContext;
@@ -18,14 +16,10 @@ use Modules\Finance\Models\FinancePostingProfileRule;
 
 final class PostingProfileService
 {
-    private const OPEN_ENDED_EFFECTIVE_TO = '9999-12-31';
-
-    public function __construct(
-        private readonly AccountRoleAssignmentService $assignments,
-    ) {}
+    public function __construct(private readonly AccountRoleAssignmentService $assignments) {}
 
     /**
-     * @param  list<array<string, mixed>>  $rules
+     * @param  list<array{line_key: string, account_role_id: int, description?: string|null}>  $rules
      */
     public function save(
         int $tenantId,
@@ -36,7 +30,6 @@ final class PostingProfileService
         bool $isActive,
         array $rules,
         ?FinancePostingProfile $profile = null,
-        ?int $expectedVersion = null,
     ): FinancePostingProfile {
         return DB::transaction(function () use (
             $tenantId,
@@ -47,94 +40,55 @@ final class PostingProfileService
             $isActive,
             $rules,
             $profile,
-            $expectedVersion,
         ): FinancePostingProfile {
-            if ($profile instanceof FinancePostingProfile) {
-                $profile = FinancePostingProfile::query()
-                    ->lockForUpdate()
-                    ->findOrFail($profile->getKey());
-                $this->assertProfileIdentity($profile, $tenantId, $organizationUnitId);
-                $this->assertExpectedVersion($profile, $expectedVersion);
-            } else {
-                $profile = new FinancePostingProfile();
-                $profile->forceFill([
+            $profile ??= new FinancePostingProfile;
+            if ($profile->exists
+                && ((int) $profile->tenant_id !== $tenantId
+                    || $profile->organization_unit_id !== $organizationUnitId)) {
+                throw new InvalidArgumentException('Posting profile scope cannot be changed.');
+            }
+
+            $duplicate = FinancePostingProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where('code', trim($code))
+                ->when($profile->exists, fn ($query) => $query->whereKeyNot($profile->getKey()))
+                ->when(
+                    $organizationUnitId === null,
+                    fn ($query) => $query->whereNull('organization_unit_id'),
+                    fn ($query) => $query->where('organization_unit_id', $organizationUnitId),
+                )
+                ->exists();
+            if ($duplicate) {
+                throw new InvalidArgumentException('Posting profile code already exists for this scope.');
+            }
+
+            $profile->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'code' => trim($code),
+                'name' => trim($name),
+                'description' => $description,
+                'is_active' => $isActive,
+            ])->save();
+
+            $profile->rules()->delete();
+            foreach ($rules as $rule) {
+                $role = FinanceAccountRole::query()->findOrFail((int) $rule['account_role_id']);
+                if ((int) $role->tenant_id !== $tenantId || ! (bool) $role->is_active) {
+                    throw new InvalidArgumentException('Posting profile account role belongs to a different tenant or is inactive.');
+                }
+
+                FinancePostingProfileRule::query()->create([
                     'tenant_id' => $tenantId,
-                    'organization_unit_id' => $organizationUnitId,
+                    'posting_profile_id' => $profile->getKey(),
+                    'line_key' => trim($rule['line_key']),
+                    'account_role_id' => $role->getKey(),
+                    'description' => $rule['description'] ?? null,
                 ]);
             }
 
-            $profileAttributes = [
-                'code' => $code,
-                'name' => $name,
-                'description' => $description,
-                'is_active' => $isActive,
-            ];
-            if ($profile->exists) {
-                $profileAttributes['row_version'] = ((int) $profile->row_version) + 1;
-            }
-            $profile->forceFill($profileAttributes)->save();
-
-            $seen = [];
-            foreach ($rules as $rule) {
-                $lineKey = trim((string) ($rule['line_key'] ?? ''));
-                $accountRoleId = (int) ($rule['account_role_id'] ?? 0);
-                $effectiveFrom = $this->normalizeDate(
-                    $rule['effective_from'] ?? FinancePostingProfileRule::OPENING_EFFECTIVE_DATE,
-                    'Posting profile rule effective-from date',
-                );
-                $effectiveTo = $this->normalizeNullableDate(
-                    $rule['effective_to'] ?? null,
-                    'Posting profile rule effective-to date',
-                );
-                $ruleIsActive = (bool) ($rule['is_active'] ?? true);
-
-                if ($lineKey === '' || $accountRoleId < 1) {
-                    throw new InvalidArgumentException('Posting profile rules require a line key and account role.');
-                }
-                if ($effectiveTo !== null && strcmp($effectiveTo, $effectiveFrom) < 0) {
-                    throw new InvalidArgumentException('Posting profile rule effective-to date cannot be before effective-from date.');
-                }
-
-                $duplicateKey = $this->ruleIdentity($lineKey, $effectiveFrom);
-                if (isset($seen[$duplicateKey])) {
-                    throw new InvalidArgumentException("Posting profile rule [{$lineKey}] has duplicate effective-from date [{$effectiveFrom}].");
-                }
-                $seen[$duplicateKey] = true;
-
-                $existing = FinancePostingProfileRule::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('posting_profile_id', $profile->getKey())
-                    ->where('line_key', $lineKey)
-                    ->whereDate('effective_from', $effectiveFrom)
-                    ->first();
-
-                if ($ruleIsActive) {
-                    $this->assertNoOverlappingRule(
-                        $tenantId,
-                        (int) $profile->getKey(),
-                        $lineKey,
-                        $effectiveFrom,
-                        $effectiveTo,
-                        $existing?->getKey(),
-                    );
-                }
-
-                ($existing ?? new FinancePostingProfileRule())->forceFill([
-                    'tenant_id' => $tenantId,
-                    'posting_profile_id' => $profile->getKey(),
-                    'line_key' => $lineKey,
-                    'account_role_id' => $accountRoleId,
-                    'effective_from' => $effectiveFrom,
-                    'effective_to' => $effectiveTo,
-                    'is_active' => $ruleIsActive,
-                    'description' => $rule['description'] ?? null,
-                ])->save();
-            }
-
-            $this->assertNoRulesRemovedByOmission($profile, $seen);
-
             return $profile->refresh()->load('rules.role');
-        }, 3);
+        });
     }
 
     public function resolveProfile(PostingContext $request): ?FinancePostingProfile
@@ -143,12 +97,15 @@ final class PostingProfileService
         if ($code === '') {
             return null;
         }
+
         $query = FinancePostingProfile::query()
             ->with('rules.role')
             ->where('tenant_id', $request->source->tenantId)
             ->where('code', $code)
             ->where('is_active', true);
+
         $this->scopeOrganization($query, $request->source->organizationUnitId);
+
         $profile = $query->first();
         if (! $profile instanceof FinancePostingProfile) {
             throw new InvalidArgumentException("Posting profile [{$code}] is missing or inactive for this scope.");
@@ -162,28 +119,20 @@ final class PostingProfileService
         PostingLine $line,
         ?FinancePostingProfile $profile = null,
     ): FinanceAccount {
-        $profileKey = trim((string) $line->profileKey);
-        if (! $profile instanceof FinancePostingProfile || $profileKey === '') {
-            throw new InvalidArgumentException('Posting line requires a semantic posting profile mapping key.');
+        if (trim((string) $line->accountCode) !== '') {
+            throw new InvalidArgumentException('Source postings cannot select Finance accounts by code; use a semantic posting profile key.');
         }
 
-        $rule = FinancePostingProfileRule::query()
-            ->with('role')
-            ->where('tenant_id', (int) $request->source->tenantId)
-            ->where('posting_profile_id', $profile->getKey())
-            ->where('line_key', $profileKey)
-            ->where('is_active', true)
-            ->whereDate('effective_from', '<=', $request->postingDate)
-            ->where(function (Builder $query) use ($request): void {
-                $query->whereNull('effective_to')
-                    ->orWhereDate('effective_to', '>=', $request->postingDate);
-            })
-            ->orderByDesc('effective_from')
-            ->first();
+        $profileKey = trim((string) $line->profileKey);
+        if (! $profile instanceof FinancePostingProfile || $profileKey === '') {
+            throw new InvalidArgumentException('Posting line requires a posting profile mapping key.');
+        }
+
+        $rule = $profile->rules->firstWhere('line_key', $profileKey);
         $role = $rule?->role;
         if (! $role instanceof FinanceAccountRole) {
             throw new InvalidArgumentException(
-                "Posting profile [{$profile->code}] is missing account role mapping [{$profileKey}] for posting date [{$request->postingDate}].",
+                "Posting profile [{$profile->code}] is missing account role mapping [{$profileKey}].",
             );
         }
 
@@ -206,6 +155,7 @@ final class PostingProfileService
             ->where('tenant_id', $request->source->tenantId)
             ->where('code', $code)
             ->where('is_active', true);
+
         $this->scopeOrganization($query, $request->source->organizationUnitId);
         $dimension = $query->first();
 
@@ -216,112 +166,10 @@ final class PostingProfileService
         return $dimension;
     }
 
-    private function assertProfileIdentity(
-        FinancePostingProfile $profile,
-        int $tenantId,
-        ?int $organizationUnitId,
-    ): void {
-        if ((int) $profile->tenant_id !== $tenantId
-            || ($profile->organization_unit_id === null ? null : (int) $profile->organization_unit_id) !== $organizationUnitId
-        ) {
-            throw new InvalidArgumentException('Posting profile tenant and organization scope cannot be changed.');
-        }
-    }
-
-    private function assertExpectedVersion(
-        FinancePostingProfile $profile,
-        ?int $expectedVersion,
-    ): void {
-        if ($expectedVersion === null || (int) $profile->row_version !== $expectedVersion) {
-            throw new InvalidArgumentException('Posting profile was changed by another request. Reload it before updating.');
-        }
-    }
-
-    /**
-     * @param  array<string, true>  $seen
-     */
-    private function assertNoRulesRemovedByOmission(FinancePostingProfile $profile, array $seen): void
-    {
-        $omittedRule = FinancePostingProfileRule::query()
-            ->where('tenant_id', (int) $profile->tenant_id)
-            ->where('posting_profile_id', $profile->getKey())
-            ->where('is_active', true)
-            ->get(['line_key', 'effective_from'])
-            ->first(function (FinancePostingProfileRule $rule) use ($seen): bool {
-                $effectiveFrom = $rule->effective_from?->format('Y-m-d')
-                    ?? (string) $rule->getRawOriginal('effective_from');
-
-                return ! isset($seen[$this->ruleIdentity((string) $rule->line_key, $effectiveFrom)]);
-            });
-
-        if ($omittedRule instanceof FinancePostingProfileRule) {
-            throw new InvalidArgumentException(
-                'Posting profile rules cannot be removed by omission. Submit the existing rule with is_active=false or an effective_to date.',
-            );
-        }
-    }
-
-    private function ruleIdentity(string $lineKey, string $effectiveFrom): string
-    {
-        return $lineKey.'|'.$effectiveFrom;
-    }
-
-    private function assertNoOverlappingRule(
-        int $tenantId,
-        int $postingProfileId,
-        string $lineKey,
-        string $effectiveFrom,
-        ?string $effectiveTo,
-        ?int $ignoreRuleId = null,
-    ): void {
-        $query = FinancePostingProfileRule::query()
-            ->where('tenant_id', $tenantId)
-            ->where('posting_profile_id', $postingProfileId)
-            ->where('line_key', $lineKey)
-            ->where('is_active', true)
-            ->whereDate('effective_from', '<=', $effectiveTo ?? self::OPEN_ENDED_EFFECTIVE_TO)
-            ->where(function (Builder $query) use ($effectiveFrom): void {
-                $query->whereNull('effective_to')
-                    ->orWhereDate('effective_to', '>=', $effectiveFrom);
-            });
-
-        if ($ignoreRuleId !== null) {
-            $query->where('id', '!=', $ignoreRuleId);
-        }
-
-        if ($query->exists()) {
-            throw new InvalidArgumentException("Posting profile rule [{$lineKey}] has overlapping effective periods.");
-        }
-    }
-
-    private function normalizeNullableDate(mixed $value, string $label): ?string
-    {
-        if ($value === null || trim((string) $value) === '') {
-            return null;
-        }
-
-        return $this->normalizeDate($value, $label);
-    }
-
-    private function normalizeDate(mixed $value, string $label): string
-    {
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d', trim((string) $value));
-        $errors = DateTimeImmutable::getLastErrors();
-        $hasErrors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
-        if (! $date instanceof DateTimeImmutable || $hasErrors) {
-            throw new InvalidArgumentException("{$label} must use YYYY-MM-DD format.");
-        }
-
-        return $date->format('Y-m-d');
-    }
-
     private function scopeOrganization($query, ?int $organizationUnitId): void
     {
-        $query->where(function (Builder $scope) use ($organizationUnitId): void {
-            $scope->where('organization_unit_id', $organizationUnitId);
-            if ($organizationUnitId !== null) {
-                $scope->orWhereNull('organization_unit_id');
-            }
-        })->orderByRaw('organization_unit_id IS NULL ASC');
+        $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
     }
 }

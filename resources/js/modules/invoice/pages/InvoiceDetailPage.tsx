@@ -1,92 +1,58 @@
 import { useState } from 'react';
-import { useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
     approveInvoice,
-    cancelInvoice,
     getInvoice,
     getInvoiceAdjustments,
     getInvoiceBalance,
-    getInvoiceSignedPrintLink,
-    getInvoiceWhatsAppShare,
     getInvoiceSources,
     postInvoice,
-    reverseInvoice,
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
-import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
-import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
-import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
-import { sellingPermissions } from '@/modules/selling/sellingPermissions';
-import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
-import { Button, LinkButton } from '@/shared/components/Button';
-import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
-import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
-import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { RecordTable } from '@/shared/components/RecordTable';
-import { InvoiceStatusBadge } from '../components/InvoiceStatusBadge';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
-import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { humanize, readableRelation } from '@/shared/utils/object';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { useAuth } from '@/modules/auth/AuthProvider';
-import { hasPermission } from '@/modules/auth/accessControl';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import RentalInvoicePrintView from '../components/RentalInvoicePrintView';
 
-type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments';
-type InvoiceAction = 'approve' | 'post' | 'reverse' | 'cancel';
+type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments' | 'rental_invoice';
 
 const summaryTab: TabItem<Tab> = { id: 'summary', label: 'Summary' };
 const linesTab: TabItem<Tab> = { id: 'lines', label: 'Lines' };
-const settlementStatuses = ['posted', 'partially_paid'] as const;
-const retiredSourceInvoiceTypes = new Set(['rental', 'vehicle_finance']);
-const freshRentalSourceTypes = new Set([
-    'vehicle_rental_customer_base_charge',
-    'vehicle_rental_owner_base_charge',
-    'vehicle_rental_customer_usage_charge',
-    'vehicle_rental_owner_usage_charge',
-]);
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
-    const location = useLocation();
     const auth = useAuth();
-    const [searchParams] = useSearchParams();
     const canViewBalance = hasInvoicePermission(auth, invoicePermissions.balanceView);
     const canViewSources = hasInvoicePermission(auth, invoicePermissions.sourcesView);
-    const canApprove = hasInvoicePermission(auth, invoicePermissions.approve);
-    const canPost = hasInvoicePermission(auth, invoicePermissions.post);
-    const canReverse = hasInvoicePermission(auth, invoicePermissions.reverse);
-    const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
-    const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
-    const canCreatePayment = hasPaymentPermission(auth, paymentPermissions.create);
-    const canOpenPaymentEntry = useTenantRouteAccess('/payments/create');
-    const canViewPaymentMethods = useTenantRouteAccess('/payments/methods');
-    const canViewInvoices = useTenantRouteAccess('/invoices');
-    const canOpenSellingPayment = canOpenPaymentEntry && canViewPaymentMethods && canViewInvoices
-        && hasPermission(auth, sellingPermissions.salesCreate);
-    const [action, setAction] = useState<InvoiceAction | null>(null);
-    const [actionError, setActionError] = useState<ApiError | null>(null);
-    const [reversalOpen, setReversalOpen] = useState(false);
-    const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
-    const tabState = useOnDemandTab<Tab>('summary');
+    const [searchParams] = useSearchParams();
+    const initialTab: Tab = searchParams.get('tab') === 'rental_invoice' ? 'rental_invoice' : 'summary';
+    const tabState = useOnDemandTab<Tab>(initialTab);
+    const invoice = useApi((signal) => getInvoice(id, signal), [id]);
+    const isRental = invoice.data?.invoice_type === 'rental' || searchParams.get('type') === 'rental';
     const tabs: TabItem<Tab>[] = [
         summaryTab,
+        ...(isRental ? [{ id: 'rental_invoice' as const, label: 'Rental Tax Invoice (Print)' }] : []),
         ...(canViewBalance ? [{ id: 'balance' as const, label: 'Balance' }] : []),
         ...(canViewSources ? [
             { id: 'sources' as const, label: 'Sources' },
             { id: 'adjustments' as const, label: 'Adjustments' },
         ] : []),
         linesTab,
+        ...(!isRental ? [{ id: 'rental_invoice' as const, label: 'Rental Tax Invoice' }] : []),
     ];
-    const invoice = useApi((signal) => getInvoice(id, signal), [id]);
     const balance = useApi(
         (signal) => getInvoiceBalance(id, signal),
         [id],
@@ -102,101 +68,43 @@ export default function InvoiceDetailPage() {
         [id],
         canViewSources && tabState.openedTabs.has('adjustments'),
     );
+    const canApprove = hasInvoicePermission(auth, invoicePermissions.approve);
+    const canPost = hasInvoicePermission(auth, invoicePermissions.post);
+    const [actionBusy, setActionBusy] = useState(false);
+    const [actionError, setActionError] = useState<ApiError | null>(null);
+
     if (invoice.loading) return <LoadingState />;
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
     const value = invoice.data;
-    const fromPurchase = location.pathname.startsWith('/purchase/invoices/');
-    const vehicleServiceSource = (value.sources ?? []).find((source) => source.source_type === 'vehicle_service_job');
-    const vehicleServiceJobId = vehicleServiceSource?.source_id ?? Number(searchParams.get('job_id'));
-    const hasVehicleServiceJobContext = Number.isInteger(vehicleServiceJobId) && vehicleServiceJobId > 0;
-    const isServiceInvoice = value.invoice_type === 'service' && value.direction === 'outbound';
-    const isSellingInvoice = value.invoice_type === 'sales' && value.direction === 'outbound';
+    const fromPurchase = searchParams.get('from') === 'purchase';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
-    const canPaySupplierInvoice = isSupplierInvoice
-        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
-        && isPositiveDecimal(value.balance_due ?? '0')
-        && hasPermission(auth, purchasePermissions.paymentsExecute);
-    const isRetiredSourceInvoice = retiredSourceInvoiceTypes.has(value.invoice_type ?? '');
-    const hasFreshRentalSource = (value.sources ?? []).some((source) => freshRentalSourceTypes.has(source.source_type));
-    const canSettleServiceInvoice = hasVehicleServiceJobContext
-        && isServiceInvoice
-        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
-        && isPositiveDecimal(value.balance_due ?? '0');
-    const canSettleSellingInvoice = canOpenSellingPayment
-        && isSellingInvoice
-        && !isRetiredSourceInvoice
-        && (settlementStatuses as readonly string[]).includes(value.status ?? '')
-        && isPositiveDecimal(value.balance_due ?? value.balance?.remaining_amount ?? '0');
-    const canSettleRentalInvoice = hasFreshRentalSource
-        && !isRetiredSourceInvoice
-        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
-        && isPositiveDecimal(value.balance_due ?? '0');
-    const canShareViaWhatsApp = value.direction === 'outbound' && value.party_type === 'customer' && ['posted', 'partially_paid', 'paid'].includes(value.status ?? '');
-    const printUrl = `/invoices/${id}/print`;
+    const hasBalanceDue = Number(value.balance_due ?? 0) > 0;
 
-    const runAction = async (nextAction: Exclude<InvoiceAction, 'reverse'>) => {
-        let reason: string | undefined;
-        if (nextAction === 'cancel') {
-            const response = window.prompt('Enter the reason for cancelling this invoice.');
-            if (response === null) return;
-            reason = response.trim() || undefined;
-        }
-
-        setAction(nextAction);
+    const handleApprove = async () => {
+        if (!value.row_version) return;
+        setActionBusy(true);
         setActionError(null);
         try {
-            const updated = nextAction === 'approve'
-                ? await approveInvoice(id, value.row_version)
-                : nextAction === 'post'
-                    ? await postInvoice(id, value.row_version)
-                    : await cancelInvoice(id, value.row_version, reason ?? '');
-            invoice.setData(updated);
-            if (canViewBalance) balance.reload();
-        } catch (error: unknown) {
-            setActionError(toApiError(error));
+            await approveInvoice(id, value.row_version);
+            invoice.reload();
+        } catch (err) {
+            setActionError(toApiError(err));
         } finally {
-            setAction(null);
+            setActionBusy(false);
         }
     };
 
-    const reverse = async (facts: ReversalFacts) => {
-        setAction('reverse');
+    const handlePost = async () => {
+        if (!value.row_version) return;
+        setActionBusy(true);
         setActionError(null);
         try {
-            const updated = await reverseInvoice(id, {
-                expected_version: value.row_version,
-                ...facts,
-            });
-            invoice.setData(updated);
-            setReversalOpen(false);
-            if (canViewBalance) balance.reload();
-        } catch (error: unknown) {
-            setActionError(toApiError(error));
+            await postInvoice(id, value.row_version);
+            invoice.reload();
+        } catch (err) {
+            setActionError(toApiError(err));
         } finally {
-            setAction(null);
-        }
-    };
-
-    const shareViaWhatsApp = async () => {
-        const pendingWindow = openPendingWhatsAppWindow();
-        setSharingWhatsApp(true);
-        setActionError(null);
-        try {
-            const share = await getInvoiceWhatsAppShare(id);
-            if (share.recipient.verification_status !== 'verified'
-                && !confirmPendingWhatsAppShare(pendingWindow, 'This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
-                closePendingWhatsAppWindow(pendingWindow);
-                return;
-            }
-
-            if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
-                throw new Error('The server returned an invalid WhatsApp link.');
-            }
-        } catch (error: unknown) {
-            closePendingWhatsAppWindow(pendingWindow);
-            setActionError(toApiError(error));
-        } finally {
-            setSharingWhatsApp(false);
+            setActionBusy(false);
         }
     };
 
@@ -207,130 +115,91 @@ export default function InvoiceDetailPage() {
                 description={formatDate(value.invoice_date)}
                 actions={(
                     <div className="flex flex-wrap justify-end gap-2">
-                        {fromPurchase && isSupplierInvoice && <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>}
-                        {canPaySupplierInvoice && <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>}
-                        {canSettleSellingInvoice && <LinkButton to={`/payments/create?invoice_id=${id}&view=selling`}>Receive payment</LinkButton>}
-                        {canSettleServiceInvoice && canCreateVehicleServicePayment ? (
-                            <LinkButton to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment?invoice_id=${id}`}>
-                                Pay this invoice
-                            </LinkButton>
-                        ) : null}
-                        {canSettleRentalInvoice && canCreatePayment ? (
-                            <LinkButton to={`/payments/create?invoice_id=${id}`}>
-                                {value.direction === 'outbound' ? 'Receive customer payment' : 'Pay owner'}
-                            </LinkButton>
-                        ) : null}
-                        {!isRetiredSourceInvoice && value.status === 'draft' && canApprove ? (
-                            <Button loading={action === 'approve'} onClick={() => void runAction('approve')}>Approve</Button>
-                        ) : null}
-                        {!isRetiredSourceInvoice && value.status === 'approved' && canPost ? (
-                            <Button loading={action === 'post'} onClick={() => void runAction('post')}>Post</Button>
-                        ) : null}
-                        {!isRetiredSourceInvoice && value.status === 'posted' && canReverse ? (
-                            <Button variant="danger" disabled={action !== null} onClick={() => setReversalOpen(true)}>Reverse</Button>
-                        ) : null}
-                        {!isRetiredSourceInvoice && ['draft', 'approved'].includes(value.status ?? '') && canCancel ? (
-                            <Button variant="danger" loading={action === 'cancel'} onClick={() => void runAction('cancel')}>Cancel</Button>
-                        ) : null}
-                        <Button variant="secondary" onClick={async () => {
-                            try {
-                                const json = await getInvoiceSignedPrintLink(id);
-                                if (json.print_url) {
-                                    openSameOriginUrl(json.print_url);
-                                    return;
-                                }
-                            } catch {
-                                // fallback to direct print URL
-                            }
-
-                            openSameOriginUrl(printUrl);
-                        }}>Print</Button>
-                        <Button variant="secondary" onClick={async () => {
-                            try {
-                                const json = await getInvoiceSignedPrintLink(id);
-                                if (json.pdf_url) {
-                                    window.open(json.pdf_url, '_blank', 'noopener');
-                                    return;
-                                }
-                            } catch {
-                                // fallback
-                            }
-
-                            window.open(`/invoices/${id}/pdf`, '_blank');
-                        }}>Download PDF</Button>
-                        {canShareViaWhatsApp ? (
+                        {isRental && (
                             <Button
                                 variant="secondary"
-                                loading={sharingWhatsApp}
-                                loadingLabel="Opening WhatsApp..."
-                                onClick={() => void shareViaWhatsApp()}
+                                onClick={() => tabState.openTab('rental_invoice')}
                             >
-                                Share via WhatsApp
+                                View / Print Rental Invoice
                             </Button>
-                        ) : null}
+                        )}
+                        {value.status === 'draft' && canApprove && (
+                            <Button
+                                variant="secondary"
+                                onClick={handleApprove}
+                                disabled={actionBusy}
+                            >
+                                Approve
+                            </Button>
+                        )}
+                        {value.status === 'approved' && canPost && (
+                            <Button
+                                variant="secondary"
+                                onClick={handlePost}
+                                disabled={actionBusy}
+                            >
+                                Post Invoice
+                            </Button>
+                        )}
+                        {value.status !== 'cancelled' && value.status !== 'void' && hasBalanceDue && (
+                            value.direction === 'outbound' ? (
+                                <LinkButton to={`/payments/create?party_id=${value.party?.id ?? ''}&invoice_id=${id}`}>
+                                    Receive Payment
+                                </LinkButton>
+                            ) : (
+                                <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>
+                                    Create Payment
+                                </LinkButton>
+                            )
+                        )}
+                        {fromPurchase && (
+                            <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>
+                        )}
                     </div>
                 )}
             />
-            <ErrorAlert error={actionError} />
-            {isRetiredSourceInvoice ? (
-                <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                    This historical invoice is read-only because its source module has been retired.
-                </p>
-            ) : null}
+            {actionError && <div className="mb-4"><ErrorAlert error={actionError} /></div>}
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">
                     {tabState.activeTab === 'summary' && <DetailGrid items={[
-                        { label: 'Status', value: <InvoiceStatusBadge invoice={value} /> },
+                        { label: 'Status', value: <StatusBadge status={value.status} /> },
                         { label: 'Party', value: readableRelation(value.party) },
                         { label: 'Type', value: humanize(value.invoice_type) },
                         { label: 'Direction', value: humanize(value.direction) },
                         { label: 'Due date', value: formatDate(value.due_date) },
-                        { label: 'Currency', value: value.currency?.code ?? '-' },
-                        { label: 'Exchange rate', value: value.exchange_rate ?? '-' },
-                        { label: 'Total', value: <MoneyDisplay value={value.grand_total} currency={value.currency?.code ?? undefined} /> },
-                        { label: 'Paid', value: <MoneyDisplay value={value.paid_total} currency={value.currency?.code ?? undefined} /> },
-                        { label: 'Credits', value: <MoneyDisplay value={value.credit_total} currency={value.currency?.code ?? undefined} /> },
-                        { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} currency={value.currency?.code ?? undefined} /> },
-                        { label: 'Finance profile', value: humanize(value.posting_plan?.posting_profile_code) },
-                        { label: 'Finance posting', value: value.posting_plan?.finance_posting_reference ?? '-' },
-                        { label: 'Finance reversal', value: value.posting_plan?.finance_reversal_reference ?? '-' },
+                        { label: 'Total', value: <MoneyDisplay value={value.grand_total} /> },
+                        { label: 'Paid', value: <MoneyDisplay value={value.paid_total} /> },
+                        { label: 'Credits', value: <MoneyDisplay value={value.credit_total} /> },
+                        { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} /> },
                     ]} />}
+                    {tabState.activeTab === 'rental_invoice' && <RentalInvoicePrintView invoice={value} />}
                     {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} rowKey={(row, index) => String(row.id ?? row.line_number ?? `invoice-line-${index}`)} />}
-                    {canViewBalance && tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} currency={value.currency?.code ?? undefined} />}
+                    {canViewBalance && tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} />}
                     {canViewSources && tabState.activeTab === 'adjustments' && <AdjustmentRecords loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} />}
                     {canViewSources && tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
                 </div>
             </Panel>
-            <ReversalDialog
-                open={reversalOpen}
-                title="Reverse invoice"
-                loading={action === 'reverse'}
-                defaultDate={value.posting_plan?.posting_date ?? value.invoice_date}
-                onCancel={() => setReversalOpen(false)}
-                onConfirm={reverse}
-            />
         </>
     );
 }
 
-function BalanceSummary({ loading, error, balance, currency }: {
+function BalanceSummary({ loading, error, balance }: {
     loading: boolean;
     error: import('@/shared/api/apiError').ApiError | null;
     balance: import('../invoiceTypes').InvoiceBalanceResult | null;
-    currency?: string;
 }) {
     if (loading) return <LoadingState />;
     if (error) return <ErrorAlert error={error} />;
     if (!balance) return null;
     return <DetailGrid items={[
-        { label: 'Invoice total', value: <MoneyDisplay value={balance.invoiceTotal} currency={currency} /> },
-        { label: 'Payments', value: <MoneyDisplay value={balance.paidAmount} currency={currency} /> },
-        { label: 'Credits and debit notes', value: <MoneyDisplay value={balance.creditAmount} currency={currency} /> },
-        { label: 'Debit adjustments', value: <MoneyDisplay value={balance.debitAmount} currency={currency} /> },
-        { label: 'Refunded', value: <MoneyDisplay value={balance.refundedAmount} currency={currency} /> },
-        { label: 'Remaining', value: <MoneyDisplay value={balance.remainingAmount} currency={currency} /> },
-        { label: 'Balance status', value: <InvoiceStatusBadge invoice={{ paid_total: balance.paidAmount, credit_total: balance.creditAmount, balance_due: balance.remainingAmount }} status={balance.status} /> },
+        { label: 'Invoice total', value: <MoneyDisplay value={balance.invoiceTotal} /> },
+        { label: 'Payments', value: <MoneyDisplay value={balance.paidAmount} /> },
+        { label: 'Credits and debit notes', value: <MoneyDisplay value={balance.creditAmount} /> },
+        { label: 'Debit adjustments', value: <MoneyDisplay value={balance.debitAmount} /> },
+        { label: 'Refunded', value: <MoneyDisplay value={balance.refundedAmount} /> },
+        { label: 'Remaining', value: <MoneyDisplay value={balance.remainingAmount} /> },
+        { label: 'Balance status', value: <StatusBadge status={balance.status} /> },
     ]} />;
 }
 

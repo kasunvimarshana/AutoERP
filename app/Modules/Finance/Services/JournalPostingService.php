@@ -16,7 +16,6 @@ final class JournalPostingService
     public function __construct(
         private readonly FinanceValidationService $validator,
         private readonly LedgerPostingService $ledger,
-        private readonly AccountingPeriodService $periods,
     ) {}
 
     public function post(FinanceJournalEntry $journal, ?int $postedBy = null): JournalPostingResult
@@ -28,20 +27,13 @@ final class JournalPostingService
                 ->findOrFail($journal->getKey());
             $status = $this->statusOf($journal);
 
-            if ($status === JournalStatus::Posted) {
-                $this->validator->assertPostedLedgerIntegrity($journal);
-
+            if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
                 return $this->resultFromJournal($journal, $status);
             }
             if ($status !== JournalStatus::Draft) {
-                throw new InvalidArgumentException('Only draft journals can be posted. Reversed journals cannot be reposted.');
+                throw new InvalidArgumentException('Only draft journals can be posted.');
             }
 
-            $this->periods->assertPostingDateAllowed(
-                (int) $journal->tenant_id,
-                $journal->organization_unit_id === null ? null : (int) $journal->organization_unit_id,
-                $journal->journal_date->toDateString(),
-            );
             $this->validator->validateForPosting($journal);
 
             $ledgerCount = $this->ledger->post($journal);

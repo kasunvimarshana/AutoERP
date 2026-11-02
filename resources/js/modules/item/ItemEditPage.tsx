@@ -1,10 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { TENANT_MODULE_CODE } from '@/app/access/tenantModules';
-import { hasPermission } from '@/modules/auth/accessControl';
-import { useAuth } from '@/modules/auth/AuthProvider';
-import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
-import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
@@ -13,9 +8,10 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
-import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
+import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import type { NamedResource } from '@/shared/types/common';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { getBaseUomUsageAudit, getItem, updateItem } from './itemApi';
 import { hasItemPermission, itemPermissions } from './itemPermissions';
 import type { BaseUomUsageAudit, ItemPayload } from './itemTypes';
@@ -28,14 +24,11 @@ const ItemPriceTab = lazy(() => import('./components/ItemPriceTab'));
 const ItemCodeTab = lazy(() => import('./components/ItemCodeTab'));
 const ItemUsageRuleTab = lazy(() => import('./components/ItemUsageRuleTab'));
 const BaseUomChangeWizard = lazy(() => import('./components/BaseUomChangeWizard'));
-const LaborItemCommissionEditor = lazy(
-    () => import('@/modules/vehicle-service/components/LaborItemCommissionEditor'),
-);
 
-type Tab = 'basic' | 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules' | 'commission';
+type Tab = 'basic' | 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules';
 const tabs = [
     ['basic', 'Basic'], ['units', 'Units'], ['variants', 'Variants'], ['bundles', 'Bundle'],
-    ['prices', 'Pricing'], ['codes', 'Codes'], ['usage_rules', 'Usage'], ['commission', 'Commission'],
+    ['prices', 'Pricing'], ['codes', 'Codes'], ['usage_rules', 'Usage'],
 ].map(([id, label]) => ({ id: id as Tab, label }));
 
 export default function ItemEditPage() {
@@ -47,15 +40,8 @@ export default function ItemEditPage() {
     const canManageVariants = hasItemPermission(auth, itemPermissions.manageVariants);
     const canManageBundles = hasItemPermission(auth, itemPermissions.manageBundles);
     const canManagePrices = hasItemPermission(auth, itemPermissions.managePrices);
-    const canViewBatchPrices = hasPermission(auth, inventoryPermissions.trackingView);
-    const canManageBatchPrices = hasPermission(auth, inventoryPermissions.trackingManage);
     const canManageCodes = hasItemPermission(auth, itemPermissions.manageCodes);
     const canManageUsageRules = hasItemPermission(auth, itemPermissions.manageUsageRules);
-    const vehicleServiceEnabled = auth.enabledModules?.includes(TENANT_MODULE_CODE.VEHICLE_SERVICE) === true;
-    const canViewLaborCommission = vehicleServiceEnabled
-        && hasPermission(auth, vehicleServicePermissions.commissionsView);
-    const canManageLaborCommission = vehicleServiceEnabled
-        && hasPermission(auth, vehicleServicePermissions.commissionsManage);
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const requestedTab = tabs.some((entry) => entry.id === searchParams.get('tab')) ? searchParams.get('tab') as Tab : 'basic';
@@ -64,17 +50,11 @@ export default function ItemEditPage() {
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);
     const [baseUom, setBaseUom] = useState<NamedResource | null>(null);
-    const [priceDefaults, setPriceDefaults] = useState<{ currency: NamedResource | null; uom: NamedResource | null }>({ currency: null, uom: null });
     const [baseUomAudit, setBaseUomAudit] = useState<BaseUomUsageAudit | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(submitting);
-    const visibleTabs = tabs.filter((entry) => entry.id !== 'commission'
-        || (form?.item_type === 'labour' && canViewLaborCommission));
-    const displayedTab = visibleTabs.some((entry) => entry.id === tab.activeTab)
-        ? tab.activeTab
-        : 'basic';
 
     useEffect(() => {
         const controller = new AbortController();
@@ -82,7 +62,6 @@ export default function ItemEditPage() {
             .then(([item, audit]) => {
                 if (controller.signal.aborted) return;
                 setForm({
-                    reorder_level: item.reorder_level ?? null,
                     code: item.code,
                     name: item.name,
                     item_type: item.item_type,
@@ -105,7 +84,6 @@ export default function ItemEditPage() {
                 setCategory(item.category ?? null);
                 setBrand(item.brand ?? null);
                 setBaseUom(item.base_uom ?? null);
-                setPriceDefaults({ currency: item.tenant_base_currency ?? null, uom: item.base_uom ?? null });
                 setBaseUomAudit(audit);
             })
             .catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError)))
@@ -116,13 +94,13 @@ export default function ItemEditPage() {
     if (loading) return <LoadingState />;
     if (!form) return <ErrorAlert error={error} />;
     return <>
-        <ContentHeader title="Edit Item" description="Update item fields, related item data, and Vehicle Service labor commission defaults." />
-        {!canUpdate && displayedTab === 'basic' && <CapabilityNotice>You do not have permission to update item fields.</CapabilityNotice>}
+        <ContentHeader title="Edit Item" description="Update item fields and manage related item data." />
+        {!canUpdate && tab.activeTab === 'basic' && <CapabilityNotice>You do not have permission to update item fields.</CapabilityNotice>}
         <ErrorAlert error={error} />
         <Panel className="p-0">
-            <Tabs tabs={visibleTabs} active={displayedTab} onChange={tab.openTab} />
+            <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
             <div className="p-5">
-                {displayedTab === 'basic' && canUpdate && (
+                {tab.activeTab === 'basic' && canUpdate && (
                     <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
                         <ItemForm
                             value={form}
@@ -142,23 +120,15 @@ export default function ItemEditPage() {
                     </form>
                 )}
                 <Suspense fallback={<LoadingState />}>
-                    {tab.openedTabs.has('units') && <div hidden={displayedTab !== 'units'} className="space-y-5">
+                    {tab.openedTabs.has('units') && <div hidden={tab.activeTab !== 'units'} className="space-y-5">
                         {canChangeBaseUom && <BaseUomChangeWizard itemId={itemId} onApplied={() => navigate(0)} />}
                         <ItemUnitTab itemId={itemId} readOnly={!canManageUnits} />
                     </div>}
-                    {tab.openedTabs.has('variants') && <div hidden={displayedTab !== 'variants'}><ItemVariantTab itemId={itemId} readOnly={!canManageVariants} /></div>}
-                    {tab.openedTabs.has('bundles') && <div hidden={displayedTab !== 'bundles'}><ItemBundleTab itemId={itemId} canBundle={['combo', 'package'].includes(form.item_type)} readOnly={!canManageBundles} /></div>}
-                    {tab.openedTabs.has('prices') && <div hidden={displayedTab !== 'prices'}><ItemPriceTab itemId={itemId} trackingType={form.tracking_type} defaultCurrency={priceDefaults.currency} defaultUom={priceDefaults.uom} readOnly={!canManagePrices} canViewBatchPrices={canViewBatchPrices} canManageBatchPrices={canManageBatchPrices} /></div>}
-                    {tab.openedTabs.has('codes') && <div hidden={displayedTab !== 'codes'}><ItemCodeTab itemId={itemId} readOnly={!canManageCodes} /></div>}
-                    {tab.openedTabs.has('usage_rules') && <div hidden={displayedTab !== 'usage_rules'}><ItemUsageRuleTab itemId={itemId} readOnly={!canManageUsageRules} /></div>}
-                    {tab.openedTabs.has('commission') && canViewLaborCommission && form.item_type === 'labour' && (
-                        <div hidden={displayedTab !== 'commission'}>
-                            <LaborItemCommissionEditor
-                                itemId={itemId}
-                                canManage={canManageLaborCommission}
-                            />
-                        </div>
-                    )}
+                    {tab.openedTabs.has('variants') && <div hidden={tab.activeTab !== 'variants'}><ItemVariantTab itemId={itemId} readOnly={!canManageVariants} /></div>}
+                    {tab.openedTabs.has('bundles') && <div hidden={tab.activeTab !== 'bundles'}><ItemBundleTab itemId={itemId} canBundle={['combo', 'package'].includes(form.item_type)} readOnly={!canManageBundles} /></div>}
+                    {tab.openedTabs.has('prices') && <div hidden={tab.activeTab !== 'prices'}><ItemPriceTab itemId={itemId} readOnly={!canManagePrices} /></div>}
+                    {tab.openedTabs.has('codes') && <div hidden={tab.activeTab !== 'codes'}><ItemCodeTab itemId={itemId} readOnly={!canManageCodes} /></div>}
+                    {tab.openedTabs.has('usage_rules') && <div hidden={tab.activeTab !== 'usage_rules'}><ItemUsageRuleTab itemId={itemId} readOnly={!canManageUsageRules} /></div>}
                 </Suspense>
             </div>
         </Panel>

@@ -1,7 +1,7 @@
 import type { ApiCollection } from '@/shared/types/api';
 import type { ReportDefinition, ReportRow } from './genericReportTypes';
 
-export type OperationalReportKind = 'vehicle-service' | 'employee-incentive';
+export type OperationalReportKind = 'purchase' | 'vehicle-service' | 'employee-incentive';
 
 export interface OperationalReportParams {
     page?: number;
@@ -21,12 +21,6 @@ export interface OperationalReportParams {
     vehicle_id?: number | null;
     employee_id?: number | null;
     department_id?: number | null;
-    agreement_id?: number | null;
-    driver_employee_id?: number | null;
-    chart_status?: string;
-    assignment_status?: string;
-    invoice_status?: string;
-    exception_type?: string;
 }
 
 export type OperationalReportSummary = Record<string, string | number>;

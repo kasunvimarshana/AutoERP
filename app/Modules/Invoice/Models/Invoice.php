@@ -25,15 +25,17 @@ final class Invoice extends TenantOwnedModel
 
     protected $table = 'invoices';
 
+    protected $guarded = ['id'];
+
     protected static function booted(): void
     {
-        self::updating(static function (Invoice $invoice): void {
+        static::updating(static function (Invoice $invoice): void {
             if (! $invoice->isDirty('row_version')) {
                 $invoice->row_version = ((int) $invoice->getOriginal('row_version')) + 1;
             }
         });
 
-        self::deleting(static function (Invoice $invoice): void {
+        static::deleting(static function (Invoice $invoice): void {
             $status = $invoice->status instanceof InvoiceStatus
                 ? $invoice->status
                 : InvoiceStatus::from((string) $invoice->status);
@@ -63,7 +65,6 @@ final class Invoice extends TenantOwnedModel
             'approved_at' => 'immutable_datetime',
             'posted_at' => 'immutable_datetime',
             'cancelled_at' => 'immutable_datetime',
-            'original_printed_at' => 'immutable_datetime',
             'exchange_rate' => 'decimal:6',
             'subtotal' => 'decimal:6',
             'discount_total' => 'decimal:6',
@@ -130,16 +131,6 @@ final class Invoice extends TenantOwnedModel
     public function balance(): HasOne
     {
         return $this->hasOne(InvoiceBalance::class, 'invoice_id');
-    }
-
-    public function postingPlan(): HasOne
-    {
-        return $this->hasOne(InvoicePostingPlan::class, 'invoice_id');
-    }
-
-    public function documentSnapshot(): HasOne
-    {
-        return $this->hasOne(InvoiceDocumentSnapshot::class, 'invoice_id');
     }
 
     public function creditAllocations(): HasMany

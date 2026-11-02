@@ -93,7 +93,7 @@ describe('VehicleMasterDataPage', () => {
         expect(apiMocks.createVehicleMake).toHaveBeenCalledOnce();
         resolveCreate?.(toyota);
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-        expect(apiMocks.listVehicleMakes).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(apiMocks.listVehicleMakes).toHaveBeenCalledTimes(2));
     });
 
     it('shows backend validation beside fields', async () => {

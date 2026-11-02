@@ -7,49 +7,40 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
-use Modules\VehicleService\DTOs\VehicleServiceLineData;
-use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
-use Modules\VehicleService\Services\Availability\VehicleServiceAdmissionService;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceJobService
 {
     use AssertsVehicleServiceExpectedVersion;
 
-    private const ZERO_AMOUNT = '0.000000';
-
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceNumberService $numbers,
         private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceCommissionService $commissions,
-        private readonly VehicleServiceCommissionPolicyService $commissionPolicies,
         private readonly VehicleServiceStatusService $statuses,
         private readonly VehicleServiceInspectionService $inspections,
-        private readonly VehicleServiceAdmissionService $admission,
-        private readonly VehicleServiceLineService $lines,
     ) {}
 
-    /** @param list<VehicleServiceLineData> $lines */
-    public function create(VehicleServiceJobData $data, array $lines = []): VehicleServiceJob
+    public function create(VehicleServiceJobData $data): VehicleServiceJob
     {
-        return DB::transaction(function () use ($data, $lines): VehicleServiceJob {
+        return DB::transaction(function () use ($data): VehicleServiceJob {
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $data->customerId);
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
             if ($data->supervisorEmployeeId !== null) {
-                $this->validator->supervisorEmployee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
+                $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
-            $this->validateMileageFields($data);
+            if ($data->odometerReading !== null) {
+                $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
+            }
 
-            $job = new VehicleServiceJob;
-            $job->forceFill($this->attributes($data, true, self::ZERO_AMOUNT))->save();
+            $job = VehicleServiceJob::query()->create($this->attributes($data, true, '0.000000'));
             $this->statuses->recordCreated($job, $data->createdBy);
             if ($data->customerComplaint !== null) {
                 $this->inspections->save($job, new VehicleServiceInspectionData(
@@ -59,24 +50,14 @@ final class VehicleServiceJobService
                 ));
             }
 
-            foreach ($lines as $line) {
-                $this->lines->create($job, $line, actorId: $data->createdBy);
-            }
-
-            return $job->refresh()->load($this->relations());
+            return $job->load($this->relations());
         });
     }
 
     public function update(VehicleServiceJob $job, VehicleServiceJobData $data, ?int $expectedVersion = null): VehicleServiceJob
     {
         return DB::transaction(function () use ($job, $data, $expectedVersion): VehicleServiceJob {
-            $snapshot = VehicleServiceJob::query()->findOrFail($job->getKey());
-            Vehicle::query()->where('tenant_id', $snapshot->tenant_id)
-                ->whereIn('id', array_unique([(int) $snapshot->vehicle_id, $data->vehicleId]))->orderBy('id')->lockForUpdate()->get();
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
-            if ($job->status !== VehicleServiceJobStatus::Draft && (int) $job->vehicle_id !== $data->vehicleId) {
-                throw new InvalidArgumentException('Cancel the admitted workshop job before selecting a different physical vehicle.');
-            }
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->validator->assertMutable($job);
 
@@ -87,15 +68,14 @@ final class VehicleServiceJobService
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
             if ($data->supervisorEmployeeId !== null) {
-                $this->validator->supervisorEmployee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
+                $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
-            $this->validateMileageFields($data);
+            if ($data->odometerReading !== null) {
+                $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
+            }
 
             $versionBefore = (int) $job->row_version;
-            $job->forceFill($this->attributes($data, false, (string) $job->grand_total, $job))->save();
-            if (in_array($job->status, [VehicleServiceJobStatus::Inspected, VehicleServiceJobStatus::InProgress], true)) {
-                $this->admission->assertAdmissible($job);
-            }
+            $job->fill($this->attributes($data, false, (string) $job->grand_total))->save();
             $job->refresh()->load('inspection');
             $complaintChanged = $this->syncCustomerComplaint($job, $data);
             if ($complaintChanged && (int) $job->row_version === $versionBefore) {
@@ -122,33 +102,25 @@ final class VehicleServiceJobService
     }
 
     /** @return array<string, mixed> */
-    private function attributes(
-        VehicleServiceJobData $data,
-        bool $creating,
-        string $commissionBase,
-        ?VehicleServiceJob $existing = null,
-    ): array {
-        $commission = $this->supervisorCommission($data, $existing);
+    private function attributes(VehicleServiceJobData $data, bool $creating, string $commissionBase): array
+    {
         $attributes = [
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
             'job_date' => $data->jobDate,
             'expected_delivery_date' => $data->expectedDeliveryDate,
-            'type' => $data->type->value,
             'customer_id' => $data->customerId,
             'bill_to_customer_id' => $this->billToCustomerId($data),
             'vehicle_id' => $data->vehicleId,
             'supervisor_employee_id' => $data->supervisorEmployeeId,
-            'supervisor_commission_type' => $commission['type']->value,
-            'supervisor_commission_value' => $commission['value'],
+            'supervisor_commission_type' => $data->supervisorCommissionType->value,
+            'supervisor_commission_value' => $this->math->normalize($data->supervisorCommissionValue),
             'supervisor_commission_amount' => $this->commissions->calculate(
-                $commission['type'],
-                $commission['value'],
+                $data->supervisorCommissionType,
+                $data->supervisorCommissionValue,
                 $commissionBase,
             ),
             'odometer_reading' => $data->odometerReading === null ? null : $this->math->normalize($data->odometerReading),
-            'next_service_mileage' => $data->nextServiceMileage === null ? null : $this->math->normalize($data->nextServiceMileage),
-            'manual_job_card' => $data->manualJobCard,
             'fuel_level' => $data->fuelLevel,
             'priority' => $data->priority,
             'notes' => $data->notes,
@@ -158,14 +130,11 @@ final class VehicleServiceJobService
             $attributes += [
                 'job_number' => $data->jobNumber ?? $this->numbers->next($data->tenantId),
                 'status' => VehicleServiceJobStatus::Draft->value,
-                'subtotal' => self::ZERO_AMOUNT,
-                'line_discount_total' => self::ZERO_AMOUNT,
-                'job_discount_base' => self::ZERO_AMOUNT,
-                'job_discount_amount' => self::ZERO_AMOUNT,
-                'discount_total' => self::ZERO_AMOUNT,
-                'tax_total' => self::ZERO_AMOUNT,
-                'charge_total' => self::ZERO_AMOUNT,
-                'grand_total' => self::ZERO_AMOUNT,
+                'subtotal' => '0.000000',
+                'discount_total' => '0.000000',
+                'tax_total' => '0.000000',
+                'charge_total' => '0.000000',
+                'grand_total' => '0.000000',
                 'created_by' => $data->createdBy,
             ];
         }
@@ -173,70 +142,9 @@ final class VehicleServiceJobService
         return $attributes;
     }
 
-    /** @return array{type: VehicleServiceCommissionType, value: string} */
-    private function supervisorCommission(
-        VehicleServiceJobData $data,
-        ?VehicleServiceJob $existing,
-    ): array {
-        if ($data->supervisorEmployeeId === null) {
-            return ['type' => VehicleServiceCommissionType::None, 'value' => self::ZERO_AMOUNT];
-        }
-
-        if ($data->supervisorCommissionType !== null) {
-            if ($data->supervisorCommissionValue === null) {
-                throw new InvalidArgumentException('Supervisor commission value is required.');
-            }
-
-            return [
-                'type' => $data->supervisorCommissionType,
-                'value' => $this->math->normalize($data->supervisorCommissionValue),
-            ];
-        }
-
-        if ($data->supervisorCommissionValue !== null) {
-            throw new InvalidArgumentException('Supervisor commission type is required.');
-        }
-
-        if ($existing instanceof VehicleServiceJob && $existing->supervisor_employee_id !== null) {
-            return [
-                'type' => $existing->supervisor_commission_type,
-                'value' => (string) $existing->supervisor_commission_value,
-            ];
-        }
-
-        if ($data->organizationUnitId === null) {
-            return ['type' => VehicleServiceCommissionType::None, 'value' => self::ZERO_AMOUNT];
-        }
-
-        return $this->commissionPolicies->resolveSupervisorDefault(
-            $data->tenantId,
-            $data->organizationUnitId,
-        );
-    }
-
     private function billToCustomerId(VehicleServiceJobData $data): int
     {
         return $data->billToCustomerId ?? $data->customerId;
-    }
-
-    private function validateMileageFields(VehicleServiceJobData $data): void
-    {
-        if (! $data->type->tracksMileage()) {
-            if ($data->odometerReading !== null || $data->nextServiceMileage !== null) {
-                throw new InvalidArgumentException('Mileage fields are not applicable to this job type.');
-            }
-
-            return;
-        }
-
-        if ($data->odometerReading === null) {
-            throw new InvalidArgumentException('Odometer reading is required for mileage-tracked service jobs.');
-        }
-
-        $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
-        if ($data->nextServiceMileage !== null) {
-            $this->validator->nonNegative($data->nextServiceMileage, 'Next service mileage cannot be negative.');
-        }
     }
 
     private function syncCustomerComplaint(VehicleServiceJob $job, VehicleServiceJobData $data): bool
@@ -277,7 +185,6 @@ final class VehicleServiceJobService
     {
         return [
             'customer', 'billToCustomer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor', 'inspection.inspector',
-            'currentDiscountRevision.changedBy',
             'invoiceLinks.invoice.balance', 'paymentLinks.payment.lines.paymentMethod', 'paymentLinks.payment.allocations', 'paymentLinks.invoice',
         ];
     }

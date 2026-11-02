@@ -29,9 +29,7 @@ final class CustomerLookupService
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
             ->active()
-            ->whereHas('creditProfile', static fn (Builder $profile): Builder => $profile
-                ->where('credit_allowed', true)
-                ->where('is_active', true))
+            ->where('is_credit_allowed', true)
             ->get();
     }
 
@@ -58,10 +56,6 @@ final class CustomerLookupService
 
     public function result(Customer $customer): CustomerResultData
     {
-        $profile = $customer->relationLoaded('creditProfile')
-            ? $customer->creditProfile
-            : $customer->creditProfile()->first();
-
         return new CustomerResultData(
             customerId: (int) $customer->getKey(),
             tenantId: (int) $customer->tenant_id,
@@ -71,15 +65,16 @@ final class CustomerLookupService
             name: (string) $customer->name,
             customerType: $customer->customer_type,
             status: $customer->status,
-            creditLimit: (string) ($profile?->credit_limit ?? '0.000000'),
-            creditAllowed: (bool) ($profile?->credit_allowed ?? false),
-            advanceAllowed: (bool) ($profile?->advance_allowed ?? false),
+            creditLimit: (string) $customer->credit_limit,
+            openingBalance: (string) $customer->opening_balance,
+            isCreditAllowed: (bool) $customer->is_credit_allowed,
+            isAdvanceAllowed: (bool) $customer->is_advance_allowed,
             isTaxExempt: (bool) $customer->is_tax_exempt,
         );
     }
 
     private function baseQuery(int $tenantId, ?int $organizationUnitId): Builder
     {
-        return Customer::query()->forTenant($tenantId, $organizationUnitId)->with('creditProfile');
+        return Customer::query()->forTenant($tenantId, $organizationUnitId);
     }
 }

@@ -44,4 +44,5 @@ final class FinanceAccountBalance extends TenantOwnedModel
     {
         return $this->belongsTo(FinanceAccount::class, 'account_id');
     }
+
 }

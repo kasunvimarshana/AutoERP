@@ -18,8 +18,7 @@ final class InvoiceBalanceService
 
     public function createBalance(Invoice $invoice, string $invoiceTotal): InvoiceBalance
     {
-        $balance = new InvoiceBalance();
-        $balance->forceFill([
+        return InvoiceBalance::query()->create([
             'tenant_id' => $invoice->tenant_id,
             'organization_unit_id' => $invoice->organization_unit_id,
             'invoice_id' => $invoice->getKey(),
@@ -31,9 +30,6 @@ final class InvoiceBalanceService
             'remaining_amount' => $invoiceTotal,
             'status' => $this->calculator->status($invoiceTotal, $invoiceTotal)->value,
         ]);
-        $balance->save();
-
-        return $balance;
     }
 
     public function result(InvoiceBalance $balance): InvoiceBalanceResult
@@ -81,10 +77,5 @@ final class InvoiceBalanceService
     public function cancel(Invoice $invoice): InvoiceBalance
     {
         return $this->updater->cancel($invoice);
-    }
-
-    public function reverse(Invoice $invoice): InvoiceBalance
-    {
-        return $this->updater->reverse($invoice);
     }
 }

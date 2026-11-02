@@ -11,9 +11,6 @@ import type {
     BankReconciliationPayload,
     Budget,
     BudgetPayload,
-    CustomerOutstandingParams,
-    CustomerOutstandingReportResult,
-    CustomerOutstandingInvoicesResult,
     FinanceAccount,
     FinanceAccountAssignment,
     FinanceAccountRole,
@@ -23,7 +20,6 @@ import type {
     LedgerEntry,
     PostingProfile,
     PostingProfilePayload,
-    PostingProfileSimulationResult,
     TrialBalance,
 } from './financeTypes';
 
@@ -48,7 +44,6 @@ export type {
     LedgerEntry,
     PostingProfile,
     PostingProfilePayload,
-    PostingProfileSimulationResult,
     TrialBalance,
 } from './financeTypes';
 
@@ -154,39 +149,6 @@ export async function getArAging(params: ListParams, signal?: AbortSignal) {
     return response.data.data;
 }
 
-export async function getCustomerOutstanding(params: CustomerOutstandingParams, signal?: AbortSignal) {
-    const response = await apiClient.get<CustomerOutstandingReportResult>(`${endpoints.reports}/customer-outstanding`, { params, signal });
-    return response.data;
-}
-
-export async function getCustomerOutstandingLocations(signal?: AbortSignal) {
-    const response = await apiClient.get<ApiResource<Array<{ id: number; name: string }>>>(
-        `${endpoints.finance}/customer-outstanding/locations`,
-        { signal },
-    );
-    return response.data.data;
-}
-
-export async function getCustomerOutstandingInvoices(
-    customerId: number,
-    params: CustomerOutstandingParams,
-    signal?: AbortSignal,
-) {
-    const response = await apiClient.get<CustomerOutstandingInvoicesResult>(
-        `${endpoints.reports}/customer-outstanding/${customerId}/invoices`,
-        { params, signal },
-    );
-    return response.data;
-}
-
-export async function downloadCustomerOutstandingCsv(params: CustomerOutstandingParams) {
-    const response = await apiClient.get<Blob>(`${endpoints.reports}/customer-outstanding/export`, {
-        params,
-        responseType: 'blob',
-    });
-    return response.data;
-}
-
 export async function getApAging(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<AgingReport>>(`${endpoints.finance}/ap-aging`, { params, signal });
     return response.data.data;
@@ -214,19 +176,6 @@ export async function createPostingProfile(payload: PostingProfilePayload) {
 
 export async function updatePostingProfile(id: number, payload: PostingProfilePayload) {
     const response = await apiClient.patch<ApiResource<PostingProfile>>(`${endpoints.finance}/posting-profiles/${id}`, payload);
-    return response.data.data;
-}
-
-export async function simulatePostingProfile(
-    id: number,
-    payload: { posting_date?: string } = {},
-    signal?: AbortSignal,
-) {
-    const response = await apiClient.post<ApiResource<PostingProfileSimulationResult>>(
-        `${endpoints.finance}/posting-profiles/${id}/simulate`,
-        payload,
-        { signal },
-    );
     return response.data.data;
 }
 

@@ -34,9 +34,6 @@ interface SequenceRepositoryInterface extends RepositoryPortInterface
         ?string $periodValue,
     ): ?DataRecord;
 
-    /** @param array<string, mixed> $attributes */
-    public function insertIfMissing(array $attributes): bool;
-
     public function updateNextNumberWithVersion(
         int|string $id,
         int $expectedRowVersion,

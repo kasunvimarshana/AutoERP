@@ -1,8 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
-import { useApi } from '@/shared/hooks/useApi';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { preloadVehicleModels, searchVehicleModels } from '../vehicleApi';
+import { searchVehicleModels } from '../vehicleApi';
 import type { VehicleModel } from '../vehicleTypes';
 
 export function VehicleModelSelect({ makeId, value, onChange, error }: {
@@ -11,8 +10,6 @@ export function VehicleModelSelect({ makeId, value, onChange, error }: {
     onChange: (value: VehicleModel | null) => void;
     error?: string;
 }) {
-    useApi((signal) => preloadVehicleModels(signal), []);
-
     useEffect(() => {
         if (value?.make?.id && makeId && Number(value.make.id) !== Number(makeId)) onChange(null);
     }, [makeId, onChange, value]);

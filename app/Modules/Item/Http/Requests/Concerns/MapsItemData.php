@@ -40,7 +40,6 @@ trait MapsItemData
             purchaseTaxGroupId: $this->nullableInt($item, 'purchase_tax_group_id'),
             salesTaxGroupId: $this->nullableInt($item, 'sales_tax_group_id'),
             isStockable: (bool) ($item['is_stockable'] ?? false),
-            reorderLevel: $this->nullableString($item, 'reorder_level'),
             isCombo: array_key_exists('is_combo', $item) ? (bool) $item['is_combo'] : null,
             isTaxExempt: (bool) ($item['is_tax_exempt'] ?? false),
             isActive: (bool) ($item['is_active'] ?? true),
@@ -68,8 +67,6 @@ trait MapsItemData
                 uomId: isset($row['uom_id']) ? (int) $row['uom_id'] : null,
                 isRequired: (bool) ($row['is_required'] ?? true),
                 sortOrder: (int) ($row['sort_order'] ?? 0),
-                unitCost: (string) ($row['unit_cost'] ?? '0.000000'),
-                usesJobSupervisor: (bool) ($row['uses_job_supervisor'] ?? false),
             ), $relations['bundles'] ?? []),
             prices: array_map(fn (array $row): ItemPriceData => new ItemPriceData(
                 priceType: ItemPriceType::from((string) $row['price_type']),

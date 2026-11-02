@@ -6,12 +6,9 @@ namespace Modules\VehicleService\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
-use Modules\Vehicle\Contracts\VehicleAvailabilityBlockerInterface;
-use Modules\VehicleService\Console\Commands\ImportLegacyVehicleServiceHistoryCommand;
+use Modules\Invoice\Contracts\InvoiceSourceCancellationHandlerInterface;
 use Modules\VehicleService\Constants\VehicleServicePermission;
-use Modules\VehicleService\Services\Availability\VehicleServiceAvailabilityBlocker;
-use Modules\VehicleService\Services\Invoice\VehicleServiceInvoiceRestorationHandler;
+use Modules\VehicleService\Services\Invoice\VehicleServiceInvoiceCancellationHandler;
 
 final class VehicleServiceServiceProvider extends ServiceProvider
 {
@@ -19,12 +16,8 @@ final class VehicleServiceServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/vehicle-service.php', 'vehicle-service');
         $this->app->tag(
-            [VehicleServiceInvoiceRestorationHandler::class],
-            InvoiceSourceRestorationHandlerInterface::TAG,
-        );
-        $this->app->tag(
-            [VehicleServiceAvailabilityBlocker::class],
-            VehicleAvailabilityBlockerInterface::TAG,
+            [VehicleServiceInvoiceCancellationHandler::class],
+            InvoiceSourceCancellationHandlerInterface::TAG,
         );
     }
 
@@ -34,10 +27,6 @@ final class VehicleServiceServiceProvider extends ServiceProvider
             ->register('vehicle-service', VehicleServicePermission::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([__DIR__.'/../Database/Migrations', __DIR__.'/../Database/UpgradeMigrations']);
-
-        if ($this->app->runningInConsole()) {
-            $this->commands([ImportLegacyVehicleServiceHistoryCommand::class]);
-        }
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

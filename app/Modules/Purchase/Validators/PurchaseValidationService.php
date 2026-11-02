@@ -6,11 +6,10 @@ namespace Modules\Purchase\Validators;
 
 use InvalidArgumentException;
 use Illuminate\Validation\ValidationException;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
-use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Supplier\Models\Supplier;
@@ -58,15 +57,6 @@ final class PurchaseValidationService
         }
 
         return $item;
-    }
-
-    public function assertPurchasableStockItem(Item $item, string $field): void
-    {
-        if (! in_array($item->item_type, [ItemType::Stock, ItemType::Consumable], true) || ! $item->is_stockable) {
-            throw ValidationException::withMessages([
-                $field => ['Only stockable stock or consumable items can be added to purchase orders and goods receipts.'],
-            ]);
-        }
     }
 
     public function supplier(int $tenantId, ?int $organizationUnitId, int $supplierId, string $field = 'supplier_id'): Supplier

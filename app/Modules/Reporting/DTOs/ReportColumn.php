@@ -19,7 +19,6 @@ final readonly class ReportColumn
         public string $format = 'text',
         public bool $summarize = false,
         public ?Closure $value = null,
-        public ?string $hrefPath = null,
     ) {}
 
     /**

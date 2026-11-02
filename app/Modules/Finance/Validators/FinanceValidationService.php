@@ -15,10 +15,7 @@ use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceDimension;
 use Modules\Finance\Models\FinanceJournalEntry;
-use Modules\Finance\Models\FinanceJournalLine;
 use Modules\Finance\Models\FinancePostingProfile;
-use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Tenant\Models\TenantModel;
 
 final class FinanceValidationService
 {
@@ -33,6 +30,8 @@ final class FinanceValidationService
         if (trim($data->code) === '' || trim($data->name) === '') {
             throw new InvalidArgumentException('Finance account code and name are required.');
         }
+
+        $this->assertNonNegative($data->openingBalance, 'Opening balance');
 
         $duplicate = FinanceAccount::query()
             ->where('tenant_id', $data->tenantId)
@@ -82,7 +81,6 @@ final class FinanceValidationService
         if ($this->math->isNegative($data->exchangeRate) || $this->math->isZero($data->exchangeRate)) {
             throw new InvalidArgumentException('Journal exchange rate must be greater than zero.');
         }
-        $this->validateJournalCurrency($data->tenantId, $data->currencyId, $data->exchangeRate);
 
         foreach ($data->lines as $line) {
             if (! $line instanceof JournalLineData) {
@@ -91,16 +89,11 @@ final class FinanceValidationService
 
             $this->validateJournalLine($line);
             $account = FinanceAccount::query()->findOrFail($line->accountId);
-            $this->assertPostingScope(
-                $data->tenantId,
-                $data->organizationUnitId,
-                (int) $account->tenant_id,
-                $account->organization_unit_id,
-            );
+            $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $account->tenant_id, $account->organization_unit_id);
 
             if ($line->dimensionId !== null) {
                 $dimension = FinanceDimension::query()->findOrFail($line->dimensionId);
-                $this->assertPostingScope(
+                $this->assertSameScope(
                     $data->tenantId,
                     $data->organizationUnitId,
                     (int) $dimension->tenant_id,
@@ -124,7 +117,7 @@ final class FinanceValidationService
 
         if ($data->postingProfileId !== null) {
             $profile = FinancePostingProfile::query()->findOrFail($data->postingProfileId);
-            $this->assertPostingScope(
+            $this->assertSameScope(
                 $data->tenantId,
                 $data->organizationUnitId,
                 (int) $profile->tenant_id,
@@ -151,12 +144,7 @@ final class FinanceValidationService
         if ($this->math->compare((string) $journal->total_debit, (string) $journal->total_credit) !== 0) {
             throw new InvalidArgumentException('Unbalanced journal cannot be posted.');
         }
-        if ($journal->lines->isEmpty()) {
-            throw new InvalidArgumentException('Journal cannot be posted without lines.');
-        }
 
-        $lineDebit = '0.000000';
-        $lineCredit = '0.000000';
         foreach ($journal->lines as $line) {
             $this->validateJournalLine(new JournalLineData(
                 accountId: (int) $line->account_id,
@@ -174,68 +162,11 @@ final class FinanceValidationService
                 throw new InvalidArgumentException('Cannot post to non-posting account.');
             }
 
-            $this->assertPostingScope(
-                (int) $journal->tenant_id,
-                $journal->organization_unit_id,
-                (int) $account->tenant_id,
-                $account->organization_unit_id,
-            );
-
-            $lineDebit = $this->math->add($lineDebit, (string) $line->debit);
-            $lineCredit = $this->math->add($lineCredit, (string) $line->credit);
-        }
-        if ($this->math->compare($lineDebit, (string) $journal->total_debit) !== 0
-            || $this->math->compare($lineCredit, (string) $journal->total_credit) !== 0
-        ) {
-            throw new InvalidArgumentException('Journal header totals do not match its lines.');
+            $this->assertSameScope((int) $journal->tenant_id, $journal->organization_unit_id, (int) $account->tenant_id, $account->organization_unit_id);
         }
     }
 
-    /**
-     * Posted journals may be replayed or reversed only while their immutable
-     * ledger evidence still agrees with every original journal line.
-     */
-    public function assertPostedLedgerIntegrity(FinanceJournalEntry $journal): void
-    {
-        $lines = $journal->lines->keyBy('id');
-        $entries = $journal->ledgerEntries()->get();
-        $invalid = 'Posted Finance journal ledger does not match its journal lines.';
-
-        if ($lines->isEmpty() || $lines->count() !== $entries->count()) {
-            throw new InvalidArgumentException($invalid);
-        }
-
-        $totalDebit = '0.000000';
-        $totalCredit = '0.000000';
-        foreach ($entries as $entry) {
-            $line = $lines->pull((int) $entry->journal_line_id);
-            if (! $line instanceof FinanceJournalLine
-                || (int) $entry->journal_entry_id !== (int) $journal->getKey()
-                || (int) $entry->tenant_id !== (int) $journal->tenant_id
-                || $entry->organization_unit_id !== $journal->organization_unit_id
-                || (int) $line->tenant_id !== (int) $journal->tenant_id
-                || $line->organization_unit_id !== $journal->organization_unit_id
-                || (int) $entry->account_id !== (int) $line->account_id
-                || $entry->dimension_id !== $line->dimension_id
-                || $this->math->compare((string) $entry->debit, (string) $line->debit) !== 0
-                || $this->math->compare((string) $entry->credit, (string) $line->credit) !== 0
-            ) {
-                throw new InvalidArgumentException($invalid);
-            }
-
-            $totalDebit = $this->math->add($totalDebit, (string) $line->debit);
-            $totalCredit = $this->math->add($totalCredit, (string) $line->credit);
-        }
-
-        if ($this->math->compare($totalDebit, (string) $journal->total_debit) !== 0
-            || $this->math->compare($totalCredit, (string) $journal->total_credit) !== 0
-            || $this->math->compare($totalDebit, $totalCredit) !== 0
-        ) {
-            throw new InvalidArgumentException($invalid);
-        }
-    }
-
-    public function assertReversible(FinanceJournalEntry $journal, bool $allowSourceOwned = false): void
+    public function assertReversible(FinanceJournalEntry $journal): void
     {
         $status = $journal->status instanceof JournalStatus
             ? $journal->status
@@ -244,15 +175,6 @@ final class FinanceValidationService
         if ($status !== JournalStatus::Posted) {
             throw new InvalidArgumentException('Only posted journals can be reversed.');
         }
-
-        if (! $allowSourceOwned && ! $journal->isFinanceOwned()) {
-            throw new InvalidArgumentException(
-                'Source-owned journals must be reversed through the module that owns the source document.',
-            );
-        }
-
-        $journal->loadMissing('lines');
-        $this->assertPostedLedgerIntegrity($journal);
 
         if ($journal->reversals()->exists()) {
             throw new InvalidArgumentException('Journal has already been reversed.');
@@ -274,28 +196,6 @@ final class FinanceValidationService
         }
 
         return [$totalDebit, $totalCredit];
-    }
-
-    private function validateJournalCurrency(int $tenantId, ?int $currencyId, string $exchangeRate): void
-    {
-        $tenant = TenantModel::query()->findOrFail($tenantId);
-        $baseCurrencyId = $tenant->base_currency_id === null ? null : (int) $tenant->base_currency_id;
-
-        if ($currencyId === null) {
-            if ($this->math->compare($exchangeRate, '1.000000') !== 0) {
-                throw new InvalidArgumentException('A journal without an explicit currency must use an exchange rate of 1.000000.');
-            }
-
-            return;
-        }
-
-        $currency = CurrencyModel::query()->find($currencyId);
-        if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
-            throw new InvalidArgumentException('Journal currency must be active.');
-        }
-        if ($baseCurrencyId !== null && $currencyId === $baseCurrencyId && $this->math->compare($exchangeRate, '1.000000') !== 0) {
-            throw new InvalidArgumentException('Tenant base currency journals must use an exchange rate of 1.000000.');
-        }
     }
 
     private function validateJournalLine(JournalLineData $line): void
@@ -326,29 +226,6 @@ final class FinanceValidationService
         }
 
         if ($organizationUnitId !== $targetOrganizationUnitId) {
-            throw new InvalidArgumentException('Finance posting organization unit scope mismatch.');
-        }
-    }
-
-    private function assertPostingScope(
-        int $tenantId,
-        ?int $organizationUnitId,
-        int $targetTenantId,
-        ?int $targetOrganizationUnitId,
-    ): void {
-        if ($tenantId !== $targetTenantId) {
-            throw new InvalidArgumentException('Finance posting tenant scope mismatch.');
-        }
-
-        if ($organizationUnitId === null) {
-            if ($targetOrganizationUnitId !== null) {
-                throw new InvalidArgumentException('Finance posting organization unit scope mismatch.');
-            }
-
-            return;
-        }
-
-        if ($targetOrganizationUnitId !== null && $targetOrganizationUnitId !== $organizationUnitId) {
             throw new InvalidArgumentException('Finance posting organization unit scope mismatch.');
         }
     }

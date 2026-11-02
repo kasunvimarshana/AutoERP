@@ -27,7 +27,7 @@ final class InvoiceBalanceUpdater
         string $amount,
         bool $allowOverpayment = false,
     ): InvoiceBalance {
-        $amount = $this->assertPositive($amount, 'Payment amount');
+        $this->assertPositive($amount, 'Payment amount');
 
         return $this->mutateBalance(
             $invoice,
@@ -51,7 +51,7 @@ final class InvoiceBalanceUpdater
 
     public function reversePayment(Invoice $invoice, string $amount): InvoiceBalance
     {
-        $amount = $this->assertPositive($amount, 'Payment reversal amount');
+        $this->assertPositive($amount, 'Payment reversal amount');
 
         return $this->mutateBalance(
             $invoice,
@@ -77,7 +77,7 @@ final class InvoiceBalanceUpdater
         string $amount,
         bool $allowOverAllocation = false,
     ): InvoiceBalance {
-        $amount = $this->assertPositive($amount, 'Credit allocation amount');
+        $this->assertPositive($amount, 'Credit allocation amount');
 
         return $this->mutateBalance(
             $invoice,
@@ -139,32 +139,6 @@ final class InvoiceBalanceUpdater
         });
     }
 
-    public function reverse(Invoice $invoice): InvoiceBalance
-    {
-        return DB::transaction(function () use ($invoice): InvoiceBalance {
-            $lockedInvoice = $this->lockInvoice($invoice);
-            $status = $lockedInvoice->status instanceof InvoiceStatus
-                ? $lockedInvoice->status
-                : InvoiceStatus::from((string) $lockedInvoice->status);
-            if ($status !== InvoiceStatus::Reversed) {
-                throw new InvalidArgumentException(
-                    'Invoice balance can only be reversed after the invoice is reversed.',
-                );
-            }
-
-            $balance = $lockedInvoice->balance()->lockForUpdate()->firstOrFail();
-            $balance->remaining_amount = '0.000000';
-            $balance->status = InvoiceBalanceStatus::Reversed->value;
-            $balance->save();
-
-            $lockedInvoice->forceFill([
-                'balance_due' => '0.000000',
-            ])->save();
-
-            return $balance->refresh();
-        });
-    }
-
     /**
      * @param  Closure(Invoice, InvoiceBalance): void  $mutation
      */
@@ -174,26 +148,11 @@ final class InvoiceBalanceUpdater
             $lockedInvoice = $this->lockInvoice($invoice);
             $this->statuses->assertCanSettle($lockedInvoice);
             $balance = $lockedInvoice->balance()->lockForUpdate()->firstOrFail();
-            $this->assertBalanceConservation($balance);
 
             $mutation($lockedInvoice, $balance);
 
             return $this->syncBalance($lockedInvoice, $balance);
         });
-    }
-
-    private function assertBalanceConservation(InvoiceBalance $balance): void
-    {
-        $expected = $this->calculator->remainingAmount(
-            (string) $balance->invoice_total,
-            (string) $balance->paid_amount,
-            (string) $balance->credit_allocated_amount,
-        );
-        if ($this->math->compare($expected, (string) $balance->remaining_amount) !== 0) {
-            throw new InvalidArgumentException(
-                'Invoice balance is inconsistent with its persisted settlements.',
-            );
-        }
     }
 
     private function syncBalance(Invoice $invoice, InvoiceBalance $balance): InvoiceBalance
@@ -245,15 +204,11 @@ final class InvoiceBalanceUpdater
         int $creditSourceId,
         string $amount,
     ): void {
-        // Preserve the exact persisted decimal values. Database SUM aggregates
-        // can be coerced to a PHP float before returning to the application.
-        $previouslyAllocated = $this->math->sum(InvoiceCreditAllocation::query()
+        $previouslyAllocated = $this->math->normalize((string) InvoiceCreditAllocation::query()
             ->where('tenant_id', $invoice->tenant_id)
             ->where('credit_source_type', $creditSourceType)
             ->where('credit_source_id', $creditSourceId)
-            ->select('allocated_amount')
-            ->cursor()
-            ->map(static fn (InvoiceCreditAllocation $row): string => (string) $row->allocated_amount));
+            ->sum('allocated_amount'));
 
         InvoiceCreditAllocation::query()->create([
             'tenant_id' => $invoice->tenant_id,
@@ -276,13 +231,10 @@ final class InvoiceBalanceUpdater
         return Invoice::query()->lockForUpdate()->findOrFail($invoice->getKey());
     }
 
-    private function assertPositive(string $amount, string $label): string
+    private function assertPositive(string $amount, string $label): void
     {
-        $amount = $this->math->normalize($amount);
         if ($this->math->isNegative($amount) || $this->math->isZero($amount)) {
             throw new InvalidArgumentException($label.' must be greater than zero.');
         }
-
-        return $amount;
     }
 }

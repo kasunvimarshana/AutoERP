@@ -7,9 +7,6 @@ namespace Modules\Purchase\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Audit\Contracts\AuditRecorderInterface;
-use Modules\Audit\Data\AuditEventData;
-use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
@@ -20,12 +17,6 @@ use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Services\UserAccessResolver;
-use Tests\Support\ActiveTenantSubscriptionFixture;
-use Tests\Support\CurrencyFixture;
-use Tests\Support\FinancePostingFixture;
-use Tests\Support\OrganizationUnitFixture;
-use Tests\Support\TenantAuthenticationFixture;
-use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -50,93 +41,6 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.lines.0.uom.code', $context['uom_code'])
             ->assertJsonPath('data.lines.0.line_total', '101.100000')
             ->assertJsonPath('data.grand_total', '101.100000');
-    }
-
-    public function test_purchase_order_pdf_can_be_downloaded_with_view_permission(): void
-    {
-        $context = $this->context();
-        $order = $this->withAuth($context)
-            ->postJson('/api/v1/purchase/orders', $this->payload($context, ['notes' => 'Deliver before month end']))
-            ->assertCreated()
-            ->json('data');
-
-        $response = $this->withAuth($context)->get('/api/v1/purchase/orders/'.$order['id'].'/pdf');
-
-        $response->assertOk()
-            ->assertHeader('Content-Type', 'application/pdf')
-            ->assertHeader('Content-Disposition', 'attachment; filename="purchase-order-'.$order['purchase_order_number'].'.pdf"');
-        self::assertStringStartsWith('%PDF-', $response->getContent());
-    }
-
-    public function test_purchase_order_pdf_is_tenant_scoped(): void
-    {
-        $owner = $this->context('PDFOWNER');
-        $other = $this->context('PDFOTHER');
-        $orderId = $this->withAuth($owner)
-            ->postJson('/api/v1/purchase/orders', $this->payload($owner))
-            ->assertCreated()
-            ->json('data.id');
-
-        $this->withAuth($other)
-            ->get('/api/v1/purchase/orders/'.$orderId.'/pdf')
-            ->assertNotFound();
-    }
-
-    public function test_approved_purchase_order_can_open_whatsapp_with_a_signed_pdf_link(): void
-    {
-        $context = $this->context('POSHARE');
-        DB::table('suppliers')->where('id', $context['supplier_id'])->update(['mobile' => '0771234567']);
-        $order = $this->withAuth($context)
-            ->postJson('/api/v1/purchase/orders', $this->payload($context))
-            ->assertCreated()
-            ->json('data');
-
-        $submitted = $this->withAuth($context)
-            ->patchJson('/api/v1/purchase/orders/'.$order['id'].'/submit', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))
-            ->assertOk()
-            ->json('data');
-        self::assertSame('pending_approval', $submitted['status']);
-
-        $this->withAuth($context)
-            ->patchJson('/api/v1/purchase/orders/'.$order['id'].'/approve', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))
-            ->assertOk()
-            ->assertJsonPath('data.status', 'approved');
-
-        $share = $this->withAuth($context)
-            ->postJson('/api/v1/purchase/orders/'.$order['id'].'/whatsapp-share')
-            ->assertOk()
-            ->assertJsonPath('data.recipient.phone', '94771234567')
-            ->assertJsonPath('data.recipient.verification_status', 'unverified')
-            ->json('data');
-
-        self::assertStringStartsWith('https://wa.me/94771234567?text=', $share['whatsapp_url']);
-        self::assertStringContainsString('/shared/purchase-orders/', $share['document_url']);
-        self::assertNotEmpty($share['expires_at']);
-
-        $pdf = $this->get($share['document_url'])->assertOk();
-        $pdf->assertHeader('Content-Type', 'application/pdf');
-        self::assertStringStartsWith('%PDF-', $pdf->getContent());
-
-        DB::table('purchase_orders')->where('id', $order['id'])->update(['status' => 'cancelled']);
-        $this->get($share['document_url'])->assertNotFound();
-    }
-
-    public function test_approved_unreceived_purchase_order_hides_supplier_invoice_capability(): void
-    {
-        $context = $this->context('POUNRECEIVED');
-        $order = $this->createApprovedHttpOrder($context, '10.000000');
-
-        $this->withAuth($context)
-            ->getJson('/api/v1/purchase/orders/'.$order['id'])
-            ->assertOk()
-            ->assertJsonPath('data.status', 'approved')
-            ->assertJsonPath('data.receipt_status', 'not_received')
-            ->assertJsonPath('data.capabilities.can_invoice', false)
-            ->assertJsonPath('data.capabilities.details.can_invoice.code', 'not_received')
-            ->assertJsonPath(
-                'data.capabilities.details.can_invoice.reason',
-                'Purchase order must have received quantity before supplier invoicing.',
-            );
     }
 
     public function test_create_purchase_order_with_header_adjustments_is_decimal_safe(): void
@@ -240,23 +144,6 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonValidationErrors(['expected_version']);
     }
 
-    public function test_manual_purchase_debit_note_rejects_non_supplier_party_type(): void
-    {
-        $context = $this->context();
-
-        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'debit_note_date' => '2026-06-10',
-            'supplier_type' => 'customer',
-            'supplier_id' => $context['supplier_id'],
-            'amount' => '10.000000',
-            'reason' => 'Invalid party discriminator',
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['supplier_type']);
-    }
-
     public function test_manual_purchase_debit_note_rejects_client_source_fields(): void
     {
         $context = $this->context();
@@ -276,386 +163,11 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonValidationErrors(['source_type', 'source_id']);
     }
 
-    public function test_manual_purchase_debit_note_requires_valid_explicit_currency(): void
-    {
-        $context = $this->context();
-        $payload = [
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'debit_note_date' => '2026-06-10',
-            'supplier_type' => 'supplier',
-            'supplier_id' => $context['supplier_id'],
-            'amount' => '10.000000',
-            'reason' => 'Verified manual adjustment',
-        ];
-
-        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', $payload)
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['currency_id']);
-
-        $invalid = CurrencyFixture::create(['is_active' => false]);
-        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
-            ...$payload,
-            'currency_id' => $invalid,
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['currency_id']);
-
-        $currencyId = CurrencyFixture::create();
-        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
-            ...$payload,
-            'currency_id' => $currencyId,
-        ])
-            ->assertCreated()
-            ->assertJsonPath('data.currency_id', $currencyId)
-            ->assertJsonPath('data.currency.id', $currencyId);
-    }
-
-    public function test_manual_debit_note_creation_rolls_back_when_audit_recording_fails(): void
-    {
-        $context = $this->context();
-        $currencyId = CurrencyFixture::create();
-
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_CREATED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_CREATED);
-        });
-
-        $this->withoutExceptionHandling();
-        try {
-            $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
-                'tenant_id' => $context['tenant_id'],
-                'organization_unit_id' => $context['organization_unit_id'],
-                'debit_note_date' => '2026-06-10',
-                'supplier_type' => 'supplier',
-                'supplier_id' => $context['supplier_id'],
-                'currency_id' => $currencyId,
-                'amount' => '10.000000',
-                'reason' => 'Audit atomicity regression',
-            ]);
-            self::fail('Debit note creation must not succeed without its audit record.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        self::assertSame(0, DB::table('purchase_debit_notes')
-            ->where('tenant_id', $context['tenant_id'])->count());
-    }
-
-    public function test_manual_debit_note_approval_rolls_back_when_audit_recording_fails(): void
-    {
-        $context = $this->context();
-        $currencyId = CurrencyFixture::create();
-        $note = $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'debit_note_date' => '2026-06-10',
-            'supplier_type' => 'supplier',
-            'supplier_id' => $context['supplier_id'],
-            'currency_id' => $currencyId,
-            'amount' => '10.000000',
-            'reason' => 'Approval audit atomicity regression',
-        ])->assertCreated()->json('data');
-
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_APPROVED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_APPROVED);
-        });
-
-        $this->withoutExceptionHandling();
-        try {
-            $this->withAuth($context)->patchJson('/api/v1/purchase/debit-notes/'.$note['id'].'/approve', [
-                'tenant_id' => $context['tenant_id'],
-                'expected_version' => $note['row_version'],
-            ]);
-            self::fail('Debit note approval must not succeed without its audit record.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        $persisted = DB::table('purchase_debit_notes')->where('tenant_id', $context['tenant_id'])
-            ->where('id', $note['id'])->first();
-        self::assertSame('draft', $persisted->status);
-        self::assertSame((int) $note['row_version'], (int) $persisted->row_version);
-        self::assertNull($persisted->approved_at);
-    }
-
-    public function test_manual_debit_note_post_rolls_back_when_audit_recording_fails(): void
-    {
-        $context = $this->context();
-        $currencyId = CurrencyFixture::create();
-        $note = $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'debit_note_date' => '2026-06-10',
-            'supplier_type' => 'supplier',
-            'supplier_id' => $context['supplier_id'],
-            'currency_id' => $currencyId,
-            'amount' => '10.000000',
-            'reason' => 'Posting audit atomicity regression',
-        ])->assertCreated()->json('data');
-        $approved = $this->withAuth($context)->patchJson('/api/v1/purchase/debit-notes/'.$note['id'].'/approve', [
-            'tenant_id' => $context['tenant_id'],
-            'expected_version' => $note['row_version'],
-        ])->assertOk()->json('data');
-
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_POSTED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_POSTED);
-        });
-
-        $this->withoutExceptionHandling();
-        try {
-            $this->withAuth($context)->patchJson('/api/v1/purchase/debit-notes/'.$note['id'].'/post', [
-                'tenant_id' => $context['tenant_id'],
-                'expected_version' => $approved['row_version'],
-            ]);
-            self::fail('Debit note posting must not succeed without its audit record.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        $persisted = DB::table('purchase_debit_notes')->where('tenant_id', $context['tenant_id'])
-            ->where('id', $note['id'])->first();
-        self::assertSame('approved', $persisted->status);
-        self::assertSame((int) $approved['row_version'], (int) $persisted->row_version);
-    }
-
-    public function test_grn_creation_rolls_back_when_audit_persistence_fails(): void
-    {
-        $context = $this->context('AUDITGRN');
-        $order = $this->createApprovedHttpOrder($context, '10.000000');
-
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::GOODS_RECEIPT_CREATED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::GOODS_RECEIPT_CREATED);
-        });
-        $this->withoutExceptionHandling();
-
-        try {
-            $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
-                'tenant_id' => $context['tenant_id'],
-                'organization_unit_id' => $context['organization_unit_id'],
-                'received_date' => '2026-06-18',
-                'warehouse_id' => $context['warehouse_id'],
-                'purchase_order_id' => $order['id'],
-                'lines' => [[
-                    'item_id' => $context['item_id'],
-                    'uom_id' => $context['uom_id'],
-                    'purchase_order_line_id' => $order['lines'][0]['id'],
-                    'ordered_quantity' => '10.000000',
-                    'received_quantity' => '1.000000',
-                    'accepted_quantity' => '1.000000',
-                    'unit_price' => '10.000000',
-                ]],
-            ]);
-            self::fail('GRN creation without its audit event must roll back.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        self::assertSame(0, DB::table('goods_receipt_notes')
-            ->where('tenant_id', $context['tenant_id'])->count());
-    }
-
-    public function test_purchase_return_post_rolls_back_stock_and_note_when_audit_fails(): void
-    {
-        $context = $this->context('AUDITRETURN');
-        $order = $this->createApprovedHttpOrder($context, '10.000000');
-        $grn = $this->createPostedHttpGrn($context, (int) $order['id'], (int) $order['lines'][0]['id'], '10.000000');
-        $return = $this->withAuth($context)->postJson('/api/v1/purchase/returns', [
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'return_date' => '2026-06-19',
-            'return_type' => 'referenced',
-            'source_id' => $grn['id'],
-            'lines' => [[
-                'source_line_type' => 'goods_receipt_note_line',
-                'source_line_id' => $grn['lines'][0]['id'],
-                'returned_quantity' => '1.000000',
-            ]],
-        ])->assertCreated()->json('data');
-
-        $beforeStockMovements = DB::table('inventory_movements')
-            ->where('tenant_id', $context['tenant_id'])->count();
-        $beforeNotes = DB::table('purchase_debit_notes')
-            ->where('tenant_id', $context['tenant_id'])->count();
-
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_RETURN_POSTED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_RETURN_POSTED);
-        });
-        $this->withoutExceptionHandling();
-
-        try {
-            $this->withAuth($context)->patchJson('/api/v1/purchase/returns/'.$return['id'].'/post', [
-                'tenant_id' => $context['tenant_id'],
-                'expected_version' => $return['row_version'],
-            ]);
-            self::fail('Purchase return posting without audit must roll back.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        $persisted = DB::table('purchase_returns')->where('tenant_id', $context['tenant_id'])
-            ->where('id', $return['id'])->first();
-        self::assertSame('draft', $persisted->status);
-        self::assertSame((int) $return['row_version'], (int) $persisted->row_version);
-        self::assertSame($beforeStockMovements, DB::table('inventory_movements')
-            ->where('tenant_id', $context['tenant_id'])->count());
-        self::assertSame($beforeNotes, DB::table('purchase_debit_notes')
-            ->where('tenant_id', $context['tenant_id'])->count());
-    }
-
-    public function test_grn_post_rolls_back_inventory_and_finance_when_audit_fails(): void
-    {
-        $context = $this->context('AUDITGRNPOST');
-        $order = $this->createApprovedHttpOrder($context, '10.000000');
-        $grn = $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'received_date' => '2026-06-18',
-            'warehouse_id' => $context['warehouse_id'],
-            'purchase_order_id' => $order['id'],
-            'lines' => [[
-                'item_id' => $context['item_id'],
-                'uom_id' => $context['uom_id'],
-                'purchase_order_line_id' => $order['lines'][0]['id'],
-                'ordered_quantity' => '10.000000',
-                'received_quantity' => '1.000000',
-                'accepted_quantity' => '1.000000',
-                'unit_price' => '10.000000',
-            ]],
-        ])->assertCreated()->json('data');
-
-        $previousMovements = DB::table('inventory_movements')
-            ->where('tenant_id', $context['tenant_id'])->count();
-        $previousJournals = DB::table('finance_journal_entries')
-            ->where('tenant_id', $context['tenant_id'])->count();
-
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::GOODS_RECEIPT_POSTED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::GOODS_RECEIPT_POSTED);
-        });
-        $this->withoutExceptionHandling();
-
-        try {
-            $this->withAuth($context)->patchJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', [
-                'tenant_id' => $context['tenant_id'],
-                'expected_version' => $grn['row_version'],
-            ]);
-            self::fail('GRN posting without audit must roll back inventory and Finance.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        $persisted = DB::table('goods_receipt_notes')->where('tenant_id', $context['tenant_id'])
-            ->where('id', $grn['id'])->first();
-        self::assertSame('draft', $persisted->status);
-        self::assertSame((int) $grn['row_version'], (int) $persisted->row_version);
-        self::assertSame($previousMovements, DB::table('inventory_movements')
-            ->where('tenant_id', $context['tenant_id'])->count());
-        self::assertSame($previousJournals, DB::table('finance_journal_entries')
-            ->where('tenant_id', $context['tenant_id'])->count());
-    }
-
-    public function test_order_create_rolls_back_when_audit_write_fails(): void
-    {
-        $context = $this->context('AUDITORDER');
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_ORDER_CREATED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_ORDER_CREATED);
-        });
-        $this->withoutExceptionHandling();
-
-        try {
-            $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context));
-            self::fail('Purchase order creation without audit must roll back.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        self::assertSame(0, DB::table('purchase_orders')
-            ->where('tenant_id', $context['tenant_id'])->count());
-        self::assertSame(0, DB::table('purchase_order_lines')
-            ->where('tenant_id', $context['tenant_id'])->count());
-    }
-
-    public function test_order_delete_rolls_back_when_audit_write_fails(): void
-    {
-        $context = $this->context('AUDITORDERDELETE');
-        $order = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))
-            ->assertCreated()->json('data');
-
-        $this->mock(AuditRecorderInterface::class, function ($mock): void {
-            $mock->shouldReceive('record')->once()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName === PurchaseAuditEvent::PURCHASE_ORDER_DELETED)
-                ->andThrow(new \RuntimeException('Injected purchase audit failure'));
-            $mock->shouldReceive('record')->zeroOrMoreTimes()
-                ->withArgs(static fn (AuditEventData $event): bool => $event->eventName !== PurchaseAuditEvent::PURCHASE_ORDER_DELETED);
-        });
-        $this->withoutExceptionHandling();
-
-        try {
-            $this->withAuth($context)->deleteJson('/api/v1/purchase/orders/'.$order['id'], [
-                'tenant_id' => $context['tenant_id'],
-                'expected_version' => $order['row_version'],
-            ]);
-            self::fail('Purchase order deletion without audit must roll back.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Injected purchase audit failure', $exception->getMessage());
-        } finally {
-            $this->withExceptionHandling();
-        }
-
-        $persisted = DB::table('purchase_orders')->where('tenant_id', $context['tenant_id'])
-            ->where('id', $order['id'])->first();
-        self::assertNotNull($persisted);
-        self::assertNull($persisted->deleted_at);
-        self::assertSame('draft', $persisted->status);
-    }
-
     public function test_approve_cancel_and_close_purchase_orders(): void
     {
         $context = $this->context();
         $approveId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
         $cancelId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
-        $approvedCancelId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
         $closeId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approveId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $approveId))
@@ -667,17 +179,7 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$cancelId.'/cancel', $this->actionPayload($context, 'purchase_orders', (int) $cancelId))
             ->assertOk()
-            ->assertJsonPath('data.status', 'cancelled')
-            ->assertJsonPath('data.cancelled_by.id', $context['user_id']);
-        self::assertNotNull(DB::table('purchase_orders')->where('id', $cancelId)->value('cancelled_at'));
-
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approvedCancelId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $approvedCancelId))->assertOk();
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approvedCancelId.'/approve', $this->actionPayload($context, 'purchase_orders', (int) $approvedCancelId))->assertOk();
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approvedCancelId.'/cancel', $this->actionPayload($context, 'purchase_orders', (int) $approvedCancelId))
-            ->assertOk()
-            ->assertJsonPath('data.status', 'cancelled')
-            ->assertJsonPath('data.approved_by.id', $context['user_id'])
-            ->assertJsonPath('data.cancelled_by.id', $context['user_id']);
+            ->assertJsonPath('data.status', 'cancelled');
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $closeId))->assertOk();
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/approve', $this->actionPayload($context, 'purchase_orders', (int) $closeId))->assertOk();
@@ -740,7 +242,6 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.invoice_status', 'partially_invoiced')
             ->assertJsonPath('data.return_status', 'partially_returned')
             ->assertJsonPath('data.capabilities.can_receive', true)
-            ->assertJsonPath('data.capabilities.can_invoice', true)
             ->assertJsonPath('data.capabilities.details.can_receive.allowed', true)
             ->assertJsonPath('data.capabilities.details.can_close.code', 'remaining_receivable')
             ->assertJsonMissingPath('data.capabilities.can_return')
@@ -781,37 +282,6 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertOk()
             ->json('data');
         $this->assertNull(collect($eligible)->firstWhere('id', $orderId));
-    }
-
-    public function test_batch_receivable_line_exposes_tracking_and_indexes_missing_allocation_error(): void
-    {
-        $context = $this->context('HTTPBATCHRECV');
-        DB::table('items')->where('id', $context['item_id'])->update(['tracking_type' => 'batch']);
-        $order = $this->createApprovedHttpOrder($context, '4.000000');
-        $orderId = (int) $order['id'];
-        $lineId = (int) $order['lines'][0]['id'];
-
-        $this->withAuth($context)->getJson('/api/v1/purchase/orders/'.$orderId.'/receivable-lines')
-            ->assertOk()
-            ->assertJsonPath('data.0.item.tracking_type', 'batch');
-
-        $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
-            'tenant_id' => $context['tenant_id'],
-            'organization_unit_id' => $context['organization_unit_id'],
-            'received_date' => '2026-06-18',
-            'warehouse_id' => $context['warehouse_id'],
-            'purchase_order_id' => $orderId,
-            'lines' => [[
-                'item_id' => $context['item_id'],
-                'uom_id' => $context['uom_id'],
-                'purchase_order_line_id' => $lineId,
-                'ordered_quantity' => '4.000000',
-                'received_quantity' => '4.000000',
-                'accepted_quantity' => '4.000000',
-                'unit_price' => '10.000000',
-            ]],
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['lines.0.batch_allocations']);
     }
 
     public function test_partial_grn_invoice_http_flow_keeps_remaining_invoiceable_eligible(): void
@@ -943,18 +413,6 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.defaults.warehouse_id', $context['warehouse_id'])
             ->assertJsonPath('data.defaults.warehouse_location_id', $locationId)
             ->assertJsonPath('data.defaults.warehouse_location_source', 'warehouse_default');
-    }
-
-    public function test_supplier_payment_context_exposes_tenant_default_currency(): void
-    {
-        $context = $this->context();
-        $currencyId = $this->createCurrency('BASE-'.Str::upper(Str::random(4)));
-        DB::table('tenants')->where('id', $context['tenant_id'])->update(['base_currency_id' => $currencyId]);
-
-        $this->withAuth($context)->getJson('/api/v1/purchase/payments/context')
-            ->assertOk()
-            ->assertJsonPath('data.default_currency.id', $currencyId)
-            ->assertJsonPath('data.default_currency.name', DB::table('currencies')->where('id', $currencyId)->value('name'));
     }
 
     public function test_referenced_purchase_return_http_contract_derives_backend_controlled_fields(): void
@@ -1492,10 +950,10 @@ final class PurchaseOrderApiTest extends TestCase
             SupplierAuthorizationService::VIEW,
         ]);
         $other = $this->context('LOOKUPOTHER');
-        $activeCurrencyId = $this->createCurrency('LOOK-'.Str::upper(Str::random(4)));
-        $inactiveCurrencyId = $this->createCurrency('NOLOOK-'.Str::upper(Str::random(4)), active: false);
-        $activeCurrencyCode = (string) DB::table('currencies')->where('id', $activeCurrencyId)->value('code');
-        $inactiveCurrencyCode = (string) DB::table('currencies')->where('id', $inactiveCurrencyId)->value('code');
+        $activeCurrencyCode = 'LOOK-'.Str::upper(Str::random(4));
+        $inactiveCurrencyCode = 'NOLOOK-'.Str::upper(Str::random(4));
+        $this->createCurrency($activeCurrencyCode);
+        $this->createCurrency($inactiveCurrencyCode, active: false);
 
         $fastPurchaseContext = $this->withAuth($context)->getJson('/api/v1/purchase/fast-purchases/context');
         $fastPurchaseContext->assertOk();
@@ -1637,7 +1095,6 @@ final class PurchaseOrderApiTest extends TestCase
     {
         return array_replace_recursive([
             'tenant_id' => $context['tenant_id'],
-            'currency_id' => CurrencyFixture::create(),
             'organization_unit_id' => $context['organization_unit_id'],
             'return_date' => '2026-06-19',
             'return_type' => 'manual_supplier_return',
@@ -1673,7 +1130,7 @@ final class PurchaseOrderApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $suffix): int
     {
-        return (int) OrganizationUnitFixture::create([
+        return (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main '.$suffix,
             'code' => 'MAIN-'.$suffix,
@@ -1685,12 +1142,17 @@ final class PurchaseOrderApiTest extends TestCase
         ]);
     }
 
-    private function createCurrency(string $label, bool $active = true): int
+    private function createCurrency(string $code, bool $active = true): int
     {
-        return CurrencyFixture::create([
-            'name' => 'Currency '.$label,
-            'symbol' => substr($label, 0, 1),
+        return (int) DB::table('currencies')->insertGetId([
+            'row_version' => 1,
+            'code' => $code,
+            'name' => 'Currency '.$code,
+            'symbol' => substr($code, 0, 1),
+            'decimal_places' => 2,
             'is_active' => $active,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
@@ -1823,9 +1285,8 @@ final class PurchaseOrderApiTest extends TestCase
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(4));
         $tenantId = $this->createTenant($suffix);
-        ActiveTenantSubscriptionFixture::create($tenantId);
+        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, $suffix);
-        FinancePostingFixture::seedPurchasePostingProfiles($tenantId, $organizationUnitId);
         $user = $this->createAuthContext($tenantId, $organizationUnitId, $suffix, $permissions);
         $uomCode = 'PCS-'.$suffix;
         $supplierCode = 'SUP-'.$suffix;
@@ -1852,13 +1313,14 @@ final class PurchaseOrderApiTest extends TestCase
 
     /**
      * @param  list<string>|null  $permissions
+     *
      * @return array{token: string, user_id: int, role_id: int}
      */
     private function createAuthContext(int $tenantId, int $organizationUnitId, string $suffix, ?array $permissions = null): array
     {
         $now = now();
         $email = 'purchase-'.Str::lower($suffix).'@example.test';
-        $userId = (int) TenantUserFixture::create([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Purchase',
             'last_name' => 'Tester',
@@ -1912,7 +1374,7 @@ final class PurchaseOrderApiTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
@@ -1966,6 +1428,7 @@ final class PurchaseOrderApiTest extends TestCase
 
     /**
      * @param  list<string>  $names
+     *
      * @return list<int>
      */
     private function seedPurchasePermissions(int $tenantId, array $names): array

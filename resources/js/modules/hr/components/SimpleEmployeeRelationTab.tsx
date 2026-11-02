@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import { hasPermission } from '@/modules/auth/accessControl';
-import { useAuth } from '@/modules/auth/AuthProvider';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import type { ApiCollection } from '@/shared/types/api';
-import { hrPermissions } from '../hrPermissions';
 import { EmployeeRelationTab } from './EmployeeRelationTab';
 import { useEmployeeRelationCrud } from './useEmployeeRelationCrud';
 
@@ -35,8 +32,6 @@ export function SimpleEmployeeRelationTab<T extends { id: number }, P extends ob
         remove: (id: number, rowId: number) => Promise<unknown>;
     };
 }) {
-    const auth = useAuth();
-    const canManage = hasPermission(auth, hrPermissions.employeesUpdate);
     const crud = useEmployeeRelationCrud<T, P>(employeeId, api);
     const [draft, setDraft] = useState<P>(defaults);
 
@@ -66,7 +61,6 @@ export function SimpleEmployeeRelationTab<T extends { id: number }, P extends ob
             editing={crud.editing}
             submitting={crud.submitting}
             actionError={crud.actionError}
-            canManage={canManage}
             onCreate={startCreate}
             onEdit={startEdit}
             onDelete={crud.destroy}

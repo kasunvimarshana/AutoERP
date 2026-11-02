@@ -16,7 +16,6 @@ final readonly class CreateInvoiceData
      * @param  list<InvoiceSourceData>  $sources
      * @param  list<InvoiceSourceLineData>  $sourceLines
      * @param  list<InvoiceAdjustmentData>  $adjustments
-     * @param  list<array{label: string, value: string}>  $purchaserReferenceFields
      */
     public function __construct(
         public int $tenantId,
@@ -38,13 +37,5 @@ final readonly class CreateInvoiceData
         public array $sourceLines = [],
         public array $adjustments = [],
         public ?TaxCalculationResult $taxCalculation = null,
-        public ?InvoicePostingPlanData $postingPlan = null,
-        public ?string $supplyDate = null,
-        public ?string $supplyPeriodStart = null,
-        public ?string $supplyPeriodEnd = null,
-        public ?string $placeOfSupply = null,
-        public ?string $paymentMode = null,
-        public ?string $paymentTerms = null,
-        public array $purchaserReferenceFields = [],
     ) {}
 }

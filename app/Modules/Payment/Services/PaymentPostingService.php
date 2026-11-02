@@ -11,14 +11,11 @@ use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Payment\Constants\PaymentRefundFinanceMetadata;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentLifecycleDimension;
 use Modules\Payment\Enums\PaymentMethodType;
-use Modules\Payment\Enums\PaymentPostingRole;
 use Modules\Payment\Enums\PaymentPostingStatus;
-use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -31,10 +28,6 @@ final class PaymentPostingService
         private readonly PaymentValidationService $validator,
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentAllocationService $allocations,
-        private readonly PaymentAllocationFinanceService $allocationFinance,
-        private readonly PaymentPostingPolicyService $postingPolicy,
-        private readonly PaymentRefundFinanceService $refundFinance,
-        private readonly PaymentBalanceSynchronizer $balances,
     ) {}
 
     public function post(Payment $payment, int $expectedVersion, ?int $postedBy = null): Payment
@@ -67,8 +60,6 @@ final class PaymentPostingService
                 $this->validator->assertPositive((string) $line->amount, 'Payment line amount');
             }
 
-            $locked = $this->allocations->realizePending($locked, $postedBy);
-
             $locked->forceFill([
                 'posting_status' => PaymentPostingStatus::Posting->value,
                 'row_version' => (int) $locked->row_version + 1,
@@ -84,29 +75,14 @@ final class PaymentPostingService
             );
 
             $result = $this->postings->post($this->postingContext($locked), $postedBy);
-            $metadata = is_array($locked->metadata) ? $locked->metadata : [];
-            $refundFxReference = $this->refundFinance->post($locked, $postedBy);
-            if ($refundFxReference !== null) {
-                $metadata[PaymentRefundFinanceMetadata::FX_POSTING_REFERENCE] = $refundFxReference;
-            }
-
             $locked->forceFill([
                 'finance_posting_reference' => $result->journalNumber,
-                'metadata' => $metadata,
                 'posting_correlation_key' => 'payment:'.$locked->getKey().':post',
                 'posting_status' => PaymentPostingStatus::Posted->value,
                 'posted_by' => $postedBy,
                 'posted_at' => now(),
                 'row_version' => (int) $locked->row_version + 1,
             ])->save();
-            $locked = $locked->refresh()->load('allocations');
-            foreach ($locked->allocations as $allocation) {
-                if ((string) ($allocation->status instanceof \BackedEnum ? $allocation->status->value : $allocation->status) !== 'active') {
-                    continue;
-                }
-
-                $this->allocationFinance->post($locked, $allocation, $postedBy);
-            }
             $locked = $locked->refresh();
             $this->events->record(
                 $locked,
@@ -116,7 +92,8 @@ final class PaymentPostingService
                 $postedBy,
                 'Payment posted to Finance as '.$result->journalNumber.'.',
             );
-            $this->synchronizeOriginalAfterRefundPosting($locked, $postedBy);
+
+            $locked = $this->allocations->realizePending($locked, $postedBy);
 
             return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
         });
@@ -124,8 +101,6 @@ final class PaymentPostingService
 
     private function postingContext(Payment $payment): PostingContext
     {
-        $policy = $this->postingPolicy->resolve($payment);
-
         return new PostingContext(
             source: new PostingSourceData(
                 sourceType: 'payment',
@@ -139,93 +114,49 @@ final class PaymentPostingService
             postingDate: $payment->payment_date?->toDateString() ?? now()->toDateString(),
             currencyId: $payment->currency_id,
             exchangeRate: (string) $payment->exchange_rate,
-            lines: $this->postingLines($payment, $policy->unappliedRole),
+            lines: $this->postingLines($payment),
             description: 'Payment '.$payment->payment_number,
-            postingProfileCode: $policy->postingProfileCode,
+            postingProfileCode: $this->profileCode($payment),
         );
     }
 
     /** @return list<PostingLine> */
-    private function postingLines(
-        Payment $payment,
-        PaymentPostingRole $unappliedRole,
-    ): array {
+    private function postingLines(Payment $payment): array
+    {
         $direction = $payment->direction instanceof PaymentDirection
             ? $payment->direction
             : PaymentDirection::from((string) $payment->direction);
-        $allocatedAmount = $this->math->normalize((string) $payment->allocated_amount);
-        $unappliedAmount = $this->math->normalize((string) $payment->unapplied_amount);
-        $totalAmount = $this->math->normalize((string) $payment->total_amount);
-        if ($this->math->compare($this->math->add($allocatedAmount, $unappliedAmount), $totalAmount) !== 0) {
-            throw new InvalidArgumentException('Payment allocated and unapplied amounts must equal the payment total before posting.');
-        }
-
         $lines = [];
+
         if ($direction === PaymentDirection::Inbound) {
             foreach ($payment->lines as $line) {
                 $lines[] = $this->cashPostingLine($payment, $line, (string) $line->amount, '0.000000');
             }
-            $this->appendCounterpartyLine($lines, $payment, $totalAmount, '0.000000', $unappliedRole);
+            $lines[] = new PostingLine(
+                debit: '0.000000',
+                credit: (string) $payment->total_amount,
+                description: 'Payment receipt '.$payment->payment_number,
+                profileKey: 'receivable',
+                sourceLineType: 'payment',
+                sourceLineId: (int) $payment->getKey(),
+            );
 
-            return $this->creditCounterpartyLines($lines);
+            return $lines;
         }
 
-        $this->appendCounterpartyLine($lines, $payment, $totalAmount, '0.000000', $unappliedRole);
+        $lines[] = new PostingLine(
+            debit: (string) $payment->total_amount,
+            credit: '0.000000',
+            description: 'Payment disbursement '.$payment->payment_number,
+            profileKey: 'payable',
+            sourceLineType: 'payment',
+            sourceLineId: (int) $payment->getKey(),
+        );
         foreach ($payment->lines as $line) {
             $lines[] = $this->cashPostingLine($payment, $line, '0.000000', (string) $line->amount);
         }
 
         return $lines;
-    }
-
-    /**
-     * Inbound counterparty amounts are credits. They are assembled as debits first so
-     * the same helper can be used for outbound payments, then converted explicitly.
-     *
-     * @param  list<PostingLine>  $lines
-     * @return list<PostingLine>
-     */
-    private function creditCounterpartyLines(array $lines): array
-    {
-        return array_map(static function (PostingLine $line): PostingLine {
-            if ($line->sourceLineType !== 'payment_counterparty') {
-                return $line;
-            }
-
-            return new PostingLine(
-                debit: '0.000000',
-                credit: $line->debit,
-                description: $line->description,
-                profileKey: $line->profileKey,
-                sourceLineType: $line->sourceLineType,
-                sourceLineId: $line->sourceLineId,
-                dimensionCode: $line->dimensionCode,
-                dimensions: $line->dimensions,
-            );
-        }, $lines);
-    }
-
-    /** @param list<PostingLine> $lines */
-    private function appendCounterpartyLine(
-        array &$lines,
-        Payment $payment,
-        string $debit,
-        string $credit,
-        PaymentPostingRole $role,
-    ): void {
-        $amount = $this->math->isZero($debit) ? $credit : $debit;
-        if ($this->math->isZero($amount)) {
-            return;
-        }
-
-        $lines[] = new PostingLine(
-            debit: $debit,
-            credit: $credit,
-            description: 'Payment counterparty '.$payment->payment_number,
-            profileKey: $role->value,
-            sourceLineType: 'payment_counterparty',
-            sourceLineId: (int) $payment->getKey(),
-        );
     }
 
     private function cashPostingLine(Payment $payment, PaymentLine $line, string $debit, string $credit): PostingLine
@@ -244,35 +175,18 @@ final class PaymentPostingService
         );
     }
 
-    private function cashProfileKey(PaymentLine $line): string
+    private function profileCode(Payment $payment): string
     {
-        return (string) $line->payment_method_type_snapshot === PaymentMethodType::Cash->value
-            ? PaymentPostingRole::Cash->value
-            : PaymentPostingRole::Bank->value;
+        $direction = $payment->direction instanceof PaymentDirection
+            ? $payment->direction
+            : PaymentDirection::from((string) $payment->direction);
+
+        return $direction === PaymentDirection::Inbound ? 'payment_received' : 'payment_made';
     }
 
-    private function synchronizeOriginalAfterRefundPosting(Payment $payment, ?int $actorId): void
+    private function cashProfileKey(PaymentLine $line): string
     {
-        $type = $payment->payment_type instanceof PaymentType
-            ? $payment->payment_type
-            : PaymentType::from((string) $payment->payment_type);
-        if ($type !== PaymentType::Refund || $payment->original_payment_id === null) {
-            return;
-        }
-
-        $query = Payment::query()
-            ->where('tenant_id', $payment->tenant_id)
-            ->whereKey((int) $payment->original_payment_id)
-            ->lockForUpdate();
-        $payment->organization_unit_id === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $payment->organization_unit_id);
-        $original = $query->firstOrFail();
-
-        $original = $this->balances->sync($original, 'Refund payment posted.', $actorId);
-        $original->forceFill([
-            'row_version' => (int) $original->row_version + 1,
-        ])->save();
+        return (string) $line->payment_method_type_snapshot === PaymentMethodType::Cash->value ? 'cash' : 'bank';
     }
 
     private function assertVersion(Payment $payment, int $expectedVersion): void

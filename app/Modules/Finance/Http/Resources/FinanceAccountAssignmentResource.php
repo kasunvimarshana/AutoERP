@@ -29,11 +29,6 @@ final class FinanceAccountAssignmentResource extends JsonResource
                 'code' => (string) $this->account->code,
                 'name' => (string) $this->account->name,
             ]),
-            'organization_unit' => $this->whenLoaded('organizationUnit', fn (): ?array => $this->organizationUnit ? [
-                'id' => (int) $this->organizationUnit->getKey(),
-                'code' => (string) $this->organizationUnit->code,
-                'name' => (string) $this->organizationUnit->name,
-            ] : null),
         ];
     }
 }

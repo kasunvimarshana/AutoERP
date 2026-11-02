@@ -1,5 +1,4 @@
 import type { NamedResource } from '@/shared/types/common';
-import type { WhatsAppVerificationRecipient, WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 
 export const supplierTypes = ['company', 'individual', 'government', 'internal', 'foreign', 'other'] as const;
 export const supplierStatuses = ['pending_approval', 'active', 'inactive', 'on_hold', 'blacklisted'] as const;
@@ -7,13 +6,7 @@ export const supplierAddressTypes = ['billing', 'shipping', 'registered', 'wareh
 export const supplierDocumentTypes = ['business_registration', 'tax_certificate', 'vat_certificate', 'svat_certificate', 'contract', 'license', 'insurance', 'other'] as const;
 export const supplierDocumentStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
 
-export interface SupplierDueTotal {
-    amount: string;
-    currency_code?: string | null;
-}
-
 export interface SupplierSummary extends NamedResource {
-    row_version: number;
     supplier_number: string;
     code: string;
     display_name?: string | null;
@@ -22,12 +15,10 @@ export interface SupplierSummary extends NamedResource {
     email?: string | null;
     phone?: string | null;
     mobile?: string | null;
-    whatsapp_contact?: (WhatsAppVerificationRecipient & { status: WhatsAppVerificationStatus }) | null;
     default_currency?: NamedResource | null;
     categories?: SupplierCategory[];
     is_credit_allowed: boolean;
     is_advance_allowed: boolean;
-    total_due?: SupplierDueTotal[];
 }
 
 export interface Supplier extends SupplierSummary {
@@ -51,7 +42,6 @@ export interface Supplier extends SupplierSummary {
 }
 
 export interface SupplierPayload {
-    row_version?: number;
     supplier_number?: string | null;
     code: string;
     name: string;

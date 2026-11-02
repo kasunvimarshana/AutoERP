@@ -2,15 +2,14 @@ import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { searchDepartments } from '../hrApi';
 import type { HrDepartment } from '../hrTypes';
 
-export function HrDepartmentSelect({ value, onChange, error, label = 'Department' }: {
+export function HrDepartmentSelect({ value, onChange, error }: {
     value: HrDepartment | null;
     onChange: (value: HrDepartment | null) => void;
     error?: string;
-    label?: string;
 }) {
     return (
         <GenericLookupSelect
-            label={label}
+            label="Department"
             value={value}
             onChange={onChange}
             search={searchDepartments}

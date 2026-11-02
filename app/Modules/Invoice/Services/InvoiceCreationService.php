@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
@@ -14,10 +13,8 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Invoice\Validators\InvoiceValidationService;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 use Modules\Tax\Services\TaxSnapshotService;
-use Modules\Tenant\Models\TenantModel;
 
 final class InvoiceCreationService
 {
@@ -36,15 +33,12 @@ final class InvoiceCreationService
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
         private readonly InvoiceIssuanceService $issuance,
         private readonly InvoiceReferenceSnapshotService $snapshots,
-        private readonly InvoiceDocumentSnapshotService $documentSnapshots,
         private readonly TaxSnapshotService $taxSnapshots,
-        private readonly InvoicePostingPlanService $postingPlans,
     ) {}
 
     public function create(CreateInvoiceData $data): Invoice
     {
         $this->validator->validateForCreation($data);
-        $this->validateCurrency($data);
 
         return DB::transaction(function () use ($data): Invoice {
             $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data, lockRows: true);
@@ -58,8 +52,7 @@ final class InvoiceCreationService
 
             // Creation has exactly one persisted initial state. Requested approved
             // or posted targets are applied below through legal lifecycle commands.
-            $invoice = new Invoice();
-            $invoice->forceFill([
+            $invoice = Invoice::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'invoice_number' => $this->numbers->resolve($data),
@@ -85,11 +78,8 @@ final class InvoiceCreationService
                 'notes' => $data->notes,
                 'created_by' => $data->createdBy,
             ]);
-            $invoice->save();
 
             $this->lines->create($invoice, $data, $calculation, $sourceLineRows);
-            $invoice->load('lines');
-            $this->documentSnapshots->create($invoice, $data);
             $this->sources->createSources(
                 $invoice,
                 $data,
@@ -98,9 +88,6 @@ final class InvoiceCreationService
             );
             $this->adjustments->createAdjustments($invoice, $preparedAdjustments);
             $this->balances->createBalance($invoice, $calculation->grandTotal);
-            if ($data->postingPlan !== null) {
-                $this->postingPlans->create($invoice, $data->postingPlan, $data->createdBy);
-            }
 
             $invoice = $invoice->refresh()->load('lines');
             $taxDocument = $this->taxDocumentMapper->map($invoice);
@@ -129,8 +116,6 @@ final class InvoiceCreationService
                 'adjustments',
                 'adjustmentAllocations',
                 'balance',
-                'postingPlan',
-                'documentSnapshot',
             ]);
         });
     }
@@ -138,7 +123,6 @@ final class InvoiceCreationService
     public function preview(CreateInvoiceData $data): InvoiceCalculationResult
     {
         $this->validator->validateForCreation($data);
-        $this->validateCurrency($data);
         $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data);
         $preparedAdjustments = $this->adjustmentAllocations->prepareAdjustmentAllocations($data, $sourceLineRows);
 
@@ -146,31 +130,6 @@ final class InvoiceCreationService
             $data,
             $this->allocatedAdjustments($preparedAdjustments),
         );
-    }
-
-    private function validateCurrency(CreateInvoiceData $data): void
-    {
-        $tenant = TenantModel::query()->findOrFail($data->tenantId);
-        $baseCurrencyId = $tenant->base_currency_id === null ? null : (int) $tenant->base_currency_id;
-
-        if ($data->currencyId === null) {
-            if ($this->math->compare($data->exchangeRate, '1.000000') !== 0) {
-                throw new InvalidArgumentException('An invoice without an explicit currency must use an exchange rate of 1.000000.');
-            }
-
-            return;
-        }
-
-        $currency = CurrencyModel::query()->find($data->currencyId);
-        if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
-            throw new InvalidArgumentException('Invoice currency must be active.');
-        }
-
-        if ($baseCurrencyId !== null
-            && $data->currencyId === $baseCurrencyId
-            && $this->math->compare($data->exchangeRate, '1.000000') !== 0) {
-            throw new InvalidArgumentException('Tenant base currency invoices must use an exchange rate of 1.000000.');
-        }
     }
 
     /**

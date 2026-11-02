@@ -24,7 +24,7 @@ const calculationOptions = [
     { value: 'percentage', label: 'Percentage' },
 ];
 
-export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, warehouseId, purchaseDate, errorFor, onSave, onClear, onCancel }: {
+export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, warehouseId, purchaseDate, errorFor, onSave, onCancel }: {
     line: EditablePurchaseLine;
     mode: 'create' | 'edit';
     config: PurchaseLineEditorConfig;
@@ -34,7 +34,6 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
     purchaseDate?: string;
     errorFor: (field: PurchaseLineField) => string | undefined;
     onSave: (line: EditablePurchaseLine) => void;
-    onClear?: () => void;
     onCancel: () => void;
 }) {
     const [draft, setDraft] = useState(line);
@@ -154,9 +153,7 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <ItemLookupSelect
-                        stockOnly={config.stockItemsOnly}
                         value={draft.item}
-                        autoFocus={mode === 'create' && Boolean(config.continuousCreate)}
                         onChange={(item) => {
                             setDraft((current) => ({
                                 ...current,
@@ -307,10 +304,7 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                 </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2">
-                {mode === 'create' && onClear && (
-                    <Button type="button" variant="secondary" onClick={onClear}>Clear</Button>
-                )}
+            <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
                 <Button type="submit" loading={contextLoading} disabled={Boolean(draft.item) && (!context || Boolean(contextError))}>{mode === 'edit' ? 'Save line' : 'Add line'}</Button>
             </div>

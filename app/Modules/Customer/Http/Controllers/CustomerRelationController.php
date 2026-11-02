@@ -9,7 +9,6 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Customer\Http\Requests\AssignCustomerCategoryRequest;
-use Modules\Customer\Http\Requests\DeleteCustomerContactRequest;
 use Modules\Customer\Http\Requests\ListCustomerRequest;
 use Modules\Customer\Http\Requests\StoreCustomerAddressRequest;
 use Modules\Customer\Http\Requests\StoreCustomerBankAccountRequest;
@@ -76,10 +75,10 @@ final class CustomerRelationController
         ));
     }
 
-    public function deleteContact(DeleteCustomerContactRequest $request, int $customer, int $contact): JsonResponse
+    public function deleteContact(ListCustomerRequest $request, int $customer, int $contact): JsonResponse
     {
         $parent = $this->customer($request, $customer);
-        $this->contactsService->delete($parent, $this->queries->contact($parent, $contact), (int) $request->validated('row_version'));
+        $this->contactsService->delete($parent, $this->queries->contact($parent, $contact));
 
         return response()->json(null, 204);
     }

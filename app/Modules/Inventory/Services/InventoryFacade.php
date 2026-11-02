@@ -100,14 +100,6 @@ final class InventoryFacade
         return $this->adjustments->post($adjustment, $postedBy);
     }
 
-    public function reverseMovement(
-        InventoryMovement $movement,
-        ?int $reversedBy = null,
-        ?string $reason = null,
-    ): InventoryMovement {
-        return $this->movements->reverse($movement, $reversedBy, $reason);
-    }
-
     public function reverse(
         InventoryMovement|InventoryAdjustment|InventoryTransfer $record,
         ?int $reversedBy = null,

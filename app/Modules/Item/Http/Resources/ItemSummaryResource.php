@@ -18,10 +18,6 @@ final class ItemSummaryResource extends JsonResource
             'id' => (int) $this->getKey(),
             'code' => $this->code,
             'name' => $this->name,
-            'has_duplicate_name' => $this->when(
-                array_key_exists('has_duplicate_name', $this->resource->getAttributes()),
-                fn () => (bool) $this->resource->getAttribute('has_duplicate_name'),
-            ),
             'sku' => $this->sku,
             'barcode' => $this->barcode,
             'item_type' => $this->enumValue($this->item_type),
@@ -35,36 +31,11 @@ final class ItemSummaryResource extends JsonResource
             'purchase_tax_group' => $this->whenLoaded('purchaseTaxGroup', fn () => $this->namedResource($this->purchaseTaxGroup)),
             'sales_tax_group' => $this->whenLoaded('salesTaxGroup', fn () => $this->namedResource($this->salesTaxGroup)),
             'is_stockable' => (bool) $this->is_stockable,
-            'reorder_level' => $this->reorder_level === null ? null : (string) $this->reorder_level,
             'is_combo' => (bool) $this->is_combo,
             'is_tax_exempt' => (bool) ($this->is_tax_exempt ?? false),
             'default_tax_group_id' => $this->default_tax_group_id,
             'purchase_tax_group_id' => $this->purchase_tax_group_id,
             'sales_tax_group_id' => $this->sales_tax_group_id,
-            'resolved_sales_unit_price' => $this->when(
-                array_key_exists('resolved_sales_unit_price', $this->resource->getAttributes()),
-                fn () => $this->resource->getAttribute('resolved_sales_unit_price'),
-            ),
-            'resolved_service_unit_price' => $this->when(
-                array_key_exists('resolved_service_unit_price', $this->resource->getAttributes()),
-                fn () => $this->resource->getAttribute('resolved_service_unit_price'),
-            ),
-            'has_service_price' => $this->when(
-                array_key_exists('has_service_price', $this->resource->getAttributes()),
-                fn () => (bool) $this->resource->getAttribute('has_service_price'),
-            ),
-            'resolved_purchase_unit_price' => $this->when(
-                array_key_exists('resolved_purchase_unit_price', $this->resource->getAttributes()),
-                fn () => $this->resource->getAttribute('resolved_purchase_unit_price'),
-            ),
-            'available_stock_quantity' => $this->when(
-                array_key_exists('available_stock_quantity', $this->resource->getAttributes()),
-                fn () => $this->resource->getAttribute('available_stock_quantity'),
-            ),
-            'reserved_stock_quantity' => $this->when(
-                array_key_exists('reserved_stock_quantity', $this->resource->getAttributes()),
-                fn () => $this->resource->getAttribute('reserved_stock_quantity'),
-            ),
             'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

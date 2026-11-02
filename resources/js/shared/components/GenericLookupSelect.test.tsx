@@ -84,55 +84,6 @@ describe('GenericLookupSelect', () => {
         expect(screen.queryByText('Stale result')).not.toBeInTheDocument();
         expect(screen.getByText('Fresh result')).toBeInTheDocument();
     });
-
-    it('renders a custom empty state action when no matches are found', async () => {
-        const search = vi.fn(async (): Promise<LookupResult<NamedResource>> => ({
-            data: [],
-            links: {},
-            meta: { current_page: 1, from: null, last_page: 1, path: '/', per_page: 20, to: null, total: 0 },
-        }));
-
-        render(
-            <GenericLookupSelect<NamedResource>
-                label="Source"
-                value={null}
-                onChange={() => undefined}
-                search={search}
-                formatLabel={(item) => item.name}
-                minSearchLength={2}
-                debounceMs={0}
-                renderEmptyState={({ searchText }) => (
-                    <button type="button">Create {searchText}</button>
-                )}
-            />,
-        );
-
-        await userEvent.type(screen.getByRole('combobox', { name: 'Source' }), 'AB');
-
-        expect(await screen.findByRole('button', { name: 'Create AB' })).toBeInTheDocument();
-    });
-
-    it('does not show a required-selection error when an untouched empty lookup loses focus', async () => {
-        render(
-            <GenericLookupSelect<NamedResource>
-                label="Source"
-                value={null}
-                onChange={() => undefined}
-                search={async () => ({ data: [], links: {}, meta: undefined })}
-                formatLabel={(item) => item.name}
-                required
-            />,
-        );
-
-        const input = screen.getByRole('combobox', { name: 'Source' });
-        fireEvent.focus(input);
-        fireEvent.blur(input);
-        expect(screen.queryByText('Select a valid source from the list.')).not.toBeInTheDocument();
-
-        await userEvent.type(input, 'Unknown source');
-        fireEvent.blur(input);
-        expect(screen.getByText('Select a valid source from the list.')).toBeInTheDocument();
-    });
 });
 
 function renderLookup(props: Partial<{

@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\VehicleRental\Http\Requests;
+
+use Illuminate\Validation\Rule;
+use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\VehicleRental\Enums\RentalUsageEventApplicability;
+use Modules\VehicleRental\Enums\RentalUsageEventType;
+
+final class StoreRentalUsageRequest extends TenantScopedRequest
+{
+    public function rules(): array
+    {
+        return [
+            'usage_date' => ['required', 'date'],
+            'started_at' => ['required', 'date'],
+            'ended_at' => ['required', 'date', 'after:started_at'],
+            'start_odometer' => ['required', 'decimal:0,6', 'gte:0'],
+            'end_odometer' => ['required', 'decimal:0,6', 'gte:start_odometer'],
+            'garage_distance_km' => ['nullable', 'decimal:0,6', 'gte:0'],
+            'internal_distance_km' => ['nullable', 'decimal:0,6', 'gte:0'],
+            'normal_overtime_minutes' => ['nullable', 'integer', 'gte:0'],
+            'double_overtime_minutes' => ['nullable', 'integer', 'gte:0'],
+            'triple_overtime_minutes' => ['nullable', 'integer', 'gte:0'],
+            'night_out_count' => ['nullable', 'decimal:0,6', 'gte:0'],
+            'driver_assignment_id' => ['nullable', 'integer', 'min:1'],
+            'trip_from' => ['nullable', 'string', 'max:255'],
+            'trip_to' => ['nullable', 'string', 'max:255'],
+            'trip_purpose' => ['nullable', 'string', 'max:255'],
+            'odometer_variance_reason' => ['nullable', 'string'],
+            'remarks' => ['nullable', 'string'],
+            'metadata' => ['nullable', 'array'],
+            'metadata.driver_in_time' => ['nullable', 'string', 'max:50'],
+            'metadata.driver_out_time' => ['nullable', 'string', 'max:50'],
+            'metadata.normal_hours_threshold' => ['nullable', 'numeric', 'gte:0'],
+            'metadata.driver_hourly_rate' => ['nullable', 'numeric', 'gte:0'],
+            'metadata.driver_daily_rate' => ['nullable', 'numeric', 'gte:0'],
+            'metadata.driver_ot_hours' => ['nullable', 'numeric', 'gte:0'],
+            'metadata.driver_ot_amount' => ['nullable', 'numeric', 'gte:0'],
+            'metadata.driver_salary_amount' => ['nullable', 'numeric', 'gte:0'],
+            'events' => ['nullable', 'array'],
+            'events.*.event_type' => ['required', Rule::enum(RentalUsageEventType::class)],
+            'events.*.applicability' => ['required', Rule::enum(RentalUsageEventApplicability::class)],
+            'events.*.occurred_at' => ['nullable', 'date'],
+            'events.*.quantity' => ['required', 'decimal:0,6', 'gte:0'],
+            'events.*.unit' => ['nullable', 'string', 'max:30'],
+            'events.*.reference_number' => ['nullable', 'string', 'max:100'],
+            'events.*.remarks' => ['nullable', 'string'],
+        ];
+    }
+}

@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { hasPermission } from '@/modules/auth/accessControl';
-import { useAuth } from '@/modules/auth/AuthProvider';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -13,13 +11,9 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { listUomConversions } from './uomApi';
-import { uomPermissions } from './uomPermissions';
 import type { UomConversion } from './uomTypes';
 
 export default function UomConversionListPage() {
-    const auth = useAuth();
-    const canCreate = hasPermission(auth, uomPermissions.conversionsCreate);
-    const canUpdate = hasPermission(auth, uomPermissions.conversionsUpdate);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const debouncedSearch = useDebounce(search);
@@ -30,12 +24,12 @@ export default function UomConversionListPage() {
         { key: 'to', header: 'To', render: (row) => formatUom(row.to_uom) },
         { key: 'factor', header: 'Factor', render: (row) => row.conversion_factor },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        ...(canUpdate ? [{ key: 'actions', header: '', className: 'text-right', render: (row: UomConversion) => <Link className="text-sm font-semibold text-slate-600 hover:text-sky-700" to={`/uom-conversions/${row.id}/edit`}>Edit</Link> }] : []),
+        { key: 'actions', header: '', className: 'text-right', render: (row) => <Link className="text-sm font-semibold text-slate-600 hover:text-sky-700" to={`/uom-conversions/${row.id}/edit`}>Edit</Link> },
     ];
 
     return (
         <>
-            <ContentHeader title="UOM Conversions" description="Generic conversion factors between units." actions={canCreate ? <LinkButton to="/uom-conversions/create">New conversion</LinkButton> : undefined} />
+            <ContentHeader title="UOM Conversions" description="Generic conversion factors between units." actions={<LinkButton to="/uom-conversions/create">New conversion</LinkButton>} />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search UOM code, name, or symbol" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}

@@ -18,14 +18,11 @@ use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
-use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\FinanceStatementService;
-use Modules\Finance\Services\JournalPostingService;
-use Modules\Finance\Services\JournalReversalService;
 use Modules\Finance\Services\TrialBalanceService;
 use Tests\TestCase;
 
@@ -159,204 +156,6 @@ final class FinanceHardeningTest extends TestCase
         });
     }
 
-    public function test_posted_replay_is_idempotent_but_reversed_finance_journal_cannot_post_again(): void
-    {
-        [$tenantId] = $this->context();
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
-            $posting = app(FinancePostingInterface::class);
-            $request = $this->directRequest($tenantId, '2026-06-30');
-            $posted = $posting->post($request);
-
-            $same = $posting->post($request);
-            $this->assertSame($posted->journalId, $same->journalId);
-            $this->assertSame('posted', $same->status);
-            $this->assertDatabaseCount('finance_ledger_entries', 2);
-
-            $posting->reverseJournal($posted->journalId, '2026-07-01', reason: 'Correct source document');
-            $this->assertDatabaseCount('finance_ledger_entries', 4);
-
-            foreach ([
-                [fn () => $posting->postJournal($posted->journalId),
-                    'Only draft journals can be posted. Reversed journals cannot be reposted.'],
-                [fn () => $posting->createDraftJournal($request),
-                    'Reversed Finance posting sources cannot be replayed.'],
-                [fn () => $posting->post($request),
-                    'Reversed Finance posting sources cannot be replayed.'],
-                [fn () => app(JournalPostingService::class)->post(
-                    FinanceJournalEntry::query()->findOrFail($posted->journalId),
-                ), 'Only draft journals can be posted. Reversed journals cannot be reposted.'],
-            ] as [$repost, $expectedMessage]) {
-                try {
-                    $repost();
-                    $this->fail('Reversed source was reported as a successful posting replay.');
-                } catch (InvalidArgumentException $exception) {
-                    $this->assertSame($expectedMessage, $exception->getMessage());
-                }
-            }
-
-            $this->assertDatabaseHas('finance_journal_entries', [
-                'id' => $posted->journalId,
-                'status' => 'reversed',
-            ]);
-            $this->assertDatabaseCount('finance_ledger_entries', 4);
-        });
-    }
-
-    public function test_unbalanced_source_lines_cannot_hide_behind_balanced_journal_header(): void
-    {
-        [$tenantId] = $this->context();
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
-            $posting = app(FinancePostingInterface::class);
-            $draft = $posting->createDraftJournal($this->directRequest($tenantId, '2026-06-30'));
-
-            // Simulate a stale imported header: both header sides still balance
-            // each other, but neither matches the underlying journal lines.
-            FinanceJournalEntry::query()->findOrFail($draft->journalId)
-                ->forceFill(['total_debit' => '90.000000', 'total_credit' => '90.000000'])
-                ->save();
-
-            try {
-                $posting->postJournal($draft->journalId);
-                $this->fail('A journal with inconsistent header and line totals was posted.');
-            } catch (InvalidArgumentException $exception) {
-                $this->assertSame('Journal header totals do not match its lines.', $exception->getMessage());
-            }
-
-            $this->assertDatabaseHas('finance_journal_entries', [
-                'id' => $draft->journalId,
-                'status' => 'draft',
-            ]);
-            $this->assertDatabaseCount('finance_ledger_entries', 0);
-        });
-    }
-
-    public function test_draft_journal_without_lines_cannot_post_zero_entry_ledger(): void
-    {
-        [$tenantId] = $this->context();
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
-            $posting = app(FinancePostingInterface::class);
-            $draft = $posting->createDraftJournal($this->directRequest($tenantId, '2026-06-30'));
-
-            // An incomplete historical import must never become a posted
-            // journal merely because the stored header still balances.
-            DB::table('finance_journal_lines')
-                ->where('journal_entry_id', $draft->journalId)
-                ->delete();
-
-            try {
-                $posting->postJournal($draft->journalId);
-                $this->fail('A journal with no lines was posted.');
-            } catch (InvalidArgumentException $exception) {
-                $this->assertSame('Journal cannot be posted without lines.', $exception->getMessage());
-            }
-
-            $this->assertDatabaseHas('finance_journal_entries', [
-                'id' => $draft->journalId,
-                'status' => 'draft',
-            ]);
-            $this->assertDatabaseCount('finance_ledger_entries', 0);
-        });
-    }
-
-    public function test_posted_journal_cannot_be_replayed_or_reversed_with_missing_ledger(): void
-    {
-        [$tenantId] = $this->context();
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
-            $posting = app(FinancePostingInterface::class);
-            $request = $this->directRequest($tenantId, '2026-06-30');
-            $posted = $posting->post($request);
-
-            $ledgerId = DB::table('finance_ledger_entries')
-                ->where('journal_entry_id', $posted->journalId)
-                ->orderBy('id')
-                ->value('id');
-            $this->assertNotNull($ledgerId);
-            // Deliberate untrusted historical import corruption in disposable
-            // test DB: bypass the immutable Eloquent ledger guard.
-            DB::table('finance_ledger_entries')->where('id', $ledgerId)->delete();
-
-            foreach ([
-                fn () => $posting->postJournal($posted->journalId),
-                fn () => $posting->createDraftJournal($request),
-                fn () => $posting->post($request),
-                fn () => $posting->reverseJournal(
-                    $posted->journalId, '2026-07-01', reason: 'Correct document',
-                ),
-            ] as $operation) {
-                try {
-                    $operation();
-                    $this->fail('Corrupt posted Finance journal was accepted.');
-                } catch (InvalidArgumentException $exception) {
-                    $this->assertSame(
-                        'Posted Finance journal ledger does not match its journal lines.',
-                        $exception->getMessage(),
-                    );
-                }
-            }
-
-            $this->assertDatabaseHas('finance_journal_entries', [
-                'id' => $posted->journalId,
-                'status' => 'posted',
-            ]);
-            $this->assertDatabaseCount('finance_ledger_entries', 1);
-            $this->assertDatabaseCount('finance_journal_entries', 1);
-        });
-    }
-
-    public function test_posted_journal_cannot_be_replayed_with_modified_ledger_amount(): void
-    {
-        [$tenantId] = $this->context();
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
-            $posting = app(FinancePostingInterface::class);
-            $posted = $posting->post($this->directRequest($tenantId, '2026-06-30'));
-            $ledgerId = DB::table('finance_ledger_entries')
-                ->where('journal_entry_id', $posted->journalId)
-                ->where('debit', '>', 0)
-                ->value('id');
-            $this->assertNotNull($ledgerId);
-
-            DB::table('finance_ledger_entries')->where('id', $ledgerId)
-                ->update(['debit' => '99.000000']);
-
-            try {
-                $posting->postJournal($posted->journalId);
-                $this->fail('Finance accepted a posted ledger with altered monetary evidence.');
-            } catch (InvalidArgumentException $exception) {
-                $this->assertSame(
-                    'Posted Finance journal ledger does not match its journal lines.',
-                    $exception->getMessage(),
-                );
-            }
-
-            $this->assertDatabaseCount('finance_ledger_entries', 2);
-            $this->assertDatabaseCount('finance_journal_entries', 1);
-        });
-    }
-
-    public function test_source_owned_journal_cannot_be_reversed_directly_from_finance(): void
-    {
-        [$tenantId] = $this->context();
-
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
-            $posting = app(FinancePostingInterface::class);
-            $posted = $posting->post(new FinancePostingRequest(
-                source: new PostingSourceData('invoice', 77, $tenantId, sourceModule: 'invoice'),
-                postingDate: '2026-06-30',
-                lines: [
-                    new FinancePostingLine(null, 'Cash', debit: '100.000000', profileKey: 'cash'),
-                    new FinancePostingLine(null, 'Capital', credit: '100.000000', profileKey: 'capital'),
-                ],
-                postingProfileCode: 'direct_test',
-            ));
-            $journal = FinanceJournalEntry::query()->findOrFail($posted->journalId);
-
-            $this->expectException(InvalidArgumentException::class);
-            $this->expectExceptionMessage('Source-owned journals must be reversed through the module that owns the source document.');
-
-            app(JournalReversalService::class)->reverse($journal, '2026-07-01');
-        });
-    }
-
     public function test_trial_balance_and_financial_statements_are_ledger_balanced(): void
     {
         [$tenantId, $cash] = $this->context(withIncomeAccounts: true);
@@ -451,7 +250,7 @@ final class FinanceHardeningTest extends TestCase
     private function directRequest(int $tenantId, string $date): FinancePostingRequest
     {
         return new FinancePostingRequest(
-            source: new PostingSourceData('test_source', 1, $tenantId, sourceModule: FinanceJournalEntry::SOURCE_MODULE),
+            source: new PostingSourceData('test_source', 1, $tenantId, sourceModule: 'test'),
             postingDate: $date,
             lines: [
                 new FinancePostingLine(null, 'Cash', debit: '100.000000', profileKey: 'cash'),

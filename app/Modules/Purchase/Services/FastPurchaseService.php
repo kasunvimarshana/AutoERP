@@ -898,10 +898,7 @@ final class FastPurchaseService
             $this->validator->invalidReference($field, 'item');
         }
 
-        $item = $this->validator->item($tenantId, $organizationUnitId, (int) $item->getKey(), $field);
-        $this->validator->assertPurchasableStockItem($item, $field);
-
-        return $item;
+        return $this->validator->item($tenantId, $organizationUnitId, (int) $item->getKey(), $field);
     }
 
     private function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId, bool $lockRecords, string $field): WarehouseModel

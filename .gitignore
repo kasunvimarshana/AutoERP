@@ -25,5 +25,3 @@ Thumbs.db
 /.vite
 .env.local
 *.zip
-
-# /tmp

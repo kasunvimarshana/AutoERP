@@ -1,5 +1,4 @@
 import type { NamedResource } from '@/shared/types/common';
-import type { WhatsAppVerificationRecipient, WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 
 export const customerTypes = ['individual', 'company', 'government', 'internal', 'foreign', 'retail', 'wholesale', 'corporate', 'other'] as const;
 export const customerStatuses = ['pending_approval', 'active', 'inactive', 'on_hold', 'blacklisted'] as const;
@@ -8,13 +7,7 @@ export const customerDocumentTypes = ['business_registration', 'tax_certificate'
 export const customerDocumentStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
 export const preferredCommunicationChannels = ['email', 'phone', 'mobile', 'sms', 'whatsapp', 'other'] as const;
 
-export interface CustomerVehicleSummary {
-    id: number;
-    registration_number?: string | null;
-}
-
 export interface CustomerSummary extends NamedResource {
-    row_version: number;
     customer_number: string;
     code: string;
     display_name?: string | null;
@@ -23,12 +16,10 @@ export interface CustomerSummary extends NamedResource {
     email?: string | null;
     phone?: string | null;
     mobile?: string | null;
-    whatsapp_contact?: (WhatsAppVerificationRecipient & { status: WhatsAppVerificationStatus }) | null;
     default_currency?: NamedResource | null;
     categories?: CustomerCategory[];
-    credit_allowed: boolean;
-    advance_allowed: boolean;
-    current_vehicles?: CustomerVehicleSummary[];
+    is_credit_allowed: boolean;
+    is_advance_allowed: boolean;
     is_tax_exempt: boolean;
     marketing_consent: boolean;
 }
@@ -40,6 +31,8 @@ export interface Customer extends CustomerSummary {
     vat_number?: string | null;
     svat_number?: string | null;
     business_registration_number?: string | null;
+    credit_limit: string;
+    opening_balance: string;
     preferred_communication_channel?: string | null;
     notes?: string | null;
     metadata?: Record<string, unknown> | null;
@@ -53,7 +46,6 @@ export interface Customer extends CustomerSummary {
 }
 
 export interface CustomerPayload {
-    row_version?: number;
     customer_number?: string | null;
     code: string;
     name: string;
@@ -66,11 +58,14 @@ export interface CustomerPayload {
     mobile?: string | null;
     website?: string | null;
     default_currency_id?: number | null;
-    payment_term_id?: number | null;
     tax_registration_number?: string | null;
     vat_number?: string | null;
     svat_number?: string | null;
     business_registration_number?: string | null;
+    credit_limit?: string;
+    opening_balance?: string;
+    is_credit_allowed: boolean;
+    is_advance_allowed: boolean;
     is_tax_exempt: boolean;
     marketing_consent: boolean;
     preferred_communication_channel?: string | null;
@@ -79,7 +74,6 @@ export interface CustomerPayload {
 
 export interface CustomerContact {
     id: number;
-    row_version: number;
     contact_name: string;
     designation?: string | null;
     department?: string | null;
@@ -91,7 +85,7 @@ export interface CustomerContact {
     notes?: string | null;
 }
 
-export type CustomerContactPayload = Omit<CustomerContact, 'id' | 'row_version'> & { row_version?: number };
+export type CustomerContactPayload = Omit<CustomerContact, 'id'>;
 
 export interface CustomerAddress {
     id: number;
@@ -158,12 +152,9 @@ export type CustomerDocumentPayload = Omit<CustomerDocument, 'id'>;
 
 export interface CustomerCreditProfile {
     id?: number;
-    row_version?: number | null;
     credit_limit: string;
     credit_period_days?: number | null;
     warning_threshold_percent: string;
-    credit_allowed: boolean;
-    advance_allowed: boolean;
     allow_over_credit: boolean;
     allow_partial_payment: boolean;
     is_active: boolean;
@@ -182,7 +173,7 @@ export interface CustomerWithRelationsPayload {
     contacts: CustomerContactPayload[];
     addresses: CustomerAddressPayload[];
     bank_accounts: CustomerBankAccountPayload[];
-    categories?: number[];
-    documents?: CustomerDocumentPayload[];
-    credit_profile?: Omit<CustomerCreditProfile, 'id' | 'row_version'> | null;
+    categories: number[];
+    documents: CustomerDocumentPayload[];
+    credit_profile?: CustomerCreditProfile | null;
 }

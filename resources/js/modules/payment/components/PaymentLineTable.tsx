@@ -3,11 +3,8 @@ import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import type { PaymentMethod } from '../paymentApi';
-import { paymentMethodKind } from '../paymentLineInput';
 import { PaymentMethodFields } from './PaymentMethodFields';
 import { PaymentSummary } from './PaymentSummary';
-
-export const PAYMENT_AMOUNT_FRACTION_DIGITS = 2;
 
 export type PaymentLineDraft = {
     key: number;
@@ -26,6 +23,13 @@ interface PaymentLineTableProps {
     onMetadataChange: (key: number, field: string, value: string) => void;
     onAddLine: () => void;
     onRemoveLine: (key: number) => void;
+}
+
+function methodKind(method?: PaymentMethod): string {
+    const type = method?.method_type ?? '';
+    if (['bank_transfer', 'direct_debit'].includes(type)) return 'bank_transfer';
+    if (['digital_wallet', 'mobile_wallet'].includes(type)) return 'wallet';
+    return type || 'other';
 }
 
 function methodLabel(method: PaymentMethod): string {
@@ -51,7 +55,7 @@ export function PaymentLineTable({
         <div className="space-y-4">
             {lines.map((line) => {
                 const method = methods.find((row) => String(row.id) === line.paymentMethodId);
-                const kind = paymentMethodKind(method);
+                const kind = methodKind(method);
 
                 return (
                     <div key={line.key} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -63,7 +67,7 @@ export function PaymentLineTable({
                                 placeholder={methodsLoading ? 'Loading methods...' : 'Configured method'}
                                 onChange={(event) => onLineChange(line.key, { paymentMethodId: event.target.value, metadata: {} })}
                             />
-                            <DecimalInput label="Amount" maxFractionDigits={PAYMENT_AMOUNT_FRACTION_DIGITS} value={line.amount} onChange={(event) => onLineChange(line.key, { amount: event.target.value })} />
+                            <DecimalInput label="Amount" value={line.amount} onChange={(event) => onLineChange(line.key, { amount: event.target.value })} />
                             <Input label="Line reference" value={line.reference} onChange={(event) => onLineChange(line.key, { reference: event.target.value })} />
                             <Button type="button" variant="danger" disabled={lines.length === 1} onClick={() => onRemoveLine(line.key)}>Remove</Button>
                         </div>

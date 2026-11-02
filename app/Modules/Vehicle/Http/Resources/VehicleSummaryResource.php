@@ -16,7 +16,6 @@ final class VehicleSummaryResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
-            'row_version' => (int) $this->row_version,
             'vehicle_number' => $this->vehicle_number,
             'code' => $this->code,
             'registration_number' => $this->registration_number,
@@ -31,7 +30,7 @@ final class VehicleSummaryResource extends JsonResource
             'current_customer' => $this->whenLoaded('currentOwnerships', fn () => $this->ownershipSnapshot('customer')),
             'current_supplier' => $this->whenLoaded('currentOwnerships', fn () => $this->ownershipSnapshot('supplier')),
             'status' => $this->enumValue($this->status),
-            'odometer_reading' => $this->odometer_reading === null ? null : (string) $this->odometer_reading,
+            'odometer_reading' => (string) $this->odometer_reading,
             'odometer_unit' => $this->odometer_unit,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

@@ -20,7 +20,7 @@ final readonly class CreateCustomerData
      */
     public function __construct(
         public int $tenantId,
-        public ?string $code,
+        public string $code,
         public string $name,
         public CustomerType $customerType,
         public ?int $organizationUnitId = null,
@@ -38,6 +38,10 @@ final readonly class CreateCustomerData
         public ?string $vatNumber = null,
         public ?string $svatNumber = null,
         public ?string $businessRegistrationNumber = null,
+        public string $creditLimit = '0.000000',
+        public string $openingBalance = '0.000000',
+        public bool $isCreditAllowed = true,
+        public bool $isAdvanceAllowed = true,
         public bool $isTaxExempt = false,
         public bool $marketingConsent = false,
         public ?PreferredCommunicationChannel $preferredCommunicationChannel = null,

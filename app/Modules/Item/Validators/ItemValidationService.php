@@ -18,9 +18,7 @@ use Modules\Item\DTOs\ItemUsageRuleData;
 use Modules\Item\DTOs\ItemVariantData;
 use Modules\Item\DTOs\UpdateItemData;
 use Modules\Item\Enums\CostingMethod;
-use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
-use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemBrand;
@@ -43,7 +41,6 @@ final class ItemValidationService
 
     private const BUNDLE_CHILD_TYPES = [
         ItemType::Stock->value,
-        ItemType::Consumable->value,
         ItemType::Service->value,
         ItemType::Labour->value,
         ItemType::NonStock->value,
@@ -143,11 +140,7 @@ final class ItemValidationService
         $this->assertPositiveDecimal($data->conversionFactor, 'Item unit conversion factor must be greater than zero.');
         $organizationUnitId = $item->organization_unit_id === null ? null : (int) $item->organization_unit_id;
         $this->assertUomIsUsable((int) $item->tenant_id, $organizationUnitId, $data->uomId);
-        $this->assertUomCompatibleWithItemBase(
-            $item,
-            $data->uomId,
-            $data->unitRole === ItemUnitRole::Purchase,
-        );
+        $this->assertUomCompatibleWithItemBase($item, $data->uomId);
 
         $duplicate = $item->units()
             ->where('uom_id', $data->uomId)
@@ -183,7 +176,6 @@ final class ItemValidationService
     public function validateBundle(Item $parent, ItemBundleData $data): void
     {
         $this->assertPositiveDecimal($data->quantity, 'Item bundle quantity must be greater than zero.');
-        $this->assertNotNegativeDecimal($data->unitCost, 'Item bundle unit cost cannot be negative.');
 
         $parentType = $parent->item_type instanceof ItemType ? $parent->item_type->value : (string) $parent->item_type;
         if (! in_array($parentType, self::BUNDLE_PARENT_TYPES, true)) {
@@ -198,14 +190,6 @@ final class ItemValidationService
             throw new InvalidArgumentException('Item bundle line type is invalid.');
         }
 
-        if ($data->lineType !== ItemType::Labour->value
-            && ($data->usesJobSupervisor || ! $this->math->isZero($data->unitCost))) {
-            throw ValidationException::withMessages([
-                'unit_cost' => ['Bundle commission cost is only available for labour lines.'],
-                'uses_job_supervisor' => ['Job supervisor assignment is only available for labour lines.'],
-            ]);
-        }
-
         $child = Item::query()->findOrFail($data->childItemId);
         $this->assertItemScope($parent, $child);
 
@@ -218,12 +202,6 @@ final class ItemValidationService
         $childType = $child->item_type instanceof ItemType ? $child->item_type->value : (string) $child->item_type;
         if (! in_array($childType, self::BUNDLE_CHILD_TYPES, true)) {
             throw new InvalidArgumentException('Item bundle child type is not supported.');
-        }
-
-        if ($child->is_stockable && $data->lineType !== ItemType::Stock->value) {
-            throw ValidationException::withMessages([
-                'line_type' => ['Stockable bundle items must use the stock line type.'],
-            ]);
         }
 
         if ($data->childVariantId !== null) {
@@ -248,12 +226,7 @@ final class ItemValidationService
             $item->organization_unit_id === null ? null : (int) $item->organization_unit_id,
         );
         $this->assertUomIsUsable((int) $item->tenant_id, $data->organizationUnitId, $data->uomId);
-        $this->assertItemUomIsActive(
-            $item,
-            $data->uomId,
-            'Price UOM must be an active unit for the selected item.',
-            $data->priceType === ItemPriceType::Purchase,
-        );
+        $this->assertItemUomIsActive($item, $data->uomId, 'Price UOM must be an active unit for the selected item.');
         $this->assertCurrencyIsUsable((int) $item->tenant_id, $data->currencyId);
 
         $effectiveFrom = $this->parseDate($data->effectiveFrom, 'Item price effective from date is invalid.');
@@ -552,10 +525,9 @@ final class ItemValidationService
         }
     }
 
-    private function assertUomCompatibleWithItemBase(Item $item, int $uomId, bool $allowPurchasePack = false): void
+    private function assertUomCompatibleWithItemBase(Item $item, int $uomId): void
     {
-        // A purchase pack may represent contents measured in a different physical UOM category.
-        if ($allowPurchasePack || $item->base_uom_id === null || (int) $item->base_uom_id === $uomId) {
+        if ($item->base_uom_id === null || (int) $item->base_uom_id === $uomId) {
             return;
         }
 
@@ -586,32 +558,24 @@ final class ItemValidationService
         }
     }
 
-    private function assertItemUomIsActive(
-        Item $item,
-        ?int $uomId,
-        string $message,
-        bool $allowPurchasePack = false,
-    ): void
+    private function assertItemUomIsActive(Item $item, ?int $uomId, string $message): void
     {
         if ($uomId === null) {
             return;
         }
 
-        $unit = ItemUnit::query()
+        $this->assertUomCompatibleWithItemBase($item, $uomId);
+        $exists = ItemUnit::query()
             ->where('item_id', $item->getKey())
             ->where('uom_id', $uomId)
             ->where('is_active', true)
-            ->first();
+            ->exists();
 
-        if (! $unit instanceof ItemUnit) {
+        if (! $exists) {
             throw ValidationException::withMessages([
                 'uom_id' => [$message],
             ]);
         }
-
-        $isPurchasePack = $allowPurchasePack
-            && $unit->unit_role === ItemUnitRole::Purchase;
-        $this->assertUomCompatibleWithItemBase($item, $uomId, $isPurchasePack);
     }
 
     private function assertPositiveDecimal(string $value, string $message): void

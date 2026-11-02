@@ -18,8 +18,6 @@ import {
 } from '../vehicleServiceApi';
 import type { VehicleServiceDocument } from '../vehicleServiceTypes';
 
-const BYTES_PER_KILOBYTE = 1024;
-const BYTES_PER_MEGABYTE = BYTES_PER_KILOBYTE * BYTES_PER_KILOBYTE;
 
 export default function VehicleServiceDocumentTab({
     jobId,
@@ -28,7 +26,7 @@ export default function VehicleServiceDocumentTab({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged: (nextVersion: number) => void;
+    onChanged?: () => void;
 }) {
     const result = useApi((signal) => listVehicleServiceDocuments(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServiceDocumentOptions(jobId, signal), [jobId]);
@@ -58,12 +56,12 @@ export default function VehicleServiceDocumentTab({
 
         try {
             const created = await createVehicleServiceDocument(jobId, payload);
-            result.setData((current) => [created, ...(current ?? [])]);
+            result.setData([created, ...(result.data ?? [])]);
             setDescription('');
             setFile(null);
             setFileInputKey((current) => current + 1);
             formGuard.markSaved();
-            onChanged(expectedVersion + 1);
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -89,9 +87,9 @@ export default function VehicleServiceDocumentTab({
         setError(null);
         try {
             await deleteVehicleServiceDocument(jobId, deleteTarget.id, expectedVersion);
-            result.setData((current) => (current ?? []).filter((document) => document.id !== deleteTarget.id));
+            result.setData((result.data ?? []).filter((document) => document.id !== deleteTarget.id));
             setDeleteTarget(null);
-            onChanged(expectedVersion + 1);
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -198,10 +196,11 @@ export default function VehicleServiceDocumentTab({
 }
 
 function formatBytes(value: number): string {
-    if (value < BYTES_PER_KILOBYTE) return `${value} B`;
-    if (value < BYTES_PER_MEGABYTE) return `${(value / BYTES_PER_KILOBYTE).toFixed(1)} KB`;
-    return `${(value / BYTES_PER_MEGABYTE).toFixed(1)} MB`;
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
+
 
 function readableMimeType(value: string): string {
     const labels: Record<string, string> = {

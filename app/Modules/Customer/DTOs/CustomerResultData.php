@@ -19,8 +19,9 @@ final readonly class CustomerResultData
         public CustomerType $customerType,
         public CustomerStatus $status,
         public string $creditLimit,
-        public bool $creditAllowed,
-        public bool $advanceAllowed,
+        public string $openingBalance,
+        public bool $isCreditAllowed,
+        public bool $isAdvanceAllowed,
         public bool $isTaxExempt,
     ) {}
 }

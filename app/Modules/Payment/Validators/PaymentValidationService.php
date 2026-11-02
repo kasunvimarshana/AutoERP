@@ -8,30 +8,22 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\DTOs\BalanceResultData;
-use Modules\Payment\Constants\PaymentPostingMetadata;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
-use Modules\Payment\Enums\PaymentCardBrand;
-use Modules\Payment\Enums\PaymentMethodType;
-use Modules\Payment\Enums\PaymentPostingRole;
-use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
-use Modules\Payment\Services\PaymentRefundPolicyService;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
-use Modules\Tenant\Models\TenantModel;
 
 final class PaymentValidationService
 {
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentMethodService $paymentMethods,
-        private readonly PaymentRefundPolicyService $refundPolicy,
     ) {}
 
     public function validateForCreation(CreatePaymentData $data): void
@@ -47,8 +39,7 @@ final class PaymentValidationService
         }
 
         $this->validateTypeDirectionParty($data);
-        $this->validateSemanticPostingContract($data);
-        $this->validateCurrency($data->tenantId, $data->currencyId, $data->exchangeRate);
+        $this->validateCurrency($data->currencyId, $data->exchangeRate);
 
         if ($data->lines === []) {
             throw new InvalidArgumentException('Payment requires at least one payment line.');
@@ -61,16 +52,14 @@ final class PaymentValidationService
 
             $this->assertPositive($line->amount, 'Payment line amount');
             $this->assertNonNegative($line->clearedAmount, 'Payment line cleared amount');
-            $method = $this->resolvePaymentMethod($line->paymentMethodId);
             $this->validatePaymentMethod(
-                $method,
+                $this->resolvePaymentMethod($line->paymentMethodId),
                 $data->tenantId,
                 $data->organizationUnitId,
                 $data->direction,
                 $line->referenceNumber ?? $data->referenceNumber,
                 $this->hasInstrumentDetails($line),
             );
-            $this->validateTenderDetails($line, $method, $data->direction);
         }
 
         foreach ($data->allocations as $allocation) {
@@ -92,9 +81,8 @@ final class PaymentValidationService
         if ($payment->party_type !== $invoiceBalance->partyType || (int) $payment->party_id !== (int) $invoiceBalance->partyId) {
             throw new InvalidArgumentException('Payment invoice party must match payment party.');
         }
-        $paymentCurrencyId = $payment->currency_id === null ? null : (int) $payment->currency_id;
-        if ($paymentCurrencyId !== $invoiceBalance->currencyId) {
-            throw new InvalidArgumentException('Payment invoice currency must match payment currency exactly.');
+        if ($payment->currency_id !== null && $invoiceBalance->currencyId !== null && (int) $payment->currency_id !== $invoiceBalance->currencyId) {
+            throw new InvalidArgumentException('Cross-currency payment allocation is not supported.');
         }
 
         $this->assertPositive($allocation->allocatedAmount, 'Payment allocation amount');
@@ -144,7 +132,7 @@ final class PaymentValidationService
         }
 
         $expectedParty = match ($data->paymentType) {
-            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt, PaymentType::RentalReceipt => 'customer',
+            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt => 'customer',
             PaymentType::SupplierPayment => 'supplier',
             default => $data->partyType,
         };
@@ -156,53 +144,6 @@ final class PaymentValidationService
                 throw new InvalidArgumentException('Payment party type and party id must be provided together.');
             }
             $this->validateParty($data->partyType, $data->partyId, $data->tenantId, $data->organizationUnitId);
-        }
-    }
-
-    private function validateSemanticPostingContract(CreatePaymentData $data): void
-    {
-        if (PaymentSourceType::tryFrom((string) $data->sourceType)?->isRentalDeposit() === true
-            && ($data->paymentType !== PaymentType::Advance || $data->direction !== PaymentDirection::Inbound
-                || $data->partyType !== 'customer' || $data->sourceId === null || $data->sourceId < 1 || $data->allocations !== [])) {
-            throw new InvalidArgumentException('Rental deposits require an inbound customer advance, a source identity and no initial allocations.');
-        }
-        if ($data->paymentType === PaymentType::Advance) {
-            $isCustomerAdvance = $data->direction === PaymentDirection::Inbound && $data->partyType === 'customer';
-            $isSupplierAdvance = $data->direction === PaymentDirection::Outbound && $data->partyType === 'supplier';
-            if (! $isCustomerAdvance && ! $isSupplierAdvance) {
-                throw new InvalidArgumentException('Advance payment requires an inbound customer or outbound supplier party.');
-            }
-        }
-
-        if ($data->paymentType === PaymentType::Refund) {
-            if ($data->allocations !== []) {
-                throw new InvalidArgumentException('Refund payment cannot allocate an invoice directly.');
-            }
-            if ($data->sourceType === PaymentSourceType::SaleReturn->value) {
-                if ($data->originalPaymentId !== null || $data->sourceId === null
-                    || $data->direction !== PaymentDirection::Outbound || $data->partyType !== 'customer') {
-                    throw new InvalidArgumentException('Sale return refund requires an outbound customer payment linked to a return.');
-                }
-            } elseif ($data->sourceType === PaymentSourceType::PaymentRefund->value && $data->originalPaymentId !== null) {
-                $this->refundPolicy->originalForCreation($data);
-            } else {
-                throw new InvalidArgumentException('Refund payment requires a supported refund source.');
-            }
-        } elseif ($data->originalPaymentId !== null) {
-            throw new InvalidArgumentException('Only refund payments can reference an original payment.');
-        }
-
-        if ($data->paymentType === PaymentType::Manual) {
-            $metadata = is_array($data->metadata) ? $data->metadata : [];
-            $profileCode = trim((string) ($metadata[PaymentPostingMetadata::PROFILE_CODE] ?? ''));
-            $counterpartyRole = PaymentPostingRole::tryFrom(
-                trim((string) ($metadata[PaymentPostingMetadata::COUNTERPARTY_ROLE] ?? '')),
-            );
-            if ($profileCode === '' || ! $counterpartyRole instanceof PaymentPostingRole) {
-                throw new InvalidArgumentException(
-                    'Manual payment requires posting_profile_code and a supported counterparty_profile_key in metadata.',
-                );
-            }
         }
     }
 
@@ -222,28 +163,18 @@ final class PaymentValidationService
         }
     }
 
-    private function validateCurrency(int $tenantId, ?int $currencyId, string $exchangeRate): void
+    private function validateCurrency(?int $currencyId, string $exchangeRate): void
     {
         if ($this->math->isNegative($exchangeRate) || $this->math->isZero($exchangeRate)) {
             throw new InvalidArgumentException('Payment exchange rate must be greater than zero.');
         }
-
-        $tenant = TenantModel::query()->findOrFail($tenantId);
-        $baseCurrencyId = $tenant->base_currency_id === null ? null : (int) $tenant->base_currency_id;
         if ($currencyId === null) {
-            if ($this->math->compare($exchangeRate, '1.000000') !== 0) {
-                throw new InvalidArgumentException('A payment without an explicit currency must use an exchange rate of 1.000000.');
-            }
-
             return;
         }
 
         $currency = CurrencyModel::query()->find($currencyId);
         if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
             throw new InvalidArgumentException('Payment currency must be active.');
-        }
-        if ($baseCurrencyId !== null && $currencyId === $baseCurrencyId && $this->math->compare($exchangeRate, '1.000000') !== 0) {
-            throw new InvalidArgumentException('Tenant base currency payments must use an exchange rate of 1.000000.');
         }
     }
 
@@ -259,33 +190,6 @@ final class PaymentValidationService
         }
 
         return $method;
-    }
-
-    private function validateTenderDetails(PaymentLineData $line, ?PaymentMethod $method, PaymentDirection $direction): void
-    {
-        $metadata = $line->metadata ?? [];
-        $methodType = $method?->method_type;
-        $methodType = $methodType instanceof PaymentMethodType
-            ? $methodType
-            : PaymentMethodType::tryFrom((string) $methodType);
-
-        if (array_key_exists('cash_received_amount', $metadata)) {
-            if ($methodType !== PaymentMethodType::Cash || $direction !== PaymentDirection::Inbound) {
-                throw new InvalidArgumentException('Cash received is only valid for an inbound cash payment method.');
-            }
-            if (! is_string($metadata['cash_received_amount'])
-                || $this->math->compare($metadata['cash_received_amount'], $line->amount) < 0) {
-                throw new InvalidArgumentException('Cash received must cover the applied cash amount.');
-            }
-        }
-
-        if (array_key_exists('card_brand', $metadata)) {
-            if ($methodType !== PaymentMethodType::Card
-                || ! is_string($metadata['card_brand'])
-                || PaymentCardBrand::tryFrom($metadata['card_brand']) === null) {
-                throw new InvalidArgumentException('A valid card brand requires a card payment method.');
-            }
-        }
     }
 
     private function hasInstrumentDetails(PaymentLineData $line): bool

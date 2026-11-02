@@ -2,10 +2,6 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 
-export const PAYMENT_IDEMPOTENCY_HEADER = 'Idempotency-Key';
-const MAX_RETAINED_PAYMENT_CREATE_KEYS = 100;
-const paymentCreateKeys = new Map<string, string>();
-
 export interface PaymentPartySummary {
     id: number | null;
     type?: string | null;
@@ -46,9 +42,6 @@ export interface PaymentLine {
     external_bank_name?: string | null;
     external_bank_branch?: string | null;
     instrument_number?: string | null;
-    card_brand?: 'visa' | 'master' | 'amex' | null;
-    cash_received_amount?: string | null;
-    cash_change_amount?: string | null;
     instrument_date?: string | null;
     deposit_date?: string | null;
     realized_date?: string | null;
@@ -56,7 +49,6 @@ export interface PaymentLine {
     bounced_date?: string | null;
     returned_date?: string | null;
     notes?: string | null;
-    allowed_settlement_statuses?: string[];
 }
 
 export interface Payment extends Record<string, unknown> {
@@ -72,7 +64,6 @@ export interface Payment extends Record<string, unknown> {
     instrument_status?: string | null;
     party?: PaymentPartySummary | null;
     currency?: PaymentCurrencySummary | null;
-    exchange_rate?: string | null;
     total_amount?: string | null;
     allocated_amount?: string | null;
     unapplied_amount?: string | null;
@@ -113,8 +104,6 @@ export interface PaymentLinePayload {
     payment_method_id: number;
     reference_number?: string;
     amount: string;
-    cash_received_amount?: string;
-    card_brand?: 'visa' | 'master' | 'amex';
     instrument_direction?: 'received' | 'issued';
     external_bank_name?: string;
     external_bank_branch?: string;
@@ -128,17 +117,6 @@ export interface PaymentAllocationPayload {
     allocated_amount: string;
     allocation_date?: string;
     allocation_method?: string;
-}
-
-export interface PaymentAllocation extends Record<string, unknown> {
-    id: number;
-    row_version: number;
-    invoice_id: number;
-    invoice?: { id?: number; invoice_number?: string | null; name?: string | null } | null;
-    allocated_amount: string;
-    allocation_date?: string | null;
-    allocation_method?: string | null;
-    status: string;
 }
 
 export interface PaymentPayload {
@@ -163,8 +141,7 @@ export interface PaymentRefundPayload {
     refund_date: string;
     amount: string;
     reason: string;
-    payment_method_id: number;
-    exchange_rate: string;
+    payment_method_id?: number;
     reference_number?: string;
     external_bank_name?: string;
     external_bank_branch?: string;
@@ -184,25 +161,7 @@ export async function listPayments(params: ListParams, signal?: AbortSignal) {
 }
 
 export async function createPayment(payload: PaymentPayload) {
-    return createPaymentAt(payload, endpoints.payments);
-}
-
-export async function finalizeSellingPayment(payload: PaymentPayload) {
-    return createPaymentAt(payload, `${endpoints.payments}/selling-settlement`);
-}
-
-async function createPaymentAt(payload: PaymentPayload, url: string) {
-    const fingerprint = `${url}:${paymentPayloadFingerprint(payload)}`;
-    const idempotencyKey = paymentCreateKeys.get(fingerprint) ?? createPaymentIdempotencyKey();
-    retainPaymentCreateKey(fingerprint, idempotencyKey);
-
-    const response = await apiClient.post<ApiResource<Payment>>(url, payload, {
-        headers: {
-            [PAYMENT_IDEMPOTENCY_HEADER]: idempotencyKey,
-        },
-    });
-    paymentCreateKeys.delete(fingerprint);
-
+    const response = await apiClient.post<ApiResource<Payment>>(endpoints.payments, payload);
     return response.data.data;
 }
 
@@ -216,18 +175,8 @@ export async function listPaymentMethods(params: ListParams & { direction?: stri
     return response.data;
 }
 
-export async function listUsablePaymentMethods(params: ListParams & { direction?: string; method_type?: string }, signal?: AbortSignal) {
-    const response = await apiClient.get<ApiCollection<PaymentMethod>>(`${endpoints.payments}/usable-methods`, { params, signal });
-    return response.data;
-}
-
-export async function listUsableRefundPaymentMethods(params: ListParams & { direction?: string; method_type?: string }, signal?: AbortSignal) {
-    const response = await apiClient.get<ApiCollection<PaymentMethod>>(`${endpoints.payments}/refund-methods`, { params, signal });
-    return response.data;
-}
-
 export async function getPaymentAllocations(id: number, signal?: AbortSignal) {
-    const response = await apiClient.get<ApiResource<PaymentAllocation[]>>(`${endpoints.payments}/${id}/allocations`, { signal });
+    const response = await apiClient.get<ApiResource<Record<string, unknown>[]>>(`${endpoints.payments}/${id}/allocations`, { signal });
     return response.data.data;
 }
 
@@ -241,23 +190,6 @@ export async function allocatePayment(id: number, expectedVersion: number, alloc
         expected_version: expectedVersion,
         allocations,
     });
-    return response.data.data;
-}
-
-export async function reversePaymentAllocation(
-    paymentId: number,
-    allocationId: number,
-    payload: {
-        expected_payment_version: number;
-        expected_allocation_version: number;
-        reversal_date: string;
-        reason: string;
-    },
-) {
-    const response = await apiClient.post<ApiResource<Payment>>(
-        `${endpoints.payments}/${paymentId}/allocations/${allocationId}/reverse`,
-        payload,
-    );
     return response.data.data;
 }
 
@@ -278,7 +210,6 @@ export async function settlePaymentLine(
         expected_payment_version: number;
         expected_line_version: number;
         status: string;
-        event_date: string;
         reason?: string;
     },
 ) {
@@ -327,37 +258,3 @@ export const submitPayment = (id: number, expectedVersion: number) => paymentAct
 export const approvePayment = (id: number, expectedVersion: number) => paymentAction(id, 'approve', expectedVersion);
 export const postPayment = (id: number, expectedVersion: number) => paymentAction(id, 'post', expectedVersion);
 export const voidPayment = (id: number, expectedVersion: number, reason?: string) => paymentAction(id, 'void', expectedVersion, reason);
-
-function createPaymentIdempotencyKey(): string {
-    return globalThis.crypto.randomUUID();
-}
-
-function retainPaymentCreateKey(fingerprint: string, key: string): void {
-    if (!paymentCreateKeys.has(fingerprint) && paymentCreateKeys.size >= MAX_RETAINED_PAYMENT_CREATE_KEYS) {
-        const oldestFingerprint = paymentCreateKeys.keys().next().value;
-        if (typeof oldestFingerprint === 'string') {
-            paymentCreateKeys.delete(oldestFingerprint);
-        }
-    }
-
-    paymentCreateKeys.set(fingerprint, key);
-}
-
-function paymentPayloadFingerprint(payload: PaymentPayload): string {
-    return JSON.stringify(canonicalize(payload));
-}
-
-function canonicalize(value: unknown): unknown {
-    if (Array.isArray(value)) {
-        return value.map(canonicalize);
-    }
-    if (value === null || typeof value !== 'object') {
-        return value;
-    }
-
-    return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-            .sort(([left], [right]) => left.localeCompare(right))
-            .map(([key, item]) => [key, canonicalize(item)]),
-    );
-}

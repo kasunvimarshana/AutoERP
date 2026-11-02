@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Tests;
 
-use Modules\Finance\DTOs\PostingContext;
-use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Services\FinancePostingService;
 use PHPUnit\Framework\TestCase;
-use ReflectionClass;
 
 final class FinancePostingIdempotencyBoundaryTest extends TestCase
 {
@@ -29,77 +25,17 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
         self::assertStringContainsString('$table->unique(\'source_key\'', $migration);
     }
 
-    public function test_source_identity_does_not_change_with_descriptive_module_alias(): void
+    public function test_posted_or_reversed_journal_replay_does_not_repost_ledger(): void
     {
-        $reflection = new ReflectionClass(FinancePostingService::class);
-        $service = $reflection->newInstanceWithoutConstructor();
-        $sourceKey = $reflection->getMethod('sourceKey');
-        $first = new PostingContext(source: new PostingSourceData(
-            sourceType: 'invoice',
-            sourceId: 91,
-            tenantId: 7,
-            organizationUnitId: 3,
-            sourceModule: 'invoice',
-        ));
-        $second = new PostingContext(source: new PostingSourceData(
-            sourceType: 'invoice',
-            sourceId: 91,
-            tenantId: 7,
-            organizationUnitId: 3,
-            sourceModule: 'vehicle_service',
-        ));
+        $posting = $this->source('../Services/JournalPostingService.php');
+        $statusGuard = 'in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)';
 
-        self::assertSame(
-            $sourceKey->invoke($service, $first),
-            $sourceKey->invoke($service, $second),
-        );
-    }
-
-    public function test_existing_source_keys_have_a_fail_closed_upgrade_path(): void
-    {
-        $migration = $this->source('../Database/UpgradeMigrations/2026_07_13_000002_canonicalize_finance_journal_source_keys.php');
-
-        self::assertStringContainsString("\$identity['source_type'] = \$sourceType;", $migration);
-        self::assertStringContainsString("\$identity['source_id'] = \$sourceId;", $migration);
-        self::assertStringContainsString('Multiple Finance journals use the same canonical source identity', $migration);
-        self::assertStringContainsString("->update(['source_key' => null])", $migration);
-        self::assertStringContainsString("->update(['source_key' => \$key])", $migration);
-    }
-
-    public function test_posted_journal_replay_is_idempotent_and_reversed_journal_replay_is_rejected(): void
-    {
-        foreach ([
-            '../Services/JournalPostingService.php',
-            '../Services/FinancePostingService.php',
-        ] as $servicePath) {
-            $posting = $this->source($servicePath);
-            self::assertStringContainsString('if ($status === JournalStatus::Posted)', $posting);
-            self::assertStringContainsString(
-                'Only draft journals can be posted. Reversed journals cannot be reposted.',
-                $posting,
-            );
-            self::assertStringNotContainsString(
-                'in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)',
-                $posting,
-            );
-        }
-
-        $contract = $this->source('../Services/FinancePostingService.php');
-        self::assertStringContainsString(
-            'Reversed Finance posting sources cannot be replayed.',
-            $contract,
-        );
-        self::assertStringContainsString(
-            'if ($status === JournalStatus::Reversed)',
-            $contract,
-        );
-
-        $ledger = $this->source('../Services/JournalPostingService.php');
-        self::assertStringContainsString('$this->validator->assertPostedLedgerIntegrity($journal);', $ledger);
-        self::assertStringContainsString('$this->posting->post($journal', $contract);
+        self::assertStringContainsString($statusGuard, $posting);
+        self::assertStringContainsString('return $this->resultFromJournal($journal, $status);', $posting);
+        self::assertStringContainsString('$ledgerCount = $this->ledger->post($journal);', $posting);
         self::assertLessThan(
-            strpos($ledger, '$ledgerCount = $this->ledger->post($journal);'),
-            strpos($ledger, 'if ($status === JournalStatus::Posted)'),
+            strpos($posting, '$ledgerCount = $this->ledger->post($journal);'),
+            strpos($posting, $statusGuard),
         );
     }
 

@@ -141,8 +141,8 @@ final class TaxSnapshotService
     public function recordTransaction(TaxDocumentSnapshot $snapshot, array $attributes = []): TaxTransaction
     {
         $taxAmount = $this->math->normalize((string) $snapshot->tax_amount);
-        $transaction = new TaxTransaction();
-        $transaction->forceFill([
+
+        return TaxTransaction::query()->create([
             'tenant_id' => $snapshot->tenant_id,
             'organization_unit_id' => $snapshot->organization_unit_id,
             'tax_id' => $snapshot->tax_id,
@@ -167,9 +167,6 @@ final class TaxSnapshotService
             'account_id' => $attributes['account_id'] ?? null,
             'metadata' => $attributes['metadata'] ?? null,
         ]);
-        $transaction->save();
-
-        return $transaction;
     }
 
     /**

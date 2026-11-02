@@ -6,9 +6,7 @@ namespace Modules\Hr\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Modules\Hr\Models\HrEmployee;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class EmployeeQueryService
 {
@@ -30,26 +28,9 @@ final class EmployeeQueryService
         return $this->base($tenantId, $organizationUnitId)->findOrFail($id);
     }
 
-    public function delete(HrEmployee $employee, int $rowVersion): void
+    public function delete(HrEmployee $employee): void
     {
-        DB::transaction(function () use ($employee, $rowVersion): void {
-            $employee = HrEmployee::query()
-                ->whereKey($employee->getKey())
-                ->where('tenant_id', (int) $employee->tenant_id)
-                ->when(
-                    $employee->organization_unit_id === null,
-                    static fn ($query) => $query->whereNull('organization_unit_id'),
-                    static fn ($query) => $query->where('organization_unit_id', (int) $employee->organization_unit_id),
-                )
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if ($rowVersion !== (int) $employee->row_version) {
-                throw new ConflictHttpException('Employee was changed by someone else. Reload before deleting.');
-            }
-
-            $employee->delete();
-        });
+        $employee->delete();
     }
 
     public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage, string $kind = 'all'): LengthAwarePaginator
@@ -80,12 +61,6 @@ final class EmployeeQueryService
         }
         foreach (['department_id', 'designation_id', 'employment_type_id', 'status', 'availability_status'] as $key) {
             if (isset($criteria[$key]) && $criteria[$key] !== '') { $query->where($key, $criteria[$key]); }
-        }
-        if (isset($criteria['designation_code']) && $criteria['designation_code'] !== '') {
-            $query->whereHas('designation', fn (Builder $q) => $q->where('code', $criteria['designation_code']));
-        }
-        if (isset($criteria['exclude_designation_code']) && $criteria['exclude_designation_code'] !== '') {
-            $query->whereHas('designation', fn (Builder $q) => $q->where('code', '!=', $criteria['exclude_designation_code']));
         }
         if (isset($criteria['skill_id'])) { $query->whereHas('skillAssignments', fn (Builder $q) => $q->where('skill_id', $criteria['skill_id'])); }
         if (isset($criteria['certification_id'])) { $query->whereHas('certificationAssignments', fn (Builder $q) => $q->where('certification_id', $criteria['certification_id'])); }

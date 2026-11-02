@@ -1,5 +1,4 @@
 import { Button } from '@/shared/components/Button';
-import { Link } from 'react-router-dom';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import type { ReportColumn, ReportRow } from '../reportingTypes';
 
@@ -17,13 +16,11 @@ export function ReportDataGrid({ columns, rows, sort, direction, onSort }: {
                 {column.label}{sort === column.key ? (direction === 'asc' ? ' ASC' : ' DESC') : ''}
             </Button>
         ) : column.label,
-        render: (row) => column.format === 'link' && typeof row[`${column.key}_url`] === 'string'
-            ? <Link className="font-medium text-sky-700 hover:underline" to={String(row[`${column.key}_url`])}>{formatValue(row[column.key], column.format)}</Link>
-            : formatValue(row[column.key], column.format),
+        render: (row) => formatValue(row[column.key], column.format),
         className: ['money', 'decimal'].includes(column.format) ? 'tabular-nums' : undefined,
     }));
 
-    return <DataTable rows={rows} columns={tableColumns} rowKey={(row, index) => String(row.id ?? `${JSON.stringify(row)}-${index}`)} />;
+    return <DataTable rows={rows} columns={tableColumns} rowKey={(row) => String(row.id ?? JSON.stringify(row))} />;
 }
 
 function formatValue(value: ReportRow[string], format: string) {

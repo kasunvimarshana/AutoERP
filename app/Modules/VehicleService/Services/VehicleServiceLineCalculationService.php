@@ -6,24 +6,15 @@ namespace Modules\VehicleService\Services;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
-use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceDiscountCalculationType;
-use Modules\VehicleService\Enums\VehicleServiceDiscountRevisionAction;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
-use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 
 final class VehicleServiceLineCalculationService
 {
-    private const CANCELLED_ASSIGNMENT_STATUS = 'cancelled';
-
-    private const ZERO_AMOUNT = '0.000000';
-
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceCommissionService $commissions,
@@ -70,13 +61,10 @@ final class VehicleServiceLineCalculationService
             'line_source_type' => $data->lineSourceType->value,
             'item_id' => $data->itemId,
             'item_variant_id' => $data->itemVariantId,
-            'batch_id' => $data->batchId,
-            'batch_price_revision_id' => $data->batchPriceRevisionId,
             'uom_id' => $data->uomId ?? $item?->base_uom_id,
             'description' => trim($data->description),
             'quantity' => $this->math->normalize($data->quantity),
             'unit_cost' => $this->math->normalize($data->unitCost),
-            'uses_job_supervisor' => $data->usesJobSupervisor,
             'unit_price' => $this->math->normalize($data->unitPrice),
             'discount_calculation_type' => $data->discountCalculationType,
             'discount_rate' => $this->math->normalize($data->discountRate),
@@ -98,7 +86,7 @@ final class VehicleServiceLineCalculationService
 
     public function recalculateJob(VehicleServiceJob $job): VehicleServiceJob
     {
-        $job->load('lines.employeeAssignments');
+        $job->load('lines');
         $billable = $job->lines->where('is_billable', true)
             ->where('status', '!=', VehicleServiceLineStatus::Cancelled);
         $subtotal = '0.000000';
@@ -118,188 +106,32 @@ final class VehicleServiceLineCalculationService
             $grand = $this->math->add($grand, (string) $line->line_total);
         }
 
-        $discountBase = $this->math->sub($subtotal, $discount);
-        $jobDiscount = $this->currentJobDiscountAmount($job, $discountBase);
-        $grand = $this->math->sub($grand, $jobDiscount);
-        if ($this->math->isNegative($grand)) {
-            throw new InvalidArgumentException('Whole-job discount cannot make the service job total negative.');
-        }
-
-        $comboSupervisorLines = $job->lines
-            ->where('line_source_type', VehicleServiceLineSourceType::ComboChild)
-            ->where('uses_job_supervisor', true)
-            ->where('status', '!=', VehicleServiceLineStatus::Cancelled);
-        $employeeCommission = $job->lines
-            ->where('status', '!=', VehicleServiceLineStatus::Cancelled)
-            ->reduce(
-                fn (string $total, VehicleServiceJobLine $line): string => $line->employeeAssignments
-                    ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
-                    ->reduce(
-                        fn (string $lineTotal, VehicleServiceLineEmployee $assignment): string => $this->math->add(
-                            $lineTotal,
-                            (string) $assignment->commission_amount,
-                        ),
-                        $total,
-                    ),
-                self::ZERO_AMOUNT,
-            );
-        $supervisorCommission = $comboSupervisorLines->isEmpty()
-            ? $this->commissions->calculate(
-                $job->supervisor_commission_type,
-                (string) $job->supervisor_commission_value,
-                $grand,
-            )
-            : $comboSupervisorLines->reduce(
-                fn (string $total, VehicleServiceJobLine $line): string => $line->employeeAssignments
-                    ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
-                    ->reduce(
-                        fn (string $lineTotal, VehicleServiceLineEmployee $assignment): string => $this->math->add(
-                            $lineTotal,
-                            (string) $assignment->commission_amount,
-                        ),
-                        $total,
-                    ),
-                self::ZERO_AMOUNT,
-            );
-        $commissionCost = $comboSupervisorLines->isEmpty()
-            ? $this->math->add($employeeCommission, $supervisorCommission)
-            : $employeeCommission;
-
-        $job->forceFill([
+        $job->fill([
             'subtotal' => $subtotal,
-            'line_discount_total' => $discount,
-            'job_discount_base' => $discountBase,
-            'job_discount_amount' => $jobDiscount,
-            'discount_total' => $this->math->add($discount, $jobDiscount),
+            'discount_total' => $discount,
             'tax_total' => $tax,
             'charge_total' => $charge,
             'grand_total' => $grand,
-            'supervisor_commission_amount' => $supervisorCommission,
-            'commission_cost_total' => $commissionCost,
-            'net_after_commission' => $this->math->sub($grand, $commissionCost),
+            'supervisor_commission_amount' => $this->commissions->calculate(
+                $job->supervisor_commission_type,
+                (string) $job->supervisor_commission_value,
+                $grand,
+            ),
         ])->save();
 
         return $job->refresh();
     }
 
-    public function discountBase(VehicleServiceJob $job): string
-    {
-        $job->load('lines');
-        $billable = $job->lines->where('is_billable', true)
-            ->where('status', '!=', VehicleServiceLineStatus::Cancelled);
-        $subtotal = self::ZERO_AMOUNT;
-        $lineDiscount = self::ZERO_AMOUNT;
-
-        foreach ($billable as $line) {
-            $subtotal = $this->math->add(
-                $subtotal,
-                $this->math->mul((string) $line->quantity, (string) $line->unit_price),
-            );
-            $lineDiscount = $this->math->add($lineDiscount, (string) $line->discount_amount);
-        }
-
-        return $this->math->sub($subtotal, $lineDiscount);
-    }
-
-    public function discountAmount(
-        VehicleServiceDiscountCalculationType $type,
-        string $rate,
-        string $fixedAmount,
-        string $base,
-    ): string {
-        if ($this->math->isNegative($base)) {
-            throw new InvalidArgumentException('Whole-job discount base cannot be negative.');
-        }
-        if ($this->math->isNegative($rate) || $this->math->compare($rate, '100') > 0) {
-            throw new InvalidArgumentException('Whole-job discount percentage must be between 0 and 100.');
-        }
-        if ($this->math->isNegative($fixedAmount)) {
-            throw new InvalidArgumentException('Whole-job fixed discount cannot be negative.');
-        }
-
-        $amount = $type === VehicleServiceDiscountCalculationType::Percentage
-            ? $this->math->div($this->math->mul($base, $rate, 12), '100')
-            : $this->math->normalize($fixedAmount);
-
-        if ($this->math->compare($amount, $base) > 0) {
-            throw new InvalidArgumentException('Whole-job discount cannot exceed the eligible amount after line discounts.');
-        }
-
-        return $amount;
-    }
-
     public function recalculateAssignments(VehicleServiceJobLine $line): void
     {
-        $assignments = $line->employeeAssignments()->orderBy('id')->get();
-
-        foreach ($assignments->where('status', self::CANCELLED_ASSIGNMENT_STATUS) as $cancelledAssignment) {
-            if ($this->math->compare((string) $cancelledAssignment->commission_amount, self::ZERO_AMOUNT) === 0) {
-                continue;
-            }
-
-            $cancelledAssignment->commission_amount = self::ZERO_AMOUNT;
-            $cancelledAssignment->save();
-        }
-
-        $activeAssignments = $assignments
-            ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
-            ->values();
-        if ($activeAssignments->isEmpty()) {
-            return;
-        }
-
-        /** @var VehicleServiceLineEmployee $first */
-        $first = $activeAssignments->first();
-        $sharesOnePolicy = $activeAssignments->every(
-            fn (VehicleServiceLineEmployee $assignment): bool => $assignment->commission_type === $first->commission_type
-                && $this->math->compare(
-                    (string) $assignment->commission_value,
-                    (string) $first->commission_value,
-                ) === 0,
-        );
-
-        $amounts = $sharesOnePolicy
-            ? $this->commissions->splitEvenly(
-                $this->commissions->calculate(
-                    $first->commission_type,
-                    (string) $first->commission_value,
-                    (string) $line->line_total,
-                ),
-                $activeAssignments->count(),
-            )
-            : $activeAssignments->map(
-                fn (VehicleServiceLineEmployee $assignment): string => $this->commissions->calculate(
-                    $assignment->commission_type,
-                    (string) $assignment->commission_value,
-                    (string) $line->line_total,
-                ),
-            )->all();
-
-        foreach ($activeAssignments as $index => $assignment) {
-            if ($this->math->compare((string) $assignment->commission_amount, $amounts[$index]) === 0) {
-                continue;
-            }
-
-            $assignment->commission_amount = $amounts[$index];
+        foreach ($line->employeeAssignments as $assignment) {
+            $assignment->commission_amount = $this->commissions->calculate(
+                $assignment->commission_type,
+                (string) $assignment->commission_value,
+                (string) $line->line_total,
+            );
             $assignment->save();
         }
-    }
-
-    public function recalculateComboChildAssignments(VehicleServiceJobLine $line): void
-    {
-        $line->loadMissing('item');
-        if ($line->line_source_type === VehicleServiceLineSourceType::ComboChild
-            && $line->item?->item_type === ItemType::Labour) {
-            $commissionPool = $this->math->mul((string) $line->quantity, (string) $line->unit_cost);
-            $line->employeeAssignments()
-                ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
-                ->update([
-                    'commission_type' => VehicleServiceCommissionType::Fixed->value,
-                    'commission_value' => $commissionPool,
-                ]);
-        }
-
-        $this->recalculateAssignments($line);
     }
 
     private function adjustment(?string $type, string $rate, string $amount, string $base): string
@@ -313,20 +145,5 @@ final class VehicleServiceLineCalculationService
         }
 
         return $this->math->normalize($amount);
-    }
-
-    private function currentJobDiscountAmount(VehicleServiceJob $job, string $base): string
-    {
-        $revision = $job->discountRevisions()->first();
-        if ($revision === null || $revision->action === VehicleServiceDiscountRevisionAction::Removed) {
-            return self::ZERO_AMOUNT;
-        }
-
-        return $this->discountAmount(
-            $revision->calculation_type,
-            (string) $revision->rate,
-            (string) $revision->fixed_amount,
-            $base,
-        );
     }
 }

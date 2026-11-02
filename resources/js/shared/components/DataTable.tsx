@@ -5,12 +5,11 @@ export interface DataColumn<T> {
     key: string;
     header: ReactNode;
     render: (row: T) => ReactNode;
-    footer?: ReactNode;
     className?: string;
     mobile?: boolean;
 }
 
-export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records found.', mobileSummary, mobileDetails, mobileActions, rowBadge, rowHref, onRowClick, rowClickEnabled, rowClassName }: {
+export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records found.', mobileSummary, mobileDetails, mobileActions, rowBadge, rowHref }: {
     rows: T[];
     columns: DataColumn<T>[];
     rowKey: (row: T, index: number) => string | number;
@@ -20,25 +19,15 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
     mobileActions?: (row: T) => ReactNode;
     rowBadge?: (row: T) => ReactNode;
     rowHref?: (row: T) => string;
-    onRowClick?: (row: T) => void;
-    rowClickEnabled?: (row: T) => boolean;
-    rowClassName?: (row: T) => string | undefined;
 }) {
     const navigate = useNavigate();
     const openRow = (event: MouseEvent | KeyboardEvent, row: T) => {
-        const clickEnabled = Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true);
-        if ((!rowHref && !clickEnabled) || event.defaultPrevented) return;
+        if (!rowHref || event.defaultPrevented) return;
         const target = event.target;
         if (target instanceof Element && target.closest('a, button, input, select, textarea, summary')) return;
-        if ('key' in event) {
-            if (!rowHref || (event.key !== 'Enter' && event.key !== ' ')) return;
-            event.preventDefault();
-        }
-        if (clickEnabled) {
-            onRowClick?.(row);
-            return;
-        }
-        if (rowHref) navigate(rowHref(row));
+        if ('key' in event && event.key !== 'Enter' && event.key !== ' ') return;
+        if ('key' in event) event.preventDefault();
+        navigate(rowHref(row));
     };
 
     if (rows.length === 0) {
@@ -53,11 +42,10 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
     return (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="grid gap-3 p-3 md:hidden">
-                {rows.map((row, index) => {
-                    const isClickable = Boolean(rowHref) || (Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true));
-                    return <article
+                {rows.map((row, index) => (
+                    <article
                         key={rowKey(row, index)}
-                        className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${rowClassName?.(row) ?? ''} ${isClickable ? 'cursor-pointer' : ''} ${rowHref ? 'focus:outline-none focus:ring-2 focus:ring-sky-500' : ''}`}
+                        className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500' : ''}`}
                         tabIndex={rowHref ? 0 : undefined}
                         role={rowHref ? 'link' : undefined}
                         onClick={(event) => openRow(event, row)}
@@ -76,8 +64,8 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                             ))}
                         </dl>}
                         {mobileActions && <div className="mt-4 border-t border-slate-100 pt-3">{mobileActions(row)}</div>}
-                    </article>;
-                })}
+                    </article>
+                ))}
             </div>
             <div className="hidden overflow-x-auto md:block">
                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
@@ -85,30 +73,18 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                         <tr>{columns.map((column) => <th key={column.key} className={`px-4 py-3 font-semibold ${column.className ?? ''}`}>{column.header}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {rows.map((row, index) => {
-                            const isClickable = Boolean(rowHref) || (Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true));
-                            return <tr
+                        {rows.map((row, index) => (
+                            <tr
                                 key={rowKey(row, index)}
-                                className={`transition-colors hover:bg-blue-50/40 ${rowClassName?.(row) ?? ''} ${isClickable ? 'cursor-pointer' : ''} ${rowHref ? 'focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500' : ''}`}
+                                className={`transition-colors hover:bg-blue-50/40 ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500' : ''}`}
                                 tabIndex={rowHref ? 0 : undefined}
                                 onClick={(event) => openRow(event, row)}
                                 onKeyDown={(event) => openRow(event, row)}
                             >
                                 {columns.map((column) => <td key={column.key} className={`px-4 py-3 text-slate-700 ${column.className ?? ''}`}>{column.render(row)}</td>)}
-                            </tr>;
-                        })}
-                    </tbody>
-                    {columns.some((column) => column.footer !== undefined) && (
-                        <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
-                            <tr>
-                                {columns.map((column) => (
-                                    <td key={column.key} className={`px-4 py-3 ${column.className ?? ''}`}>
-                                        {column.footer}
-                                    </td>
-                                ))}
                             </tr>
-                        </tfoot>
-                    )}
+                        ))}
+                    </tbody>
                 </table>
             </div>
         </div>

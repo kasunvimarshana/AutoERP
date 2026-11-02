@@ -50,6 +50,14 @@ abstract class TestCase extends BaseTestCase
         );
     }
 
+    protected function tenantPutJson(int $tenantId, string $uri, array $data = [], array $headers = []): TestResponse
+    {
+        return $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): TestResponse => $this->putJson($uri, $data, $headers),
+        );
+    }
+
     protected function tenantPatchJson(int $tenantId, string $uri, array $data = [], array $headers = []): TestResponse
     {
         return $this->withTenantExecutionContext(

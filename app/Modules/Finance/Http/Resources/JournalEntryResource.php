@@ -44,7 +44,6 @@ final class JournalEntryResource extends JsonResource
             'can_post' => $status === JournalStatus::Draft,
             'can_cancel' => $status === JournalStatus::Draft,
             'can_reverse' => $status === JournalStatus::Posted
-                && $this->isFinanceOwned()
                 && ($this->relationLoaded('reversals')
                     ? $this->reversals->isEmpty()
                     : ! $this->reversals()->exists()),

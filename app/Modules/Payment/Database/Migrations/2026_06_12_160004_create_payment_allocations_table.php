@@ -8,12 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    private const ACTIVE_IDENTITY_SLOT = 1;
-
-    private const DEFAULT_ALLOCATION_METHOD = 'specific_invoice';
-
-    private const DEFAULT_STATUS = 'pending';
-
     public function up(): void
     {
         Schema::create('payment_allocations', function (Blueprint $table): void {
@@ -23,30 +17,23 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
             $table->foreignId('invoice_id');
-            $table->unsignedTinyInteger('active_identity_slot')
-                ->nullable()
-                ->default(self::ACTIVE_IDENTITY_SLOT);
             $table->string('invoice_number_snapshot', 100);
             $table->date('invoice_date_snapshot')->nullable();
             $table->string('invoice_currency_code_snapshot', 20)->nullable();
-            $table->decimal('invoice_exchange_rate_snapshot', 20, 6);
             $table->decimal('invoice_total', 20, 6);
             $table->decimal('invoice_balance_before', 20, 6);
             $table->decimal('previously_allocated_amount', 20, 6)->default('0');
             $table->decimal('allocated_amount', 20, 6);
             $table->decimal('invoice_balance_after', 20, 6);
             $table->date('allocation_date');
-            $table->string('allocation_method', 50)->default(self::DEFAULT_ALLOCATION_METHOD);
-            $table->string('status', 40)->default(self::DEFAULT_STATUS);
+            $table->string('allocation_method', 50)->default('specific_invoice');
+            $table->string('status', 40)->default('pending');
             $table->timestamp('realized_at')->nullable();
             $table->unsignedBigInteger('realized_by')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(
-                ['payment_id', 'invoice_id', 'active_identity_slot'],
-                'payment_allocations_payment_invoice_active_uk',
-            );
+            $table->unique(['payment_id', 'invoice_id'], 'payment_allocations_payment_invoice_uk');
             $table->index('invoice_id', 'payment_allocations_invoice_ix');
             $table->unique(['id', 'tenant_id'], 'payment_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_allocations_organization_unit_id_tenant_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();

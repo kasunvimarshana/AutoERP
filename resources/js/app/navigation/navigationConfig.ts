@@ -11,13 +11,15 @@ import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 import { financePermissions } from "@/modules/finance/financePermissions";
-import { expensePermissions } from "@/modules/expense/expensePermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
-import { sellingPermissions } from "@/modules/selling/sellingPermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
-import { inventoryPermissions } from "@/modules/inventory/inventoryPermissions";
 import { warehousePermissions } from "@/modules/warehouse/warehousePermissions";
+import {
+    vehicleRentalNavigationPermissions,
+    vehicleRentalPermissions,
+} from "@/modules/vehicle-rental/vehicleRentalPermissions";
+
 const tenantAccess = (
     modules: NonNullable<
         NavigationSection["items"][number]["access"]
@@ -246,6 +248,47 @@ export const tenantNavigationSections: NavigationSection[] = [
                 ],
             },
             {
+                id: "hr",
+                type: "module",
+                label: "Human Resources",
+                icon: "users",
+                access: { requiresTenant: true },
+                children: [
+                    {
+                        id: "hr-drivers",
+                        type: "link",
+                        label: "Drivers",
+                        to: "/hr/drivers",
+                        match: ["/hr/drivers"],
+                        access: { requiresTenant: true },
+                    },
+                    {
+                        id: "hr-driver-create",
+                        type: "link",
+                        label: "Register Driver",
+                        to: "/hr/drivers/create",
+                        match: ["/hr/drivers/create"],
+                        access: { requiresTenant: true },
+                    },
+                    {
+                        id: "hr-employees",
+                        type: "link",
+                        label: "All Employees",
+                        to: "/hr/employees",
+                        match: ["/hr/employees"],
+                        access: { requiresTenant: true },
+                    },
+                    {
+                        id: "hr-employee-create",
+                        type: "link",
+                        label: "Create Employee",
+                        to: "/hr/employees/create",
+                        match: ["/hr/employees/create"],
+                        access: { requiresTenant: true },
+                    },
+                ],
+            },
+            {
                 id: "items",
                 type: "module",
                 label: "Items",
@@ -464,102 +507,6 @@ export const tenantNavigationSections: NavigationSection[] = [
                         match: ["/inventory"],
                         access: operationalAccess(["inventory"]),
                     },
-                    {
-                        id: "inventory-adjustments",
-                        type: "link",
-                        label: "Adjustments",
-                        to: "/inventory?tab=adjustments",
-                        match: ["/inventory"],
-                        access: {
-                            ...operationalAccess(["inventory"]),
-                            permissions: [
-                                inventoryPermissions.adjustmentsView,
-                                inventoryPermissions.adjustmentsManage,
-                                inventoryPermissions.adjustmentsPost,
-                            ],
-                        },
-                    },
-                    {
-                        id: "inventory-batch-serial",
-                        type: "link",
-                        label: "Batch / Serial",
-                        to: "/inventory?tab=tracking",
-                        match: ["/inventory"],
-                        access: {
-                            ...operationalAccess(["inventory"]),
-                            permissions: [
-                                inventoryPermissions.trackingView,
-                                inventoryPermissions.trackingManage,
-                            ],
-                        },
-                    },
-                    {
-                        id: "inventory-stock-movements",
-                        type: "link",
-                        label: "Stock Movements",
-                        to: "/reports/inventory.stock-movement",
-                        match: ["/reports/inventory.stock-movement"],
-                        access: {
-                            ...operationalAccess(["inventory", "reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "inventory-stock-card",
-                        type: "link",
-                        label: "Stock Card",
-                        to: "/inventory/stock-card",
-                        match: ["/inventory/stock-card"],
-                        access: {
-                            ...operationalAccess(["inventory"]),
-                            permissions: [inventoryPermissions.stockView],
-                        },
-                    },
-                ],
-            },
-            {
-                id: "selling",
-                type: "module",
-                label: "Selling",
-                icon: "purchase",
-                access: {
-                    ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
-                    permissions: [sellingPermissions.salesView, sellingPermissions.salesCreate, sellingPermissions.returnsView, sellingPermissions.returnsCreate],
-                },
-                children: [
-                    {
-                        id: "selling-create",
-                        type: "link",
-                        label: "Create Selling",
-                        to: "/selling/create",
-                        match: ["/selling/create"],
-                        access: {
-                            ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
-                            permissions: [sellingPermissions.salesCreate],
-                        },
-                    },
-                    {
-                        id: "selling-list",
-                        type: "link",
-                        label: "Selling List",
-                        to: "/selling",
-                        match: ["/selling", "/selling/sales"],
-                        access: {
-                            ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
-                            permissions: [sellingPermissions.salesView],
-                        },
-                    },
-                    {
-                        id: "selling-returns",
-                        type: "link",
-                        label: "Selling Return",
-                        to: "/selling/returns",
-                        match: ["/selling/returns"],
-                        access: {
-                            ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
-                            permissions: [sellingPermissions.returnsView],
-                        },
-                    },
                 ],
             },
             {
@@ -575,7 +522,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                     {
                         id: "purchase-orders",
                         type: "link",
-                        label: "Purchase Orders List",
+                        label: "Purchase Orders",
                         to: "/purchase/orders",
                         match: ["/purchase/orders"],
                         access: {
@@ -584,16 +531,6 @@ export const tenantNavigationSections: NavigationSection[] = [
                                 purchasePermissions.ordersView,
                                 purchasePermissions.ordersCreate,
                             ],
-                        },
-                    },
-                    {
-                        id: "purchase-order-create",
-                        type: "link",
-                        label: "Create Purchase Order",
-                        to: "/purchase/orders/create",
-                        access: {
-                            ...operationalAccess(["purchase"]),
-                            permissions: [purchasePermissions.ordersCreate],
                         },
                     },
                     {
@@ -695,17 +632,9 @@ export const tenantNavigationSections: NavigationSection[] = [
                     {
                         id: "service-jobs",
                         type: "link",
-                        label: "Service Job List",
+                        label: "Service Jobs",
                         to: "/vehicle-service/jobs",
                         match: ["/vehicle-service/jobs"],
-                        access: operationalAccess(["vehicle-service"]),
-                    },
-                    {
-                        id: "create-service-job",
-                        type: "link",
-                        label: "Create Service Job",
-                        to: "/vehicle-service/jobs/create",
-                        match: ["/vehicle-service/jobs/create"],
                         access: operationalAccess(["vehicle-service"]),
                     },
                     {
@@ -736,66 +665,236 @@ export const tenantNavigationSections: NavigationSection[] = [
                     },
                 ],
             },
+            {
+                id: "vehicle-rental",
+                type: "module",
+                label: "Vehicle Rental",
+                icon: "rental",
+                access: {
+                    ...operationalAccess(["vehicle-rental"]),
+                    permissions: vehicleRentalNavigationPermissions,
+                },
+                children: [
+                    {
+                        id: "rental-overview",
+                        type: "link",
+                        label: "Overview",
+                        to: "/vehicle-rental",
+                        match: ["/vehicle-rental"],
+                        exclude: [
+                            "/vehicle-rental/reservations",
+                            "/vehicle-rental/agreements",
+                            "/vehicle-rental/allocations",
+                            "/vehicle-rental/custody",
+                            "/vehicle-rental/running-chart",
+                            "/vehicle-rental/expenses",
+                            "/vehicle-rental/billing",
+                            "/vehicle-rental/deposits",
+                            "/vehicle-rental/finance-agreements",
+                            "/vehicle-rental/availability",
+                            "/vehicle-rental/reports",
+                        ],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [vehicleRentalPermissions.view],
+                        },
+                    },
+                    {
+                        id: "rental-reservations",
+                        type: "link",
+                        label: "Reservations",
+                        to: "/vehicle-rental/reservations",
+                        match: ["/vehicle-rental/reservations"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.view,
+                                vehicleRentalPermissions.reservationsManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-agreements",
+                        type: "link",
+                        label: "Agreements",
+                        to: "/vehicle-rental/agreements",
+                        match: ["/vehicle-rental/agreements"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.view,
+                                vehicleRentalPermissions.agreementsManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-allocations",
+                        type: "link",
+                        label: "Vehicle Allocations",
+                        to: "/vehicle-rental/allocations",
+                        match: ["/vehicle-rental/allocations"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.view,
+                                vehicleRentalPermissions.allocationsManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-custody",
+                        type: "link",
+                        label: "Handover & Return",
+                        to: "/vehicle-rental/custody",
+                        match: ["/vehicle-rental/custody"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.view,
+                                vehicleRentalPermissions.custodyManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-running-chart",
+                        type: "link",
+                        label: "Daily Running Chart",
+                        to: "/vehicle-rental/running-chart",
+                        match: ["/vehicle-rental/running-chart"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.view,
+                                vehicleRentalPermissions.usageRecord,
+                                vehicleRentalPermissions.usageApprove,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-expenses",
+                        type: "link",
+                        label: "Expenses & Deductions",
+                        to: "/vehicle-rental/expenses",
+                        match: ["/vehicle-rental/expenses"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.financialView,
+                                vehicleRentalPermissions.expensesRecord,
+                                vehicleRentalPermissions.expensesApprove,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-billing",
+                        type: "link",
+                        label: "Billing & Owner Cost",
+                        to: "/vehicle-rental/billing",
+                        match: ["/vehicle-rental/billing"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.financialView,
+                                vehicleRentalPermissions.calculationsManage,
+                                vehicleRentalPermissions.calculationsApprove,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-deposits",
+                        type: "link",
+                        label: "Security Deposits",
+                        to: "/vehicle-rental/deposits",
+                        match: ["/vehicle-rental/deposits"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.financialView,
+                                vehicleRentalPermissions.depositsManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-finance",
+                        type: "link",
+                        label: "Vehicle Finance",
+                        to: "/vehicle-rental/finance-agreements",
+                        match: ["/vehicle-rental/finance-agreements"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.financialView,
+                                vehicleRentalPermissions.financeAgreementsManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-availability",
+                        type: "link",
+                        label: "Vehicle Availability",
+                        to: "/vehicle-rental/availability",
+                        match: ["/vehicle-rental/availability"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [vehicleRentalPermissions.view],
+                        },
+                    },
+                    {
+                        id: "rental-reports",
+                        type: "link",
+                        label: "Rental Reports",
+                        to: "/vehicle-rental/reports",
+                        match: ["/vehicle-rental/reports"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [vehicleRentalPermissions.view],
+                        },
+                    },
+                    {
+                        id: "owner-payables",
+                        type: "link",
+                        label: "Owner Payables",
+                        to: "/invoices?view=rental-payable",
+                        match: ["/invoices"],
+                        access: operationalAccess([
+                            "invoice",
+                            "vehicle-rental",
+                        ]),
+                    },
+                    {
+                        id: "rental-invoices",
+                        type: "link",
+                        label: "Customer Invoices",
+                        to: "/invoices?view=rental-customer",
+                        match: ["/invoices"],
+                        access: operationalAccess([
+                            "invoice",
+                            "vehicle-rental",
+                        ]),
+                    },
+                    {
+                        id: "rental-settlements",
+                        type: "link",
+                        label: "Settlements",
+                        to: "/payments?view=rental",
+                        match: ["/payments"],
+                        exclude: [
+                            "/payments/create",
+                            "/payments/cheque-templates",
+                        ],
+                        access: operationalAccess([
+                            "payment",
+                            "vehicle-rental",
+                        ]),
+                    },
+                ],
+            },
         ],
     },
     {
         id: "finance",
         label: "Finance",
         items: [
-            {
-                id: "expense-workspace",
-                type: "module",
-                label: "Expenses",
-                icon: "payment",
-                access: operationalAccess(["finance"]),
-                children: [
-                    {
-                        id: "expenses",
-                        type: "link",
-                        label: "All Expenses",
-                        to: "/expenses",
-                        match: ["/expenses"],
-                        exclude: ["/expenses/create", "/expenses/types", "/expenses/consumable-usage"],
-                        access: {
-                            ...operationalAccess(["finance"]),
-                            permissions: [expensePermissions.view],
-                        },
-                    },
-                    {
-                        id: "add-expense",
-                        type: "link",
-                        label: "Add Expense",
-                        to: "/expenses/create",
-                        match: ["/expenses/create"],
-                        access: {
-                            ...operationalAccess(["finance"]),
-                            permissions: [expensePermissions.create],
-                        },
-                    },
-                    {
-                        id: "consumable-usage",
-                        type: "link",
-                        label: "Consumable Usage",
-                        to: "/expenses/consumable-usage",
-                        match: ["/expenses/consumable-usage"],
-                        access: {
-                            ...operationalAccess(["finance", "inventory"]),
-                            permissions: [inventoryPermissions.consumableUsageView],
-                        },
-                    },
-                    {
-                        id: "expense-types",
-                        type: "link",
-                        label: "Expense Types",
-                        to: "/expenses/types",
-                        match: ["/expenses/types"],
-                        access: {
-                            ...operationalAccess(["finance"]),
-                            permissions: [expensePermissions.typesView],
-                        },
-                    },
-                ],
-            },
             {
                 id: "finance-workspace",
                 type: "module",
@@ -982,125 +1081,14 @@ export const tenantNavigationSections: NavigationSection[] = [
             },
             {
                 id: "reports",
-                type: "module",
+                type: "link",
                 label: "Reports",
+                to: "/reports",
                 icon: "list",
                 access: {
-                    ...operationalAccess(["reporting"]),
+                    ...operationalAccess([]),
                     permissions: [reportingPermissions.view],
                 },
-                children: [
-                    {
-                        id: "summary-reports",
-                        type: "link",
-                        label: "Summary Reports",
-                        to: "/reports/summary",
-                        match: ["/reports/summary"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "payment-method-wise-summary",
-                        type: "link",
-                        label: "Payment Method Wise Summary",
-                        to: "/reports/payment-method-wise-summary",
-                        match: ["/reports/payment-method-wise-summary"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "expense-report",
-                        type: "link",
-                        label: "Expense Report",
-                        to: "/reports/expenses",
-                        match: ["/reports/expenses"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "consumable-usage-report",
-                        type: "link",
-                        label: "Consumable Usage Report",
-                        to: "/reports/consumable-usage",
-                        match: ["/reports/consumable-usage"],
-                        access: {
-                            ...operationalAccess(["reporting", "finance", "inventory"]),
-                            permissions: [reportingPermissions.view, inventoryPermissions.consumableUsageView],
-                        },
-                    },
-                    {
-                        id: "customer-outstanding-report",
-                        type: "link",
-                        label: "Customer Outstanding",
-                        to: "/reports/customer-outstanding",
-                        match: ["/reports/customer-outstanding"],
-                        access: {
-                            ...operationalAccess(["reporting", "finance"]),
-                            permissions: [reportingPermissions.view, financePermissions.reportsView],
-                        },
-                    },
-                    {
-                        id: "all-reports",
-                        type: "link",
-                        label: "All Reports",
-                        to: "/reports",
-                        match: ["/reports"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "grn-payables-report",
-                        type: "link",
-                        label: "GRN Payables",
-                        to: "/reports/purchase/grn-payables",
-                        match: ["/reports/purchase/grn-payables"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "employee-commission-report",
-                        type: "link",
-                        label: "Employee Commission",
-                        to: "/reports/vehicle-service/employee-commissions",
-                        match: ["/reports/vehicle-service/employee-commissions"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "vehicle-service-history-report",
-                        type: "link",
-                        label: "Vehicle Service History",
-                        to: "/reports/vehicle-service/service-history",
-                        match: ["/reports/vehicle-service/service-history"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                    {
-                        id: "vehicle-service-sales-summary-report",
-                        type: "link",
-                        label: "Service Sales Summary",
-                        to: "/reports/vehicle-service/sales-summary",
-                        match: ["/reports/vehicle-service/sales-summary"],
-                        access: {
-                            ...operationalAccess(["reporting"]),
-                            permissions: [reportingPermissions.view],
-                        },
-                    },
-                ],
             },
             {
                 id: "payments",

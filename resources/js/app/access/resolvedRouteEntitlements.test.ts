@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { financePermissions } from '@/modules/finance/financePermissions';
-import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
-import { sellingPermissions } from '@/modules/selling/sellingPermissions';
-import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { resolveTenantRouteEntitlement } from './resolvedRouteEntitlements';
 
 const expectedFinanceRoutes = [
@@ -31,35 +28,9 @@ describe('resolved tenant route entitlements', () => {
         expect(entitlement?.permissions).toContain(permission);
     });
 
-    it('requires the HR tenant module for HR routes', () => {
-        const entitlement = resolveTenantRouteEntitlement('/hr/employees');
-
-        expect(entitlement?.modules).toEqual(['hr']);
-        expect(entitlement?.requiresOrganizationUnit).toBe(true);
-    });
-
-    it('keeps Tax routes under the Finance tenant module', () => {
-        const entitlement = resolveTenantRouteEntitlement('/tax/taxes');
-
-        expect(entitlement?.modules).toContain('finance');
-        expect(entitlement?.requiresOrganizationUnit).toBe(true);
-    });
-
-    it('resolves non-Finance policies from their feature-owned registries', () => {
+    it('preserves existing non-Finance route policies through the feature-owned resolver', () => {
         expect(resolveTenantRouteEntitlement('/payments')?.permissions).toContain('payments.view');
         expect(resolveTenantRouteEntitlement('/customers')?.permissions).toContain('customers.view');
-        expect(resolveTenantRouteEntitlement('/purchase/orders')?.permissions).toContain('purchase.orders.view');
-        expect(resolveTenantRouteEntitlement('/vehicle-service/jobs')?.permissions).toContain(vehicleServicePermissions.jobsView);
-    });
-
-    it('protects Purchase-owned invoice and payment detail routes with Purchase permissions', () => {
-        const invoice = resolveTenantRouteEntitlement('/purchase/invoices/42');
-        const payment = resolveTenantRouteEntitlement('/purchase/payments/84');
-
-        expect(invoice?.modules).toContain('purchase');
-        expect(invoice?.permissions).toContain(purchasePermissions.supplierInvoicesView);
-        expect(payment?.modules).toEqual(expect.arrayContaining(['purchase', 'payment']));
-        expect(payment?.permissions).toContain(purchasePermissions.paymentsView);
     });
 
     it('protects the Inventory workspace route at its exact path', () => {
@@ -67,20 +38,5 @@ describe('resolved tenant route entitlements', () => {
 
         expect(entitlement?.modules).toContain('inventory');
         expect(entitlement?.requiresOrganizationUnit).toBe(true);
-    });
-
-    it('resolves Selling workspace routes with their module and permission requirements', () => {
-        const list = resolveTenantRouteEntitlement('/selling');
-        expect(list?.modules).toEqual(['selling', 'customer', 'item', 'inventory', 'invoice', 'warehouse']);
-        expect(list?.requiresOrganizationUnit).toBe(true);
-        expect(list?.permissions).toEqual([sellingPermissions.salesView]);
-
-        expect(resolveTenantRouteEntitlement('/selling/create')?.permissions).toEqual([sellingPermissions.salesCreate]);
-        expect(resolveTenantRouteEntitlement('/selling/returns')?.permissions).toEqual([sellingPermissions.returnsView]);
-        expect(resolveTenantRouteEntitlement('/selling/sales/42')?.permissions).toEqual([sellingPermissions.salesView]);
-    });
-
-    it('returns no entitlement for an unregistered route', () => {
-        expect(resolveTenantRouteEntitlement('/unregistered-workspace')).toBeNull();
     });
 });

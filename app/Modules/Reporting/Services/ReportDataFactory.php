@@ -27,20 +27,16 @@ final class ReportDataFactory
         ?int $organizationUnitId,
         array $input = [],
         string $mode = 'preview',
-        ?int $rowLimit = null,
-        bool $truncated = false,
     ): ReportData {
         return new ReportData(
             definition: $definition,
             rows: $rows,
             summary: $this->summaries->build($definition, $rows),
             branding: $this->branding->resolve($tenantId, $organizationUnitId),
-            filters: $this->filters($input, $definition->excludedFilterKeys),
+            filters: $this->filters($input),
             generatedAt: new DateTimeImmutable,
             template: $this->templates->resolve($definition),
             mode: $mode,
-            rowLimit: $rowLimit,
-            truncated: $truncated,
         );
     }
 
@@ -48,7 +44,7 @@ final class ReportDataFactory
      * @param  array<string, mixed>  $input
      * @return array<int, array{label: string, value: string}>
      */
-    private function filters(array $input, array $excludedFilterKeys): array
+    private function filters(array $input): array
     {
         $excluded = ['tenant_id', 'organization_unit_id', 'page', 'per_page', 'direction'];
         $filters = [];
@@ -60,7 +56,7 @@ final class ReportDataFactory
 
             if ($key === 'filters' && is_array($value)) {
                 foreach ($value as $filterKey => $filterValue) {
-                    if (! in_array((string) $filterKey, $excludedFilterKeys, true) && $filterValue !== null && $filterValue !== '') {
+                    if ($filterValue !== null && $filterValue !== '') {
                         $filters[] = [
                             'label' => $this->label((string) $filterKey),
                             'value' => $this->plain($filterValue),

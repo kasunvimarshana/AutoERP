@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Item\Models\Item;
@@ -81,10 +80,5 @@ final class GoodsReceiptNoteLine extends TenantOwnedModel
     public function inventoryMovement(): BelongsTo
     {
         return $this->belongsTo(InventoryMovement::class, 'inventory_movement_id');
-    }
-
-    public function batchAllocations(): HasMany
-    {
-        return $this->hasMany(GoodsReceiptNoteLineBatchAllocation::class, 'goods_receipt_note_line_id');
     }
 }

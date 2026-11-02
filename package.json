@@ -6,8 +6,7 @@
         "build": "vite build",
         "dev": "vite",
         "lint": "eslint resources/js",
-        "security:audit": "npm audit --audit-level=high",
-        "test": "vitest run --reporter=dot --silent=true",
+        "test": "vitest run --reporter=dot --silent",
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
@@ -36,11 +35,6 @@
         "axios": "^1.17.0",
         "react": "^19.2.7",
         "react-dom": "^19.2.7",
-        "react-router-dom": "^7.17.0",
-        "react-toastify": "^11.1.0",
-        "zustand": "^5.0.14"
-    },
-    "overrides": {
-        "minimatch": "^11.0.3"
+        "react-router-dom": "^7.17.0"
     }
 }

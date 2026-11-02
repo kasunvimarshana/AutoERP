@@ -30,6 +30,8 @@ final class VehicleQueryService
             throw new \InvalidArgumentException('Customer is required for vehicle by-customer lookup.');
         } elseif ($kind === 'service-available') {
             $criteria['available_for_service'] = true;
+        } elseif ($kind === 'rental-available') {
+            $criteria['available_for_rental'] = true;
         }
 
         return $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
@@ -69,7 +71,17 @@ final class VehicleQueryService
 
     private function applyCriteria(Builder $query, array $criteria): void
     {
-        $query->matchingSearch($criteria['search'] ?? null);
+        $search = trim((string) ($criteria['search'] ?? ''));
+        if ($search !== '') {
+            $query->where(function (Builder $scope) use ($search): void {
+                $scope->where('vehicle_number', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('registration_number', 'like', "%{$search}%")
+                    ->orWhere('chassis_number', 'like', "%{$search}%")
+                    ->orWhere('engine_number', 'like', "%{$search}%")
+                    ->orWhere('vin_number', 'like', "%{$search}%");
+            });
+        }
         foreach (['status', 'vehicle_make_id', 'vehicle_model_id', 'vehicle_type_id', 'vehicle_category_id'] as $filter) {
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
@@ -89,6 +101,9 @@ final class VehicleQueryService
         }
         if (! empty($criteria['available_for_service'])) {
             $query->whereIn('status', [VehicleStatus::Active->value, VehicleStatus::UnderService->value]);
+        }
+        if (! empty($criteria['available_for_rental'])) {
+            $query->where('status', VehicleStatus::Active->value);
         }
     }
 }

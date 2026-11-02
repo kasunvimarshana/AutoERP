@@ -72,29 +72,15 @@ final class ReportService
         string $mode = 'preview',
     ): ReportData {
         $definition = $this->definitions->get($key);
-        $rowLimit = max(1, (int) config('reporting.export_row_limit'));
         $rows = $this->data->rows(
             $definition,
             $tenantId,
             $organizationUnitId,
             $input,
-            $rowLimit + 1,
+            (int) config('reporting.export_row_limit', 5000),
         );
-        $truncated = count($rows) > $rowLimit;
-        if ($truncated) {
-            $rows = array_slice($rows, 0, $rowLimit);
-        }
 
-        return $this->documents->make(
-            $definition,
-            $rows,
-            $tenantId,
-            $organizationUnitId,
-            $input,
-            $mode,
-            $rowLimit,
-            $truncated,
-        );
+        return $this->documents->make($definition, $rows, $tenantId, $organizationUnitId, $input, $mode);
     }
 
     /**

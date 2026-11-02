@@ -7,7 +7,6 @@ namespace Modules\Purchase\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Modules\Invoice\Models\Invoice;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
@@ -38,7 +37,7 @@ final class PurchaseDebitNoteController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::DEBIT_NOTES_VIEW);
         $this->assertAllowedStatus($request, PurchaseDebitNoteStatus::cases());
 
-        $query = $this->scope(PurchaseDebitNote::query(), $request)->with(['supplier', 'purchaseReturn', 'currency']);
+        $query = $this->scope(PurchaseDebitNote::query(), $request)->with(['supplier', 'purchaseReturn']);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(function (Builder $scope) use ($search): void {
@@ -80,13 +79,8 @@ final class PurchaseDebitNoteController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::DEBIT_NOTES_CREATE);
 
-        $note = DB::transaction(function () use ($request, $service): PurchaseDebitNote {
-            $note = $service->create($request->toData())
-                ->load(['supplier', 'purchaseReturn', 'currency']);
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_CREATED, 'purchase_debit_note', $note);
-
-            return $note;
-        });
+        $note = $service->create($request->toData())->load(['supplier', 'purchaseReturn']);
+        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_CREATED, 'purchase_debit_note', $note);
 
         return (new PurchaseDebitNoteResource($this->presentation->preparePurchaseDebitNote($note)))
             ->response()
@@ -98,7 +92,7 @@ final class PurchaseDebitNoteController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::DEBIT_NOTES_VIEW);
 
         $note = $this->scope(PurchaseDebitNote::query(), $request)
-            ->with(['supplier', 'purchaseReturn', 'currency'])
+            ->with(['supplier', 'purchaseReturn'])
             ->findOrFail($debitNote);
 
         return new PurchaseDebitNoteResource($this->presentation->preparePurchaseDebitNote($note));
@@ -113,16 +107,12 @@ final class PurchaseDebitNoteController
 
         $model = $this->find($request, $debitNote);
         $before = $model->attributesToArray();
-        $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseDebitNote {
-            $updated = $service->approve(
+        $updated = $service->approve(
                 $model,
                 $request->currentUserId(),
                 $request->expectedVersion(),
-            )->load(['supplier', 'purchaseReturn', 'currency']);
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_APPROVED, 'purchase_debit_note', $updated, $before);
-
-            return $updated;
-        });
+            )->load(['supplier', 'purchaseReturn']);
+        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_APPROVED, 'purchase_debit_note', $updated, $before);
 
         return new PurchaseDebitNoteResource($this->presentation->preparePurchaseDebitNote($updated));
     }
@@ -136,13 +126,9 @@ final class PurchaseDebitNoteController
 
         $model = $this->find($request, $debitNote);
         $before = $model->attributesToArray();
-        $updated = DB::transaction(function () use ($model, $request, $service, $before): PurchaseDebitNote {
-            $updated = $service->post($model, $request->expectedVersion())
-                ->load(['supplier', 'purchaseReturn', 'currency']);
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_POSTED, 'purchase_debit_note', $updated, $before);
-
-            return $updated;
-        });
+        $updated = $service->post($model, $request->expectedVersion())
+            ->load(['supplier', 'purchaseReturn']);
+        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_POSTED, 'purchase_debit_note', $updated, $before);
 
         return new PurchaseDebitNoteResource($this->presentation->preparePurchaseDebitNote($updated));
     }
@@ -159,20 +145,16 @@ final class PurchaseDebitNoteController
 
         $model = $this->find($request, $debitNote);
         $before = $model->attributesToArray();
-        $updated = DB::transaction(function () use ($model, $invoice, $request, $service, $before): PurchaseDebitNote {
-            $updated = $service->allocate(
+        $updated = $service->allocate(
                 $model,
                 $invoice,
                 $request->amount(),
                 $request->expectedVersion(),
-            )->load(['supplier', 'purchaseReturn', 'currency']);
-            $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_ALLOCATED, 'purchase_debit_note', $updated, $before, [
-                'invoice_id' => $invoice->getKey(),
-                'amount' => $request->amount(),
-            ]);
-
-            return $updated;
-        });
+            )->load(['supplier', 'purchaseReturn']);
+        $this->audit->recordDocumentEvent(PurchaseAuditEvent::PURCHASE_DEBIT_NOTE_ALLOCATED, 'purchase_debit_note', $updated, $before, [
+            'invoice_id' => $invoice->getKey(),
+            'amount' => $request->amount(),
+        ]);
 
         return new PurchaseDebitNoteResource($this->presentation->preparePurchaseDebitNote($updated));
     }

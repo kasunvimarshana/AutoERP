@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import type { ApiError } from '@/shared/api/apiError';
-import { useErrorToast } from '@/shared/notifications/appToast';
 
-export function ErrorAlert({ error, title = 'Request failed', inline = false }: { error: ApiError | null; title?: string; inline?: boolean }) {
+export function ErrorAlert({ error, title = 'Request failed' }: { error: ApiError | null; title?: string }) {
     const [copiedReference, setCopiedReference] = useState<string | null>(null);
-    useErrorToast(error, title);
     if (!error) return null;
-    if (!inline) return null;
 
     const fieldMessages = Object.entries(error.fields).flatMap(([field, messages]) =>
         messages.map((message) => `${field.replaceAll('.', ' ')}: ${message}`),

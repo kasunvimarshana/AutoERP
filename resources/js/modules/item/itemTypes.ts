@@ -21,16 +21,10 @@ export interface ItemSummary extends NamedResource {
     brand?: NamedResource | null;
     tenant_base_currency?: NamedResource | null;
     base_uom?: NamedResource | null;
-    resolved_sales_unit_price?: string | null;
-    resolved_service_unit_price?: string | null;
-    resolved_purchase_unit_price?: string | null;
     default_tax_group_id?: number | null;
     purchase_tax_group_id?: number | null;
     sales_tax_group_id?: number | null;
     is_stockable: boolean;
-    reorder_level?: string | null;
-    available_stock_quantity?: string | null;
-    reserved_stock_quantity?: string | null;
     is_combo: boolean;
     is_active: boolean;
 }
@@ -60,7 +54,6 @@ export interface ItemPayload {
     item_brand_id?: number | null;
     sku?: string | null;
     barcode?: string | null;
-    reorder_level?: string | null;
     description?: string | null;
     base_uom_id?: number | null;
     default_tax_group_id?: number | null;
@@ -108,8 +101,6 @@ export interface ItemBundle {
     quantity: string;
     uom: NamedResource | null;
     line_type: string;
-    unit_cost: string;
-    uses_job_supervisor: boolean;
     is_required: boolean;
     sort_order: number;
 }
@@ -120,8 +111,6 @@ export interface ItemBundlePayload {
     quantity: string;
     uom_id?: number | null;
     line_type: string;
-    unit_cost?: string;
-    uses_job_supervisor?: boolean;
     is_required: boolean;
     sort_order: number;
 }

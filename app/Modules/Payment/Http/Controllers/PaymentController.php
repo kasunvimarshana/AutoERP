@@ -13,13 +13,11 @@ use Modules\Payment\Http\Requests\AllocatePaymentRequest;
 use Modules\Payment\Http\Requests\ListPaymentRequest;
 use Modules\Payment\Http\Requests\PaymentActionRequest;
 use Modules\Payment\Http\Requests\RefundPaymentRequest;
-use Modules\Payment\Http\Requests\ReversePaymentAllocationRequest;
 use Modules\Payment\Http\Requests\ReversePaymentRequest;
 use Modules\Payment\Http\Requests\SettlePaymentLineRequest;
 use Modules\Payment\Http\Requests\StorePaymentRequest;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Payment\Models\Payment;
-use Modules\Payment\Services\PaymentAllocationReversalService;
 use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
@@ -138,23 +136,6 @@ final class PaymentController
         ));
     }
 
-    public function reverseAllocation(
-        ReversePaymentAllocationRequest $request,
-        int $payment,
-        int $allocation,
-        PaymentAllocationReversalService $service,
-    ): PaymentResource {
-        return new PaymentResource($service->reverse(
-            $this->find($request, $payment),
-            $allocation,
-            $request->expectedPaymentVersion(),
-            $request->expectedAllocationVersion(),
-            $request->reversalDate(),
-            $request->reason(),
-            $request->currentUserId(),
-        ));
-    }
-
     public function allocations(
         ListPaymentRequest $request,
         int $payment,
@@ -182,7 +163,6 @@ final class PaymentController
                 $this->find($request, $payment),
                 $line,
                 $request->settlementStatus(),
-                $request->eventDate(),
                 $request->expectedPaymentVersion(),
                 $request->expectedLineVersion(),
                 $request->currentUserId(),
@@ -199,7 +179,7 @@ final class PaymentController
     }
 
     private function find(
-        ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentAllocationRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
+        ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
         int $payment,
     ): Payment {
         return $this->scope(Payment::query(), $request)->findOrFail($payment);
@@ -207,7 +187,7 @@ final class PaymentController
 
     private function scope(
         Builder $query,
-        ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentAllocationRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
+        ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
     ): Builder {
         $query->where('tenant_id', $request->tenantId());
 

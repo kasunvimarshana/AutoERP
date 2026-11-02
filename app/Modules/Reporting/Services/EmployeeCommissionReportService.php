@@ -10,8 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
-use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
-use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 
 final class EmployeeCommissionReportService
@@ -47,58 +45,6 @@ final class EmployeeCommissionReportService
     }
 
     /**
-     * Build the compact employee ranking used by the Business Overview dashboard.
-     *
-     * @param  array<string, mixed>  $params
-     * @return list<array<string, mixed>>
-     */
-    public function dashboardPerformance(array $params, int $limit = 5): array
-    {
-        $groups = array_values(array_filter(
-            $this->groups(
-                $this->query([
-                    ...$params,
-                    'group_by' => 'employee',
-                    'include_cancelled' => true,
-                ]),
-                'employee',
-            ),
-            static fn (array $group): bool => $group['resource'] !== null,
-        ));
-
-        usort($groups, function (array $left, array $right): int {
-            $labourComparison = $this->math->compare(
-                (string) $right['total_labour_value'],
-                (string) $left['total_labour_value'],
-            );
-            if ($labourComparison !== 0) {
-                return $labourComparison;
-            }
-
-            $commissionComparison = $this->math->compare(
-                (string) $right['total_commission'],
-                (string) $left['total_commission'],
-            );
-
-            return $commissionComparison !== 0
-                ? $commissionComparison
-                : strcmp((string) $left['label'], (string) $right['label']);
-        });
-
-        return array_slice(array_map(static fn (array $group): array => [
-            'employee' => $group['resource'],
-            'completed_jobs' => $group['completed_jobs'],
-            'total_jobs' => $group['total_jobs'],
-            'total_hours' => $group['total_hours'],
-            'labour_value' => $group['total_labour_value'],
-            'earned_commission' => $group['earned_commission'],
-            'pending_commission' => $group['pending_commission'],
-            'cancelled_commission' => $group['cancelled_commission'],
-            'total_commission' => $group['total_commission'],
-        ], $groups), 0, min(20, max(1, $limit)));
-    }
-
-    /**
      * @param  array<string, mixed>  $params
      * @return Collection<int, array<string, mixed>>
      */
@@ -112,93 +58,6 @@ final class EmployeeCommissionReportService
             $query,
             fn (object $row): array => $this->row($row, $groupBy),
         );
-    }
-
-    public function incentiveSummaryDefinition(): ReportDefinition
-    {
-        return new ReportDefinition(
-            key: 'vehicle-service/employee-commissions/incentive-summary',
-            title: 'Incentive Summary Report',
-            group: 'Vehicle Service',
-            model: VehicleServiceLineEmployee::class,
-            description: 'Employee incentive totals for the selected period. Eligible amounts use completion dates; pending amounts use job dates.',
-            columns: [
-                new ReportColumn('employee_code', 'Employee number'),
-                new ReportColumn('employee_name', 'Employee'),
-                new ReportColumn('designation_name', 'Designation'),
-                new ReportColumn('total_jobs', 'Jobs', format: 'integer'),
-                new ReportColumn('earned_commission', 'EOM eligible (earned)', format: 'money', summarize: true),
-                new ReportColumn('pending_commission', 'Pending', format: 'money', summarize: true),
-                new ReportColumn('total_commission', 'Total incentive', format: 'money', summarize: true),
-            ],
-            defaultSort: 'employee_name',
-            defaultDirection: 'asc',
-        );
-    }
-
-    /** @param array<string, mixed> $params */
-    public function exportIncentiveSummaryRows(array $params): Collection
-    {
-        return collect($this->groups($this->query([...$params, 'period_view' => true]), 'employee'))
-            ->map(static fn (array $group): array => [
-                'employee_code' => (string) ($group['resource']['code'] ?? ''),
-                'employee_name' => $group['label'],
-                'designation_name' => $group['designation_name'] ?? '',
-                'total_jobs' => $group['total_jobs'],
-                'earned_commission' => $group['earned_commission'],
-                'pending_commission' => $group['pending_commission'],
-                'total_commission' => $group['total_commission'],
-            ]);
-    }
-
-    /** @param array<string, mixed> $params */
-    public function employeeJobs(array $params, int $employeeId): array
-    {
-        $query = $this->query([
-            ...$params,
-            'employee_id' => $employeeId,
-            'period_view' => true,
-        ]);
-        $jobs = $query->select([])->selectRaw(
-            'commission_rows.job_id, MAX(commission_rows.job_number) as job_number, '
-            .'MAX(commission_rows.job_date) as job_date, '
-            ."MAX(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.completed_at END) as last_earned_at, "
-            .'MAX(commission_rows.customer_name) as customer_name, '
-            .'MAX(commission_rows.vehicle_label) as vehicle_label, '
-            .'COUNT(*) as entry_count, '
-            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.commission_amount ELSE 0 END), 0) as earned_commission, "
-            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'pending' THEN commission_rows.commission_amount ELSE 0 END), 0) as pending_commission, "
-            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
-        )
-            ->groupBy('commission_rows.job_id')
-            ->orderByDesc('job_date')
-            ->orderByDesc('commission_rows.job_id');
-
-        $page = max(1, (int) ($params['page'] ?? 1));
-        $perPage = min(100, max(1, (int) ($params['per_page'] ?? 25)));
-        $result = $jobs->paginate($perPage, ['*'], 'page', $page);
-
-        return [
-            'data' => $result->getCollection()->map(fn (object $row): array => [
-                'job' => ['id' => (int) $row->job_id, 'number' => (string) $row->job_number],
-                'job_date' => (string) $row->job_date,
-                'last_earned_at' => $row->last_earned_at === null ? null : (string) $row->last_earned_at,
-                'customer_name' => (string) ($row->customer_name ?? ''),
-                'vehicle_label' => (string) ($row->vehicle_label ?? ''),
-                'entry_count' => (int) $row->entry_count,
-                'earned_commission' => $this->decimal($row->earned_commission),
-                'pending_commission' => $this->decimal($row->pending_commission),
-                'total_commission' => $this->decimal($row->total_commission),
-            ])->all(),
-            'meta' => [
-                'current_page' => $result->currentPage(),
-                'from' => $result->firstItem(),
-                'last_page' => $result->lastPage(),
-                'per_page' => $result->perPage(),
-                'to' => $result->lastItem(),
-                'total' => $result->total(),
-            ],
-        ];
     }
 
     public function definition(): ReportDefinition
@@ -249,7 +108,7 @@ final class EmployeeCommissionReportService
         $organizationUnitId = $params['organization_unit_id'] ?? null;
         $includeCancelled = filter_var($params['include_cancelled'] ?? false, FILTER_VALIDATE_BOOL);
 
-        $commissionRows = $this->assignmentRows($tenantId, $organizationUnitId, $includeCancelled)
+        $commissionRows = $this->technicianRows($tenantId, $organizationUnitId, $includeCancelled)
             ->unionAll($this->supervisorRows($tenantId, $organizationUnitId, $includeCancelled));
         $query = DB::query()
             ->fromSub($commissionRows, 'commission_rows')
@@ -281,7 +140,7 @@ final class EmployeeCommissionReportService
         return $query;
     }
 
-    private function assignmentRows(int $tenantId, mixed $organizationUnitId, bool $includeCancelled): Builder
+    private function technicianRows(int $tenantId, mixed $organizationUnitId, bool $includeCancelled): Builder
     {
         $query = DB::table('vehicle_service_line_employees as assignments')
             ->join('vehicle_service_jobs as jobs', 'jobs.id', '=', 'assignments.vehicle_service_job_id')
@@ -312,8 +171,7 @@ final class EmployeeCommissionReportService
         }
 
         return $query->selectRaw(
-            "CASE WHEN lines.line_source_type = ? AND lines.uses_job_supervisor = ? THEN 'supervisor' ELSE 'technician' END as commission_source, "
-            ."'assignment' as source_origin, assignments.id as source_id, assignments.employee_id, jobs.id as job_id, lines.id as line_id, "
+            "'technician' as commission_source, assignments.id as source_id, assignments.employee_id, jobs.id as job_id, lines.id as line_id, "
             .'employees.employee_number as employee_code, employees.display_name as employee_name, '
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
             .'designations.id as designation_id, designations.code as designation_code, designations.name as designation_name, '
@@ -328,7 +186,6 @@ final class EmployeeCommissionReportService
             ."WHEN assignments.completed_at IS NOT NULL OR assignments.status = 'completed' OR jobs.completed_at IS NOT NULL "
             ."OR jobs.status IN ('completed', 'invoiced', 'partially_paid', 'paid') THEN 'earned' ELSE 'pending' END as commission_status, "
             .'COALESCE(assignments.completed_at, jobs.completed_at) as completed_at',
-            [VehicleServiceLineSourceType::ComboChild->value, true],
         );
     }
 
@@ -347,22 +204,6 @@ final class EmployeeCommissionReportService
             ->where(function (Builder $commission): void {
                 $commission->where('jobs.supervisor_commission_type', '<>', 'none')
                     ->orWhere('jobs.supervisor_commission_amount', '>', 0);
-            })
-            ->whereNotExists(function (Builder $comboSupervisorLines) use ($tenantId, $organizationUnitId): void {
-                $comboSupervisorLines
-                    ->selectRaw('1')
-                    ->from('vehicle_service_job_lines as combo_supervisor_lines')
-                    ->whereColumn('combo_supervisor_lines.vehicle_service_job_id', 'jobs.id')
-                    ->where('combo_supervisor_lines.tenant_id', $tenantId)
-                    ->where('combo_supervisor_lines.line_source_type', VehicleServiceLineSourceType::ComboChild->value)
-                    ->where('combo_supervisor_lines.uses_job_supervisor', true)
-                    ->where('combo_supervisor_lines.status', '<>', VehicleServiceLineStatus::Cancelled->value);
-
-                $this->organizationScope(
-                    $comboSupervisorLines,
-                    'combo_supervisor_lines.organization_unit_id',
-                    $organizationUnitId,
-                );
             });
 
         $this->organizationScope($query, 'jobs.organization_unit_id', $organizationUnitId);
@@ -371,7 +212,7 @@ final class EmployeeCommissionReportService
         }
 
         return $query->selectRaw(
-            "'supervisor' as commission_source, 'job' as source_origin, jobs.id as source_id, jobs.supervisor_employee_id as employee_id, jobs.id as job_id, 0 as line_id, "
+            "'supervisor' as commission_source, jobs.id as source_id, jobs.supervisor_employee_id as employee_id, jobs.id as job_id, 0 as line_id, "
             .'employees.employee_number as employee_code, employees.display_name as employee_name, '
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
             .'designations.id as designation_id, designations.code as designation_code, designations.name as designation_name, '
@@ -429,15 +270,11 @@ final class EmployeeCommissionReportService
      */
     private function applyFilters(Builder $query, array $params, int $tenantId, mixed $organizationUnitId): void
     {
-        if (filter_var($params['period_view'] ?? false, FILTER_VALIDATE_BOOL)) {
-            $this->applyIncentivePeriod($query, $params);
-        } else {
-            if (! empty($params['date_from'])) {
-                $query->whereDate('commission_rows.job_date', '>=', (string) $params['date_from']);
-            }
-            if (! empty($params['date_to'])) {
-                $query->whereDate('commission_rows.job_date', '<=', (string) $params['date_to']);
-            }
+        if (! empty($params['date_from'])) {
+            $query->whereDate('commission_rows.job_date', '>=', (string) $params['date_from']);
+        }
+        if (! empty($params['date_to'])) {
+            $query->whereDate('commission_rows.job_date', '<=', (string) $params['date_to']);
         }
 
         $this->whereInteger($query, 'commission_rows.employee_id', $params['employee_id'] ?? null);
@@ -500,38 +337,6 @@ final class EmployeeCommissionReportService
                     ->orWhere('commission_rows.role_type', 'like', $search)
                     ->orWhere('commission_rows.commission_source', 'like', $search);
             });
-        }
-    }
-
-    /** @param array<string, mixed> $params */
-    private function applyIncentivePeriod(Builder $query, array $params): void
-    {
-        $query->where(function (Builder $period) use ($params): void {
-            $period->where(function (Builder $earned) use ($params): void {
-                $earned->where('commission_rows.commission_status', 'earned')
-                    ->whereNotNull('commission_rows.completed_at');
-                $this->applyDateBounds($earned, 'commission_rows.completed_at', $params);
-            })->orWhere(function (Builder $pending) use ($params): void {
-                $pending->where('commission_rows.commission_status', 'pending');
-                $this->applyDateBounds($pending, 'commission_rows.job_date', $params);
-            });
-            if (filter_var($params['include_cancelled'] ?? false, FILTER_VALIDATE_BOOL)) {
-                $period->orWhere(function (Builder $cancelled) use ($params): void {
-                    $cancelled->where('commission_rows.commission_status', 'cancelled');
-                    $this->applyDateBounds($cancelled, 'commission_rows.job_date', $params);
-                });
-            }
-        });
-    }
-
-    /** @param array<string, mixed> $params */
-    private function applyDateBounds(Builder $query, string $column, array $params): void
-    {
-        if (! empty($params['date_from'])) {
-            $query->whereDate($column, '>=', (string) $params['date_from']);
-        }
-        if (! empty($params['date_to'])) {
-            $query->whereDate($column, '<=', (string) $params['date_to']);
         }
     }
 
@@ -692,15 +497,9 @@ final class EmployeeCommissionReportService
             ->select([])
             ->selectRaw(
                 "{$key} as group_key, MAX({$label}) as group_label, "
-                .'MAX(commission_rows.employee_code) as group_code, '
-                .'MAX(commission_rows.designation_name) as group_designation_name, '
                 .'COUNT(DISTINCT commission_rows.job_id) as total_jobs, '
-                ."COUNT(DISTINCT CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.job_id END) as completed_jobs, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.assigned_hours ELSE 0 END), 0) as total_hours, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.labour_amount ELSE 0 END), 0) as total_labour_value, "
-                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.commission_amount ELSE 0 END), 0) as earned_commission, "
-                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'pending' THEN commission_rows.commission_amount ELSE 0 END), 0) as pending_commission, "
-                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as cancelled_commission, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
             )
             ->groupBy($key)
@@ -717,21 +516,10 @@ final class EmployeeCommissionReportService
                     'label' => $label,
                     'resource' => $resourceType === 'source' || $key === 'unassigned'
                         ? null
-                        : [
-                            'id' => (int) $row->group_key,
-                            'code' => $resourceType === 'employee' ? (string) ($row->group_code ?? '') : '',
-                            'name' => $label,
-                        ],
-                    'designation_name' => $resourceType === 'employee'
-                        ? (trim((string) ($row->group_designation_name ?? '')) ?: null)
-                        : null,
-                    'completed_jobs' => (int) $row->completed_jobs,
+                        : ['id' => (int) $row->group_key, 'code' => '', 'name' => $label],
                     'total_jobs' => (int) $row->total_jobs,
                     'total_hours' => $this->decimal($row->total_hours),
                     'total_labour_value' => $this->decimal($row->total_labour_value),
-                    'earned_commission' => $this->decimal($row->earned_commission),
-                    'pending_commission' => $this->decimal($row->pending_commission),
-                    'cancelled_commission' => $this->decimal($row->cancelled_commission),
                     'total_commission' => $this->decimal($row->total_commission),
                 ];
             })
@@ -747,9 +535,7 @@ final class EmployeeCommissionReportService
         $group = $this->groupResource($row, $groupBy);
 
         return [
-            'id' => $row->commission_source === 'supervisor' && $row->source_origin === 'assignment'
-                ? 'supervisor-assignment-'.(string) $row->source_id
-                : (string) $row->commission_source.'-'.(string) $row->source_id,
+            'id' => (string) $row->commission_source.'-'.(string) $row->source_id,
             'commission_source' => (string) $row->commission_source,
             'employee' => $this->employeeResource($row),
             'employee_code' => (string) ($row->employee_code ?? ''),

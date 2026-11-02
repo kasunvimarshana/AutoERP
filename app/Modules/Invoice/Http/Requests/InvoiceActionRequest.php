@@ -14,7 +14,6 @@ final class InvoiceActionRequest extends TenantScopedRequest
     {
         $mutation = ! $this->isMethod('get');
         $cancellation = $this->routeIs('api.v1.invoices.cancel');
-        $reversal = $this->routeIs('api.v1.invoices.reverse');
 
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
@@ -22,10 +21,7 @@ final class InvoiceActionRequest extends TenantScopedRequest
             'expected_version' => $mutation
                 ? ['required', 'integer', 'min:1']
                 : ['prohibited'],
-            'reversal_date' => $reversal
-                ? ['required', 'date_format:Y-m-d']
-                : ['prohibited'],
-            'reason' => ($cancellation || $reversal)
+            'reason' => $cancellation
                 ? ['required', 'string', 'max:'.self::REASON_MAX_LENGTH]
                 : ['prohibited'],
         ];
@@ -45,10 +41,5 @@ final class InvoiceActionRequest extends TenantScopedRequest
         $reason = trim((string) $this->input('reason'));
 
         return $reason === '' ? null : $reason;
-    }
-
-    public function reversalDate(): string
-    {
-        return (string) $this->input('reversal_date');
     }
 }

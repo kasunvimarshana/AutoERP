@@ -1,9 +1,5 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { hasPermission } from '@/modules/auth/accessControl';
-import { useAuth } from '@/modules/auth/AuthProvider';
 import { ContentHeader } from '@/shared/components/ContentHeader';
-import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
@@ -20,7 +16,6 @@ import {
     listTransfers,
     listValuationLayers,
 } from '../inventoryApi';
-import { inventoryPermissions } from '../inventoryPermissions';
 import { AvailabilityTab, DashboardTab } from '../components/InventoryOverview';
 import {
     AllocationsTab,
@@ -53,96 +48,38 @@ const tabs = [
 ];
 
 export default function InventoryPage() {
-    const auth = useAuth();
-    const can = (permission: string) => hasPermission(auth, permission);
-    const canAny = (permissions: readonly string[]) => permissions.some(can);
-    const [searchParams, setSearchParams] = useSearchParams();
-    const requestedTab = searchParams.get('tab');
-    const tab: Tab = tabs.some((candidate) => candidate.id === requestedTab)
-        ? requestedTab as Tab
-        : 'dashboard';
+    const [tab, setTab] = useState<Tab>('dashboard');
     const [page, setPage] = useState(1);
     const [itemFilter, setItemFilter] = useState<NamedResource | null>(null);
-
-    const canStockView = can(inventoryPermissions.stockView);
-    const canAuditView = can(inventoryPermissions.auditView);
-    const canReservationsView = can(inventoryPermissions.reservationsView);
-    const canReservationsManage = can(inventoryPermissions.reservationsManage);
-    const canAllocationsView = can(inventoryPermissions.allocationsView);
-    const canAllocationsManage = can(inventoryPermissions.allocationsManage);
-    const canAllocationsIssue = can(inventoryPermissions.allocationsIssue);
-    const canAdjustmentsView = can(inventoryPermissions.adjustmentsView);
-    const canAdjustmentsManage = can(inventoryPermissions.adjustmentsManage);
-    const canAdjustmentsPost = can(inventoryPermissions.adjustmentsPost);
-    const canTransfersView = can(inventoryPermissions.transfersView);
-    const canTransfersManage = can(inventoryPermissions.transfersManage);
-    const canTransfersDispatch = can(inventoryPermissions.transfersDispatch);
-    const canTransfersReceive = can(inventoryPermissions.transfersReceive);
-    const canValuationView = can(inventoryPermissions.valuationView);
-    const canCostAdjustmentsView = can(inventoryPermissions.costAdjustmentsView);
-    const canCostAdjustmentsManage = can(inventoryPermissions.costAdjustmentsManage);
-    const canCostAdjustmentsPost = can(inventoryPermissions.costAdjustmentsPost);
-    const canStockCountsView = can(inventoryPermissions.stockCountsView);
-    const canStockCountsManage = can(inventoryPermissions.stockCountsManage);
-    const canStockCountsApprove = can(inventoryPermissions.stockCountsApprove);
-    const canStockCountsPost = can(inventoryPermissions.stockCountsPost);
-    const canTrackingView = can(inventoryPermissions.trackingView);
-    const canTrackingManage = can(inventoryPermissions.trackingManage);
-    const canOpenInventory = canAny(Object.values(inventoryPermissions));
-
-    const tabAccess: Record<Tab, boolean> = {
-        dashboard: canStockView || canAuditView,
-        availability: canStockView,
-        reservations: canReservationsView || canReservationsManage,
-        allocations: canAllocationsView || canAllocationsManage || canAllocationsIssue,
-        adjustments: canAdjustmentsView || canAdjustmentsManage || canAdjustmentsPost,
-        transfers: canTransfersView || canTransfersManage || canTransfersDispatch || canTransfersReceive,
-        counts: canStockCountsView || canStockCountsManage || canStockCountsApprove || canStockCountsPost,
-        costing: canValuationView || canCostAdjustmentsView || canCostAdjustmentsManage || canCostAdjustmentsPost,
-        tracking: canTrackingView || canTrackingManage,
-        audit: canAuditView,
-        reports: canOpenInventory,
-    };
-    const allowedTabs = tabs.filter((candidate) => tabAccess[candidate.id]);
-    const activeTab = tabAccess[tab] ? tab : allowedTabs[0]?.id ?? 'dashboard';
-    const selectTab = (nextTab: Tab) => {
-        const nextSearchParams = new URLSearchParams(searchParams);
-        if (nextTab === 'dashboard') nextSearchParams.delete('tab');
-        else nextSearchParams.set('tab', nextTab);
-        setSearchParams(nextSearchParams);
-        setPage(1);
-    };
-
     const balances = useApi(
         (signal) => listStockBalances({ page, per_page: 25, item_id: itemFilter?.id }, signal),
         [page, itemFilter?.id],
-        canStockView && activeTab === 'dashboard',
     );
     const reservations = useApi(
         (signal) => listReservations({ per_page: 25 }, signal),
         [],
-        canReservationsView && ['reservations', 'allocations'].includes(activeTab),
+        ['reservations', 'allocations'].includes(tab),
     );
-    const allocations = useApi((signal) => listAllocations({ per_page: 25 }, signal), [], canAllocationsView && activeTab === 'allocations');
-    const adjustments = useApi((signal) => listAdjustments({ per_page: 25 }, signal), [], canAdjustmentsView && activeTab === 'adjustments');
-    const transfers = useApi((signal) => listTransfers({ per_page: 25 }, signal), [], canTransfersView && activeTab === 'transfers');
-    const counts = useApi((signal) => listStockCounts({ per_page: 25 }, signal), [], canStockCountsView && activeTab === 'counts');
+    const allocations = useApi((signal) => listAllocations({ per_page: 25 }, signal), [], tab === 'allocations');
+    const adjustments = useApi((signal) => listAdjustments({ per_page: 25 }, signal), [], tab === 'adjustments');
+    const transfers = useApi((signal) => listTransfers({ per_page: 25 }, signal), [], tab === 'transfers');
+    const counts = useApi((signal) => listStockCounts({ per_page: 25 }, signal), [], tab === 'counts');
     const valuationLayers = useApi(
         (signal) => listValuationLayers({ per_page: 25, status: 'open' }, signal),
         [],
-        canValuationView && activeTab === 'costing',
+        tab === 'costing',
     );
     const costAdjustments = useApi(
         (signal) => listCostAdjustments({ per_page: 25 }, signal),
         [],
-        canCostAdjustmentsView && activeTab === 'costing',
+        tab === 'costing',
     );
-    const batches = useApi((signal) => listBatches({ per_page: 25 }, signal), [], canTrackingView && activeTab === 'tracking');
-    const serials = useApi((signal) => listSerials({ per_page: 25 }, signal), [], canTrackingView && activeTab === 'tracking');
+    const batches = useApi((signal) => listBatches({ per_page: 25 }, signal), [], tab === 'tracking');
+    const serials = useApi((signal) => listSerials({ per_page: 25 }, signal), [], tab === 'tracking');
     const states = useApi(
         (signal) => listStateChanges({ per_page: 20 }, signal),
         [],
-        canAuditView && ['dashboard', 'audit'].includes(activeTab),
+        ['dashboard', 'audit'].includes(tab),
     );
 
     const reloadInventory = () => {
@@ -162,96 +99,75 @@ export default function InventoryPage() {
     return (
         <>
             <ContentHeader title="Inventory" description="Availability, reservations, allocations, transfers, counts, tracking, and reports." />
-            {allowedTabs.length === 0 ? (
-                <Panel title="Inventory permission required">
-                    <p className="text-sm text-slate-600">You do not have permission to access inventory workflows.</p>
-                </Panel>
-            ) : (
-                <>
-                    <Tabs tabs={allowedTabs} active={activeTab} onChange={selectTab} />
-                    <div className="mt-5">
-                        {activeTab === 'dashboard' && (
-                            <DashboardTab
-                                balances={balances}
-                                states={states}
-                                itemFilter={itemFilter}
-                                setItemFilter={setItemFilter}
-                                page={page}
-                                setPage={setPage}
-                            />
-                        )}
-                        {activeTab === 'availability' && <AvailabilityTab />}
-                        {activeTab === 'reservations' && (
-                            <ReservationsTab
-                                data={reservations.data?.data ?? []}
-                                loading={reservations.loading}
-                                error={reservations.error}
-                                reload={reloadInventory}
-                                canManage={canReservationsManage}
-                            />
-                        )}
-                        {activeTab === 'allocations' && (
-                            <AllocationsTab
-                                data={allocations.data?.data ?? []}
-                                reservations={reservations.data?.data ?? []}
-                                loading={allocations.loading}
-                                error={allocations.error}
-                                reload={reloadInventory}
-                                canManage={canAllocationsManage}
-                                canIssue={canAllocationsIssue}
-                            />
-                        )}
-                        {activeTab === 'adjustments' && (
-                            <AdjustmentsTab
-                                data={adjustments.data?.data ?? []}
-                                loading={adjustments.loading}
-                                error={adjustments.error}
-                                reload={reloadInventory}
-                                canManage={canAdjustmentsManage}
-                                canPost={canAdjustmentsPost}
-                            />
-                        )}
-                        {activeTab === 'transfers' && (
-                            <TransfersTab
-                                data={transfers.data?.data ?? []}
-                                loading={transfers.loading}
-                                error={transfers.error}
-                                reload={reloadInventory}
-                                canManage={canTransfersManage}
-                                canDispatch={canTransfersDispatch}
-                                canReceive={canTransfersReceive}
-                            />
-                        )}
-                        {activeTab === 'counts' && (
-                            <CountsTab
-                                data={counts.data?.data ?? []}
-                                loading={counts.loading}
-                                error={counts.error}
-                                reload={reloadInventory}
-                                canManage={canStockCountsManage}
-                                canApprove={canStockCountsApprove}
-                                canPost={canStockCountsPost}
-                            />
-                        )}
-                        {activeTab === 'costing' && (
-                            <CostingTab
-                                data={costAdjustments.data?.data ?? []}
-                                layers={valuationLayers.data?.data ?? []}
-                                layersLoading={valuationLayers.loading}
-                                layersError={valuationLayers.error}
-                                loading={costAdjustments.loading}
-                                error={costAdjustments.error}
-                                reload={reloadInventory}
-                                canManage={canCostAdjustmentsManage}
-                                canPost={canCostAdjustmentsPost}
-                            />
-                        )}
-                        {activeTab === 'tracking' && <TrackingTab batches={batches} serials={serials} canManage={canTrackingManage} reload={reloadInventory} />}
-                        {activeTab === 'audit' && <AuditTab states={states} />}
-                        {activeTab === 'reports' && <ReportsTab />}
-                    </div>
-                </>
-            )}
+            <Tabs tabs={tabs} active={tab} onChange={setTab} />
+            <div className="mt-5">
+                {tab === 'dashboard' && (
+                    <DashboardTab
+                        balances={balances}
+                        states={states}
+                        itemFilter={itemFilter}
+                        setItemFilter={setItemFilter}
+                        page={page}
+                        setPage={setPage}
+                    />
+                )}
+                {tab === 'availability' && <AvailabilityTab />}
+                {tab === 'reservations' && (
+                    <ReservationsTab
+                        data={reservations.data?.data ?? []}
+                        loading={reservations.loading}
+                        error={reservations.error}
+                        reload={reloadInventory}
+                    />
+                )}
+                {tab === 'allocations' && (
+                    <AllocationsTab
+                        data={allocations.data?.data ?? []}
+                        reservations={reservations.data?.data ?? []}
+                        loading={allocations.loading}
+                        error={allocations.error}
+                        reload={reloadInventory}
+                    />
+                )}
+                {tab === 'adjustments' && (
+                    <AdjustmentsTab
+                        data={adjustments.data?.data ?? []}
+                        loading={adjustments.loading}
+                        error={adjustments.error}
+                        reload={reloadInventory}
+                    />
+                )}
+                {tab === 'transfers' && (
+                    <TransfersTab
+                        data={transfers.data?.data ?? []}
+                        loading={transfers.loading}
+                        error={transfers.error}
+                        reload={reloadInventory}
+                    />
+                )}
+                {tab === 'counts' && (
+                    <CountsTab
+                        data={counts.data?.data ?? []}
+                        loading={counts.loading}
+                        error={counts.error}
+                        reload={reloadInventory}
+                    />
+                )}
+                {tab === 'costing' && (
+                    <CostingTab
+                        data={costAdjustments.data?.data ?? []}
+                        layers={valuationLayers.data?.data ?? []}
+                        layersLoading={valuationLayers.loading}
+                        layersError={valuationLayers.error}
+                        loading={costAdjustments.loading}
+                        error={costAdjustments.error}
+                        reload={reloadInventory}
+                    />
+                )}
+                {tab === 'tracking' && <TrackingTab batches={batches} serials={serials} />}
+                {tab === 'audit' && <AuditTab states={states} />}
+                {tab === 'reports' && <ReportsTab />}
+            </div>
         </>
     );
 }

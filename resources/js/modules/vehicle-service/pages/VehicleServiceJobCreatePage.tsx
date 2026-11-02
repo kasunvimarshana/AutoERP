@@ -4,7 +4,7 @@ import { VehicleServiceJobForm } from '../components/VehicleServiceJobForm';
 export default function VehicleServiceJobCreatePage() {
     return (
         <>
-            <ContentHeader title="New vehicle service job" description="Select the vehicle and supervisor, then record the service details needed for the job." />
+            <ContentHeader title="New vehicle service job" description="Save a draft with customer, vehicle, supervisor, odometer, fuel level, and complaint." />
             <VehicleServiceJobForm />
         </>
     );

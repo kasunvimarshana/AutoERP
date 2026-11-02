@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { expensePermissions } from '@/modules/expense/expensePermissions';
 import { itemPermissions } from '@/modules/item/itemPermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
-import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
-import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
+import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
 import { tenantNavigationSections } from './navigationConfig';
-import { tenantWorkspaceNavigationSections } from './tenantWorkspaceNavigation';
 import {
     filterNavigation,
     findNavigationMatch,
@@ -35,16 +32,20 @@ describe('navigation access and matching', () => {
             isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
-            permissions: [purchasePermissions.ordersView, invoicePermissions.view],
+            permissions: [
+                vehicleRentalPermissions.view,
+                vehicleRentalPermissions.reservationsManage,
+                invoicePermissions.view,
+            ],
             permissionsLoaded: true,
-            enabledModules: ['purchase', 'invoice', 'payment'],
+            enabledModules: ['vehicle-rental', 'invoice', 'payment'],
             enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
-        expect(itemIds).toContain('purchase');
+        expect(itemIds).toContain('vehicle-rental');
         expect(itemIds).toContain('invoices');
-        expect(itemIds).not.toContain('inventory');
+        expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('users');
     });
 
@@ -64,6 +65,7 @@ describe('navigation access and matching', () => {
         expect(itemIds).toContain('dashboard');
         expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('items');
+        expect(itemIds).not.toContain('vehicle-rental');
         expect(itemIds).not.toContain('vehicle');
         expect(itemIds).not.toContain('users');
         expect(itemIds).not.toContain('users-access');
@@ -174,116 +176,8 @@ describe('navigation access and matching', () => {
         ]);
     });
 
-    it('shows Expenses as a focused top-level workspace with permission-owned actions', () => {
+    it('shows inventory navigation through the Inventory route entitlement', () => {
         const sections = filterNavigation(tenantNavigationSections, {
-            tenantId: 10,
-            isPlatformOperator: false,
-            organizationUnitId: 20,
-            roles: [],
-            permissions: [
-                expensePermissions.view,
-                expensePermissions.create,
-                expensePermissions.typesView,
-            ],
-            permissionsLoaded: true,
-            enabledModules: ['finance'],
-            enabledModulesLoaded: true,
-        });
-        const expenseModule = sections
-            .flatMap((section) => section.items)
-            .find((item) => item.id === 'expense-workspace');
-
-        expect(expenseModule?.type).toBe('module');
-        expect(expenseModule?.type === 'module' ? expenseModule.children.map((child) => child.label) : []).toEqual([
-            'All Expenses',
-            'Add Expense',
-            'Expense Types',
-        ]);
-        expect(findNavigationMatch('/expenses/types', '', tenantNavigationSections)?.parent?.id).toBe('expense-workspace');
-        expect(findNavigationMatch('/expenses/types', '', tenantNavigationSections)?.item.id).toBe('expense-types');
-    });
-
-    it('shows Consumable Usage under Expenses when Finance and Inventory access are enabled', () => {
-        const context = {
-            tenantId: 10,
-            isPlatformOperator: false,
-            organizationUnitId: 20,
-            roles: ['Super Admin'],
-            permissions: [] as string[],
-            permissionsLoaded: true,
-            enabledModules: ['finance', 'inventory'],
-            enabledModulesLoaded: true,
-        };
-        const sections = filterNavigation(tenantNavigationSections, context);
-        const expenses = sections.flatMap((section) => section.items).find((item) => item.id === 'expense-workspace');
-
-        expect(expenses?.type).toBe('module');
-        expect(expenses?.type === 'module' ? expenses.children.map((child) => child.label) : []).toContain('Consumable Usage');
-        expect(findNavigationMatch('/expenses/consumable-usage', '', sections)?.parent?.id).toBe('expense-workspace');
-
-        const withoutInventory = filterNavigation(tenantNavigationSections, { ...context, enabledModules: ['finance'] });
-        const expenseWithoutInventory = withoutInventory.flatMap((section) => section.items).find((item) => item.id === 'expense-workspace');
-        expect(expenseWithoutInventory?.type === 'module' ? expenseWithoutInventory.children.map((child) => child.label) : []).not.toContain('Consumable Usage');
-    });
-
-    it('shows Summary Reports under the reporting workspace', () => {
-        const sections = filterNavigation(tenantNavigationSections, {
-            tenantId: 10,
-            isPlatformOperator: false,
-            organizationUnitId: 20,
-            roles: [],
-            permissions: [reportingPermissions.view],
-            permissionsLoaded: true,
-            enabledModules: ['reporting'],
-            enabledModulesLoaded: true,
-        });
-        const reports = sections
-            .flatMap((section) => section.items)
-            .find((item) => item.id === 'reports');
-
-        expect(reports?.type).toBe('module');
-        expect(reports?.type === 'module' ? reports.children.map((child) => child.label) : []).toEqual([
-            'Summary Reports',
-            'Payment Method Wise Summary',
-            'Expense Report',
-            'All Reports',
-            'GRN Payables',
-            'Employee Commission',
-            'Vehicle Service History',
-            'Service Sales Summary',
-        ]);
-        expect(findNavigationMatch('/reports/summary', '', tenantNavigationSections)?.item.id).toBe('summary-reports');
-        expect(findNavigationMatch('/reports/payment-method-wise-summary', '', tenantNavigationSections)?.item.id).toBe('payment-method-wise-summary');
-        expect(findNavigationMatch('/reports/expenses', '', tenantNavigationSections)?.item.id).toBe('expense-report');
-        expect(findNavigationMatch('/reports/vehicle-service/sales-summary', '', tenantNavigationSections)?.item.id).toBe('vehicle-service-sales-summary-report');
-    });
-
-    it('shows the Consumable Usage Report only with Reporting, Finance, and Inventory access', () => {
-        const context = {
-            tenantId: 10,
-            isPlatformOperator: false,
-            organizationUnitId: 20,
-            roles: ['Super Admin'],
-            permissions: [] as string[],
-            permissionsLoaded: true,
-            enabledModules: ['reporting', 'finance', 'inventory'],
-            enabledModulesLoaded: true,
-        };
-        const reports = filterNavigation(tenantNavigationSections, context)
-            .flatMap((section) => section.items)
-            .find((item) => item.id === 'reports');
-
-        expect(reports?.type === 'module' ? reports.children.map((child) => child.label) : []).toContain('Consumable Usage Report');
-        expect(findNavigationMatch('/reports/consumable-usage', '', tenantNavigationSections)?.item.id).toBe('consumable-usage-report');
-
-        const withoutInventory = filterNavigation(tenantNavigationSections, { ...context, enabledModules: ['reporting', 'finance'] })
-            .flatMap((section) => section.items)
-            .find((item) => item.id === 'reports');
-        expect(withoutInventory?.type === 'module' ? withoutInventory.children.map((child) => child.label) : []).not.toContain('Consumable Usage Report');
-    });
-
-    it('requires an Inventory permission before showing Inventory navigation', () => {
-        const withoutPermission = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
             isPlatformOperator: false,
             organizationUnitId: 20,
@@ -293,56 +187,6 @@ describe('navigation access and matching', () => {
             enabledModules: ['inventory'],
             enabledModulesLoaded: true,
         });
-        expect(withoutPermission.flatMap((section) => section.items).some((item) => item.id === 'inventory')).toBe(false);
-
-        const withPermission = filterNavigation(tenantNavigationSections, {
-            tenantId: 10,
-            isPlatformOperator: false,
-            organizationUnitId: 20,
-            roles: [],
-            permissions: [inventoryPermissions.stockView],
-            permissionsLoaded: true,
-            enabledModules: ['inventory'],
-            enabledModulesLoaded: true,
-        });
-        const inventoryModule = withPermission
-            .flatMap((section) => section.items)
-            .find((item) => item.id === 'inventory');
-
-        expect(inventoryModule?.type).toBe('module');
-        expect(inventoryModule?.type === 'module' ? inventoryModule.children.map((child) => child.label) : []).toEqual(['Inventory', 'Stock Card']);
-        expect(findNavigationMatch('/inventory', '', tenantNavigationSections)?.parent?.id).toBe('inventory');
-
-        const adjustmentsOnly = filterNavigation(tenantNavigationSections, {
-            tenantId: 10,
-            isPlatformOperator: false,
-            organizationUnitId: 20,
-            roles: [],
-            permissions: [inventoryPermissions.adjustmentsView],
-            permissionsLoaded: true,
-            enabledModules: ['inventory'],
-            enabledModulesLoaded: true,
-        });
-        const adjustmentsModule = adjustmentsOnly.flatMap((section) => section.items).find((item) => item.id === 'inventory');
-        expect(adjustmentsModule?.type === 'module' ? adjustmentsModule.children.map((child) => child.label) : []).not.toContain('Stock Card');
-    });
-
-    it('shows permission-owned Inventory shortcuts and matches their destinations', () => {
-        const sections = filterNavigation(tenantWorkspaceNavigationSections, {
-            tenantId: 10,
-            isPlatformOperator: false,
-            organizationUnitId: 20,
-            roles: [],
-            permissions: [
-                inventoryPermissions.stockView,
-                inventoryPermissions.adjustmentsView,
-                inventoryPermissions.trackingView,
-                reportingPermissions.view,
-            ],
-            permissionsLoaded: true,
-            enabledModules: ['inventory', 'reporting'],
-            enabledModulesLoaded: true,
-        });
         const inventoryModule = sections
             .flatMap((section) => section.items)
             .find((item) => item.id === 'inventory');
@@ -350,15 +194,8 @@ describe('navigation access and matching', () => {
         expect(inventoryModule?.type).toBe('module');
         expect(inventoryModule?.type === 'module' ? inventoryModule.children.map((child) => child.label) : []).toEqual([
             'Inventory',
-            'Adjustments',
-            'Batch / Serial',
-            'Stock Movements',
-            'Stock Card',
         ]);
-        expect(findNavigationMatch('/inventory', '?tab=adjustments', tenantWorkspaceNavigationSections)?.item.id).toBe('inventory-adjustments');
-        expect(findNavigationMatch('/inventory', '?tab=tracking', tenantWorkspaceNavigationSections)?.item.id).toBe('inventory-batch-serial');
-        expect(findNavigationMatch('/reports/inventory.stock-movement', '', tenantWorkspaceNavigationSections)?.item.id).toBe('inventory-stock-movements');
-        expect(findNavigationMatch('/inventory/stock-card', '', tenantWorkspaceNavigationSections)?.item.id).toBe('inventory-stock-card');
+        expect(findNavigationMatch('/inventory', '', tenantNavigationSections)?.parent?.id).toBe('inventory');
     });
 
     it('preserves navigation-specific module constraints for shared route paths', () => {
@@ -375,7 +212,7 @@ describe('navigation access and matching', () => {
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
         expect(itemIds).toContain('invoices');
-        expect(itemIds).not.toContain('vehicle-service');
+        expect(itemIds).not.toContain('vehicle-rental');
     });
 
     it('selects the query-specific child for shared invoice routes', () => {
@@ -385,36 +222,26 @@ describe('navigation access and matching', () => {
         expect(match?.item.id).toBe('service-invoices');
     });
 
-    it('keeps Purchase-owned invoice and payment details in the Purchase module', () => {
-        const invoice = findNavigationMatch('/purchase/invoices/42', '', tenantWorkspaceNavigationSections);
-        const payment = findNavigationMatch('/purchase/payments/84', '', tenantWorkspaceNavigationSections);
+    it('selects the requested agreement direction', () => {
+        const match = findNavigationMatch(
+            '/vehicle-rental/agreements',
+            '?direction=inbound',
+            tenantNavigationSections,
+        );
 
-        expect(invoice?.parent?.id).toBe('purchase');
-        expect(invoice?.item.id).toBe('supplier-invoices');
-        expect(payment?.parent?.id).toBe('purchase');
-        expect(payment?.item.id).toBe('supplier-payments');
+        expect(match?.parent?.id).toBe('vehicle-rental');
+        expect(match?.item.id).toBe('rental-agreements');
     });
 
-    it('keeps canonical invoice details in the Vehicle Service invoice context', () => {
-        const match = findNavigationMatch('/invoices/42', '?from=vehicle-service&job_id=7', tenantWorkspaceNavigationSections);
+    it('selects the requested running chart mode', () => {
+        const match = findNavigationMatch(
+            '/vehicle-rental/running-chart',
+            '?mode=linked',
+            tenantNavigationSections,
+        );
 
-        expect(match?.parent?.id).toBe('vehicle-service');
-        expect(match?.item.id).toBe('service-invoices');
-    });
-
-    it('shows Service Job links alongside the fresh Vehicle Rental workspace', () => {
-        const items = tenantWorkspaceNavigationSections.flatMap((section) => section.items);
-        const vehicleService = items.find((item) => item.id === 'vehicle-service');
-
-        expect(vehicleService?.type).toBe('module');
-        expect(vehicleService?.type === 'module' ? vehicleService.children.map((child) => child.label) : []).toEqual([
-            'Service Job List',
-            'Create Service Job',
-            'Service Invoices',
-            'Customer Receipts',
-        ]);
-        expect(items.some((item) => item.id === 'vehicle-rental')).toBe(true);
-        expect(findNavigationMatch('/vehicle-service/jobs/create', '', tenantWorkspaceNavigationSections)?.item.id).toBe('create-service-job');
+        expect(match?.parent?.id).toBe('vehicle-rental');
+        expect(match?.item.id).toBe('rental-running-chart');
     });
 
     it('keeps the primary business hierarchy without brittle duplicate snapshots', () => {

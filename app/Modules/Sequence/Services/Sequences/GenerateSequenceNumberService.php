@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Sequence\Services\Sequences;
 
-use InvalidArgumentException;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
@@ -12,15 +11,10 @@ use Modules\Core\Results\Result;
 use Modules\Sequence\Constants\SequenceErrorCode;
 use Modules\Sequence\Repositories\SequenceRepositoryInterface;
 use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
-use RuntimeException;
 use Throwable;
 
 final class GenerateSequenceNumberService
 {
-    private const INTERNAL_ERROR_MESSAGE = 'Unable to generate sequence number.';
-
-    private const CONCURRENCY_ERROR_MESSAGE = 'Sequence number generation conflicted with another request.';
-
     public function __construct(
         private readonly SequenceRepositoryInterface $sequences,
         private readonly SequenceDomainServiceInterface $domain,
@@ -65,7 +59,7 @@ final class GenerateSequenceNumberService
                 );
 
                 if (! $sequence instanceof DataRecord) {
-                    $this->sequences->insertIfMissing([
+                    $sequence = $this->sequences->create([
                         'tenant_id' => $tenantId,
                         'organization_unit_id' => $organizationUnitId,
                         'document_type' => $documentType,
@@ -97,7 +91,7 @@ final class GenerateSequenceNumberService
                 }
 
                 if (! $sequence instanceof DataRecord) {
-                    throw new RuntimeException(self::INTERNAL_ERROR_MESSAGE);
+                    throw new \RuntimeException('Unable to resolve sequence for generation.');
                 }
 
                 $prefix = (string) $sequence->get('prefix', '');
@@ -129,7 +123,7 @@ final class GenerateSequenceNumberService
                 );
 
                 if (! $updated instanceof DataRecord) {
-                    throw new RuntimeException(SequenceErrorCode::CONCURRENCY_CONFLICT);
+                    throw new \RuntimeException(SequenceErrorCode::CONCURRENCY_CONFLICT);
                 }
 
                 return [
@@ -147,19 +141,12 @@ final class GenerateSequenceNumberService
             });
 
             return Result::success($result);
-        } catch (InvalidArgumentException $exception) {
-            return Result::failure(new Error(SequenceErrorCode::INVALID_VALUE, $exception->getMessage()));
-        } catch (RuntimeException $exception) {
-            if ($exception->getMessage() === SequenceErrorCode::CONCURRENCY_CONFLICT) {
-                return Result::failure(new Error(
-                    SequenceErrorCode::CONCURRENCY_CONFLICT,
-                    self::CONCURRENCY_ERROR_MESSAGE,
-                ));
-            }
+        } catch (Throwable $exception) {
+            $errorCode = $exception->getMessage() === SequenceErrorCode::CONCURRENCY_CONFLICT
+                ? SequenceErrorCode::CONCURRENCY_CONFLICT
+                : SequenceErrorCode::INVALID_VALUE;
 
-            return Result::failure(new Error(SequenceErrorCode::INTERNAL_ERROR, self::INTERNAL_ERROR_MESSAGE));
-        } catch (Throwable) {
-            return Result::failure(new Error(SequenceErrorCode::INTERNAL_ERROR, self::INTERNAL_ERROR_MESSAGE));
+            return Result::failure(new Error($errorCode, $exception->getMessage()));
         }
     }
 }

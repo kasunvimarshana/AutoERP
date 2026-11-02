@@ -8,6 +8,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
 import { createItemBundle, deleteItemBundle, listItemBundles, updateItemBundle } from '../itemApi';
 import { bundleLineTypes, type ItemBundle, type ItemBundlePayload, type ItemSummary } from '../itemTypes';
@@ -17,17 +18,13 @@ import { ItemUomSelect } from './ItemUomSelect';
 import { useItemRelationCrud } from './useItemRelationCrud';
 
 const list = (itemId: number, page: number, signal: AbortSignal) => listItemBundles(itemId, { page, per_page: 20 }, signal);
-type BundleLineType = (typeof bundleLineTypes)[number];
 
 export default function ItemBundleTab({ itemId, canBundle, readOnly = false }: { itemId: number; canBundle: boolean; readOnly?: boolean }) {
     const crud = useItemRelationCrud({ itemId, list, create: createItemBundle, update: updateItemBundle, remove: deleteItemBundle });
     const columns: DataColumn<ItemBundle>[] = [
         { key: 'child', header: 'Item', render: (row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-' },
-        { key: 'type', header: 'Type', render: (row) => bundleLineLabel(row.line_type) },
         { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}` : '-' },
-        { key: 'supervisor', header: 'Assignment', render: (row) => row.line_type !== 'labour' ? '-' : (row.uses_job_supervisor ? 'Job supervisor' : 'Select employee') },
-        { key: 'cost', header: 'Commission cost', render: (row) => row.line_type === 'labour' ? row.unit_cost : '-' },
     ];
     if (!readOnly) {
         columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
@@ -58,9 +55,7 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
     const [child, setChild] = useState<ItemSummary | null>(row?.child_item ?? null);
     const [uom, setUom] = useState<NamedResource | null>(row?.uom ?? null);
     const [quantity, setQuantity] = useState(row?.quantity ?? '1.000000');
-    const [lineType, setLineType] = useState<BundleLineType>((row?.line_type as BundleLineType | undefined) ?? 'labour');
-    const [unitCost, setUnitCost] = useState(row?.unit_cost ?? '0.000000');
-    const [usesJobSupervisor, setUsesJobSupervisor] = useState(row?.uses_job_supervisor ?? false);
+    const [lineType, setLineType] = useState(row?.line_type ?? 'stock');
     const [required, setRequired] = useState(row?.is_required ?? true);
     const [sortOrder, setSortOrder] = useState(row?.sort_order ?? 0);
     return <form className="space-y-4" onSubmit={(event) => {
@@ -71,62 +66,21 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
             quantity,
             uom_id: uom ? Number(uom.id) : null,
             line_type: lineType,
-            unit_cost: lineType === 'labour' ? unitCost : '0.000000',
-            uses_job_supervisor: lineType === 'labour' && usesJobSupervisor,
             is_required: required,
             sort_order: sortOrder,
         });
     }}>
         <ErrorAlert error={error} />
         <h3 className="font-semibold text-slate-900">Basic Details</h3>
-        <ItemLookupSelect
-            label="Child item"
-            value={child}
-            onChange={(nextChild) => {
-                setChild(nextChild);
-                if (!nextChild) return;
-                setQuantity(defaultBundleQuantity());
-                setUom(nextChild.base_uom ?? null);
-                setLineType(resolveBundleLineType(nextChild));
-                setUnitCost('0.000000');
-                setUsesJobSupervisor(false);
-            }}
-            excludeId={itemId}
-            error={fieldError(error, 'child_item_id')}
-            lookupKind="bundle-child"
-        />
-        {child?.is_stockable && (
-            <p className="rounded-lg bg-sky-50 p-3 text-sm text-sky-800">
-                This quantity is consumed from inventory when the service job starts. Its cost comes from the item’s inventory valuation.
-            </p>
-        )}
+        <ItemLookupSelect label="Child item" value={child} onChange={setChild} excludeId={itemId} error={fieldError(error, 'child_item_id')} />
         <div className="grid gap-4 sm:grid-cols-2">
             <DecimalInput label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
         </div>
-        {lineType === 'labour' && (
-            <div className="grid gap-4 sm:grid-cols-2">
-                <DecimalInput
-                    label="Commission cost"
-                    value={unitCost}
-                    min="0"
-                    error={fieldError(error, 'unit_cost')}
-                    onChange={(event) => setUnitCost(event.target.value)}
-                    required
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                        type="checkbox"
-                        checked={usesJobSupervisor}
-                        onChange={(event) => setUsesJobSupervisor(event.target.checked)}
-                    />
-                    Use the supervisor selected on the service job
-                </label>
-            </div>
-        )}
         <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <summary className="cursor-pointer font-semibold text-slate-800">Advanced</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Select label="Line type" value={lineType} onChange={(event) => setLineType(event.target.value)} options={bundleLineTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} error={fieldError(error, 'line_type')} />
                 <Input label="Sort order" type="number" min="0" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
             </div>
             <label className="mt-4 block text-sm"><input className="mr-2" type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />Required line</label>
@@ -137,26 +91,4 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
 
 function Actions({ edit, remove }: { edit: () => void; remove: () => void }) {
     return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={edit}>Edit line</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Remove line</button></div>;
-}
-
-function resolveBundleLineType(item: ItemSummary): BundleLineType {
-    if (item.is_stockable) return 'stock';
-
-    switch (item.item_type) {
-    case 'stock':
-    case 'service':
-    case 'labour':
-    case 'non_stock':
-        return item.item_type;
-    default:
-        return 'service';
-    }
-}
-
-function bundleLineLabel(lineType: string): string {
-    return lineType === 'stock' ? 'Stock item' : lineType.replaceAll('_', ' ');
-}
-
-function defaultBundleQuantity(): string {
-    return '1.000000';
 }

@@ -88,8 +88,7 @@ final class ChequePrintTest extends TestCase
                 'requires_instrument_details' => true,
                 'is_active' => true,
             ]);
-            $payment = new Payment();
-            $payment->forceFill([
+            $payment = Payment::query()->create([
                 'tenant_id' => $tenantId,
                 'payment_number' => 'PAY-TEST-001',
                 'payment_type' => 'supplier_payment',
@@ -108,9 +107,7 @@ final class ChequePrintTest extends TestCase
                 'unapplied_amount' => '12500.000000',
                 'refunded_amount' => '0.000000',
             ]);
-            $payment->save();
-            $line = new PaymentLine();
-            $line->forceFill([
+            $line = PaymentLine::query()->create([
                 'tenant_id' => $tenantId,
                 'payment_id' => $payment->getKey(),
                 'line_number' => 1,
@@ -128,7 +125,6 @@ final class ChequePrintTest extends TestCase
                 'cleared_amount' => '0.000000',
                 'status' => 'pending',
             ]);
-            $line->save();
             $template = ChequeTemplate::query()->create([
                 'tenant_id' => $tenantId,
                 'bank_name' => 'Example Bank',

@@ -16,8 +16,6 @@ use Modules\Vehicle\Enums\VehicleTransmissionType;
 
 trait MapsVehicleData
 {
-    use MapsVehicleOwnershipData;
-
     private function mapVehicleData(array $vehicle, array $relations = []): CreateVehicleData
     {
         return new CreateVehicleData(
@@ -38,7 +36,7 @@ trait MapsVehicleData
             color: $this->nullableString($vehicle, 'color'),
             fuelType: isset($vehicle['fuel_type']) && $vehicle['fuel_type'] !== null ? VehicleFuelType::from((string) $vehicle['fuel_type']) : null,
             transmissionType: isset($vehicle['transmission_type']) && $vehicle['transmission_type'] !== null ? VehicleTransmissionType::from((string) $vehicle['transmission_type']) : null,
-            odometerReading: $this->nullableString($vehicle, 'odometer_reading'),
+            odometerReading: (string) ($vehicle['odometer_reading'] ?? '0.000000'),
             odometerUnit: $this->nullableString($vehicle, 'odometer_unit'),
             fuelLevel: $this->nullableString($vehicle, 'fuel_level'),
             status: VehicleStatus::from((string) ($vehicle['status'] ?? VehicleStatus::Active->value)),
@@ -47,7 +45,6 @@ trait MapsVehicleData
             createdBy: $this->currentUserId(),
             documents: array_map(fn (array $row): VehicleDocumentData => $this->mapDocument($row), $relations['documents'] ?? []),
             attributes: array_map(fn (array $row): VehicleAttributeData => $this->mapAttribute($row), $relations['attributes'] ?? []),
-            ownerships: array_map(fn (array $row) => $this->mapOwnership($row), $relations['ownerships'] ?? []),
         );
     }
 
