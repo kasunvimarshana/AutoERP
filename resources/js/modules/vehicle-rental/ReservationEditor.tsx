@@ -196,7 +196,7 @@ export function ReservationEditor({
                 />
             </div>
 
-            <div className="flex flex-wrap gap-2 border-t pt-4">
+            <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                 <Button type="submit" loading={saving}>{isEdit ? 'Save Changes' : 'Create Reservation'}</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
             </div>

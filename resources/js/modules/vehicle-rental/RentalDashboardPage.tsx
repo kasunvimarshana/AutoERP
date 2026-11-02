@@ -144,14 +144,14 @@ export default function RentalDashboardPage() {
                     {/* Recent Operational Running Charts */}
                     {data.recent_running_charts && data.recent_running_charts.length > 0 && (
                         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <div className="flex items-center justify-between border-b pb-3">
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                                 <h3 className="font-semibold text-slate-900">Recent Running Charts</h3>
                                 <Link to={CHART_REGISTER_PATH} className="text-xs font-medium text-blue-600 hover:underline">View All</Link>
                             </div>
                             <div className="mt-3 overflow-x-auto">
                                 <table className="w-full text-left text-xs">
                                     <thead>
-                                        <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase text-slate-500">
+                                        <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
                                             {['Chart Reference', 'Vehicle', 'Customer Ref', 'Recorded Window', 'Distance', 'Status'].map(h => (
                                                 <th className="px-3 py-2" key={h}>{h}</th>
                                             ))}
@@ -159,7 +159,7 @@ export default function RentalDashboardPage() {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {data.recent_running_charts.map(chart => (
-                                            <tr key={chart.id} className="transition-colors hover:bg-slate-50">
+                                            <tr key={chart.id} className="transition-colors hover:bg-blue-50/40">
                                                 <td className="px-3 py-2 font-medium text-slate-900">{chart.reference}</td>
                                                 <td className="px-3 py-2 text-slate-700">{chart.vehicle_label}</td>
                                                 <td className="px-3 py-2 text-slate-600">{chart.customer_reference ?? '—'}</td>

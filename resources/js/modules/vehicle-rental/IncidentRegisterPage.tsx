@@ -149,29 +149,33 @@ export default function IncidentRegisterPage() {
             </form>
         </Panel>}
         <Panel title="Recorded incidents">
-            {loading ? <LoadingState label="Loading rental incidents…" /> : listFailed ? null : rows.length === 0 ? <p>No incident evidence recorded.</p> : <div className="space-y-3">
-                {rows.map(incident => <article key={incident.id} className="space-y-2 border-t pt-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="font-medium">{incident.vehicle.label} · {INCIDENT_TYPE_LABELS[incident.incident_type]}</h2>
+            {loading ? <LoadingState label="Loading rental incidents…" /> : listFailed ? null : rows.length === 0 ? <p className="text-slate-500">No incident evidence recorded.</p> : <div className="space-y-4">
+                {rows.map(incident => <article key={incident.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                        <h2 className="text-base font-semibold text-slate-900">{incident.vehicle.label} · {INCIDENT_TYPE_LABELS[incident.incident_type]}</h2>
                         <StatusBadge status={incident.status} />
                     </div>
-                    <p className="text-sm">{formatBusinessDate(incident.occurred_on)} · {incident.reference}</p>
-                    <p className="text-sm">Customer agreement: {incident.vehicle.customer_agreement ?? 'Not recorded'} · Owner agreement: {incident.vehicle.owner_agreement ?? 'Company supply'}</p>
-                    <p className="text-sm">Evidence: {incident.evidence_reference}</p>
-                    {incident.running_chart && <p className="text-sm">Running Chart: {incident.running_chart}</p>}
-                    <p>{incident.description}</p>
+                    <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                        <p><span className="font-medium text-slate-900">Incident Date & Ref:</span> {formatBusinessDate(incident.occurred_on)} · {incident.reference}</p>
+                        <p><span className="font-medium text-slate-900">Agreements:</span> Customer: {incident.vehicle.customer_agreement ?? 'Not recorded'} · Owner: {incident.vehicle.owner_agreement ?? 'Company supply'}</p>
+                        <p><span className="font-medium text-slate-900">Evidence Doc:</span> {incident.evidence_reference}</p>
+                        {incident.running_chart && <p><span className="font-medium text-slate-900">Running Chart:</span> {incident.running_chart}</p>}
+                    </div>
+                    <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-800">{incident.description}</p>
                     <IncidentAttachmentsPanel key={`attachments-${incident.id}-${incident.row_version}`} incident={incident} canRecord={canRecord} busy={busy} setBusy={setBusy}
                         onUpdated={() => { setReviewing(null); reload(); }} />
-                    {canReview && incident.status === IncidentStatus.Recorded &&
-                        <Button type="button" variant="secondary" disabled={busy} onClick={() => { setReviewing(incident); setReviewReason(''); }}>Review evidence</Button>}
-                    <Button type="button" variant="secondary" aria-expanded={historyId === incident.id}
-                        onClick={() => setHistoryId(historyId === incident.id ? null : incident.id)}>
-                        {historyId === incident.id ? 'Hide evidence history' : 'View evidence history'}
-                    </Button>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                        {canReview && incident.status === IncidentStatus.Recorded &&
+                            <Button type="button" variant="secondary" disabled={busy} onClick={() => { setReviewing(incident); setReviewReason(''); }}>Review evidence</Button>}
+                        <Button type="button" variant="secondary" aria-expanded={historyId === incident.id}
+                            onClick={() => setHistoryId(historyId === incident.id ? null : incident.id)}>
+                            {historyId === incident.id ? 'Hide evidence history' : 'View evidence history'}
+                        </Button>
+                    </div>
                     {historyId === incident.id && <IncidentHistoryPanel key={`history-${incident.id}-${incident.row_version}`} id={incident.id} />}
-                    {reviewing?.id === incident.id && <div className="space-y-2 rounded-lg border bg-slate-50 p-3">
+                    {reviewing?.id === incident.id && <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <Textarea label="Review reason (required)" required value={reviewReason} onChange={event => setReviewReason(event.target.value)} error={error?.fields.reason?.[0]} />
-                        <p className="text-sm">Confirming factual evidence does not approve a customer charge or owner deduction.</p>
+                        <p className="text-xs text-slate-600">Confirming factual evidence does not approve a customer charge or owner deduction.</p>
                         <div className="flex flex-wrap gap-2">
                             <Button type="button" disabled={busy || !reviewReason.trim()} onClick={() => void review(IncidentReviewAction.Confirm)}>Confirm evidence</Button>
                             <Button type="button" variant="danger" disabled={busy || !reviewReason.trim()} onClick={() => void review(IncidentReviewAction.Reject)}>Reject evidence</Button>
@@ -180,8 +184,10 @@ export default function IncidentRegisterPage() {
                     </div>}
                 </article>)}
             </div>}
-            <Pagination meta={meta} disabled={busy || loading} onPageChange={next => { setPage(next); setLoading(true); }} />
-            <Button type="button" variant="secondary" disabled={busy || loading} onClick={reload}>Reload incidents</Button>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <Pagination meta={meta} disabled={busy || loading} onPageChange={next => { setPage(next); setLoading(true); }} />
+                <Button type="button" variant="secondary" disabled={busy || loading} onClick={reload}>Reload incidents</Button>
+            </div>
         </Panel>
     </div>;
 }

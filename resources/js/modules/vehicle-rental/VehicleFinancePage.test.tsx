@@ -68,7 +68,7 @@ beforeEach(() => {
     session.permissions = ['vehicle-rental.finance.view'];
     vi.mocked(vehicleFinanceApi.listFinanceAgreements).mockResolvedValue({
         data: [mockAgreement],
-        meta: { current_page: 1, last_page: 1, per_page: 15, total: 1 },
+        meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
     });
     vi.mocked(vehicleFinanceApi.getFinanceAgreement).mockResolvedValue(mockAgreement);
 });
@@ -120,13 +120,11 @@ describe('VehicleFinancePage', () => {
         };
         vi.mocked(vehicleFinanceApi.listFinanceAgreements).mockResolvedValue({
             data: [activeAgreement],
-            meta: { current_page: 1, last_page: 1, per_page: 15, total: 1 },
+            meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
         });
         vi.mocked(vehicleFinanceApi.getFinanceAgreement).mockResolvedValue(activeAgreement);
         vi.mocked(vehicleFinanceApi.createInstallmentPayable).mockResolvedValue({
-            installment_id: 101,
-            invoice_id: 505,
-            invoice_number: 'INV-SUPP-505',
+            id: 505,
         });
 
         render(<VehicleFinancePage />);

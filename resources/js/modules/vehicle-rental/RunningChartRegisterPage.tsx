@@ -58,24 +58,30 @@ export default function RunningChartRegisterPage() {
         </form></Panel>
         <ErrorAlert error={error} inline />
         {loading ? <LoadingState label="Loading Running Chart register…" /> : error ? null : <>
-            {rows.length === 0 && <p>No Running Charts match these filters.</p>}
-            {rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{row.reference} · {row.vehicle_use.vehicle_label}</h2><StatusBadge status={row.status} /></div>
-                <p>Customer: {row.customer_agreement.party_name} · {row.customer_agreement.reference}</p>
-                <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
-                <p>Driver: {row.driver ? `${row.driver.name} · ${row.driver.reference}` : 'Not recorded'}</p>
-                <p>{formatBusinessDateTime(row.starts_at)} — {formatBusinessDateTime(row.ends_at)}</p><p>Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
-                {row.replaces_vehicle && <p>Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p>Corrects chart {row.corrects_chart.reference}</p>}
-                <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button>
-                {selected === row.id && <div className="space-y-3 border-t pt-3">
+            {rows.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-slate-500 shadow-sm">No Running Charts match these filters.</p>}
+            {rows.map(row => <article key={row.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3"><h2 className="text-base font-semibold text-slate-900">{row.reference} · {row.vehicle_use.vehicle_label}</h2><StatusBadge status={row.status} /></div>
+                <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
+                    <p>Customer: {row.customer_agreement.party_name} · {row.customer_agreement.reference}</p>
+                    <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+                    <p>Driver: {row.driver ? `${row.driver.name} · ${row.driver.reference}` : 'Not recorded'}</p>
+                    <p>{formatBusinessDateTime(row.starts_at)} — {formatBusinessDateTime(row.ends_at)}</p>
+                    <p className="sm:col-span-2">Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
+                </div>
+                {row.replaces_vehicle && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p className="text-sm font-medium text-sky-700">Corrects chart {row.corrects_chart.reference}</p>}
+                <div><Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button></div>
+                {selected === row.id && <div className="space-y-3 border-t border-slate-200 pt-3">
                     <dl className="grid gap-3 sm:grid-cols-2">
-                        {Object.entries(DISTANCE_LABELS).map(([key, label]) => <div key={key}><dt className="text-sm text-slate-500">{label}</dt><dd>{row[key as keyof typeof DISTANCE_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={row[key as keyof typeof DISTANCE_LABELS] as string} />}</dd></div>)}
-                        {Object.entries(COUNT_LABELS).map(([key, label]) => <div key={key}><dt className="text-sm text-slate-500">{label}</dt><dd>{row[key as keyof typeof COUNT_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={row[key as keyof typeof COUNT_LABELS] as number} precision={0} />}</dd></div>)}
+                        {Object.entries(DISTANCE_LABELS).map(([key, label]) => <div key={key} className="rounded-lg bg-slate-50 p-2.5"><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 font-medium text-slate-900">{row[key as keyof typeof DISTANCE_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={row[key as keyof typeof DISTANCE_LABELS] as string} />}</dd></div>)}
+                        {Object.entries(COUNT_LABELS).map(([key, label]) => <div key={key} className="rounded-lg bg-slate-50 p-2.5"><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 font-medium text-slate-900">{row[key as keyof typeof COUNT_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={row[key as keyof typeof COUNT_LABELS] as number} precision={0} />}</dd></div>)}
                     </dl>
-                    <p>Air conditioning: {row.ac_mode === null ? 'Not recorded' : AC_LABELS[row.ac_mode]}</p>
-                    <p>Authoritative driver: {row.driver ? `${row.driver.name} (${row.driver.source === 'employee' ? 'employee' : 'external'}) · ${row.driver.reference}` : 'Not recorded'}</p>
-                    <p>Driver observation: {row.driver_observation ?? 'Not recorded'}</p><p>Notes: {row.notes ?? 'Not recorded'}</p>
-                    <Button type="button" variant="secondary" aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>{history === row.id ? 'Hide chart history' : 'Chart history'}</Button>
+                    <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
+                        <p>Air conditioning: {row.ac_mode === null ? 'Not recorded' : AC_LABELS[row.ac_mode]}</p>
+                        <p>Authoritative driver: {row.driver ? `${row.driver.name} (${row.driver.source === 'employee' ? 'employee' : 'external'}) · ${row.driver.reference}` : 'Not recorded'}</p>
+                        <p className="sm:col-span-2">Driver observation: {row.driver_observation ?? 'Not recorded'}</p>
+                        <p className="sm:col-span-2">Notes: {row.notes ?? 'Not recorded'}</p>
+                    </div>
+                    <div className="pt-2"><Button type="button" variant="secondary" aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>{history === row.id ? 'Hide chart history' : 'Chart history'}</Button></div>
                     {history === row.id && <RunningChartHistoryPanel key={row.id} id={row.id} />}<UsageChargePanel chart={row} hasOwner={row.owner_agreement !== null} />
                 </div>}
             </article>)}

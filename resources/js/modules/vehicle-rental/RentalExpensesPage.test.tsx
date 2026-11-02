@@ -44,7 +44,7 @@ beforeEach(() => {
     session.permissions = ['vehicle-rental.expenses.view'];
     vi.mocked(rentalExpenseApi.listRentalExpenses).mockResolvedValue({
         data: [mockExpense],
-        meta: { current_page: 1, last_page: 1, per_page: 15, total: 1 },
+        meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
     });
 });
 

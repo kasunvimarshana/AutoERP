@@ -57,17 +57,21 @@ export default function VehicleUseRegisterPage() {
         </form></Panel>
         <ErrorAlert error={error} inline />
         {loading ? <LoadingState label="Loading vehicle use register…" /> : error ? null : <>
-            {rows.length === 0 && <p>No vehicle uses match these filters.</p>}
-            {rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{row.vehicle.label} · {row.customer_agreement.reference}</h2><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div>
-                <p>Customer: {row.customer_agreement.party_name}</p>
-                <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
-                <p>Planned: {formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>
-                <p>Handed over: {formatBusinessDateTime(row.handed_over_at, 'Not recorded')}</p><p>Returned: {formatBusinessDateTime(row.returned_at, 'Not recorded')}</p>
-                {row.replaces_use && <p>Replaces vehicle {row.replaces_use.vehicle_label}</p>}
-                <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.vehicle.label}</Button>
-                {selected === row.id && <div className="space-y-3 border-t pt-3">
-                    <p>Handover odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p><p>Return odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>
+            {rows.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-slate-500 shadow-sm">No vehicle uses match these filters.</p>}
+            {rows.map(row => <article key={row.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3"><h2 className="text-base font-semibold text-slate-900">{row.vehicle.label} · {row.customer_agreement.reference}</h2><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div>
+                <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
+                    <p>Customer: {row.customer_agreement.party_name}</p>
+                    <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+                    <p>Planned: {formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>
+                    <p>Handed over: {formatBusinessDateTime(row.handed_over_at, 'Not recorded')}</p>
+                    <p>Returned: {formatBusinessDateTime(row.returned_at, 'Not recorded')}</p>
+                </div>
+                {row.replaces_use && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_use.vehicle_label}</p>}
+                <div><Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.vehicle.label}</Button></div>
+                {selected === row.id && <div className="space-y-3 border-t border-slate-200 pt-3">
+                    <p>Handover odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>
+                    <p>Return odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>
                     <p>Notes: {row.notes ?? 'Not recorded'}</p>
                     <VehicleUseHistoryPanel key={row.id} id={row.id} />
                 </div>}

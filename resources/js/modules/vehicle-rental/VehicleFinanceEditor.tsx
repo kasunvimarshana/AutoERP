@@ -248,7 +248,7 @@ export function VehicleFinanceEditor({
                 error={error?.fields.remarks?.[0]}
             />
 
-            <div className="flex flex-wrap gap-2 border-t pt-4">
+            <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                 <Button type="submit" loading={saving}>Generate Schedule & Create Agreement</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
             </div>

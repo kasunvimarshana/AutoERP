@@ -172,12 +172,15 @@ export default function ReservationsPage() {
 
             {selected && (
                 <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" aria-label="Reservation details">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                         <div>
                             <h2 className="text-xl font-semibold text-slate-900">{selected.reservation_number} · {selected.customer.name}</h2>
                             <p className="text-xs text-slate-500">Mode: {selected.rental_mode === 'self_drive' ? 'Self Drive' : 'With Driver'} · Cycle: {selected.billing_cycle === 'daily' ? 'Daily' : 'Monthly'}</p>
                         </div>
-                        <StatusBadge status={selected.status} />
+                        <div className="flex items-center gap-2">
+                            <StatusBadge status={selected.status} />
+                            <Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3 text-sm">
@@ -206,7 +209,7 @@ export default function ReservationsPage() {
                     )}
 
                     {canManage && (
-                        <div className="flex flex-wrap gap-2 border-t pt-4">
+                        <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                             {selected.status === ReservationStatus.Draft && (
                                 <>
                                     <Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit Draft</Button>

@@ -154,12 +154,15 @@ export default function RentalExpensesPage() {
 
             {selected && (
                 <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" aria-label="Expense review">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                         <div>
                             <h2 className="text-xl font-semibold text-slate-900">{selected.expense_number} · {selected.expense_type_label} for {selected.vehicle.label}</h2>
                             <p className="text-xs text-slate-500">Date: {formatBusinessDate(selected.expense_date)} · Net: <MoneyDisplay value={selected.net_amount} currency={selected.currency.code} /> · Tax: <MoneyDisplay value={selected.tax_amount} currency={selected.currency.code} /></p>
                         </div>
-                        <StatusBadge status={selected.status} />
+                        <div className="flex items-center gap-2">
+                            <StatusBadge status={selected.status} />
+                            <Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>
+                        </div>
                     </div>
 
                     {selected.description && (
@@ -172,13 +175,13 @@ export default function RentalExpensesPage() {
                             <div className="overflow-x-auto rounded-lg border border-slate-200">
                                 <table className="w-full text-left text-xs">
                                     <thead>
-                                        <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase text-slate-500">
+                                        <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
                                             {['#', 'Type', 'Party', 'Amount'].map(l => <th className="px-3 py-2" key={l}>{l}</th>)}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {selected.allocations.map(a => (
-                                            <tr key={a.id}>
+                                            <tr key={a.id} className="transition-colors hover:bg-blue-50/40">
                                                 <td className="px-3 py-2">{a.sequence}</td>
                                                 <td className="px-3 py-2 font-medium">{a.allocation_type_label}</td>
                                                 <td className="px-3 py-2">{a.customer?.name ?? a.supplier?.name ?? 'Company'}</td>
@@ -192,7 +195,7 @@ export default function RentalExpensesPage() {
                     )}
 
                     {canManage && (
-                        <div className="flex flex-wrap gap-2 border-t pt-4">
+                        <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                             {selected.status === ExpenseStatus.Draft && (
                                 <>
                                     <Button onClick={() => handleTransition(selected, ExpenseStatus.Submitted)} loading={actionLoading}>Submit for Approval</Button>

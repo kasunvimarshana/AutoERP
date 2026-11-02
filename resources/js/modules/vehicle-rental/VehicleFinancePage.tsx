@@ -204,7 +204,7 @@ export default function VehicleFinancePage() {
 
             {selected && (
                 <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" aria-label="Finance agreement installments">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                         <div>
                             <h2 className="text-xl font-semibold text-slate-900">{selected.agreement_number} · {selected.supplier.name} ({selected.vehicle.label})</h2>
                             <p className="text-xs text-slate-500">
@@ -226,7 +226,7 @@ export default function VehicleFinancePage() {
                     <div className="overflow-x-auto rounded-lg border border-slate-200">
                         <table className="w-full text-left text-xs">
                             <thead>
-                                <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase text-slate-500">
+                                <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
                                     {['#', 'Due Date', 'Principal', 'Interest', 'Total Due', 'Paid', 'Balance', 'Status', 'Payable Invoice'].map(l => (
                                         <th className="px-3 py-2" key={l}>{l}</th>
                                     ))}
@@ -234,7 +234,7 @@ export default function VehicleFinancePage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {selected.installments?.map(inst => (
-                                    <tr key={inst.id} className="transition-colors hover:bg-slate-50">
+                                    <tr key={inst.id} className="transition-colors hover:bg-blue-50/40">
                                         <td className="px-3 py-2 font-medium">{inst.installment_number}</td>
                                         <td className="px-3 py-2 text-slate-600">{formatBusinessDate(inst.due_date)}</td>
                                         <td className="px-3 py-2"><MoneyDisplay value={inst.principal_due} currency={selected.currency.code} /></td>

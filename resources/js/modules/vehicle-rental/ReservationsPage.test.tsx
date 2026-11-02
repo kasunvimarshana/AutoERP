@@ -48,7 +48,7 @@ beforeEach(() => {
     session.permissions = ['vehicle-rental.reservations.view'];
     vi.mocked(reservationApi.listReservations).mockResolvedValue({
         data: [mockReservation],
-        meta: { current_page: 1, last_page: 1, per_page: 15, total: 1 },
+        meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
     });
 });
 
@@ -88,13 +88,11 @@ describe('ReservationsPage', () => {
         session.permissions = ['vehicle-rental.reservations.view', 'vehicle-rental.reservations.manage'];
         vi.mocked(reservationApi.listReservations).mockResolvedValue({
             data: [{ ...mockReservation, status: ReservationStatus.Confirmed }],
-            meta: { current_page: 1, last_page: 1, per_page: 15, total: 1 },
+            meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
         });
         vi.mocked(reservationApi.convertReservation).mockResolvedValue({
-            ...mockReservation,
-            status: ReservationStatus.Converted,
-            converted_agreement: { id: 101, reference: 'AGR-CUST-101' },
-            row_version: 2,
+            id: 101,
+            reference: 'AGR-CUST-101',
         });
 
         render(<ReservationsPage />);
