@@ -17,7 +17,7 @@ final class RentalIncidentAttachmentResource extends JsonResource
             'mime_type' => $this->mime_type,
             'size_bytes' => (int) $this->size_bytes,
             'checksum_sha256' => $this->checksum_sha256,
-            'recorded_at' => $this->recorded_at?->toISOString(),
+            'recorded_at' => $this->recorded_at?->toIso8601String(),
         ];
     }
 }

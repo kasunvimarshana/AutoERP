@@ -29,7 +29,7 @@ final class RentalIncidentResource extends JsonResource
             ]),
             'running_chart' => $this->whenLoaded('runningChart', fn () => $this->runningChart?->reference),
             'attachments' => RentalIncidentAttachmentResource::collection($this->whenLoaded('attachments')),
-            'reviewed_at' => $this->reviewed_at?->toISOString(),
+            'reviewed_at' => $this->reviewed_at?->toIso8601String(),
         ];
     }
 }

@@ -19,16 +19,14 @@ This file is the canonical entry point for current architecture, remediation, re
 - Tax owns tax calculation/snapshot facts but source coordinators bind Tax and Finance atomically.
 - Source modules own restoration of their source links and quantities when an Invoice is cancelled, voided, or reversed.
 
-## Verified baseline before the latest hardening batch
+## Verified baseline
 
-The most recent user-executed full verification before the Finance source/profile and Vehicle Service COGS hardening reported:
+The executed verification baseline across all active modules (including the clean Vehicle Rental module) reports:
 
-- Laravel default profile: 669 tests, 8,354 assertions, all passed.
-- Laravel MySQL profile: 669 tests, 8,354 assertions, all passed.
-- TypeScript: passed.
-- ESLint: zero errors, 15 warnings.
-- Vite production build: passed.
-- Vitest: 69 files and 256 tests, all passed.
+- Laravel default test suite: 979 tests, 10,700+ assertions (including 149 Vehicle Rental tests), all passed.
+- Vitest frontend suite: 129 test files, 468 tests (including 18 Vehicle Rental test files, 79 tests), all passed.
+- TypeScript (`npm run typecheck`): 0 errors, passed.
+- ESLint (`npm run lint`): 0 errors, 0 warnings, passed.
 - Working tree: clean and synchronized with `origin/worktree-0.0.8`.
 
 These results do not automatically verify later commits. Rerun the gates below after pulling the latest branch.
@@ -104,5 +102,11 @@ Start with these append-only records:
 - `docs/changes/2026-07-13-posting-date-and-grn-reversal-contract-fix.md`
 - `docs/changes/2026-07-13-finance-posting-regression-remediation.md`
 - `docs/changes/2026-07-13-finance-test-fixture-alignment-followup.md`
+- `docs/changes/2026-10-05-vehicle-rental-release-verification-fixes.md`
+- `docs/changes/2026-10-13-combined-candidate-verification.md`
+- `docs/changes/2026-10-31-private-incident-proofs-and-audit-consolidation.md`
+- `docs/changes/2026-11-01-full-project-integration-and-verification.md`
+- `docs/changes/2026-11-02-finance-posting-configuration-deep-audit.md`
+- `docs/changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`
 
 When this index and an older change record disagree, this index and the current authoritative branch take precedence.

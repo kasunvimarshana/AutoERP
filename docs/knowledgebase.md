@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-10-10
+**Knowledge refresh date:** 2026-11-02
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-release-verification-fixes.md`](changes/2026-10-05-vehicle-rental-release-verification-fixes.md)
+**Latest current-head re-verification:** [`changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`](changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -1211,3 +1211,15 @@ Rental does not gain a second payment engine, deposit ledger, FX calculator, tax
 ### 2026-10-13 integrated verification status
 
 The PR #127 candidate integrates the latest seller credit-report work, Payment/Finance hardening and rental replacement/cutover integrity fixes. Complete SQLite and MySQL suites pass (919 tests each), as do 432 frontend tests, TypeScript, lint, build and dependency audits. Customer outstanding APIs are owned by Reporting at `/api/v1/reports/customer-outstanding`; Finance reporting authorization remains required. See `docs/changes/2026-10-13-combined-candidate-verification.md` for evidence and limits. The draft remains release-blocked by hosted CI/account availability, independent approval and the outstanding Vehicle Rental section R gates.
+
+### 2026-10-31 private incident proofs integration
+
+Incident evidence attachments are integrated into Vehicle Rental (`RentalIncidentAttachment` model, controller, service, migration `2026_10_31_140001_create_vehicle_rental_incident_attachments_table.php`, and frontend UI). Attachments are stored on private disk storage with SHA-256 checksums, tenant scoping, and strict size limits. Recorded incidents track review and attachment history immutably. See `docs/changes/2026-10-31-private-incident-proofs-and-audit-consolidation.md`.
+
+### 2026-11-01 full project integration baseline
+
+Full multi-module integration baseline verified across the entire AutoERP codebase: 979 backend tests (149 Vehicle Rental), 129 Vitest test files / 468 tests (18 Vehicle Rental / 79 tests), 0 TypeScript errors, 0 ESLint warnings/errors. See `docs/changes/2026-11-01-full-project-integration-and-verification.md`.
+
+### 2026-11-02 Vehicle Rental module and documentation deep audit
+
+End-to-end audit of `docs/knowledgebase.md`, the `docs/` tree, and the entire `VehicleRental` codebase (`app/Modules/VehicleRental/`, `resources/js/modules/vehicle-rental/`). Standardized ISO timestamp serialization across API resources (`toIso8601String()`), improved request validation error messages on optimistic version mismatch, harmonized documentation across `AUDIT_AUTHORITY.md` and `README.md`, and re-verified all 149 backend tests and 79 frontend tests. See `docs/changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`.

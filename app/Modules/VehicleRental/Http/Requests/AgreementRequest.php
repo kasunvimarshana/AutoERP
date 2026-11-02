@@ -31,7 +31,7 @@ final class AgreementRequest extends TenantScopedRequest
     public function expectedVersion(): int
     {
         if (! $this->filled('expected_version')) {
-            throw ValidationException::withMessages(['expected_version' => ['Reload the agreement and supply its current version.']]);
+            throw ValidationException::withMessages(['expected_version' => ['Reload the record and supply its current version.']]);
         }
 
         return (int) $this->validated('expected_version');

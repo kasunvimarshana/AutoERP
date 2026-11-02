@@ -30,7 +30,7 @@ New audit and remediation records should classify findings as:
 
 Legacy Vehicle Rental videos remain valuable business evidence for agreements, allocations, Running Charts, customer billing, owner settlements, payments, deductions, reconciliation, and reporting.
 
-The Vehicle Rental module is not part of the current AutoERP runtime. These materials are historical product evidence only and must not be interpreted as current routes, schema, or implemented behavior.
+The historical pre-rebuild Vehicle Rental implementation from July 2026 was retired and replaced by a fresh, clean-architecture `VehicleRental` module (`app/Modules/VehicleRental/`, `resources/js/modules/vehicle-rental/`). The legacy video transcripts and reports remain valuable historical product evidence, but must not be confused with current active runtime routes, schema, or implemented behavior.
 
 Rules that the videos do not prove—such as partial-month proration, replacement charging, downtime deductions, free-kilometre pooling, garage-mileage billing, accident excess, deposit priority, and multi-driver splits—remain decision-required. They must not be implemented by assumption.
 
