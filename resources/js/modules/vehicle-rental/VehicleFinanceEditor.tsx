@@ -1,14 +1,21 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { apiClient } from '@/shared/api/apiClient';
+import { lookupApi } from '@/shared/api/lookupApi';
+import { requestLookup } from '@/shared/api/lookupRequest';
+import { endpoints } from '@/shared/api/endpoints';
+import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createFinanceAgreement, type StoreFinanceAgreementPayload } from './vehicleFinanceApi';
 
-interface Option { value: number; label: string }
+const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
+const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params)
+    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number ?? row.vehicle_number), code: String(row.vehicle_number) })) }));
 
 function computeMaturity(startStr: string, months: number): string {
     if (!startStr) return '';
@@ -26,12 +33,12 @@ export function VehicleFinanceEditor({
 }) {
     const initialStart = new Date().toISOString().slice(0, 10) + 'T00:00';
     const [agreementNumber, setAgreementNumber] = useState('');
-    const [supplierId, setSupplierId] = useState('');
-    const [vehicleId, setVehicleId] = useState('');
+    const [supplier, setSupplier] = useState<NamedResource | null>(null);
+    const [vehicle, setVehicle] = useState<NamedResource | null>(null);
     const [agreementDate, setAgreementDate] = useState(new Date().toISOString().slice(0, 10));
     const [startsAt, setStartsAt] = useState(initialStart);
     const [maturesAt, setMaturesAt] = useState(() => computeMaturity(initialStart, 12));
-    const [currencyId, setCurrencyId] = useState('');
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [principalAmount, setPrincipalAmount] = useState('1000000.00');
     const [depositAmount, setDepositAmount] = useState('0.00');
     const [residualValue, setResidualValue] = useState('0.00');
@@ -42,41 +49,23 @@ export function VehicleFinanceEditor({
     const [termDays, setTermDays] = useState('30');
     const [remarks, setRemarks] = useState('');
 
-    const [suppliers, setSuppliers] = useState<Option[]>([]);
-    const [vehicles, setVehicles] = useState<Option[]>([]);
-    const [currencies, setCurrencies] = useState<Option[]>([]);
-
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
-    useEffect(() => {
-        apiClient.get<{ data: Array<{ id: number; name: string }> }>('/api/v1/suppliers?per_page=100')
-            .then(r => setSuppliers(r.data.data.map(s => ({ value: s.id, label: s.name }))))
-            .catch(() => {});
-        apiClient.get<{ data: Array<{ id: number; vehicle_number: string; registration_number?: string }> }>('/api/v1/vehicles?per_page=100')
-            .then(r => setVehicles(r.data.data.map(v => ({ value: v.id, label: v.registration_number ?? v.vehicle_number }))))
-            .catch(() => {});
-        apiClient.get<{ data: Array<{ id: number; code: string; name: string }> }>('/api/v1/reference-data/currencies')
-            .then(r => {
-                setCurrencies(r.data.data.map(c => ({ value: c.id, label: `${c.code} – ${c.name}` })));
-                if (!currencyId && r.data.data.length > 0) setCurrencyId(String(r.data.data[0].id));
-            })
-            .catch(() => {});
-    }, [currencyId]);
-
     async function submit(event: FormEvent) {
         event.preventDefault();
+        if (!supplier || !vehicle || !currency) return;
         setSaving(true);
         setError(null);
 
         const payload: StoreFinanceAgreementPayload = {
             agreement_number: agreementNumber.trim() || undefined,
-            supplier_id: Number(supplierId),
-            vehicle_id: Number(vehicleId),
+            supplier_id: supplier.id,
+            vehicle_id: vehicle.id,
             agreement_date: agreementDate,
             starts_at: startsAt,
             matures_at: maturesAt,
-            currency_id: Number(currencyId),
+            currency_id: currency.id,
             principal_amount: principalAmount,
             initial_deposit_amount: depositAmount,
             residual_value: residualValue,
@@ -110,20 +99,20 @@ export function VehicleFinanceEditor({
                     onChange={e => setAgreementNumber(e.target.value)}
                     placeholder="Auto-generated if blank"
                 />
-                <Select
+                <LookupSelect
                     label="Financing Company / Supplier"
-                    value={supplierId}
-                    onChange={e => setSupplierId(e.target.value)}
+                    value={supplier}
+                    onChange={setSupplier}
+                    search={lookupApi.suppliers}
                     required
-                    options={[{ value: '', label: 'Select supplier/bank…' }, ...suppliers]}
                     error={error?.fields.supplier_id?.[0]}
                 />
-                <Select
+                <LookupSelect
                     label="Financed Vehicle"
-                    value={vehicleId}
-                    onChange={e => setVehicleId(e.target.value)}
+                    value={vehicle}
+                    onChange={setVehicle}
+                    search={vehicles}
                     required
-                    options={[{ value: '', label: 'Select vehicle…' }, ...vehicles]}
                     error={error?.fields.vehicle_id?.[0]}
                 />
             </div>
@@ -159,12 +148,12 @@ export function VehicleFinanceEditor({
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-                <Select
+                <LookupSelect
                     label="Currency"
-                    value={currencyId}
-                    onChange={e => setCurrencyId(e.target.value)}
+                    value={currency}
+                    onChange={setCurrency}
+                    search={currencies}
                     required
-                    options={[{ value: '', label: 'Select currency…' }, ...currencies]}
                     error={error?.fields.currency_id?.[0]}
                 />
                 <Input
@@ -249,7 +238,7 @@ export function VehicleFinanceEditor({
             />
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                <Button type="submit" loading={saving}>Generate Schedule & Create Agreement</Button>
+                <Button type="submit" loading={saving} disabled={!supplier || !vehicle || !currency || !startsAt || !maturesAt}>Generate Schedule & Create Agreement</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
             </div>
         </form>

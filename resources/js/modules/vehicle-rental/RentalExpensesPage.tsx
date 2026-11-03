@@ -9,7 +9,10 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { Select } from '@/shared/components/Select';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { formatBusinessDate } from '@/shared/utils/businessDate';
+import type { NamedResource } from '@/shared/types/common';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import {
     listRentalExpenses,
@@ -18,6 +21,7 @@ import {
     EXPENSE_PERMISSION,
     type RentalExpense,
 } from './rentalExpenseApi';
+import { searchCustomerAgreements, searchOwnerAgreements } from './agreementApi';
 import { RentalExpenseEditor } from './RentalExpenseEditor';
 
 export default function RentalExpensesPage() {
@@ -34,6 +38,11 @@ export default function RentalExpensesPage() {
     const [creating, setCreating] = useState(false);
     const [selected, setSelected] = useState<RentalExpense | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+
+    const [allocating, setAllocating] = useState(false);
+    const [allocType, setAllocType] = useState<'company_cost' | 'customer_recovery' | 'owner_deduction'>('customer_recovery');
+    const [allocCustomerAgreement, setAllocCustomerAgreement] = useState<NamedResource | null>(null);
+    const [allocOwnerAgreement, setAllocOwnerAgreement] = useState<NamedResource | null>(null);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -61,11 +70,19 @@ export default function RentalExpensesPage() {
     function reload() {
         setCreating(false);
         setSelected(null);
+        setAllocating(false);
+        setAllocCustomerAgreement(null);
+        setAllocOwnerAgreement(null);
         setLoading(true);
         setRevision(v => v + 1);
     }
 
-    async function handleTransition(expense: RentalExpense, next: ExpenseStatus, allocations?: Array<{ allocation_type: string; net_amount: string }>) {
+    async function handleTransition(expense: RentalExpense, next: ExpenseStatus, allocations?: Array<{
+        allocation_type: string;
+        net_amount: string;
+        target_customer_agreement_id?: number | null;
+        target_owner_agreement_id?: number | null;
+    }>) {
         setActionLoading(true);
         setError(null);
         try {
@@ -137,7 +154,7 @@ export default function RentalExpensesPage() {
                                         <Button
                                             variant="secondary"
                                             disabled={actionLoading || creating}
-                                            onClick={() => setSelected(selected?.id === row.id ? null : row)}
+                                            onClick={() => { setSelected(selected?.id === row.id ? null : row); setAllocating(false); }}
                                         >
                                             {selected?.id === row.id ? 'Close' : 'Review'}
                                         </Button>
@@ -209,10 +226,17 @@ export default function RentalExpensesPage() {
                                     <Button variant="danger" onClick={() => handleTransition(selected, ExpenseStatus.Reversed)} loading={actionLoading}>Reverse</Button>
                                 </>
                             )}
-                            {selected.status === ExpenseStatus.Approved && (
+                            {selected.status === ExpenseStatus.Approved && !allocating && (
                                 <>
                                     <Button
                                         variant="primary"
+                                        onClick={() => setAllocating(true)}
+                                        disabled={actionLoading}
+                                    >
+                                        Allocate to Agreement
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
                                         onClick={() => handleTransition(selected, ExpenseStatus.Allocated, [
                                             { allocation_type: 'company_cost', net_amount: selected.gross_amount },
                                         ])}
@@ -226,6 +250,66 @@ export default function RentalExpensesPage() {
                             {selected.status === ExpenseStatus.Rejected && (
                                 <Button variant="secondary" onClick={() => handleTransition(selected, ExpenseStatus.Draft)} loading={actionLoading}>Re-open as Draft</Button>
                             )}
+                        </div>
+                    )}
+
+                    {allocating && selected.status === ExpenseStatus.Approved && (
+                        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50/50 p-4 space-y-3">
+                            <h3 className="text-sm font-semibold text-slate-900">Allocate Expense: <MoneyDisplay value={selected.gross_amount} currency={selected.currency.code} /></h3>
+                            <p className="text-xs text-slate-600">Select how to recover or deduct this fleet expense according to commercial agreements.</p>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <Select
+                                    label="Allocation Treatment"
+                                    value={allocType}
+                                    onChange={e => setAllocType(e.target.value as 'company_cost' | 'customer_recovery' | 'owner_deduction')}
+                                    options={[
+                                        { value: 'customer_recovery', label: 'Charge / Recover from Customer Agreement' },
+                                        { value: 'owner_deduction', label: 'Deduct from Owner Agreement Payout' },
+                                        { value: 'company_cost', label: 'Absorb as Company Cost' },
+                                    ]}
+                                />
+                                {allocType === 'customer_recovery' && (
+                                    <LookupSelect
+                                        label="Target Customer Agreement"
+                                        value={allocCustomerAgreement}
+                                        onChange={setAllocCustomerAgreement}
+                                        search={searchCustomerAgreements}
+                                        required
+                                    />
+                                )}
+                                {allocType === 'owner_deduction' && (
+                                    <LookupSelect
+                                        label="Target Owner Agreement"
+                                        value={allocOwnerAgreement}
+                                        onChange={setAllocOwnerAgreement}
+                                        search={searchOwnerAgreements}
+                                        required
+                                    />
+                                )}
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    variant="primary"
+                                    loading={actionLoading}
+                                    disabled={
+                                        (allocType === 'customer_recovery' && !allocCustomerAgreement) ||
+                                        (allocType === 'owner_deduction' && !allocOwnerAgreement)
+                                    }
+                                    onClick={() => {
+                                        const allocs = allocType === 'customer_recovery'
+                                            ? [{ allocation_type: 'customer_recovery', net_amount: selected.gross_amount, target_customer_agreement_id: allocCustomerAgreement!.id }]
+                                            : allocType === 'owner_deduction'
+                                                ? [{ allocation_type: 'owner_deduction', net_amount: selected.gross_amount, target_owner_agreement_id: allocOwnerAgreement!.id }]
+                                                : [{ allocation_type: 'company_cost', net_amount: selected.gross_amount }];
+                                        handleTransition(selected, ExpenseStatus.Allocated, allocs);
+                                    }}
+                                >
+                                    Confirm Allocation
+                                </Button>
+                                <Button variant="secondary" disabled={actionLoading} onClick={() => setAllocating(false)}>
+                                    Cancel
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </section>

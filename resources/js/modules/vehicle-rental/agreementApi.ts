@@ -17,6 +17,13 @@ export const searchCustomerAgreements = async (params: LookupLoadParams): Promis
         name: `${ag.reference} — ${ag.party.name}`,
     }));
 };
+export const searchOwnerAgreements = async (params: LookupLoadParams): Promise<LookupResult<NamedResource>> => {
+    const result = await requestLookup<Agreement>(url(AgreementKind.Owner), params);
+    return mapLookupResult(result, ag => ({
+        id: ag.id,
+        name: `${ag.reference} — ${ag.party.name}`,
+    }));
+};
 export const saveAgreement = (kind: AgreementKind, payload: AgreementPayload, id?: number) =>
     (id ? apiClient.put<ApiResource<Agreement>>(`${url(kind)}/${id}`, payload) : apiClient.post<ApiResource<Agreement>>(url(kind), payload)).then(r => r.data.data);
 export const createAgreementSuccessor = (kind: AgreementKind, record: Agreement, payload: AgreementSuccessorPayload) =>

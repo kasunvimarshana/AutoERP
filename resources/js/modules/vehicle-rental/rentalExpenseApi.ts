@@ -133,6 +133,9 @@ export async function transitionRentalExpense(
         tax_amount?: string;
         markup_amount?: string;
         withholding_amount?: string;
+        target_customer_agreement_id?: number | null;
+        target_owner_agreement_id?: number | null;
+        target_vehicle_use_id?: number | null;
         customer_id?: number | null;
         supplier_id?: number | null;
     }>,
