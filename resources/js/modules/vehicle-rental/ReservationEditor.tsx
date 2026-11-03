@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
@@ -19,10 +19,12 @@ const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unkn
 
 export function ReservationEditor({
     reservation,
+    initialVehicleId,
     onSaved,
     onCancel,
 }: {
     reservation?: RentalReservation;
+    initialVehicleId?: number;
     onSaved: () => void;
     onCancel: () => void;
 }) {
@@ -41,6 +43,21 @@ export function ReservationEditor({
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+
+    useEffect(() => {
+        if (!reservation && initialVehicleId && !vehicle) {
+            const controller = new AbortController();
+            vehicles({ search: '', page: 1, perPage: 100, signal: controller.signal })
+                .then(result => {
+                    const found = result.data.find(v => v.id === initialVehicleId);
+                    if (found) {
+                        setVehicle(found);
+                    }
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [initialVehicleId, reservation, vehicle]);
 
     async function submit(event: FormEvent) {
         event.preventDefault();

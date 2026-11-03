@@ -6,8 +6,8 @@ import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import { AGREEMENT_API, PAGE_SIZE, AgreementKind, AgreementAction, type Agreement, type AgreementHistory, type AgreementPayload, type AgreementSuccessorPayload } from './agreements';
 
 const url = (kind: AgreementKind) => `${AGREEMENT_API}/${kind}/agreements`;
-export const listAgreements = (kind: AgreementKind, page: number, signal?: AbortSignal) =>
-    apiClient.get<ApiCollection<Agreement>>(url(kind), { params: { page, per_page: PAGE_SIZE }, signal }).then(r => r.data);
+export const listAgreements = (kind: AgreementKind, page: number, signal?: AbortSignal, search?: string) =>
+    apiClient.get<ApiCollection<Agreement>>(url(kind), { params: { page, per_page: PAGE_SIZE, search: search || undefined }, signal }).then(r => r.data);
 export const getAgreement = (kind: AgreementKind, id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<Agreement>>(`${url(kind)}/${id}`, { signal }).then(r => r.data.data);
 export const searchCustomerAgreements = async (params: LookupLoadParams): Promise<LookupResult<NamedResource>> => {

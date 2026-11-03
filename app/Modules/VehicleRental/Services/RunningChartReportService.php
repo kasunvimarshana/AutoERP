@@ -198,7 +198,7 @@ final class RunningChartReportService
         }
 
         $termsIncludedKm = $agreement->terms['included_km'] ?? null;
-        $includedKm = $termsIncludedKm !== null ? (float) $termsIncludedKm : ($agreement->included_km !== null ? (float) $agreement->included_km : 0.0);
+        $includedKm = $termsIncludedKm !== null ? (float) $termsIncludedKm : 0.0;
         $finalCumulative = (int) round($cumulativeMileage);
         $excessKm = ($includedKm > 0 && $finalCumulative > $includedKm)
             ? (int) round($finalCumulative - $includedKm)
@@ -217,10 +217,10 @@ final class RunningChartReportService
 
         return [
             'header' => [
-                'company_name' => $agreement->tenant?->name ?? 'AT Tours & Transport (Pvt) Ltd',
+                'company_name' => $agreement->tenant?->name ?? (config('app.name') ?: 'AutoERP'),
                 'report_title' => 'RUNNING CHART FOR LESSEE - Monthly Basis Vehicles',
                 'rental_mode' => $rentalModeLabel,
-                'client_name' => $agreement->customer?->name ?? $agreement->customer_name_snapshot ?? 'N/A',
+                'client_name' => $agreement->customer?->name ?? $agreement->party_name_snapshot ?? 'N/A',
                 'duration' => $start->format('d/m/Y').' To '.$endDay->format('d/m/Y'),
                 'start_date' => $startDate,
                 'end_date' => $endDate,

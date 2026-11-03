@@ -3,6 +3,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -25,6 +26,12 @@ export default function ReservationsPage() {
     const auth = useAuth();
     const canManage = hasPermission(auth, RESERVATION_PERMISSION.manage);
 
+    const initialVehicleId = (() => {
+        if (typeof window === 'undefined') return undefined;
+        const id = new URLSearchParams(window.location.search).get('vehicle_id');
+        return id ? Number(id) : undefined;
+    })();
+
     const [rows, setRows] = useState<RentalReservation[]>([]);
     const [meta, setMeta] = useState<PaginationMeta>();
     const [page, setPage] = useState(1);
@@ -32,13 +39,16 @@ export default function ReservationsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
 
-    const [editing, setEditing] = useState<RentalReservation | 'new' | null>(null);
+    const [editing, setEditing] = useState<RentalReservation | 'new' | null>(initialVehicleId ? 'new' : null);
     const [selected, setSelected] = useState<RentalReservation | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [search, setSearch] = useState('');
+    const [query, setQuery] = useState('');
 
     useEffect(() => {
         const controller = new AbortController();
-        listReservations(page, controller.signal)
+        const filters = query ? { search: query } : undefined;
+        listReservations(page, controller.signal, filters)
             .then(result => {
                 if (!controller.signal.aborted) {
                     setRows(result.data);
@@ -57,11 +67,20 @@ export default function ReservationsPage() {
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [page, revision]);
+    }, [page, revision, query]);
+
+    function handleCloseEditor() {
+        setEditing(null);
+        if (typeof window !== 'undefined' && window.location.search.includes('vehicle_id')) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('vehicle_id');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }
 
     function reload() {
         setSelected(null);
-        setEditing(null);
+        handleCloseEditor();
         setLoading(true);
         setRevision(v => v + 1);
     }
@@ -115,11 +134,47 @@ export default function ReservationsPage() {
 
             {editing !== null && (
                 <ReservationEditor
+                    key={editing === 'new' ? 'new' : editing.id}
                     reservation={editing === 'new' ? undefined : editing}
+                    initialVehicleId={editing === 'new' ? initialVehicleId : undefined}
                     onSaved={reload}
-                    onCancel={() => setEditing(null)}
+                    onCancel={handleCloseEditor}
                 />
             )}
+
+            <form
+                onSubmit={event => {
+                    event.preventDefault();
+                    setPage(1);
+                    setQuery(search.trim());
+                }}
+                className="mt-4 flex flex-wrap items-center gap-2"
+            >
+                <div className="w-80">
+                    <Input
+                        name="search"
+                        placeholder="Search by reservation, customer, or vehicle…"
+                        value={search}
+                        onChange={event => setSearch(event.target.value)}
+                    />
+                </div>
+                <Button type="submit" variant="secondary" disabled={loading}>
+                    Search
+                </Button>
+                {query && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                            setSearch('');
+                            setQuery('');
+                            setPage(1);
+                        }}
+                    >
+                        Clear
+                    </Button>
+                )}
+            </form>
 
             {loading ? (
                 <LoadingState label="Loading reservations…" />

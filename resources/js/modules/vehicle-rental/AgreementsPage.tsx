@@ -20,6 +20,7 @@ import { Pagination } from '@/shared/components/Pagination';
 import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
+import { Input } from '@/shared/components/Input';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementEditor } from './AgreementEditor';
 import { AgreementTermsGrid } from './AgreementTermsGrid';
@@ -46,14 +47,16 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [showDeposits, setShowDeposits] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [showSuccessor, setShowSuccessor] = useState(false);
+    const [search, setSearch] = useState('');
+    const [query, setQuery] = useState('');
     useEffect(() => {
         const controller = new AbortController();
-        listAgreements(kind, page, controller.signal).then(result => {
+        listAgreements(kind, page, controller.signal, query).then(result => {
             if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
         }).catch(failure => { if (!controller.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(failure)); } })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
-    }, [kind, page, revision]);
+    }, [kind, page, revision, query]);
     function reload() { setSelected(null); setAction(null); setEditing(null); setShowSuccessor(false); setLoading(true); setRevision(value => value + 1); }
     async function confirm() {
         if (!selected || !action) return;
@@ -67,6 +70,39 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             actions={<><Button variant="secondary" onClick={reload} disabled={loading || saving || editing !== null}>Reload</Button>{canManage && <Button onClick={() => { setEditing('new'); setSelected(null); }} disabled={loading || saving || editing !== null}>New agreement</Button>}</>} />
         <ErrorAlert error={error} inline />
         {editing !== null && <AgreementEditor key={editing === 'new' ? 'new' : editing.id} kind={kind} record={editing === 'new' ? undefined : editing} onSaved={reload} onCancel={() => setEditing(null)} />}
+        <form
+            onSubmit={event => {
+                event.preventDefault();
+                setPage(1);
+                setQuery(search.trim());
+            }}
+            className="mt-4 flex flex-wrap items-center gap-2"
+        >
+            <div className="w-72">
+                <Input
+                    name="search"
+                    placeholder="Search by reference or party…"
+                    value={search}
+                    onChange={event => setSearch(event.target.value)}
+                />
+            </div>
+            <Button type="submit" variant="secondary" disabled={loading}>
+                Search
+            </Button>
+            {query && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                        setSearch('');
+                        setQuery('');
+                        setPage(1);
+                    }}
+                >
+                    Clear
+                </Button>
+            )}
+        </form>
         {loading ? <LoadingState label="Loading agreements…" /> : error ? null : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm"><caption className="sr-only">Rental agreements</caption><thead><tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">{['Reference', 'Party', 'Period', 'Basis', 'Status', 'Details'].map(label => <th className="px-4 py-3" key={label}>{label}</th>)}</tr></thead>
                 <tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="transition-colors hover:bg-blue-50/40"><td className="px-4 py-3 font-medium text-slate-900">{row.reference}</td><td className="px-4 py-3 text-slate-700">{row.party.name}</td><td className="px-4 py-3 text-slate-600">{formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}</td><td className="px-4 py-3 text-slate-700">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="px-4 py-3"><StatusBadge status={row.status} /></td><td className="px-4 py-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>

@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -287,6 +288,17 @@ final class VehicleFinanceService
     public function paginate(int $tenantId, ?int $organizationUnitId, array $filters, int $perPage): LengthAwarePaginator
     {
         $query = VehicleFinanceAgreement::query()->forContext($tenantId, $organizationUnitId)->with($this->relations());
+
+        if (! empty($filters['search'])) {
+            $search = trim((string) $filters['search']);
+            $query->where(fn (Builder $scope) => $scope
+                ->where('agreement_number', 'like', "%{$search}%")
+                ->orWhere('supplier_name_snapshot', 'like', "%{$search}%")
+                ->orWhere('vehicle_label_snapshot', 'like', "%{$search}%")
+                ->orWhereHas('supplier', fn (Builder $s) => $s->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('vehicle', fn (Builder $v) => $v->where('vehicle_number', 'like', "%{$search}%")->orWhere('registration_number', 'like', "%{$search}%")));
+        }
+
         foreach (['supplier_id', 'vehicle_id', 'status'] as $key) {
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $query->where($key, $filters[$key]);

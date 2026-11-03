@@ -22,6 +22,7 @@ use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Models\RentalReservationHistory;
+use Modules\VehicleRental\Services\OperationalTime;
 
 final class RentalReservationService
 {
@@ -54,8 +55,8 @@ final class RentalReservationService
                 $this->assertVehicleAvailable(
                     $tenantId,
                     (int) $data['requested_vehicle_id'],
-                    $start->toIso8601String(),
-                    $end->toIso8601String(),
+                    OperationalTime::database($start),
+                    OperationalTime::database($end),
                 );
             }
 
@@ -116,8 +117,8 @@ final class RentalReservationService
                 $this->assertVehicleAvailable(
                     (int) $reservation->tenant_id,
                     (int) $merged['requested_vehicle_id'],
-                    $start->toIso8601String(),
-                    $end->toIso8601String(),
+                    OperationalTime::database($start),
+                    OperationalTime::database($end),
                     excludeReservationId: (int) $reservation->getKey(),
                 );
             }
@@ -180,11 +181,13 @@ final class RentalReservationService
             }
 
             if ($to === RentalReservationStatus::Confirmed && $reservation->requested_vehicle_id !== null) {
+                $start = CarbonImmutable::parse((string) $reservation->requested_start_at);
+                $end = CarbonImmutable::parse((string) $reservation->requested_end_at);
                 $this->assertVehicleAvailable(
                     (int) $reservation->tenant_id,
                     (int) $reservation->requested_vehicle_id,
-                    $reservation->requested_start_at->toIso8601String(),
-                    $reservation->requested_end_at->toIso8601String(),
+                    OperationalTime::database($start),
+                    OperationalTime::database($end),
                     excludeReservationId: (int) $reservation->getKey(),
                 );
             }
@@ -292,20 +295,23 @@ final class RentalReservationService
 
     private function assertVehicleAvailable(int $tenantId, int $vehicleId, string $start, string $end, ?int $excludeReservationId = null): void
     {
-        if ($this->availability->conflicts($tenantId, $vehicleId, $start, $end)) {
+        if ($this->availability->conflicts($tenantId, $vehicleId, $start, $end, null, $excludeReservationId)) {
+            $hasReservationConflict = RentalReservation::query()
+                ->forTenant($tenantId)
+                ->where('requested_vehicle_id', $vehicleId)
+                ->where('status', RentalReservationStatus::Confirmed->value)
+                ->when($excludeReservationId !== null, fn (Builder $q) => $q->whereKeyNot($excludeReservationId))
+                ->where(function (Builder $q) use ($start, $end): void {
+                    $q->where('requested_end_at', '>', $start)
+                        ->where('requested_start_at', '<', $end);
+                })
+                ->exists();
+
+            if ($hasReservationConflict) {
+                throw new InvalidArgumentException('The vehicle has a conflicting confirmed reservation.');
+            }
+
             throw new InvalidArgumentException(VehicleUseAvailabilityBlocker::REASON);
-        }
-
-        $conflictingReservation = RentalReservation::query()
-            ->forTenant($tenantId)
-            ->where('requested_vehicle_id', $vehicleId)
-            ->where('status', RentalReservationStatus::Confirmed->value)
-            ->when($excludeReservationId !== null, fn (Builder $q) => $q->whereKeyNot($excludeReservationId))
-            ->where(fn (Builder $q) => $q->where('requested_start_at', '<', $end)->where('requested_end_at', '>', $start))
-            ->exists();
-
-        if ($conflictingReservation) {
-            throw new InvalidArgumentException('The vehicle has a conflicting confirmed reservation.');
         }
     }
 

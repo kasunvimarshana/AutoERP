@@ -186,4 +186,103 @@ final class RentalReservationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'converted');
     }
+
+    public function test_reservation_vehicle_availability_and_conflict_detection(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $service = app(RentalReservationService::class);
+            $vehicleId = (int) $ownerData['vehicle_id'];
+
+            // 1. Create and confirm a reservation for vehicle
+            $reservation1 = $service->create([
+                'customer_id' => $customerData['party_id'],
+                'requested_vehicle_id' => $vehicleId,
+                'rental_mode' => DriverMode::SelfDrive->value,
+                'billing_cycle' => RentalBasis::Daily->value,
+                'requested_start_at' => '2026-12-01T10:00:00+05:30',
+                'requested_end_at' => '2026-12-05T18:00:00+05:30',
+                'currency_id' => $customerData['currency_id'],
+                'estimated_amount' => '20000.000000',
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $confirmed1 = $service->transition(
+                $reservation1,
+                RentalReservationStatus::Confirmed,
+                $reservation1->row_version,
+                $context->actorId,
+                'First booking confirmed'
+            );
+            $this->assertSame(RentalReservationStatus::Confirmed, $confirmed1->status);
+
+            // 2. Attempting to create an overlapping reservation for the same vehicle must fail with confirmed conflict
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('The vehicle has a conflicting confirmed reservation.');
+
+            $service->create([
+                'customer_id' => $customerData['party_id'],
+                'requested_vehicle_id' => $vehicleId,
+                'rental_mode' => DriverMode::SelfDrive->value,
+                'billing_cycle' => RentalBasis::Daily->value,
+                'requested_start_at' => '2026-12-03T09:00:00+05:30',
+                'requested_end_at' => '2026-12-07T12:00:00+05:30',
+                'currency_id' => $customerData['currency_id'],
+                'estimated_amount' => '15000.000000',
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+        });
+    }
+
+    public function test_confirmed_reservation_blocks_vehicle_use_dispatch(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $service = app(RentalReservationService::class);
+            $vehicleId = (int) $ownerData['vehicle_id'];
+
+            $reservation = $service->create([
+                'customer_id' => $customerData['party_id'],
+                'requested_vehicle_id' => $vehicleId,
+                'rental_mode' => DriverMode::SelfDrive->value,
+                'billing_cycle' => RentalBasis::Daily->value,
+                'requested_start_at' => '2026-12-10T10:00:00+05:30',
+                'requested_end_at' => '2026-12-15T18:00:00+05:30',
+                'currency_id' => $customerData['currency_id'],
+                'estimated_amount' => '20000.000000',
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $service->transition(
+                $reservation,
+                RentalReservationStatus::Confirmed,
+                $reservation->row_version,
+                $context->actorId,
+                'Booking confirmed'
+            );
+
+            // VehicleUseAvailabilityBlocker should report conflict for the overlapping period
+            $blocker = app(\Modules\VehicleRental\Services\VehicleUseAvailabilityBlocker::class);
+            $this->assertTrue($blocker->conflicts(
+                $context->tenantId,
+                $vehicleId,
+                '2026-12-12 00:00:00',
+                '2026-12-13 00:00:00'
+            ));
+            $this->assertNotNull($blocker->blockingReason(
+                $context->tenantId,
+                $context->organizationUnitId,
+                $vehicleId,
+                '2026-12-12 00:00:00',
+                '2026-12-13 00:00:00'
+            ));
+
+            // Outside the reservation window should have no conflict
+            $this->assertFalse($blocker->conflicts(
+                $context->tenantId,
+                $vehicleId,
+                '2026-12-20 00:00:00',
+                '2026-12-25 00:00:00'
+            ));
+        });
+    }
 }
