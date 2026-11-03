@@ -106,6 +106,9 @@ const RentalDashboardPage = lazy(() => import("@/modules/vehicle-rental/RentalDa
 const ReservationsPage = lazy(() => import("@/modules/vehicle-rental/ReservationsPage"));
 const VehicleFinancePage = lazy(() => import("@/modules/vehicle-rental/VehicleFinancePage"));
 const RentalExpensesPage = lazy(() => import("@/modules/vehicle-rental/RentalExpensesPage"));
+const VehicleAvailabilityPage = lazy(() => import("@/modules/vehicle-rental/VehicleAvailabilityPage"));
+const RentalRunningChartReportPage = lazy(() => import("@/modules/vehicle-rental/RentalRunningChartReportPage"));
+const RentalReportsPage = lazy(() => import("@/modules/vehicle-rental/RentalReportsPage"));
 const VehicleListPage = lazy(() => import("@/modules/vehicle/VehicleListPage"));
 const VehicleCreatePage = lazy(
     () => import("@/modules/vehicle/VehicleCreatePage"),
@@ -1056,6 +1059,9 @@ const appRouter = createBrowserRouter(
                         <Route path={INCIDENT_REGISTER_PATH} element={<PermissionRoute permission={INCIDENT_PERMISSION.view}><IncidentRegisterPage /></PermissionRoute>} />
                         <Route path="/vehicle-rental/customer/agreements" element={<PermissionRoute permission={agreementPermissions.customer.view}><RentalAgreementsPage key={AgreementKind.Customer} kind={AgreementKind.Customer} /></PermissionRoute>} />
                         <Route path="/vehicle-rental/owner/agreements" element={<PermissionRoute permission={agreementPermissions.owner.view}><RentalAgreementsPage key={AgreementKind.Owner} kind={AgreementKind.Owner} /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/vehicles/available" element={<PermissionRoute permission={USE_PERMISSION.view}><VehicleAvailabilityPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/running-chart/report" element={<PermissionRoute permission={CHART_PERMISSION.view}><RentalRunningChartReportPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><RentalReportsPage /></PermissionRoute>} />
                         <Route
                             path="/vehicle-service/jobs"
                             element={<VehicleServiceJobListPage />}

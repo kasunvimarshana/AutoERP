@@ -37,5 +37,7 @@ export const rentalNavigationItem: NavigationModuleItem = {
         { id: 'rental-expenses', type: 'link', label: 'Fleet Expenses', to: EXPENSE_REGISTER_PATH, access: access([EXPENSE_PERMISSION.view]) },
         { id: 'rental-finance', type: 'link', label: 'Vehicle Finance', to: FINANCE_REGISTER_PATH, access: access([FINANCE_PERMISSION.view]) },
         { id: 'rental-incidents', type: 'link', label: 'Incident Evidence', to: INCIDENT_REGISTER_PATH, access: access([INCIDENT_PERMISSION.view]) },
+        { id: 'rental-availability', type: 'link', label: 'Vehicle Availability', to: '/vehicle-rental/vehicles/available', access: access([USE_PERMISSION.view]) },
+        { id: 'rental-reports', type: 'link', label: 'Reports & Matrix Sheet', to: '/vehicle-rental/reports', access: access([DASHBOARD_PERMISSION, CHART_PERMISSION.view]) },
     ],
 };
