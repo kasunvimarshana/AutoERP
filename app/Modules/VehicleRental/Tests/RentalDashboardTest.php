@@ -55,4 +55,30 @@ final class RentalDashboardTest extends TestCase
 
         $this->assertIsArray($response->json('data.recent_running_charts'));
     }
+
+    public function test_dashboard_summary_with_running_charts_eager_loads_and_maps_correctly(): void
+    {
+        $this->mock(\Modules\VehicleRental\Services\RentalAuthorization::class, function ($mock): void {
+            $mock->shouldReceive('assert')->zeroOrMoreTimes();
+            $mock->shouldReceive('assertUse')->zeroOrMoreTimes();
+            $mock->shouldReceive('assertChart')->zeroOrMoreTimes();
+            $mock->shouldReceive('assertDashboard')->zeroOrMoreTimes();
+        });
+
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $charts = app(\Modules\VehicleRental\Services\RunningChartService::class);
+            $chart = $charts->create($context, (int) $use->id, (int) $use->row_version, $facts);
+
+            $service = app(RentalDashboardService::class);
+            $summary = $service->getSummary($context->tenantId, $context->organizationUnitId);
+
+            $this->assertNotEmpty($summary['recent_running_charts']);
+            $first = $summary['recent_running_charts'][0];
+            $this->assertSame($chart->reference, $first['reference']);
+            $this->assertNotEmpty($first['vehicle_label']);
+            $this->assertNotEmpty($first['starts_at']);
+            $this->assertNotEmpty($first['ends_at']);
+            $this->assertSame('draft', $first['status']);
+        });
+    }
 }

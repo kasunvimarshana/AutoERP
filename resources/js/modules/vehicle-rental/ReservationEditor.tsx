@@ -44,7 +44,7 @@ export function ReservationEditor({
 
     async function submit(event: FormEvent) {
         event.preventDefault();
-        if (!customer || !currency) return;
+        if (!customer || !currency || !startAt || !endAt) return;
         setSaving(true);
         setError(null);
 

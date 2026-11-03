@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\IncidentStatus;
@@ -26,67 +27,85 @@ final class RentalDashboardService
     public function getSummary(int $tenantId, ?int $organizationUnitId): array
     {
         $activeCustomerAgreements = CustomerAgreement::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->where('status', AgreementStatus::Active->value)
             ->count();
 
         $activeOwnerAgreements = OwnerAgreement::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->where('status', AgreementStatus::Active->value)
             ->count();
 
         $vehiclesInCustody = VehicleUse::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->where('status', VehicleUseStatus::InCustody->value)
             ->count();
 
         $plannedUses = VehicleUse::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->where('status', VehicleUseStatus::Planned->value)
             ->count();
 
         $pendingReservations = RentalReservation::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->where('status', RentalReservationStatus::Pending->value)
             ->count();
 
         $confirmedReservations = RentalReservation::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->where('status', RentalReservationStatus::Confirmed->value)
             ->count();
 
         $dueInstallments = VehicleFinanceInstallment::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->whereIn('status', [VehicleFinanceInstallmentStatus::Due->value, VehicleFinanceInstallmentStatus::Overdue->value])
             ->count();
 
         $pendingExpenses = RentalExpense::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->whereIn('status', [RentalExpenseStatus::Draft->value, RentalExpenseStatus::Submitted->value])
             ->count();
 
         $activeIncidents = RentalIncident::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
             ->where('status', IncidentStatus::Recorded->value)
             ->count();
 
-        $totalFleetVehicles = Vehicle::query()->forTenant($tenantId)->count();
+        $totalFleetVehicles = Vehicle::query()
+            ->where('tenant_id', $tenantId)
+            ->when(
+                $organizationUnitId === null,
+                fn ($q) => $q->whereNull('organization_unit_id'),
+                fn ($q) => $q->where(fn ($sub) => $sub->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId)),
+            )
+            ->where('status', VehicleStatus::Active)
+            ->count();
         $availableFleetVehicles = max(0, $totalFleetVehicles - $vehiclesInCustody);
 
         $recentRunningCharts = RunningChart::query()
-            ->forContext($tenantId, $organizationUnitId)
-            ->with(['use.vehicle', 'customerAgreement'])
+            ->forTenant($tenantId)
+            ->when($organizationUnitId !== null, fn ($q) => $q->where('organization_unit_id', $organizationUnitId))
+            ->with(['vehicleUse.vehicle', 'vehicleUse.customerAgreement'])
             ->latest('ends_at')
             ->limit(5)
             ->get()
             ->map(fn (RunningChart $c) => [
                 'id' => $c->id,
                 'reference' => $c->reference,
-                'vehicle_label' => $c->use?->vehicle ? ($c->use->vehicle->registration_number ?? $c->use->vehicle->vehicle_number) : 'Vehicle',
-                'customer_reference' => $c->customerAgreement?->reference,
+                'vehicle_label' => $c->vehicleUse?->vehicle ? ($c->vehicleUse->vehicle->registration_number ?? $c->vehicleUse->vehicle->vehicle_number) : ($c->vehicleUse?->vehicle_label_snapshot ?? 'Vehicle'),
+                'customer_reference' => $c->vehicleUse?->customerAgreement?->reference,
                 'starts_at' => $c->starts_at->toIso8601String(),
                 'ends_at' => $c->ends_at->toIso8601String(),
-                'total_km' => $c->total_km,
+                'total_km' => $c->totalKm() ?? $c->commercial_km ?? '0.000000',
                 'status' => $c->status instanceof RunningChartStatus ? $c->status->value : $c->status,
             ]);
 

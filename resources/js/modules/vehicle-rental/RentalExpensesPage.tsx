@@ -201,7 +201,13 @@ export default function RentalExpensesPage() {
                                             <tr key={a.id} className="transition-colors hover:bg-blue-50/40">
                                                 <td className="px-3 py-2">{a.sequence}</td>
                                                 <td className="px-3 py-2 font-medium">{a.allocation_type_label}</td>
-                                                <td className="px-3 py-2">{a.customer?.name ?? a.supplier?.name ?? 'Company'}</td>
+                                                <td className="px-3 py-2">
+                                                    {a.target_customer_agreement
+                                                        ? `${a.customer?.name ?? 'Customer'} (${a.target_customer_agreement.reference})`
+                                                        : a.target_owner_agreement
+                                                            ? `${a.supplier?.name ?? 'Owner'} (${a.target_owner_agreement.reference})`
+                                                            : (a.customer?.name ?? a.supplier?.name ?? 'Company Overhead')}
+                                                </td>
                                                 <td className="px-3 py-2 font-semibold text-slate-900"><MoneyDisplay value={a.total_amount} currency={selected.currency.code} /></td>
                                             </tr>
                                         ))}

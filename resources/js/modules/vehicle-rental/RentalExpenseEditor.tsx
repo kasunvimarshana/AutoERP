@@ -6,6 +6,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
@@ -27,7 +28,7 @@ export function RentalExpenseEditor({
     const [expenseNumber, setExpenseNumber] = useState('');
     const [vehicle, setVehicle] = useState<NamedResource | null>(null);
     const [expenseType, setExpenseType] = useState('fuel');
-    const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10));
+    const [expenseDate, setExpenseDate] = useState(businessDateInputValue());
     const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [netAmount, setNetAmount] = useState('0.00');
     const [taxAmount, setTaxAmount] = useState('0.00');

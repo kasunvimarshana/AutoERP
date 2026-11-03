@@ -66,6 +66,55 @@ final class RentalExpenseTest extends TestCase
         });
     }
 
+    public function test_rental_expense_allocates_to_customer_and_owner_agreements(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(\Modules\VehicleRental\Services\RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $agreements = app(\Modules\VehicleRental\Services\AgreementService::class);
+            $customerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerData);
+            $ownerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Owner, $context, $ownerData);
+
+            $service = app(RentalExpenseService::class);
+            $expense = $service->create([
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'expense_type' => RentalExpenseType::Toll->value,
+                'expense_date' => '2026-09-15',
+                'currency_id' => $ownerData['currency_id'],
+                'net_amount' => '5000.000000',
+                'reference_number' => 'EX-AG-ALLOC',
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $submitted = $service->transition($expense, RentalExpenseStatus::Submitted, $expense->row_version, $context->actorId);
+            $approved = $service->transition($submitted, RentalExpenseStatus::Approved, $submitted->row_version, $context->actorId);
+
+            $allocated = $service->transition($approved, RentalExpenseStatus::Allocated, $approved->row_version, $context->actorId, [
+                [
+                    'allocation_type' => RentalExpenseAllocationType::CustomerRecovery->value,
+                    'target_customer_agreement_id' => $customerAg->id,
+                    'net_amount' => '3000.000000',
+                ],
+                [
+                    'allocation_type' => RentalExpenseAllocationType::OwnerDeduction->value,
+                    'target_owner_agreement_id' => $ownerAg->id,
+                    'net_amount' => '2000.000000',
+                ],
+            ]);
+
+            $this->assertSame(RentalExpenseStatus::Allocated, $allocated->status);
+            $this->assertCount(2, $allocated->allocations);
+
+            $alloc1 = $allocated->allocations[0];
+            $this->assertSame($customerAg->id, $alloc1->target_customer_agreement_id);
+            $this->assertSame($customerAg->customer_id, $alloc1->customer_id);
+
+            $alloc2 = $allocated->allocations[1];
+            $this->assertSame($ownerAg->id, $alloc2->target_owner_agreement_id);
+            $this->assertSame($ownerAg->supplier_id, $alloc2->supplier_id);
+        });
+    }
+
     public function test_duplicate_expense_fingerprint_rejected(): void
     {
         [$context, , $ownerData] = $this->fixture();

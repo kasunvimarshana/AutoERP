@@ -6,6 +6,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
@@ -19,9 +20,11 @@ const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unkn
 
 function computeMaturity(startStr: string, months: number): string {
     if (!startStr) return '';
-    const d = new Date(startStr);
-    d.setMonth(d.getMonth() + (Number.isFinite(months) && months > 0 ? months : 12));
-    return d.toISOString().slice(0, 16);
+    const [datePart, timePart = '00:00'] = startStr.split('T');
+    const [y, m, d] = datePart.split('-').map(Number);
+    const date = new Date(y, m - 1 + (Number.isFinite(months) && months > 0 ? months : 12), d);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${timePart}`;
 }
 
 export function VehicleFinanceEditor({
@@ -31,11 +34,12 @@ export function VehicleFinanceEditor({
     onSaved: () => void;
     onCancel: () => void;
 }) {
-    const initialStart = new Date().toISOString().slice(0, 10) + 'T00:00';
+    const today = businessDateInputValue();
+    const initialStart = `${today}T00:00`;
     const [agreementNumber, setAgreementNumber] = useState('');
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [vehicle, setVehicle] = useState<NamedResource | null>(null);
-    const [agreementDate, setAgreementDate] = useState(new Date().toISOString().slice(0, 10));
+    const [agreementDate, setAgreementDate] = useState(today);
     const [startsAt, setStartsAt] = useState(initialStart);
     const [maturesAt, setMaturesAt] = useState(() => computeMaturity(initialStart, 12));
     const [currency, setCurrency] = useState<NamedResource | null>(null);

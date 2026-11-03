@@ -9,7 +9,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
+import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import {
     listFinanceAgreements,
@@ -113,7 +113,7 @@ export default function VehicleFinancePage() {
         setActionLoading(true);
         setError(null);
         try {
-            const today = new Date().toISOString().slice(0, 10);
+            const today = businessDateInputValue();
             await createInstallmentPayable(installment.id, installment.row_version, today);
             if (selected) {
                 const updated = await getFinanceAgreement(selected.id);

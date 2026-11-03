@@ -40,6 +40,8 @@ export interface ExpenseAllocation {
     total_amount: string;
     customer?: { id: number; name: string } | null;
     supplier?: { id: number; name: string } | null;
+    target_customer_agreement?: { id: number; reference: string } | null;
+    target_owner_agreement?: { id: number; reference: string } | null;
 }
 
 export interface RentalExpense {

@@ -246,7 +246,7 @@ final class VehicleFinanceService
 
         VehicleFinanceInstallment::query()
             ->forContext($tenantId, $organizationUnitId)
-            ->with('invoice.balance')
+            ->with(['invoice.balance', 'financeAgreement'])
             ->whereNotIn('status', [VehicleFinanceInstallmentStatus::Waived->value, VehicleFinanceInstallmentStatus::Reversed->value])
             ->chunkById(200, function ($installments) use ($date, &$updated): void {
                 foreach ($installments as $installment) {

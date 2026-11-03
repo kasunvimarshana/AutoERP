@@ -70,6 +70,14 @@ final class RentalExpenseResource extends JsonResource
                 'total_amount' => (string) $a->total_amount,
                 'customer' => $a->customer ? ['id' => $a->customer->id, 'name' => $a->customer->name] : null,
                 'supplier' => $a->supplier ? ['id' => $a->supplier->id, 'name' => $a->supplier->name] : null,
+                'target_customer_agreement' => $a->targetCustomerAgreement ? [
+                    'id' => $a->targetCustomerAgreement->id,
+                    'reference' => $a->targetCustomerAgreement->reference,
+                ] : null,
+                'target_owner_agreement' => $a->targetOwnerAgreement ? [
+                    'id' => $a->targetOwnerAgreement->id,
+                    'reference' => $a->targetOwnerAgreement->reference,
+                ] : null,
             ])),
         ];
     }
