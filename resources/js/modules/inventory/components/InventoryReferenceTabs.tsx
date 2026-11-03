@@ -265,7 +265,7 @@ export function ReportsTab() {
                     <Link
                         key={key}
                         to={`/reports/${key}`}
-                        className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:border-sky-300 hover:text-sky-700"
+                        className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:border-blue-300 hover:text-blue-600"
                     >
                         {title}
                     </Link>

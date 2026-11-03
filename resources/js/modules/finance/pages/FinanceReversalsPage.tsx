@@ -11,7 +11,7 @@ import { listJournals, type JournalEntry } from '../financeApi';
 export default function FinanceReversalsPage() {
     const result = useApi((signal) => listJournals({ per_page: 50, journal_type: 'reversal' }, signal), []);
     const columns: DataColumn<JournalEntry>[] = [
-        { key: 'journal', header: 'Reversal journal', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/finance/journals/${row.id}`}>{row.journal_number}</Link> },
+        { key: 'journal', header: 'Reversal journal', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/finance/journals/${row.id}`}>{row.journal_number}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.journal_date) },
         { key: 'source', header: 'Source', render: (row) => row.source_number ?? row.source_type ?? '-' },
         { key: 'reason', header: 'Reason', render: (row) => row.reversal_reason ?? '-' },

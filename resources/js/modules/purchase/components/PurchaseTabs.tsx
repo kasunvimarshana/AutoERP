@@ -56,7 +56,7 @@ export function PurchaseTabs({ tabs, activeTab, onChange }: {
                                     : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
                             if (next) setTab(next.id, true);
                         }}
-                        className={`min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${selected ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'} ${tab.error ? 'text-rose-700' : ''}`}
+                        className={`min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${selected ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'} ${tab.error ? 'text-rose-700' : ''}`}
                     >
                         {label}
                     </button>

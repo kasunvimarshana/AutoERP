@@ -151,19 +151,19 @@ export default function ConsumableUsagePage() {
             </div>
             <p className="mb-3 text-sm text-slate-600">Totals include posted usage in the selected period. Reversed entries remain in history.</p>
             {history.data?.summary.items.length ? (
-                <div className="mb-5 overflow-hidden rounded-xl border border-sky-200 bg-sky-50/40 shadow-sm">
+                <div className="mb-5 overflow-hidden rounded-xl border border-blue-200/80 bg-blue-50/30 shadow-2xs">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
-                            <thead className="border-b border-sky-200 bg-sky-100/50 text-left text-xs font-semibold uppercase tracking-wider text-sky-900">
+                            <thead className="border-b border-blue-200/80 bg-blue-100/50 text-left text-xs font-semibold uppercase tracking-wider text-blue-900">
                                 <tr>
                                     <th className="px-4 py-3">Item</th>
                                     <th className="px-4 py-3 text-right">Used quantity</th>
                                     <th className="px-4 py-3 text-right">Expense cost (base currency)</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-sky-100">
+                            <tbody className="divide-y divide-blue-100/60">
                                 {history.data.summary.items.map((row) => (
-                                    <tr key={row.item.id} className="transition-colors hover:bg-sky-50">
+                                    <tr key={row.item.id} className="transition-colors hover:bg-blue-50/50">
                                         <td className="px-4 py-3 font-medium text-slate-900">{row.item.name}</td>
                                         <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.quantity} {row.uom ?? ''}</td>
                                         <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">{row.cost}</td>

@@ -5,7 +5,7 @@ export default function NotFoundPage() {
     return (
         <div className="py-20 text-center">
             <ContentHeader title="Page not found" description="The requested AutoERP route does not exist." />
-            <Link className="text-sm font-semibold text-sky-700 hover:underline" to="/dashboard">Return to dashboard</Link>
+            <Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/dashboard">Return to dashboard</Link>
         </div>
     );
 }

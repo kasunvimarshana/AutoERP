@@ -35,7 +35,7 @@ export default function VehicleServicePaymentTab({ job }: { job: VehicleServiceJ
                         key: 'payment',
                         header: 'Payment',
                         render: (link) => (
-                            <Link className="text-sky-700 hover:underline" to={`/payments/${link.payment_id}`}>
+                            <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/payments/${link.payment_id}`}>
                                 {link.payment_number ?? 'Payment'}
                             </Link>
                         ),
@@ -44,7 +44,7 @@ export default function VehicleServicePaymentTab({ job }: { job: VehicleServiceJ
                         key: 'invoice',
                         header: 'Invoice',
                         render: (link) => link.invoice_id
-                            ? <Link className="text-sky-700 hover:underline" to={`/invoices/${link.invoice_id}`}>{link.invoice_number ?? 'Invoice'}</Link>
+                            ? <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/invoices/${link.invoice_id}`}>{link.invoice_number ?? 'Invoice'}</Link>
                             : '-',
                     },
                     { key: 'method', header: 'Method', render: (link) => link.payment_method?.name ?? '-' },

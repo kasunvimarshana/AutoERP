@@ -203,7 +203,7 @@ export default function ReservationsPage() {
                     )}
 
                     {selected.converted_agreement && (
-                        <p className="text-sm font-medium text-sky-700">
+                        <p className="text-sm font-medium text-blue-600">
                             Converted to Customer Agreement: {selected.converted_agreement.reference}
                         </p>
                     )}

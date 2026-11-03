@@ -53,7 +53,7 @@ export default function WarehouseLocationListPage() {
     }, signal), [active, debouncedSearch, isDefault, organizationUnitId, page, parent?.id, type, warehouse?.id]);
 
     const columns: DataColumn<WarehouseLocationSummary>[] = [
-        { key: 'code', header: 'Code', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/warehouse-locations/${row.id}`}>{row.code || '-'}</Link> },
+        { key: 'code', header: 'Code', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/warehouse-locations/${row.id}`}>{row.code || '-'}</Link> },
         { key: 'name', header: 'Name', render: (row) => row.name },
         { key: 'warehouse', header: 'Warehouse', render: (row) => readableRelation(row.warehouse) },
         { key: 'path', header: 'Parent / Path', render: (row) => row.parent ? `${readableRelation(row.parent)} / ${row.path ?? '-'}` : row.path ?? '-' },
@@ -64,7 +64,7 @@ export default function WarehouseLocationListPage() {
         { key: 'active', header: 'Active', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
         { key: 'actions', header: '', className: 'text-right', render: (row) => (
             <div className="flex items-center justify-end gap-2">
-                {canUpdate && <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500" to={`/warehouse-locations/${row.id}/edit`}>Edit</Link>}
+                {canUpdate && <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500" to={`/warehouse-locations/${row.id}/edit`}>Edit</Link>}
                 {row.is_active && canDeactivate && <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 hover:text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-500" onClick={() => void toggle(row)}>Deactivate</button>}
                 {!row.is_active && canActivate && <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" onClick={() => void toggle(row)}>Activate</button>}
             </div>

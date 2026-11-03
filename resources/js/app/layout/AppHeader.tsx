@@ -24,7 +24,7 @@ export function AppHeader({
     const [loggingOut, setLoggingOut] = useState(false);
 
     return (
-        <header className="app-header sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+        <header className="app-header sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur-md shadow-2xs sm:px-6">
             <button
                 type="button"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden"
@@ -65,7 +65,7 @@ export function AppHeader({
 
             <details className="group relative">
                 <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white" aria-hidden="true">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-2xs" aria-hidden="true">
                         {userInitials(auth.user?.name ?? auth.user?.email)}
                     </span>
                     <span className="hidden max-w-36 truncate sm:block">{auth.user?.name ?? auth.user?.email ?? 'User'}</span>

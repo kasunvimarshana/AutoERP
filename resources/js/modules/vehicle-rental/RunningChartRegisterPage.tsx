@@ -68,7 +68,7 @@ export default function RunningChartRegisterPage() {
                     <p>{formatBusinessDateTime(row.starts_at)} — {formatBusinessDateTime(row.ends_at)}</p>
                     <p className="sm:col-span-2">Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
                 </div>
-                {row.replaces_vehicle && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p className="text-sm font-medium text-sky-700">Corrects chart {row.corrects_chart.reference}</p>}
+                {row.replaces_vehicle && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p className="text-sm font-medium text-blue-600">Corrects chart {row.corrects_chart.reference}</p>}
                 <div><Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button></div>
                 {selected === row.id && <div className="space-y-3 border-t border-slate-200 pt-3">
                     <dl className="grid gap-3 sm:grid-cols-2">

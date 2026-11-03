@@ -26,7 +26,7 @@ const statusStyles: Record<string, { border: string; badge: string }> = {
     inspected: { border: 'border-l-blue-500', badge: 'bg-blue-50 text-blue-800' },
     in_progress: { border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-800' },
     completed: { border: 'border-l-emerald-500', badge: 'bg-emerald-50 text-emerald-800' },
-    invoiced: { border: 'border-l-sky-500', badge: 'bg-sky-50 text-sky-800' },
+    invoiced: { border: 'border-l-indigo-500', badge: 'bg-indigo-50 text-indigo-800' },
     partially_paid: { border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-800' },
     paid: { border: 'border-l-emerald-600', badge: 'bg-emerald-50 text-emerald-800' },
     cancelled: { border: 'border-l-rose-500', badge: 'bg-rose-50 text-rose-800' },
@@ -113,11 +113,11 @@ function VehicleHeader({ result }: { result: VehicleServiceHistoryResult }) {
 
     return (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="h-1.5 bg-sky-600" />
+            <div className="h-1.5 bg-blue-600" />
             <div className="p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <div className="text-sm font-medium text-sky-700">Selected vehicle</div>
+                        <div className="text-sm font-medium text-blue-700">Selected vehicle</div>
                         <h2 className="mt-1 text-xl font-bold text-slate-950">{vehicle.display_name}</h2>
                         <p className="text-sm text-slate-600">{[vehicle.make, vehicle.model, vehicle.manufacture_year].filter(Boolean).join(' / ') || 'Vehicle details not recorded'}</p>
                         {vehicle.current_owner?.name && <p className="mt-1 text-sm text-slate-600">Current owner: {vehicle.current_owner.name}</p>}
@@ -150,10 +150,10 @@ function ServiceJobCard({ job }: { job: VehicleServiceHistoryRow }) {
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                         {job.live_job_id ? (
-                            <Link className="text-lg font-bold text-sky-700 underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500" to={`/vehicle-service/jobs/${job.live_job_id}`}>{job.job_number}</Link>
+                            <Link className="text-lg font-bold text-blue-600 underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" to={`/vehicle-service/jobs/${job.live_job_id}`}>{job.job_number}</Link>
                         ) : <span className="text-lg font-bold text-slate-900">{job.job_number}</span>}
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone.badge}`}>{humanize(job.status)}</span>
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${job.source === 'legacy' ? 'bg-slate-100 text-slate-700' : 'bg-sky-50 text-sky-800'}`}>{job.source_label}</span>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${job.source === 'legacy' ? 'bg-slate-100 text-slate-700' : 'bg-blue-50 text-blue-800'}`}>{job.source_label}</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Job type</span>
@@ -173,7 +173,7 @@ function ServiceJobCard({ job }: { job: VehicleServiceHistoryRow }) {
                 </dl>
             </div>
             <details className="border-t border-slate-200">
-                <summary className="cursor-pointer bg-slate-50 px-5 py-3 text-sm font-semibold text-sky-700 marker:text-slate-400 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500">{job.source === 'legacy' ? 'View old service items' : 'View full service record'}</summary>
+                <summary className="cursor-pointer bg-slate-50 px-5 py-3 text-sm font-semibold text-blue-700 marker:text-slate-400 hover:bg-blue-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500">{job.source === 'legacy' ? 'View old service items' : 'View full service record'}</summary>
                 {job.source === 'legacy' ? (
                     <div className="px-5 py-5">
                         <p className="mb-4 text-sm text-slate-500">This is a read-only record imported from the old AutoERP system.</p>
@@ -189,7 +189,7 @@ function ServiceJobCard({ job }: { job: VehicleServiceHistoryRow }) {
                             {job.invoices.length ? (
                                 <div className="flex flex-wrap gap-2">
                                     {job.invoices.map((invoice) => (
-                                        <Link key={invoice.id} to={`/invoices/${invoice.id}`} className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                                        <Link key={invoice.id} to={`/invoices/${invoice.id}`} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                                             {invoice.number} <span className="ml-1 font-normal text-slate-600">({humanize(invoice.status)})</span>
                                         </Link>
                                     ))}

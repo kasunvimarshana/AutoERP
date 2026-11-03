@@ -32,7 +32,7 @@ export default function TaxPostingProfilePage() {
         { key: 'direction', header: 'Direction', render: (row) => row.direction },
         { key: 'posting_key', header: 'Finance posting key', render: (row) => row.posting_key },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.active ? 'active' : 'inactive'} /> },
-        ...(canManage ? [{ key: 'edit', header: '', className: 'text-right', render: (row: TaxPostingProfile) => <button type="button" className="text-sm font-semibold text-sky-700" onClick={() => { setSelectedId(row.id); setForm({ tax_id: String(row.tax_id), direction: row.direction, posting_key: row.posting_key, active: row.active }); }}>Edit</button> }] : []),
+        ...(canManage ? [{ key: 'edit', header: '', className: 'text-right', render: (row: TaxPostingProfile) => <button type="button" className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => { setSelectedId(row.id); setForm({ tax_id: String(row.tax_id), direction: row.direction, posting_key: row.posting_key, active: row.active }); }}>Edit</button> }] : []),
     ];
 
     return (

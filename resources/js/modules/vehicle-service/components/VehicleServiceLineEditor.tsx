@@ -221,7 +221,7 @@ export default function VehicleServiceLineEditor({
             <ErrorAlert error={error ?? loadError} />
             <ToastNotice message={toast} />
             {!canViewLines && canViewInventory && (
-                <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
+                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-900">
                     Showing stock reserved for this job. It will be issued automatically when the job starts.
                 </div>
             )}
@@ -438,7 +438,7 @@ function LineActions({ onEdit, onRemove }: {
             {onEdit && (
                 <button
                     type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sky-700 transition hover:border-sky-200 hover:bg-sky-50"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-blue-600 transition hover:border-blue-200 hover:bg-blue-50"
                     onClick={onEdit}
                     aria-label="Edit line"
                     title="Edit line"
@@ -500,7 +500,7 @@ function QuantityControl({ line, disabled, onChange }: {
         <div className="flex items-center gap-1.5">
             <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-lg font-semibold text-sky-700 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-lg font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled || compareDecimalStrings(line.quantity, DEFAULT_QUANTITY) <= 0}
                 aria-label={`Decrease quantity for ${formatLineItem(line)}`}
                 onClick={decrease}
@@ -510,7 +510,7 @@ function QuantityControl({ line, disabled, onChange }: {
             <input
                 type="text"
                 inputMode="decimal"
-                className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center tabular-nums outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100"
+                className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center tabular-nums outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100"
                 value={draft}
                 disabled={disabled}
                 aria-label={`Quantity for ${formatLineItem(line)}`}
@@ -526,7 +526,7 @@ function QuantityControl({ line, disabled, onChange }: {
             />
             <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-lg font-semibold text-sky-700 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-lg font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled}
                 aria-label={`Increase quantity for ${formatLineItem(line)}`}
                 onClick={increase}
@@ -747,7 +747,7 @@ function ComboDisclosure({
         <span className="min-w-0 space-y-1">
             <span className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold text-slate-900">{itemName}</span>
-                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700">
                     Combo pack
                 </span>
             </span>
@@ -769,7 +769,7 @@ function ComboDisclosure({
     return (
         <button
             type="button"
-            className="group -m-2 flex max-w-full items-start gap-2 rounded-lg p-2 text-left outline-none transition hover:bg-sky-100/70 focus-visible:ring-2 focus-visible:ring-sky-500"
+            className="group -m-2 flex max-w-full items-start gap-2 rounded-lg p-2 text-left outline-none transition hover:bg-blue-50/80 focus-visible:ring-2 focus-visible:ring-blue-500"
             aria-expanded={expanded}
             aria-label={`${expanded ? 'Collapse' : 'Expand'} ${itemLabel}, ${childLabel}`}
             onClick={onToggle}
@@ -779,7 +779,7 @@ function ComboDisclosure({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                className={`mt-0.5 h-4 w-4 shrink-0 text-sky-700 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                className={`mt-0.5 h-4 w-4 shrink-0 text-blue-600 transition-transform ${expanded ? 'rotate-90' : ''}`}
                 aria-hidden="true"
             >
                 <path strokeLinecap="round" strokeLinejoin="round" d="m7.5 5 5 5-5 5" />
@@ -790,7 +790,7 @@ function ComboDisclosure({
 }
 
 function lineRowClassName(row: VehicleServiceLineDisplayRow): string | undefined {
-    if (row.isComboParent) return 'bg-sky-50/60';
+    if (row.isComboParent) return 'bg-blue-50/40';
     if (row.isComboChild) return 'bg-slate-50/70';
     return undefined;
 }

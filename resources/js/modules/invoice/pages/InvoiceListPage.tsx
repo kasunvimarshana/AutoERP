@@ -62,7 +62,7 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
         per_page: 25,
     }, signal), [debounced, page, viewKey, directionFilter, settlementEligible]);
     const columns: DataColumn<Invoice>[] = [
-        { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={rowHref ? rowHref(row) : `/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
+        { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={rowHref ? rowHref(row) : `/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.invoice_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${row.invoice_type ?? '-'} / ${row.direction ?? '-'}` },

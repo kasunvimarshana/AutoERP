@@ -77,7 +77,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold text-slate-900">{selected.reference} · {selected.party.name}</h2><StatusBadge status={selected.status} /></div>
             <p className="text-sm text-slate-600">{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
             <p className="text-xs text-slate-500">Agreement date: {formatBusinessDate(selected.agreed_on)} · Executing date: {formatBusinessDate(selected.executing_on, 'Not recorded')}</p>
-            {selected.supersedes_agreement && <p className="text-xs text-sky-700 font-medium">Successor of {selected.supersedes_agreement.reference}</p>}
+            {selected.supersedes_agreement && <p className="text-xs text-blue-600 font-medium">Successor of {selected.supersedes_agreement.reference}</p>}
             <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
             {selected.notes && <p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">Notes:</span> {selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />

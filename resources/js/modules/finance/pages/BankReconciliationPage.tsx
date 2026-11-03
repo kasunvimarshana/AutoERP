@@ -34,7 +34,7 @@ export default function BankReconciliationPage() {
     const lookups = useApi((signal) => getFinanceLookups(signal), []);
     const recs = useApi((signal) => listBankReconciliations({ per_page: 25 }, signal), []);
     const columns: DataColumn<BankReconciliation>[] = [
-        { key: 'statement', header: 'Statement', render: (row) => <button type="button" className="font-semibold text-sky-700 hover:underline" onClick={() => void loadReconciliation(row.id)}>{row.statement_reference}</button> },
+        { key: 'statement', header: 'Statement', render: (row) => <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => void loadReconciliation(row.id)}>{row.statement_reference}</button> },
         { key: 'account', header: 'Bank account', render: (row) => row.bank_account ? `${row.bank_account.code} - ${row.bank_account.name}` : '-' },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.statement_date) },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },

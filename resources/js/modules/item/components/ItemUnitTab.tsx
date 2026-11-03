@@ -79,5 +79,5 @@ function UnitForm({ row, error, submitting, onCancel, onSubmit }: {
 }
 
 function RelationActions({ edit, remove }: { edit: () => void; remove: () => void }) {
-    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={edit}>Edit</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Delete</button></div>;
+    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={edit}>Edit</button><button type="button" className="font-semibold text-rose-600" onClick={remove}>Delete</button></div>;
 }

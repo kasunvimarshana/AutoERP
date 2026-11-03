@@ -125,7 +125,7 @@ export default function PurchaseOrderListPage() {
     };
 
     const columns: DataColumn<PurchaseOrder>[] = [
-        { key: 'number', header: 'Order', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/orders/${row.id}`}>{row.purchase_order_number ?? 'Purchase order'}</Link> },
+        { key: 'number', header: 'Order', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/orders/${row.id}`}>{row.purchase_order_number ?? 'Purchase order'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.purchase_order_date) },
         { key: 'supplier', header: 'Supplier', render: (row) => readableRelation(row.supplier) },
         { key: 'warehouse', header: 'Warehouse', render: (row) => readableRelation(row.warehouse) },
@@ -169,7 +169,7 @@ export default function PurchaseOrderListPage() {
                 rows={result.data?.data ?? []}
                 columns={columns}
                 rowKey={(row) => row.id}
-                mobileSummary={(row) => <Link className="break-words text-base font-semibold text-sky-700 hover:underline" to={`/purchase/orders/${row.id}`}>{row.purchase_order_number ?? 'Purchase order'}</Link>}
+                mobileSummary={(row) => <Link className="break-words text-base font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/orders/${row.id}`}>{row.purchase_order_number ?? 'Purchase order'}</Link>}
                 rowBadge={(row) => <PurchaseOrderStatusBadge status={row.workflow_status ?? row.status} />}
                 mobileDetails={(row) => (
                     <div className="space-y-3">

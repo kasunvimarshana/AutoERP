@@ -54,7 +54,7 @@ export function GoodsReceiptLineEditor({ lines, currencyCode, onChange, errorFor
     }));
     const clearQuantities = () => onChange(lines.map((line) => ({ ...line, include: false, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000' })));
     const columns: DataColumn<EditableGoodsReceiptLine & { rowIndex: number }>[] = [
-        { key: 'include', header: 'Include', render: (line) => <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" checked={line.include} onChange={(event) => toggleInclude(line.rowIndex, event.target.checked)} /> },
+        { key: 'include', header: 'Include', render: (line) => <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={line.include} onChange={(event) => toggleInclude(line.rowIndex, event.target.checked)} /> },
         { key: 'item', header: 'Item', render: formatGoodsReceiptItem },
         { key: 'quantity', header: 'Quantity now', render: (line) => line.received_quantity, className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (line) => line.source.uom?.code ?? '-' },
@@ -63,7 +63,7 @@ export function GoodsReceiptLineEditor({ lines, currencyCode, onChange, errorFor
         { key: 'rejected', header: 'Rejected', render: (line) => line.rejected_quantity, className: 'tabular-nums' },
         { key: 'remaining', header: 'Remaining quantity', render: remainingQuantity, className: 'tabular-nums' },
         { key: 'accepted_amount', header: 'Accepted amount', render: (line) => <strong className="tabular-nums font-semibold text-slate-900"><MoneyDisplay value={acceptedAmount(line)} currency={currencyCode} /></strong>, className: 'tabular-nums' },
-        { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
+        { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
     ];
     const rows = lines.map((line, index) => ({ ...line, rowIndex: index }));
 
@@ -74,7 +74,7 @@ export function GoodsReceiptLineEditor({ lines, currencyCode, onChange, errorFor
                 <Button type="button" variant="ghost" onClick={clearQuantities}>Clear</Button>
                 <Button type="button" variant="secondary" onClick={receiveAll}>Receive All Remaining</Button>
             </div>
-            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id ?? line.rowIndex} emptyMessage="Select a purchase order with receivable lines." mobileSummary={formatGoodsReceiptItem} mobileDetails={(line) => <GoodsReceiptMobileDetails line={line} currencyCode={currencyCode} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
+            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id ?? line.rowIndex} emptyMessage="Select a purchase order with receivable lines." mobileSummary={formatGoodsReceiptItem} mobileDetails={(line) => <GoodsReceiptMobileDetails line={line} currencyCode={currencyCode} />} mobileActions={(line) => <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
             <FormDrawer open={Boolean(dialog)} title="Edit receipt line" onClose={() => setDialog(null)}>
                 {dialog && (
                     <GoodsReceiptLineForm
@@ -148,7 +148,7 @@ function GoodsReceiptLineForm({ line, errorFor, onSave, onCancel }: {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" checked={draft.include} onChange={(event) => set('include', event.target.checked)} />
+                        <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={draft.include} onChange={(event) => set('include', event.target.checked)} />
                         Include
                     </label>
                     <DecimalInput label="Received quantity" value={draft.received_quantity} error={errorFor('received_quantity')} onChange={(event) => set('received_quantity', event.target.value)} />
@@ -164,7 +164,7 @@ function GoodsReceiptLineForm({ line, errorFor, onSave, onCancel }: {
                     <Summary label="Ordered" value={draft.source.ordered_quantity} />
                 </div>
             </div>
-            {isBatchTracked(draft) && <section className="space-y-3 rounded-lg border border-sky-200 bg-sky-50/40 p-4">
+            {isBatchTracked(draft) && <section className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>
                         <h3 className="font-semibold text-slate-900">Batch / lot allocation</h3>

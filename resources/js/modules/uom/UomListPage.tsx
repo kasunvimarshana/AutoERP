@@ -42,7 +42,7 @@ export default function UomListPage() {
     }, signal), [active, category, debouncedSearch, page, refreshKey, type]);
 
     const columns: DataColumn<UnitOfMeasure>[] = [
-        { key: 'uom', header: 'UOM', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/uoms/${row.id}`}>{row.code}<span className="block text-xs font-normal text-slate-500">{row.name} ({row.symbol})</span></Link> },
+        { key: 'uom', header: 'UOM', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/uoms/${row.id}`}>{row.code}<span className="block text-xs font-normal text-slate-500">{row.name} ({row.symbol})</span></Link> },
         { key: 'type', header: 'Type', render: (row) => row.type },
         { key: 'category', header: 'Category', render: (row) => row.category },
         { key: 'precision', header: 'Precision', render: (row) => row.decimal_precision },
@@ -54,7 +54,7 @@ export default function UomListPage() {
             className: 'text-right',
             render: (row: UnitOfMeasure) => (
                 <div className="flex items-center justify-end gap-2">
-                    {canUpdate && <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500" to={`/uoms/${row.id}/edit`}>Edit</Link>}
+                    {canUpdate && <Link className="rounded-md px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" to={`/uoms/${row.id}/edit`}>Edit</Link>}
                     {canDeactivate && row.is_active && (
                         <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={async () => {
                             setActionError(null);

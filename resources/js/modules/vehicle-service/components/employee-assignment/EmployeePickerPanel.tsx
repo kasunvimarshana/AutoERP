@@ -73,8 +73,8 @@ export function EmployeePickerPanel({ lineLabel, selectedEmployeeIds, excludeIds
     };
 
     return (
-        <aside aria-label="Employee contacts" className="flex max-h-[calc(100vh-8rem)] min-h-[32rem] flex-col overflow-hidden rounded-xl border border-sky-300 bg-white shadow-lg lg:sticky lg:top-4">
-            <header className="flex items-start justify-between gap-3 border-b border-sky-100 bg-sky-50/70 px-4 py-4">
+        <aside aria-label="Employee contacts" className="flex max-h-[calc(100vh-8rem)] min-h-[32rem] flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg lg:sticky lg:top-4">
+            <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-4">
                 <div className="min-w-0">
                     <h3 className="font-semibold text-slate-900">Employees</h3>
                     <p className="truncate text-xs text-slate-500">Select for {lineLabel}</p>
@@ -96,16 +96,16 @@ export function EmployeePickerPanel({ lineLabel, selectedEmployeeIds, excludeIds
                         <button
                             key={employee.id}
                             type="button"
-                            className={`flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition ${selected ? 'bg-sky-50' : 'hover:bg-slate-50'}`}
+                            className={`flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition ${selected ? 'bg-blue-50/80' : 'hover:bg-slate-50'}`}
                             aria-pressed={selected}
                             onClick={() => onToggle(employee)}
                         >
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800">{initials(employee.name ?? employee.code ?? '')}</span>
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-800">{initials(employee.name ?? employee.code ?? '')}</span>
                             <span className="min-w-0 flex-1">
                                 <strong className="block truncate text-sm font-medium text-slate-900">{employee.name}</strong>
                                 <span className="block truncate text-xs text-slate-500">{employee.code}</span>
                             </span>
-                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base font-semibold text-white ${selected ? 'bg-sky-600' : 'bg-slate-300'}`} aria-hidden="true">{selected ? '✓' : '+'}</span>
+                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base font-semibold text-white ${selected ? 'bg-blue-600' : 'bg-slate-300'}`} aria-hidden="true">{selected ? '✓' : '+'}</span>
                         </button>
                     );
                 })}

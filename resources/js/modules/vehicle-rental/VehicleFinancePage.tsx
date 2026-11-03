@@ -264,7 +264,7 @@ export default function VehicleFinancePage() {
                                         <td className="px-3 py-2"><StatusBadge status={inst.status} /></td>
                                         <td className="px-3 py-2">
                                             {inst.invoice ? (
-                                                <span className="font-medium text-sky-700">{inst.invoice.invoice_number} ({inst.invoice.status})</span>
+                                                <span className="font-medium text-blue-600">{inst.invoice.invoice_number} ({inst.invoice.status})</span>
                                             ) : canManage && selected.status === FinanceStatus.Active ? (
                                                 <Button
                                                     variant="secondary"

@@ -131,10 +131,10 @@ export default function GoodsReceiptSummaryReportPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {group.receipts.map((receipt) => <tr key={receipt.id} className="transition-colors hover:bg-blue-50/40">
-                                    <td className="whitespace-nowrap px-4 py-3"><Link to={`/purchase/goods-receipts/${receipt.id}`} className="font-semibold text-sky-800 underline-offset-2 hover:underline">{receipt.grn_number}</Link></td>
+                                    <td className="whitespace-nowrap px-4 py-3"><Link to={`/purchase/goods-receipts/${receipt.id}`} className="font-semibold text-blue-600 underline-offset-2 hover:underline hover:text-blue-800">{receipt.grn_number}</Link></td>
                                     <td className="whitespace-nowrap px-3 py-3 text-slate-700">{receipt.received_date}</td>
                                     <td className="px-3 py-3 text-slate-800">{receipt.supplier}</td>
-                                    <td className="whitespace-nowrap px-3 py-3">{receipt.purchase_order ? <Link to={`/purchase/orders/${receipt.purchase_order.id}`} className="text-sky-800 underline-offset-2 hover:underline">{receipt.purchase_order.number}</Link> : '—'}</td>
+                                    <td className="whitespace-nowrap px-3 py-3">{receipt.purchase_order ? <Link to={`/purchase/orders/${receipt.purchase_order.id}`} className="font-medium text-blue-600 underline-offset-2 hover:underline hover:text-blue-800">{receipt.purchase_order.number}</Link> : '—'}</td>
                                     <td className="max-w-64 whitespace-pre-wrap break-words px-3 py-3 text-slate-700">{receipt.note || '—'}</td>
                                     <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{quantity(receipt.accepted_quantity, receipt.uom)}</td>
                                     <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums font-medium text-slate-900">{formatMoney(receipt.total_cost, group.currency)}</td>

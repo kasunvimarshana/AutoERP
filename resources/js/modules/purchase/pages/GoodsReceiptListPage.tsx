@@ -80,7 +80,7 @@ export default function GoodsReceiptListPage() {
     };
 
     const columns: DataColumn<GoodsReceipt>[] = [
-        { key: 'number', header: 'GRN', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/goods-receipts/${row.id}`}>{row.grn_number ?? 'Goods receipt'}</Link> },
+        { key: 'number', header: 'GRN', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/goods-receipts/${row.id}`}>{row.grn_number ?? 'Goods receipt'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.received_date) },
         { key: 'supplier', header: 'Supplier', render: (row) => row.supplier?.name ?? '-' },
         { key: 'po', header: 'PO', render: (row) => row.purchase_order?.purchase_order_number ?? row.purchase_order?.name ?? '-' },

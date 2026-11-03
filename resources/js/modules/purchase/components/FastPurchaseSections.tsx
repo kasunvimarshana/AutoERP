@@ -111,7 +111,7 @@ export function FastPurchaseDetailsSection({
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {fastPurchasePresets.map((option) => (
-                    <label key={option.value} className={`rounded-lg border p-3 text-sm ${preset === option.value ? 'border-sky-300 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <label key={option.value} className={`rounded-lg border p-3 text-sm transition ${preset === option.value ? 'border-blue-300 bg-blue-50/80 text-blue-900' : 'border-slate-200 bg-white text-slate-700'}`}>
                         <span className="flex items-center gap-2 font-semibold">
                             <input type="radio" name="fast_purchase_preset" checked={preset === option.value} onChange={() => onPresetChange(option.value)} />
                             {option.label}
@@ -221,7 +221,7 @@ export function FastPurchaseCompletedSummary({ result }: { result: FastPurchaseR
             {documents.length > 0 && (
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                     {documents.map((document) => document && (
-                        <Link key={document.url} to={document.url} className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-sky-700 hover:bg-sky-50">
+                        <Link key={document.url} to={document.url} className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50/70 hover:text-blue-800">
                             {document.number}
                         </Link>
                     ))}

@@ -410,6 +410,7 @@ describe('navigation access and matching', () => {
         expect(vehicleService?.type === 'module' ? vehicleService.children.map((child) => child.label) : []).toEqual([
             'Service Job List',
             'Create Service Job',
+            'Service Cards & Offers',
             'Service Invoices',
             'Customer Receipts',
         ]);

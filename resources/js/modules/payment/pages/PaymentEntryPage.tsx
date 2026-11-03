@@ -42,7 +42,7 @@ const ZERO_AMOUNT = '0.000000';
 const SELLING_PAYMENT_METHODS = [
     { kind: 'cash', label: 'Cash', section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/40', badge: 'bg-emerald-100 text-emerald-900' },
     { kind: 'card', label: 'Card', section: 'border-blue-200 border-l-blue-500 bg-blue-50/40', badge: 'bg-blue-100 text-blue-900' },
-    { kind: 'bank_transfer', label: 'Bank transfer', section: 'border-sky-200 border-l-sky-500 bg-sky-50/40', badge: 'bg-sky-100 text-sky-900' },
+    { kind: 'bank_transfer', label: 'Bank transfer', section: 'border-teal-200 border-l-teal-500 bg-teal-50/40', badge: 'bg-teal-100 text-teal-900' },
 ] as const;
 type SellingPaymentKind = typeof SELLING_PAYMENT_METHODS[number]['kind'];
 type SellingPaymentRow = PaymentLineDraft & { kind: SellingPaymentKind; cashReceivedAmount: string };
@@ -399,7 +399,7 @@ export default function PaymentEntryPage() {
                             })}
                         </div>
                         {methodRows.some((method) => !SELLING_PAYMENT_METHODS.some(({ kind }) => kind === method.method_type)) && <LinkButton className="mt-4" variant="secondary" to={`/payments/create?invoice_id=${sellingInvoice.id}`}>Use another payment method</LinkButton>}
-                    </div> : <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                    </div> : <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-900">
                         <p>This sale was already recorded on credit, due {sellingInvoice.due_date}. No payment is collected now; the invoice stays outstanding.</p>
                         {creditConfirmed && <p role="status" className="mt-3 font-semibold">No payment was created. You can print or share the invoice.</p>}
                     </div>}

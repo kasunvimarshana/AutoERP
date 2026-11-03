@@ -62,7 +62,7 @@ export default function PurchaseReturnListPage() {
     };
     const isBusy = (row: PurchaseReturn, action: 'approve' | 'post' | 'cancel') => busyAction === `${action}:${row.id}`;
     const columns: DataColumn<PurchaseReturn>[] = [
-        { key: 'number', header: 'Return', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/returns/${row.id}`}>{row.return_number ?? 'Purchase return'}</Link> },
+        { key: 'number', header: 'Return', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/returns/${row.id}`}>{row.return_number ?? 'Purchase return'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.return_date) },
         { key: 'supplier', header: 'Supplier', render: (row) => row.supplier?.name ?? '-' },
         { key: 'type', header: 'Type', render: (row) => row.return_type?.replaceAll('_', ' ') ?? '-' },
@@ -85,7 +85,7 @@ export default function PurchaseReturnListPage() {
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <label className="block text-sm text-slate-700">
                     <span className="mb-1.5 block font-medium">Status</span>
-                    <select className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+                    <select className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
                         {purchaseReturnStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                 </label>

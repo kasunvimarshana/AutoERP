@@ -324,7 +324,7 @@ function SellingWorkspace() {
                             {sale.invoice && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm">
                                 <div><span className="font-semibold">Invoice {sale.invoice.number}</span><span className="ml-3 text-slate-600">Balance due {sale.invoice.balance_due}</span></div>
                                 <div className="flex gap-4">
-                                    <Link className="font-semibold text-sky-700" to={`/invoices/${sale.invoice.id}`}>Open invoice</Link>
+                                    <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/invoices/${sale.invoice.id}`}>Open invoice</Link>
                                 </div>
                             </div>}
                         </Panel>
@@ -349,7 +349,7 @@ function SellingWorkspace() {
                     <div className="space-y-5">
                     {refundedPayment && <Panel title="Refund posted">
                         <p className="text-sm text-emerald-800">Refund {refundedPayment.payment_number} was posted successfully.</p>
-                        {canViewPayments && <Link className="mt-2 inline-block text-sm font-semibold text-sky-700" to={`/payments/${refundedPayment.id}`}>Open payment</Link>}
+                        {canViewPayments && <Link className="mt-2 inline-block text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/payments/${refundedPayment.id}`}>Open payment</Link>}
                     </Panel>}
                     {canRefundReturns && selectedRefundReturn && <Panel title={`Refund ${selectedRefundReturn.number}`}>
                         <form className="space-y-4" onSubmit={(event) => void submitRefund(event)}>
@@ -396,7 +396,7 @@ function SellingWorkspace() {
 
     if (!id && !isCreatePage && isReturnsPage) {
         return <>
-            <ContentHeader title="Selling Returns" description="Review posted returns and open a sale to process another return." actions={canOpenSalesFromReturns && canCreateReturns ? <Link className="text-sm font-semibold text-sky-700" to="/selling">Find a sale to return</Link> : undefined} />
+            <ContentHeader title="Selling Returns" description="Review posted returns and open a sale to process another return." actions={canOpenSalesFromReturns && canCreateReturns ? <Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/selling">Find a sale to return</Link> : undefined} />
             <ErrorAlert error={error} />
             <Panel title="Return history">
                 <Input label="Search returns" value={search} onChange={(event) => { setError(null); setSearch(event.target.value); setPage(1); }} placeholder="Return number, sale number, or customer" />
@@ -405,7 +405,7 @@ function SellingWorkspace() {
                         { key: 'number', header: 'Credit note', render: (row) => row.return_number },
                         { key: 'date', header: 'Date', render: (row) => row.return_date },
                         { key: 'sale', header: 'Sale', render: (row) => canOpenSalesFromReturns
-                            ? <Link className="font-medium text-sky-700" to={`/selling/sales/${row.sale.id}`}>{row.sale.sale_number}</Link>
+                            ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/selling/sales/${row.sale.id}`}>{row.sale.sale_number}</Link>
                             : row.sale.sale_number },
                         { key: 'customer', header: 'Customer', render: (row) => row.sale.customer ?? 'Customer' },
                         { key: 'reason', header: 'Reason', render: (row) => row.reason },
@@ -426,13 +426,13 @@ function SellingWorkspace() {
 
     if (!id && !isCreatePage) {
         return <>
-            <ContentHeader title="Selling List" description="Find posted sales, review invoices, or open a sale to process a return." actions={<Link className="rounded-md bg-sky-700 px-3 py-2 text-sm font-semibold text-white" to="/selling/create">Create selling</Link>} />
+            <ContentHeader title="Selling List" description="Find posted sales, review invoices, or open a sale to process a return." actions={<LinkButton to="/selling/create">Create selling</LinkButton>} />
             <ErrorAlert error={error} />
             <Panel title="Sales">
                 <Input label="Search sales" value={search} onChange={(event) => { setError(null); setSearch(event.target.value); setPage(1); }} placeholder="Sale number or customer" />
                 <div className="mt-4">
                     <DataTable rows={sales} rowKey={(row) => row.id} emptyMessage="No sales match this search." columns={[
-                        { key: 'sale', header: 'Sale', render: (row) => <Link className="font-medium text-sky-700" to={`/selling/sales/${row.id}`}>{row.sale_number}</Link> },
+                        { key: 'sale', header: 'Sale', render: (row) => <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/selling/sales/${row.id}`}>{row.sale_number}</Link> },
                         { key: 'date', header: 'Date', render: (row) => row.sale_date },
                         { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? 'Customer' },
                         { key: 'invoice', header: 'Invoice', render: (row) => row.invoice?.number ?? 'Pending' },
@@ -453,7 +453,7 @@ function SellingWorkspace() {
 
     return (
         <>
-            <ContentHeader title="Create Selling" description="Sell stocked items, issue inventory, and post the customer invoice in one step." actions={<Link className="text-sm font-semibold text-sky-700" to="/selling">Selling list</Link>} />
+            <ContentHeader title="Create Selling" description="Sell stocked items, issue inventory, and post the customer invoice in one step." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/selling">Selling list</Link>} />
             <ErrorAlert error={error} />
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <form className="space-y-5" onSubmit={(event) => void submitSale(event)}>

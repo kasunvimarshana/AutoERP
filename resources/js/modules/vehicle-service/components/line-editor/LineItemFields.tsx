@@ -183,12 +183,12 @@ function ItemOption({ option, active }: { option: ItemLookupResource; active: bo
     return (
         <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-                <div className={`truncate font-medium ${active ? 'text-sky-900' : 'text-slate-900'}`}>
+                <div className={`truncate font-medium ${active ? 'text-blue-900' : 'text-slate-900'}`}>
                     {vehicleServiceItemLabel(option)}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                     {option.batch && (
-                        <span className="font-medium text-sky-700">Batch {option.batch.batch_number ?? option.batch.code}{option.batch.lot_number ? ` / Lot ${option.batch.lot_number}` : ''}</span>
+                        <span className="font-medium text-blue-700">Batch {option.batch.batch_number ?? option.batch.code}{option.batch.lot_number ? ` / Lot ${option.batch.lot_number}` : ''}</span>
                     )}
                     <span className={stockNoticeClass(option)}>{stockNotice(option)}</span>
                     {option.has_service_price

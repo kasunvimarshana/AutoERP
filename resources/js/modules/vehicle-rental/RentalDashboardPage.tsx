@@ -104,7 +104,7 @@ export default function RentalDashboardPage() {
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pending Reservations</span>
                             <div className="mt-2 flex items-baseline justify-between">
-                                <span className="text-2xl font-bold text-sky-600">{m.pending_reservations}</span>
+                                <span className="text-2xl font-bold text-blue-600">{m.pending_reservations}</span>
                                 <Link to={RESERVATION_REGISTER_PATH} className="text-xs font-medium text-blue-600 hover:underline">Bookings</Link>
                             </div>
                         </div>

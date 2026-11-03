@@ -138,7 +138,7 @@ function ActionRequired({ actions }: { actions: Array<{ key: string; label: stri
     const tones = {
         critical: 'border-rose-200 bg-rose-50 text-rose-800',
         warning: 'border-amber-200 bg-amber-50 text-amber-800',
-        info: 'border-sky-200 bg-sky-50 text-sky-800',
+        info: 'border-blue-200 bg-blue-50 text-blue-800',
     };
     return (
         <Panel title="Action required" className="rounded-2xl">
@@ -180,7 +180,7 @@ function OperationalDashboard() {
     );
 }
 
-const KPI_TONES = { emerald: 'bg-emerald-500', blue: 'bg-blue-600', amber: 'bg-amber-500', rose: 'bg-rose-500', sky: 'bg-sky-500', slate: 'bg-slate-600' } as const;
+const KPI_TONES = { emerald: 'bg-emerald-500', blue: 'bg-blue-600', amber: 'bg-amber-500', rose: 'bg-rose-500', sky: 'bg-indigo-500', slate: 'bg-slate-600' } as const;
 type DatePreset = 'today' | 'last30' | 'month' | 'year';
 
 function datePreset(preset: DatePreset): DashboardDateRange {

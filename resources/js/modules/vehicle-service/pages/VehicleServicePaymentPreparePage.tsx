@@ -58,7 +58,7 @@ const DIRECT_PAYMENT_KINDS: Array<{ kind: DirectPaymentKind; label: string }> = 
 const PAYMENT_METHOD_STYLES: Record<DirectPaymentKind, { section: string; label: string }> = {
     cash: { section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/40', label: 'bg-emerald-100 text-emerald-900' },
     card: { section: 'border-blue-200 border-l-blue-500 bg-blue-50/40', label: 'bg-blue-100 text-blue-900' },
-    bank_transfer: { section: 'border-sky-200 border-l-sky-500 bg-sky-50/40', label: 'bg-sky-100 text-sky-900' },
+    bank_transfer: { section: 'border-teal-200 border-l-teal-500 bg-teal-50/40', label: 'bg-teal-100 text-teal-900' },
     cheque: { section: 'border-amber-200 border-l-amber-500 bg-amber-50/40', label: 'bg-amber-100 text-amber-900' },
     wallet: { section: 'border-indigo-200 border-l-indigo-500 bg-indigo-50/40', label: 'bg-indigo-100 text-indigo-900' },
     other: { section: 'border-slate-200 border-l-slate-400 bg-slate-50/60', label: 'bg-slate-100 text-slate-900' },
@@ -606,7 +606,7 @@ export default function VehicleServicePaymentPreparePage() {
                                 })}
                             </div>
                         </> : (
-                            <div className="space-y-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+                            <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/60 p-4 text-sm text-blue-950">
                                 <p>No payment will be collected now. The outstanding invoice balance will remain on this customer account.</p>
                                 {options.data?.credit_assessment?.available && (
                                     <DetailGrid items={[
@@ -670,7 +670,7 @@ export default function VehicleServicePaymentPreparePage() {
                             )}
                         </div>
                         <div className={`mt-5 rounded-lg border px-4 py-4 ${paymentMode === 'credit'
-                            ? 'border-sky-200 bg-sky-50 text-sky-900'
+                            ? 'border-blue-200 bg-blue-50 text-blue-900'
                             : 'border-emerald-100 bg-emerald-50 text-emerald-900'}`}>
                             <p className="text-sm font-medium">{paymentMode === 'credit' ? 'Credit amount' : 'Balance after payment'}</p>
                             <p className="mt-1 text-2xl font-bold tabular-nums">

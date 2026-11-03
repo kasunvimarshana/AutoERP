@@ -19,7 +19,7 @@ export default function TrialBalanceReportPage() {
     }, signal), [dateFrom, dateTo]);
 
     return <>
-        <ContentHeader title="Trial balance" description="Ledger-derived debit and credit balances." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/reports/finance.trial-balance">Export report</Link>} />
+        <ContentHeader title="Trial balance" description="Ledger-derived debit and credit balances." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/reports/finance.trial-balance">Export report</Link>} />
         <div className="mb-4 grid max-w-2xl gap-3 md:grid-cols-2">
             <Input label="From" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
             <Input label="To" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />

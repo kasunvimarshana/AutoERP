@@ -15,7 +15,7 @@ export default function PlatformAuditDetailPage() {
     const request = useApi((signal) => platformAdministrationApi.getAudit(id ?? 0, signal), [id], id !== null, true);
 
     if (id === null) {
-        return <div className="py-20 text-center"><ContentHeader title="Invalid audit link" description="This link does not identify a valid audit event. No data request was sent." /><Link className="text-sm font-semibold text-sky-700 hover:underline" to="/administration/platform-audit">Return to platform audit</Link></div>;
+        return <div className="py-20 text-center"><ContentHeader title="Invalid audit link" description="This link does not identify a valid audit event. No data request was sent." /><Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/administration/platform-audit">Return to platform audit</Link></div>;
     }
     if (request.loading) return <LoadingState label="Loading platform audit event..." />;
     if (request.error) return <ErrorAlert error={request.error} title="Unable to load platform audit event" />;

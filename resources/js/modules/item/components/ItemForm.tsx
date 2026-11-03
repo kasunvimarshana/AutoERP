@@ -81,7 +81,7 @@ export function ItemForm({
                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             <span className="font-semibold">{baseUom ? `${baseUom.code ?? ''} - ${baseUom.name}` : 'Not set'}</span>
                             <p className="mt-1 text-xs text-slate-500">Locked because this item has operational or document usage.</p>
-                            {baseUomChangeHref && <Link className="mt-2 inline-block font-semibold text-sky-700 hover:underline" to={baseUomChangeHref}>Change via conversion wizard</Link>}
+                            {baseUomChangeHref && <Link className="mt-2 inline-block font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={baseUomChangeHref}>Change via conversion wizard</Link>}
                         </div>
                     </div>
                 ) : (

@@ -32,7 +32,7 @@ export default function BudgetPage() {
     const budgets = useApi((signal) => listBudgets({ per_page: 25 }, signal), []);
     const accounts = (lookups.data?.accounts ?? []).filter((account) => account.is_active && account.is_posting_account);
     const columns: DataColumn<Budget>[] = [
-        { key: 'name', header: 'Budget', render: (row) => <button type="button" className="font-semibold text-sky-700 hover:underline" onClick={() => void loadActuals(row)}>{row.name}</button> },
+        { key: 'name', header: 'Budget', render: (row) => <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => void loadActuals(row)}>{row.name}</button> },
         { key: 'year', header: 'Year', render: (row) => row.budget_year },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'lines', header: 'Lines', render: (row) => String(row.lines_count ?? row.lines?.length ?? 0) },

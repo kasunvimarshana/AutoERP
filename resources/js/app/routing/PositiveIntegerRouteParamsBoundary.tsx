@@ -20,7 +20,7 @@ export function PositiveIntegerRouteParamsBoundary() {
                 title="Invalid record link"
                 description="This link does not contain a valid record identifier. No data request was sent."
             />
-            <Link className="text-sm font-semibold text-sky-700 hover:underline" to="/dashboard">
+            <Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/dashboard">
                 Return to dashboard
             </Link>
         </div>

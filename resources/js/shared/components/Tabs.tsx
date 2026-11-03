@@ -48,7 +48,7 @@ export function Tabs<T extends string>({ tabs, active, onChange, id }: {
                                     : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
                             selectTab(next.id, true);
                         }}
-                        className={`min-h-11 border-b-2 px-4 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${active === tab.id ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                        className={`min-h-11 border-b-2 px-4 py-3 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${active === tab.id ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'}`}
                     >
                         {tab.label}
                     </button>

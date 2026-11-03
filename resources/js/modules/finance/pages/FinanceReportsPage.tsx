@@ -65,7 +65,7 @@ export default function FinanceReportsPage() {
             </div>
             <Panel title="Exports">
                 <div className="space-y-2">
-                    {reportLinks.map(([label, key]) => <Link key={key} className="block rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-sky-300 hover:text-sky-700" to={`/reports/${key}`}>{label}</Link>)}
+                    {reportLinks.map(([label, key]) => <Link key={key} className="block rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-600" to={`/reports/${key}`}>{label}</Link>)}
                 </div>
             </Panel>
         </div>

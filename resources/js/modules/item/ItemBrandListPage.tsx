@@ -37,7 +37,7 @@ export default function ItemBrandListPage() {
     const collection = result.data;
 
     const columns: DataColumn<ItemBrand>[] = [
-        { key: 'brand', header: 'Brand', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/item-brands/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
+        { key: 'brand', header: 'Brand', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/item-brands/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
         { key: 'description', header: 'Description', render: (row) => row.description ?? '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];

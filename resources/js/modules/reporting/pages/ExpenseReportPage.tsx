@@ -215,7 +215,7 @@ function ExpenseStory({ result, currency }: { result: ExpenseReportResult; curre
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="grid bg-slate-950 text-white lg:grid-cols-[1.25fr_0.75fr]">
                 <div className="px-6 py-7 sm:px-8">
-                    <p className="text-sm font-medium text-sky-300">Net expense · Profit and Loss</p>
+                    <p className="text-sm font-medium text-blue-300">Net expense · Profit and Loss</p>
                     <p className={`mt-2 text-4xl font-bold tracking-tight sm:text-5xl ${Number(summary.net_amount) < 0 ? 'text-emerald-300' : 'text-white'}`}>
                         {formatMoney(summary.net_amount, currency)}
                     </p>
@@ -297,7 +297,7 @@ function TrendPanel({ rows, currency }: { rows: ExpenseTrendRow[]; currency: str
                         <span className="text-slate-500">{formatDate(row.date)}</span>
                         <div className="space-y-1">
                             <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                                <div className="h-full rounded-full bg-sky-600" style={{ width: `${barWidth(row.posted_amount, maximum)}%` }} />
+                                <div className="h-full rounded-full bg-blue-600" style={{ width: `${barWidth(row.posted_amount, maximum)}%` }} />
                             </div>
                             {Number(row.reversed_amount) > 0 ? (
                                 <div className="h-1.5 overflow-hidden rounded-full bg-rose-50">

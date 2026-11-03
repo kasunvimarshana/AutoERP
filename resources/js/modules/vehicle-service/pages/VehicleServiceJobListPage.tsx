@@ -94,7 +94,7 @@ export default function VehicleServiceJobListPage() {
         updateStatusSearchParam(nextStatus, setSearchParams, searchParams);
     };
     const columns: DataColumn<VehicleServiceJob>[] = [
-        { key: 'number', header: 'Job', render: (job) => <Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${job.id}`}>{job.job_number}</Link> },
+        { key: 'number', header: 'Job', render: (job) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/vehicle-service/jobs/${job.id}`}>{job.job_number}</Link> },
         { key: 'date', header: 'Date', render: (job) => formatDate(job.job_date) },
         { key: 'customer', header: 'Customer', render: (job) => readableRelation(job.customer) },
         { key: 'vehicle', header: 'Vehicle', render: (job) => readableRelation(job.vehicle) },
@@ -109,7 +109,7 @@ export default function VehicleServiceJobListPage() {
                     {canUpdate && editableStatuses.includes(job.status as typeof editableStatuses[number]) && (
                         <Link
                             to={`/vehicle-service/jobs/${job.id}/edit`}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sky-700 transition hover:border-sky-200 hover:bg-sky-50"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-blue-600 transition hover:border-blue-200 hover:bg-blue-50"
                             aria-label="Edit job"
                             title="Edit job"
                         >
@@ -168,7 +168,7 @@ export default function VehicleServiceJobListPage() {
             </div>
             <div className="mb-4 space-y-3 md:hidden">
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                    {mobileStatusTabs.map((tab) => <button key={tab.id} type="button" onClick={() => changeStatus(tab.id)} className={`min-h-10 shrink-0 rounded-full border px-3 text-sm font-medium ${status === tab.id ? 'border-sky-600 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600'}`}>{tab.label}</button>)}
+                    {mobileStatusTabs.map((tab) => <button key={tab.id} type="button" onClick={() => changeStatus(tab.id)} className={`min-h-10 shrink-0 rounded-full border px-3 text-sm font-medium ${status === tab.id ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600'}`}>{tab.label}</button>)}
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
                     <Input label="Search" type="search" placeholder="Job, customer, or vehicle" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
@@ -192,7 +192,7 @@ export default function VehicleServiceJobListPage() {
                 rows={result.data?.data ?? []}
                 columns={columns}
                 rowKey={(job) => job.id}
-                mobileSummary={(job) => <Link className="break-words text-base font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${job.id}`}>{job.job_number}</Link>}
+                mobileSummary={(job) => <Link className="break-words text-base font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/vehicle-service/jobs/${job.id}`}>{job.job_number}</Link>}
                 rowBadge={(job) => <VehicleServiceStatusBadge status={job.status} />}
                 mobileDetails={(job) => <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -202,7 +202,7 @@ export default function VehicleServiceJobListPage() {
                     <div><p className="text-xs font-medium text-slate-500">Customer</p><p className="break-words text-slate-800">{readableRelation(job.customer)}</p></div>
                     <p className="text-sm text-slate-600">{formatDate(job.job_date)}</p>
                 </div>}
-                mobileActions={(job) => canUpdate && editableStatuses.includes(job.status as typeof editableStatuses[number]) ? <Link className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-semibold text-sky-700 hover:bg-sky-50" to={`/vehicle-service/jobs/${job.id}/edit`}>Edit job</Link> : null}
+                mobileActions={(job) => canUpdate && editableStatuses.includes(job.status as typeof editableStatuses[number]) ? <Link className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-semibold text-blue-600 hover:bg-blue-50" to={`/vehicle-service/jobs/${job.id}/edit`}>Edit job</Link> : null}
             />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </>

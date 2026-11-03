@@ -53,7 +53,7 @@ export default function PaymentListPage() {
         per_page: 25,
     }, signal), [debounced, page, viewKey]);
     const columns: DataColumn<Payment>[] = [
-        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}`}>{row.payment_number ?? 'Payment'}</Link> },
+        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/payments/${row.id}`}>{row.payment_number ?? 'Payment'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.payment_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${humanize(row.payment_type)} / ${humanize(row.direction)}` },

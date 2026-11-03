@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -35,7 +36,7 @@ export default function TaxListPage() {
             key: 'tax',
             header: 'Tax',
             render: (row) => canManage
-                ? <Link className="font-semibold text-sky-700 hover:underline" to={`/tax/taxes/${row.id}/edit`}>{row.code}<span className="block text-xs font-normal text-slate-500">{row.name}</span></Link>
+                ? <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/tax/taxes/${row.id}/edit`}>{row.code}<span className="block text-xs font-normal text-slate-500">{row.name}</span></Link>
                 : <span className="font-semibold text-slate-700">{row.code}<span className="block text-xs font-normal text-slate-500">{row.name}</span></span>,
         },
         { key: 'type', header: 'Type', render: (row) => row.tax_type },
@@ -50,12 +51,12 @@ export default function TaxListPage() {
                 title="Tax Engine"
                 description="Configurable tax master data, rates, and calculation methods."
                 actions={(
-                    <div className="flex gap-3 text-sm font-semibold">
-                        <Link className="text-sky-700 hover:underline" to="/tax/groups">Tax groups</Link>
+                    <div className="flex items-center gap-3 text-sm font-semibold">
+                        <Link className="text-blue-600 hover:text-blue-800 hover:underline" to="/tax/groups">Tax groups</Link>
                         {canManage && (
-                            <Link className="rounded-lg bg-sky-600 px-4 py-2 text-white hover:bg-sky-700" to="/tax/taxes/create">
+                            <LinkButton to="/tax/taxes/create">
                                 New tax
-                            </Link>
+                            </LinkButton>
                         )}
                     </div>
                 )}

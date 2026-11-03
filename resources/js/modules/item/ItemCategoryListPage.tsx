@@ -37,7 +37,7 @@ export default function ItemCategoryListPage() {
     const collection = result.data;
 
     const columns: DataColumn<ItemCategory>[] = [
-        { key: 'category', header: 'Category', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/item-categories/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
+        { key: 'category', header: 'Category', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/item-categories/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
         { key: 'parent', header: 'Parent Category', render: (row) => row.parent?.name ?? '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];

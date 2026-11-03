@@ -25,7 +25,7 @@ export default function ReportListPage() {
     return (
         <>
             <ContentHeader title="Reports" description="Operational and financial reports from existing AutoERP data." />
-            <Link to="/reports/payment-method-wise-summary" className="mb-5 block rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm font-semibold text-sky-900 hover:bg-sky-100">Payment Method Wise Summary — daily receipts and new credit sales</Link>
+            <Link to="/reports/payment-method-wise-summary" className="mb-5 block rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm font-semibold text-blue-900 shadow-2xs transition hover:bg-blue-100/70">Payment Method Wise Summary — daily receipts and new credit sales</Link>
             <ErrorAlert error={reports.error} />
             {reports.loading ? <LoadingState label="Loading reports..." /> : (
                 <div className="grid gap-5 xl:grid-cols-2">

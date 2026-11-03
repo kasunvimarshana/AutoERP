@@ -30,7 +30,7 @@ export default function UomConversionListPage() {
         { key: 'to', header: 'To', render: (row) => formatUom(row.to_uom) },
         { key: 'factor', header: 'Factor', render: (row) => row.conversion_factor },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        ...(canUpdate ? [{ key: 'actions', header: '', className: 'text-right', render: (row: UomConversion) => <Link className="text-sm font-semibold text-slate-600 hover:text-sky-700" to={`/uom-conversions/${row.id}/edit`}>Edit</Link> }] : []),
+        ...(canUpdate ? [{ key: 'actions', header: '', className: 'text-right', render: (row: UomConversion) => <Link className="text-sm font-semibold text-slate-600 hover:text-blue-600" to={`/uom-conversions/${row.id}/edit`}>Edit</Link> }] : []),
     ];
 
     return (

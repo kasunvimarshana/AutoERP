@@ -106,7 +106,7 @@ export function OrganizationUnitDetailDrawer({
                         <h3 className="font-semibold text-slate-900">Document branding</h3>
                         <p className="mt-1 text-sm text-slate-600">Upload a private JPG, PNG, or WebP logo. The tenant logo remains the fallback.</p>
                         <div className="mt-4 flex flex-wrap gap-2">
-                            <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
+                            <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-2xs transition hover:bg-blue-700 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2">
                                 {unit.has_logo ? 'Replace logo' : 'Upload logo'}
                                 <input
                                     type="file"

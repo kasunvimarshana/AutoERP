@@ -36,12 +36,12 @@ export default function CustomerTaxProfilePage() {
         { key: 'group', header: 'Tax group', render: (row) => row.tax_group ? `${row.tax_group.code ?? ''} ${row.tax_group.name}` : '-' },
         { key: 'status', header: 'Exemption', render: (row) => row.exemption_status },
         { key: 'active', header: 'Status', render: (row) => <StatusBadge status={row.active ? 'active' : 'inactive'} /> },
-        ...(canManage ? [{ key: 'edit', header: '', className: 'text-right', render: (row: TaxProfile) => <button type="button" className="text-sm font-semibold text-sky-700" onClick={() => { setSelectedId(row.id); setForm({ customer_id: String(row.customer_id ?? ''), tax_group_id: String(row.tax_group_id ?? ''), registration_number: row.registration_number ?? '', exemption_status: row.exemption_status, active: row.active }); }}>Edit</button> }] : []),
+        ...(canManage ? [{ key: 'edit', header: '', className: 'text-right', render: (row: TaxProfile) => <button type="button" className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => { setSelectedId(row.id); setForm({ customer_id: String(row.customer_id ?? ''), tax_group_id: String(row.tax_group_id ?? ''), registration_number: row.registration_number ?? '', exemption_status: row.exemption_status, active: row.active }); }}>Edit</button> }] : []),
     ];
 
     return (
         <>
-            <ContentHeader title="Customer tax profiles" description="Customer-specific tax group, registration, and exemption status." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/tax/supplier-profiles">Supplier profiles</Link>} />
+            <ContentHeader title="Customer tax profiles" description="Customer-specific tax group, registration, and exemption status." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/tax/supplier-profiles">Supplier profiles</Link>} />
             <ErrorAlert error={error ?? profiles.error ?? lookups.error ?? customers.error} />
             <div className={canManage ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
                 <div>
