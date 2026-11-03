@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Http\Controllers;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Core\Contracts\PermissionCheckerInterface;
+use Modules\Promotion\Constants\PromotionPermission;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Http\Requests\CancelVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
@@ -70,11 +73,25 @@ final class VehicleServiceJobController extends VehicleServiceController
         ]]);
     }
 
-    public function store(StoreVehicleServiceJobRequest $request, VehicleServiceJobService $service): JsonResponse
+    public function store(
+        StoreVehicleServiceJobRequest $request,
+        VehicleServiceJobService $service,
+        PermissionCheckerInterface $permissions,
+    ): JsonResponse
     {
+        $choices = $request->promotionChoices();
+        if ($choices !== [] && ! $permissions->allows(
+            (int) $request->currentUserId(),
+            $request->tenantId(),
+            PromotionPermission::REDEEM,
+        )) {
+            throw new AuthorizationException('You do not have permission to redeem service offers.');
+        }
+
         return (new VehicleServiceJobResource($service->create(
             $request->toData(),
             $request->lineData(),
+            $choices,
         )))
             ->response()->setStatusCode(201);
     }

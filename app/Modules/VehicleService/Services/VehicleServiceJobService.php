@@ -7,6 +7,7 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
@@ -34,12 +35,13 @@ final class VehicleServiceJobService
         private readonly VehicleServiceInspectionService $inspections,
         private readonly VehicleServiceAdmissionService $admission,
         private readonly VehicleServiceLineService $lines,
+        private readonly PromotionRuntimeService $promotions,
     ) {}
 
     /** @param list<VehicleServiceLineData> $lines */
-    public function create(VehicleServiceJobData $data, array $lines = []): VehicleServiceJob
+    public function create(VehicleServiceJobData $data, array $lines = [], array $promotionChoices = []): VehicleServiceJob
     {
-        return DB::transaction(function () use ($data, $lines): VehicleServiceJob {
+        return DB::transaction(function () use ($data, $lines, $promotionChoices): VehicleServiceJob {
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $data->customerId);
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
@@ -59,8 +61,19 @@ final class VehicleServiceJobService
                 ));
             }
 
-            foreach ($lines as $line) {
-                $this->lines->create($job, $line, actorId: $data->createdBy);
+            foreach ($lines as $index => $line) {
+                $createdLine = $this->lines->create($job, $line, actorId: $data->createdBy);
+                if (isset($promotionChoices[$index])) {
+                    $this->promotions->choose(
+                        $data->tenantId,
+                        $data->organizationUnitId,
+                        (int) $data->createdBy,
+                        (int) $job->getKey(),
+                        (int) $createdLine->getKey(),
+                        (int) $job->refresh()->row_version,
+                        $promotionChoices[$index],
+                    );
+                }
             }
 
             return $job->refresh()->load($this->relations());
@@ -79,6 +92,10 @@ final class VehicleServiceJobService
             }
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->validator->assertMutable($job);
+            if (($data->customerId !== (int) $job->customer_id || $data->vehicleId !== (int) $job->vehicle_id)
+                && $this->promotions->hasJobChoices($job)) {
+                throw new InvalidArgumentException('Remove card and offer benefits before changing the job customer or vehicle.');
+            }
 
             if ((int) $job->tenant_id !== $data->tenantId || $job->organization_unit_id !== $data->organizationUnitId) {
                 throw new InvalidArgumentException('Service job scope cannot be changed.');

@@ -16,6 +16,7 @@ use Modules\Item\Providers\ItemServiceProvider;
 use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
 use Modules\Payment\Providers\PaymentServiceProvider;
 use Modules\PrivateObject\Providers\PrivateObjectServiceProvider;
+use Modules\Promotion\Providers\PromotionServiceProvider;
 use Modules\Purchase\Providers\PurchaseServiceProvider;
 use Modules\ReferenceData\Providers\ReferenceDataServiceProvider;
 use Modules\Reporting\Providers\ReportingServiceProvider;
@@ -60,6 +61,7 @@ return [
     CustomerServiceProvider::class,
     VehicleServiceProvider::class,
     VehicleServiceServiceProvider::class,
+    PromotionServiceProvider::class,
     VehicleRentalServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,

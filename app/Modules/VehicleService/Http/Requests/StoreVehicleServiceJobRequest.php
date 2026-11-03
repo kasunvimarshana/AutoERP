@@ -7,9 +7,9 @@ namespace Modules\VehicleService\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
+use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobType;
-use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 
@@ -64,7 +64,11 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             'notes' => ['nullable', 'string'],
             'customer_complaint' => ['nullable', 'string'],
             'lines' => [$this->isMethod('post') ? 'sometimes' : 'prohibited', 'array'],
-            'lines.*' => ['array:line_source_type,item_id,item_variant_id,batch_id,batch_price_revision_id,uom_id,description,quantity,unit_cost,unit_price,discount_calculation_type,discount_rate,discount_amount,tax_calculation_type,tax_rate,tax_amount,charge_calculation_type,charge_rate,charge_amount,is_customer_supplied,is_billable,expand_combo'],
+            'lines.*' => ['array:line_source_type,item_id,item_variant_id,batch_id,batch_price_revision_id,uom_id,description,quantity,unit_cost,unit_price,discount_calculation_type,discount_rate,discount_amount,tax_calculation_type,tax_rate,tax_amount,charge_calculation_type,charge_rate,charge_amount,is_customer_supplied,is_billable,expand_combo,promotion'],
+            'lines.*.promotion' => ['nullable', 'array:card_id,card_benefit_id,offer_assignment_id'],
+            'lines.*.promotion.card_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.promotion.card_benefit_id' => ['nullable', 'integer', 'min:1'],
+            'lines.*.promotion.offer_assignment_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.line_source_type' => ['required', Rule::enum(VehicleServiceLineSourceType::class)],
             'lines.*.item_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.item_variant_id' => ['nullable', 'integer', 'min:1'],
@@ -153,6 +157,19 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
         }
 
         return $lines;
+    }
+
+    /** @return array<int, array<string, int>> */
+    public function promotionChoices(): array
+    {
+        $choices = [];
+        foreach ($this->validated('lines', []) as $index => $line) {
+            if (isset($line['promotion'])) {
+                $choices[$index] = $line['promotion'];
+            }
+        }
+
+        return $choices;
     }
 
     private function intOrNull(string $key): ?int

@@ -73,6 +73,7 @@ function line(employeeAssignments: VehicleServiceEmployeeAssignment[], usesJobSu
         unit_price: '1000.000000',
         discount_rate: '0.000000',
         discount_amount: '0.000000',
+        promotion_discount_amount: '0.000000',
         tax_rate: '0.000000',
         tax_amount: '0.000000',
         charge_rate: '0.000000',

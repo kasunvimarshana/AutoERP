@@ -42,6 +42,9 @@ use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
+use Modules\Promotion\Services\PromotionCardService;
+use Modules\Promotion\Services\PromotionOfferService;
+use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\User\Models\UserModel;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Services\VehicleAvailabilityService;
@@ -92,6 +95,200 @@ final class VehicleServiceEngineTest extends TestCase
     {
         parent::setUp();
         $this->trustTenantScopedRequestContextFromPayload();
+    }
+
+    public function test_count_offer_uses_matching_posted_paid_units_and_restores_a_reversed_reward(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $offer = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->create(
+            $tenantId, null, $actorId, [
+                'code' => 'WASH-FIVE', 'name' => 'Five washes, one free',
+                'qualifying_item_id' => (int) $context['service']->id,
+                'reward_item_id' => (int) $context['service']->id,
+                'paid_quantity' => 5, 'reward_quantity' => 1, 'count_scope' => 'vehicle',
+                'starts_on' => '2026-01-01', 'ends_on' => null,
+            ],
+        ));
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->assign(
+            $tenantId, null, $actorId, (int) $offer['id'], [
+                'customer_id' => $context['customer_id'], 'vehicle_id' => $context['vehicle_id'],
+            ],
+        ));
+
+        $wrongJob = $this->createJob($context);
+        $this->line($wrongJob, VehicleServiceLineSourceType::LabourItem, $context['labour'], '1.000000', '100.000000');
+        $this->changeStatus($wrongJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($wrongJob, VehicleServiceJobStatus::Completed);
+        $this->createServiceInvoice($wrongJob, '2026-06-07');
+        $this->assertSame(0, DB::table('promotion_qualification_events')->count());
+
+        $paidJob = $this->createJob($context);
+        $this->line($paidJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '5.000000', '100.000000');
+        $this->changeStatus($paidJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($paidJob, VehicleServiceJobStatus::Completed);
+        $this->createServiceInvoice($paidJob, '2026-06-07');
+        $available = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('1.000000', $available['offers'][0]['available_rewards']);
+        $this->assertSame('0.000000', $available['offers'][0]['progress_quantity']);
+
+        $rewardJob = $this->createJob($context);
+        $rewardLine = $this->line($rewardJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '100.000000');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->choose(
+            $tenantId, null, $actorId, (int) $rewardJob->id, (int) $rewardLine->id,
+            $this->currentJobVersion($rewardJob), ['offer_assignment_id' => $available['offers'][0]['id']],
+        ));
+        $this->changeStatus($rewardJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($rewardJob, VehicleServiceJobStatus::Completed);
+        $rewardInvoice = $this->createServiceInvoice($rewardJob, '2026-06-07');
+        $afterReward = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('0.000000', $afterReward['offers'][0]['available_rewards']);
+
+        $secondPaidJob = $this->createJob($context);
+        $this->line($secondPaidJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '5.000000', '100.000000');
+        $this->changeStatus($secondPaidJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($secondPaidJob, VehicleServiceJobStatus::Completed);
+        $this->createServiceInvoice($secondPaidJob, '2026-06-07');
+        $secondCycle = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('1.000000', $secondCycle['offers'][0]['available_rewards']);
+
+        $this->reverseBillingInvoice($rewardInvoice, $actorId);
+        $afterReversal = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('2.000000', $afterReversal['offers'][0]['available_rewards']);
+    }
+
+    public function test_unused_offer_can_be_paused_and_deleted_with_lifecycle_history(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $offer = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->create(
+            $tenantId, null, $actorId, [
+                'code' => 'DELETE-UNUSED', 'name' => 'Unused offer',
+                'qualifying_item_id' => (int) $context['service']->id,
+                'reward_item_id' => (int) $context['service']->id,
+                'paid_quantity' => 5, 'reward_quantity' => 1, 'count_scope' => 'vehicle',
+                'starts_on' => '2026-01-01', 'ends_on' => null,
+            ],
+        ));
+        $paused = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->changeStatus(
+            $tenantId, null, $actorId, (int) $offer['id'], (int) $offer['row_version'], 'paused',
+        ));
+        $this->withTenantExecutionContext($tenantId, fn () => app(PromotionOfferService::class)->deleteUnused(
+            $tenantId, null, $actorId, (int) $offer['id'], (int) $paused['row_version'],
+        ));
+
+        $this->assertFalse(DB::table('promotion_offers')->where('id', $offer['id'])->exists());
+        $this->assertSame(['created', 'paused', 'deleted'], DB::table('promotion_offer_lifecycle_events')
+            ->where('offer_id', $offer['id'])->orderBy('id')->pluck('action')->all());
+    }
+
+    public function test_card_uses_the_best_available_benefit_and_expires(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $template = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->createTemplate(
+            $tenantId, null, $actorId, [
+                'code' => 'WASH-CARD', 'name' => 'Wash card',
+                'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+                'benefits' => [
+                    ['kind' => 'direct', 'item_id' => (int) $context['service']->id,
+                        'discount_type' => 'free', 'use_limit' => 1],
+                    ['kind' => 'direct', 'item_id' => (int) $context['service']->id,
+                        'discount_type' => 'percentage', 'discount_rate' => '25', 'use_limit' => 2],
+                ],
+            ],
+        ));
+        $card = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->issue(
+            $tenantId, null, $actorId, [
+                'template_id' => $template['id'], 'card_number' => 'CARD-WASH-1',
+                'customer_id' => $context['customer_id'], 'vehicle_id' => $context['vehicle_id'],
+            ],
+        ));
+        $percentage = $template['benefits'][1];
+        $firstJob = $this->createJob($context);
+        $firstLine = $this->line($firstJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '200.000000');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->choose(
+            $tenantId, null, $actorId, (int) $firstJob->id, (int) $firstLine->id,
+            $this->currentJobVersion($firstJob), ['card_id' => $card['id'], 'card_benefit_id' => $percentage['id']],
+        ));
+        $this->assertSame('200.000000', (string) $firstLine->refresh()->promotion_discount_amount);
+        $this->changeStatus($firstJob, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($firstJob, VehicleServiceJobStatus::Completed);
+        $this->createServiceInvoice($firstJob, '2026-06-07');
+
+        $secondJob = $this->createJob($context);
+        $secondLine = $this->line($secondJob, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '200.000000');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->choose(
+            $tenantId, null, $actorId, (int) $secondJob->id, (int) $secondLine->id,
+            $this->currentJobVersion($secondJob), ['card_id' => $card['id'], 'card_benefit_id' => $percentage['id']],
+        ));
+        $this->assertSame('50.000000', (string) $secondLine->refresh()->promotion_discount_amount);
+
+        $this->travel(1)->years();
+        $available = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame([], $available['cards']);
+    }
+
+    public function test_card_transfer_keeps_old_vehicle_count_history_without_carrying_progress(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $offer = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionOfferService::class)->create(
+            $tenantId, null, $actorId, [
+                'code' => 'TRANSFER-WASH', 'name' => 'Transfer wash offer',
+                'qualifying_item_id' => (int) $context['service']->id,
+                'reward_item_id' => (int) $context['service']->id,
+                'paid_quantity' => 5, 'reward_quantity' => 1, 'count_scope' => 'vehicle',
+                'starts_on' => '2026-01-01', 'ends_on' => null,
+            ],
+        ));
+        $template = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->createTemplate(
+            $tenantId, null, $actorId, [
+                'code' => 'TRANSFER-CARD', 'name' => 'Transfer card',
+                'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+                'benefits' => [['kind' => 'earned', 'offer_id' => $offer['id']]],
+            ],
+        ));
+        $card = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->issue(
+            $tenantId, null, $actorId, [
+                'template_id' => $template['id'], 'card_number' => 'TRANSFER-1',
+                'customer_id' => $context['customer_id'], 'vehicle_id' => $context['vehicle_id'],
+            ],
+        ));
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '100.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($job, VehicleServiceJobStatus::Completed);
+        $this->createServiceInvoice($job, '2026-06-07');
+
+        $nextVehicleId = $this->vehicle($tenantId, (int) $context['customer_id'], 'TRANSFER-TO');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->transfer(
+            $tenantId, null, $actorId, (int) $card['id'], $nextVehicleId, (int) $card['row_version'], 'Manager approved transfer',
+        ));
+        $next = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], $nextVehicleId,
+        ));
+        $old = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame('0.000000', $next['offers'][0]['progress_quantity']);
+        $this->assertSame([], $old['offers']);
+        $this->assertSame(1, DB::table('promotion_qualification_events')->count());
+        $this->assertSame(2, DB::table('promotion_offer_assignments')->where('card_id', $card['id'])->count());
     }
 
     public function test_line_item_search_prioritizes_name_prefixes_across_item_types(): void

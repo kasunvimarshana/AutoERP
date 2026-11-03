@@ -7,6 +7,7 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
@@ -27,6 +28,7 @@ final class VehicleServiceLineWriteService
         private readonly VehicleServiceLineRuleService $rules,
         private readonly VehicleServiceLineCalculationService $calculations,
         private readonly VehicleServiceInventoryIntegrationService $inventory,
+        private readonly PromotionRuntimeService $promotions,
     ) {}
 
     public function create(
@@ -70,6 +72,8 @@ final class VehicleServiceLineWriteService
             $originalQuantity = (string) $line->quantity;
             $item = $this->lineValidator->validate($job, $data);
             $attributes = $this->calculations->attributes($data, $item);
+            $this->promotions->clearLineChoice((int) $job->tenant_id, (int) $line->getKey());
+            $attributes['promotion_discount_amount'] = self::ZERO_AMOUNT;
             if ($line->employeeAssignments()->exists() && ! $attributes['is_employee_assignable']) {
                 throw new InvalidArgumentException(
                     'Remove employee assignments before changing this to a non-assignable line.',
@@ -98,6 +102,7 @@ final class VehicleServiceLineWriteService
             $this->rules->assertCanDelete($line);
 
             $this->inventory->releaseLineTree($job, $line, $actorId);
+            $this->promotions->clearLineChoice((int) $job->tenant_id, (int) $line->getKey());
             $line->delete();
             $this->renumber($job);
             $this->calculations->recalculateJob($job);

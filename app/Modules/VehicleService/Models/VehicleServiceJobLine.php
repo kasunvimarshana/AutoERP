@@ -42,6 +42,7 @@ final class VehicleServiceJobLine extends TenantOwnedModel
             'unit_price' => 'decimal:6',
             'discount_rate' => 'decimal:6',
             'discount_amount' => 'decimal:6',
+            'promotion_discount_amount' => 'decimal:6',
             'tax_rate' => 'decimal:6',
             'tax_amount' => 'decimal:6',
             'charge_rate' => 'decimal:6',

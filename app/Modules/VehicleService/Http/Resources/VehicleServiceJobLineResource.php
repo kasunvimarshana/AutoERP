@@ -40,6 +40,7 @@ final class VehicleServiceJobLineResource extends JsonResource
             'discount_calculation_type' => $this->discount_calculation_type,
             'discount_rate' => (string) $this->discount_rate,
             'discount_amount' => (string) $this->discount_amount,
+            'promotion_discount_amount' => (string) $this->promotion_discount_amount,
             'tax_calculation_type' => $this->tax_calculation_type,
             'tax_rate' => (string) $this->tax_rate,
             'tax_amount' => (string) $this->tax_amount,

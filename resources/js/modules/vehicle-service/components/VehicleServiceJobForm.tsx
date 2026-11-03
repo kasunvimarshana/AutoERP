@@ -28,6 +28,7 @@ import {
 import { tracksVehicleServiceMileage } from '../vehicleServiceTypes';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobPayload, VehicleServiceJobType } from '../vehicleServiceTypes';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
+import { PromotionJobStrip } from '@/modules/promotion/components/PromotionJobStrip';
 
 const ZERO_AMOUNT = '0.000000';
 const NO_COMMISSION_TYPE: CommissionType = 'none';
@@ -76,6 +77,7 @@ const vehicleLookupLabel = (vehicle: VehicleLookupResource): string =>
 interface DraftJobLine {
     key: number;
     value: VehicleServiceLineFormValue;
+    promotion?: { card_id?: number; card_benefit_id?: number; offer_assignment_id?: number };
 }
 
 let nextDraftLineKey = -1;
@@ -165,7 +167,9 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         priority: form.priority || undefined,
         customer_complaint: form.customer_complaint,
         notes: form.notes || undefined,
-        ...(isCreating ? { lines: draftLines.map(({ value }) => lineFormToPayload(value)) } : {}),
+        ...(isCreating ? { lines: draftLines.map(({ value, promotion }) => ({
+            ...lineFormToPayload(value), ...(promotion ? { promotion } : {}),
+        })) } : {}),
     });
 
     const applyVehicle = useCallback((value: VehicleLookupResource | null) => {
@@ -234,6 +238,14 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         </div>
                     </div>
                 )}
+                <PromotionJobStrip customerId={customer?.id ?? null} vehicleId={vehicle?.id ?? null}
+                    pendingChoices={draftLines.flatMap((line) => line.promotion ? [line.promotion] : [])}
+                    onAdd={isCreating ? (item, promotion) => {
+                        const value = lineValueWithItem(emptyLineForm(), item);
+                        setDraftLines((current) => [...current, { key: nextDraftLineKey--, value, promotion }]);
+                        setActiveTab('lines');
+                        formGuard.markDirty();
+                    } : undefined} />
                 {(!isCreating || activeTab === 'details') && (
                 <Panel title="Service job">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -420,7 +432,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         onSave={(value) => {
                             formGuard.markDirty();
                             setDraftLines((current) => current.map((line) => line.key === editingDraftLine.key
-                                ? { ...line, value }
+                                ? { ...line, value, promotion: value.item?.id === line.value.item?.id ? line.promotion : undefined }
                                 : line));
                             setEditingDraftLine(null);
                         }}
@@ -471,6 +483,7 @@ function toDraftLinePreview(draft: DraftJobLine, index: number): VehicleServiceJ
         discount_calculation_type: draft.value.discount_type,
         discount_rate: draft.value.discount_type === 'percentage' ? draft.value.discount_value : ZERO_AMOUNT,
         discount_amount: preview.discount,
+        promotion_discount_amount: ZERO_AMOUNT,
         tax_calculation_type: draft.value.tax_type,
         tax_rate: draft.value.tax_type === 'percentage' ? draft.value.tax_value : ZERO_AMOUNT,
         tax_amount: preview.tax,

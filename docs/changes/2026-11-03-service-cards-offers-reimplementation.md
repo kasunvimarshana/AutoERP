@@ -1,0 +1,9 @@
+# Service Cards & Offers reimplementation
+
+Reintroduced a Promotion module for repeat count offers, promotional card designs, issued vehicle-bound cards, and limited free or percentage benefits. Offers can have an open-ended end date. Published rules are immutable; status changes and card transfers are recorded as lifecycle events. Assignments use customer and vehicle foreign keys, with transactional overlap checks instead of a duplicated subject key. Transferring a card preserves the former vehicle's count history and starts a separate assignment on the new vehicle.
+
+Connected promotions to Vehicle Service jobs and invoice posting. The job screen shows available cards, offer enrollment, paid progress, remaining visits, and earned rewards. An eligible benefit can add a priced job line; the backend validates the choice again when invoicing. Posted paid invoice units add qualification events, free redemptions use separate events, and invoice reversal appends correcting events. Promotion discounts have their own job-line amount so existing manual discount behavior stays separate. Invoice posting now supports a fully free service line.
+
+Added `promotion.view`, `promotion.manage`, and `promotion.redeem` permissions and a focused management workspace. Offer status and guarded deletion are version checked. Card issue, transfer, and status changes are permission protected and audited. No customer database migration was run as part of this code change; deploy with `php artisan migrate` and assign the new permissions to the intended roles.
+
+Verification: focused promotion and card tests passed (4 tests, 15 assertions); partial invoice test passed (1 test, 8 assertions); PHP formatting and TypeScript typecheck passed. Frontend job-form and line-editor tests, and ESLint, were also run during implementation. See the final task response for any later verification result.

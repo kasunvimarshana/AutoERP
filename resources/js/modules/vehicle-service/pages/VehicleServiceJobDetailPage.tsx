@@ -15,6 +15,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { VehicleServiceJobDiscountValue } from '../components/VehicleServiceJobDiscountValue';
+import { PromotionJobStrip } from '@/modules/promotion/components/PromotionJobStrip';
 import { VehicleServiceCancellationDialog } from '../components/VehicleServiceCancellationDialog';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
@@ -157,6 +158,7 @@ export default function VehicleServiceJobDetailPage() {
     return (
         <>
             <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
+            <PromotionJobStrip customerId={job.customer_id} vehicleId={job.vehicle_id} />
             <WorkflowHeader
                 status={<VehicleServiceStatusBadge status={job.status} />}
                 nextAction={nextAction
