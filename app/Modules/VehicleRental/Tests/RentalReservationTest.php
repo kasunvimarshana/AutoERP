@@ -74,10 +74,13 @@ final class RentalReservationTest extends TestCase
             // 2. Update Draft
             $updated = $service->update($reservation, [
                 'estimated_amount' => '30000.000000',
+                'customer_id' => $customerData['party_id'],
             ], $reservation->row_version, $context->actorId);
 
             $this->assertSame('30000.000000', (string) $updated->estimated_amount);
             $this->assertSame(2, $updated->row_version);
+            $this->assertNotEmpty($updated->customer_name_snapshot);
+            $this->assertNotEmpty($updated->currency_code_snapshot);
 
             // 3. Transition to Confirmed
             $confirmed = $service->transition($updated, RentalReservationStatus::Confirmed, $updated->row_version, $context->actorId, 'Customer confirmed booking');

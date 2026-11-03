@@ -122,15 +122,31 @@ final class RentalReservationService
                 );
             }
 
+            $customerId = $data['customer_id'] ?? $reservation->customer_id;
+            $customerNameSnapshot = $reservation->customer_name_snapshot;
+            if (isset($data['customer_id']) && (int) $data['customer_id'] !== (int) $reservation->customer_id) {
+                $customer = Customer::query()->forTenant((int) $reservation->tenant_id)->findOrFail((int) $data['customer_id']);
+                $customerNameSnapshot = $customer->name;
+            }
+
+            $currencyId = $data['currency_id'] ?? $reservation->currency_id;
+            $currencyCodeSnapshot = $reservation->currency_code_snapshot;
+            if (isset($data['currency_id']) && (int) $data['currency_id'] !== (int) $reservation->currency_id) {
+                $currency = CurrencyModel::query()->where('is_active', true)->findOrFail((int) $data['currency_id']);
+                $currencyCodeSnapshot = $currency->code;
+            }
+
             $reservation->fill([
-                'customer_id' => $data['customer_id'] ?? $reservation->customer_id,
+                'customer_id' => $customerId,
+                'customer_name_snapshot' => $customerNameSnapshot,
                 'requested_vehicle_id' => array_key_exists('requested_vehicle_id', $data) ? $data['requested_vehicle_id'] : $reservation->requested_vehicle_id,
                 'requested_vehicle_category_id' => array_key_exists('requested_vehicle_category_id', $data) ? $data['requested_vehicle_category_id'] : $reservation->requested_vehicle_category_id,
                 'rental_mode' => isset($data['rental_mode']) ? ($data['rental_mode'] instanceof DriverMode ? $data['rental_mode'] : DriverMode::from((string) $data['rental_mode'])) : $reservation->rental_mode,
                 'billing_cycle' => isset($data['billing_cycle']) ? ($data['billing_cycle'] instanceof RentalBasis ? $data['billing_cycle'] : RentalBasis::from((string) $data['billing_cycle'])) : $reservation->billing_cycle,
                 'requested_start_at' => $start,
                 'requested_end_at' => $end,
-                'currency_id' => $data['currency_id'] ?? $reservation->currency_id,
+                'currency_id' => $currencyId,
+                'currency_code_snapshot' => $currencyCodeSnapshot,
                 'estimated_amount' => $data['estimated_amount'] ?? $reservation->estimated_amount,
                 'estimated_deposit_amount' => $data['estimated_deposit_amount'] ?? $reservation->estimated_deposit_amount,
                 'source' => $data['source'] ?? $reservation->source,
