@@ -239,7 +239,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                     </div>
                 )}
                 <PromotionJobStrip customerId={customer?.id ?? null} vehicleId={vehicle?.id ?? null}
-                    pendingChoices={draftLines.flatMap((line) => line.promotion ? [line.promotion] : [])}
+                    pendingChoices={draftLines.flatMap((line) => line.promotion ? [{ ...line.promotion, quantity: line.value.quantity }] : [])}
                     onAdd={isCreating ? (item, promotion) => {
                         const value = lineValueWithItem(emptyLineForm(), item);
                         setDraftLines((current) => [...current, { key: nextDraftLineKey--, value, promotion }]);

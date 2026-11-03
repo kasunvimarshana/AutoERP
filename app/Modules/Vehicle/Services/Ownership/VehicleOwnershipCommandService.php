@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Vehicle\Data\CreateVehicleOwnershipData;
 use Modules\Vehicle\Data\VersionedVehicleOwnershipCommand;
+use Modules\Vehicle\Enums\VehicleOwnerType;
+use Modules\Vehicle\Events\CurrentCustomerOwnershipEnded;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleOwnership;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -106,11 +108,15 @@ final class VehicleOwnershipCommandService
     {
         return DB::transaction(function () use ($ownership, $command): VehicleOwnership {
             $locked = $this->lockOwnership($ownership, $command->expectedVersion);
+            $wasCurrent = (bool) $locked->is_current;
             $locked->forceFill([
                 'is_current' => false,
                 'current_guard' => null,
                 'row_version' => $locked->row_version + 1,
             ])->save();
+            if ($wasCurrent) {
+                $this->announceCustomerOwnershipEnded($locked);
+            }
 
             return $this->load($locked);
         }, 3);
@@ -125,6 +131,7 @@ final class VehicleOwnershipCommandService
             }
             $endedAt = CarbonImmutable::parse($command->endedAt ?? now()->toDateTimeString());
             $this->assertPeriod(CarbonImmutable::parse($locked->started_at), $endedAt, false);
+            $wasCurrent = (bool) $locked->is_current;
             $locked->forceFill([
                 'ended_at' => $endedAt,
                 'is_current' => false,
@@ -132,6 +139,9 @@ final class VehicleOwnershipCommandService
                 'active_guard' => null,
                 'row_version' => $locked->row_version + 1,
             ])->save();
+            if ($wasCurrent) {
+                $this->announceCustomerOwnershipEnded($locked);
+            }
 
             return $this->load($locked);
         }, 3);
@@ -162,6 +172,20 @@ final class VehicleOwnershipCommandService
             'active_guard' => null,
             'row_version' => $current->row_version + 1,
         ])->save();
+        $this->announceCustomerOwnershipEnded($current);
+    }
+
+    private function announceCustomerOwnershipEnded(VehicleOwnership $ownership): void
+    {
+        if ($ownership->owner_type !== VehicleOwnerType::Customer || $ownership->owner_id === null) {
+            return;
+        }
+
+        event(new CurrentCustomerOwnershipEnded(
+            (int) $ownership->tenant_id,
+            (int) $ownership->vehicle_id,
+            (int) $ownership->owner_id,
+        ));
     }
 
     private function lockOwnership(VehicleOwnership $ownership, int $expectedVersion): VehicleOwnership

@@ -228,24 +228,17 @@ export default function VehicleServicePaymentPreparePage() {
     const requestedInvoice = eligibleInvoices.find((link) => link.invoice_id === requestedInvoiceId);
     const invoiceId = selectedInvoiceId ?? String(requestedInvoice?.invoice_id ?? (eligibleInvoices.length === 1 ? eligibleInvoices[0].invoice_id : ''));
     useEffect(() => {
-        const directMethods = paymentMethods.filter((method) =>
-            DIRECT_PAYMENT_KINDS.some(({ kind }) => paymentMethodKind(method) === kind),
-        );
-        const soleMethod = directMethods.length === 1 ? directMethods[0] : undefined;
-        const soleKind = paymentMethodKind(soleMethod);
+        const soleKind = soleNonCashMethodKind(paymentMethods);
         const soleInvoice = eligibleInvoices.find((candidate) => candidate.invoice_id === Number(invoiceId));
-        const prefillNonCash = Boolean(soleKind && soleInvoice);
-        if (!prefillNonCash) return;
+        if (!soleKind || !soleInvoice) return;
 
         let cancelled = false;
         queueMicrotask(() => {
             if (cancelled) return;
 
-            if (prefillNonCash && soleInvoice) {
-                setRows((current) => current.map((row) => row.kind === soleKind && row.amount === ZERO_AMOUNT
-                    ? { ...row, amount: soleInvoice.balance_due ?? soleInvoice.invoice_total }
-                    : row));
-            }
+            setRows((current) => current.map((row) => row.kind === soleKind && row.amount === ZERO_AMOUNT
+                ? { ...row, amount: soleInvoice.balance_due ?? soleInvoice.invoice_total }
+                : row));
         });
 
         return () => { cancelled = true; };

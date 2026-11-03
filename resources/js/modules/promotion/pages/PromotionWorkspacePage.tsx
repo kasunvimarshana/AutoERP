@@ -189,8 +189,11 @@ export default function PromotionWorkspacePage() {
                     {canManage && <Button type="button" variant="ghost" onClick={() => { setManagedCardId(entry.id); setTransferVehicle(null); setChangeReason(''); }}>Manage card</Button>}
                 </div>)}</div></Panel>
             {canManage && managedCard && <Panel title={`Manage ${managedCard.template_name}`}>
-                <p className="mb-3 text-sm text-slate-600">{managedCard.customer_name} · {managedCard.vehicle_registration_number}. Changes require a reason and are recorded in card history.</p>
+                <p className="mb-3 text-sm text-slate-600">{managedCard.customer_name} · {managedCard.vehicle_registration_number}.</p>
+                {managedCard.status === 'ended' || managedCard.status === 'exhausted' ?
+                    <p className="text-sm text-slate-600">{managedCard.status === 'ended' ? 'This card ended when vehicle ownership changed.' : 'All available card uses have been redeemed.'}</p> :
                 <div className="space-y-3">
+                    <p className="text-xs text-slate-600">Changes require a reason and are recorded in card history.</p>
                     <Input label="Reason for change" value={changeReason} required onChange={(event) => setChangeReason(event.target.value)} />
                     <div className="flex justify-end"><Button type="button" variant="secondary" disabled={saving || !changeReason.trim()} onClick={() => void run(() => promotionApi.setCardStatus(managedCard.id, {
                         status: managedCard.status === 'active' ? 'paused' : 'active', expected_version: managedCard.row_version, reason: changeReason,
@@ -203,7 +206,7 @@ export default function PromotionWorkspacePage() {
                         onClick={() => void run(() => promotionApi.transferCard(managedCard.id, {
                             vehicle_id: transferVehicle?.id, expected_version: managedCard.row_version, reason: changeReason,
                         }), 'Card transferred to the selected vehicle.')}>Transfer card</Button></div>
-                </div>
+                </div>}
             </Panel>}
         </div>}
     </>;

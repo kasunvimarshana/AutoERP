@@ -11,4 +11,7 @@ enum PromotionCardAction: string
     case Paused = 'paused';
     case Reactivated = 'reactivated';
     case Replaced = 'replaced';
+    case OwnershipEnded = 'ownership_ended';
+    case Exhausted = 'exhausted';
+    case UsesRestored = 'uses_restored';
 }

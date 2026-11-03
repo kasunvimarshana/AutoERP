@@ -11,4 +11,6 @@ enum PromotionStatus: string
     case Paused = 'paused';
     case Expired = 'expired';
     case Transferred = 'transferred';
+    case Ended = 'ended';
+    case Exhausted = 'exhausted';
 }

@@ -54,6 +54,13 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::patch('jobs/{job}/start', [VehicleServiceJobController::class, 'start'])->whereNumber('job')->name('jobs.start');
         Route::patch('jobs/{job}/complete', [VehicleServiceJobController::class, 'complete'])->whereNumber('job')->name('jobs.complete');
     });
+    Route::patch('jobs/{job}/complete-and-bill', [VehicleServiceJobController::class, 'completeAndBill'])
+        ->whereNumber('job')
+        ->middleware([
+            $requires(VehicleServicePermission::JOBS_TRANSITION),
+            $requires(VehicleServicePermission::INVOICES_CREATE),
+        ])
+        ->name('jobs.complete-and-bill');
     Route::middleware($requires(VehicleServicePermission::JOBS_CANCEL))->group(function (): void {
         Route::get('jobs/{job}/cancellation-preview', [VehicleServiceJobController::class, 'cancellationPreview'])->whereNumber('job')->name('jobs.cancellation-preview');
         Route::patch('jobs/{job}/cancel', [VehicleServiceJobController::class, 'cancel'])->whereNumber('job')->name('jobs.cancel');

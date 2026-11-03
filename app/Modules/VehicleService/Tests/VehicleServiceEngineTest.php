@@ -46,7 +46,11 @@ use Modules\Promotion\Services\PromotionCardService;
 use Modules\Promotion\Services\PromotionOfferService;
 use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\User\Models\UserModel;
+use Modules\Vehicle\Data\CreateVehicleOwnershipData;
+use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleStatus;
+use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Modules\Vehicle\Services\VehicleAvailabilityService;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentBatchEntryData;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
@@ -240,6 +244,80 @@ final class VehicleServiceEngineTest extends TestCase
             $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
         ));
         $this->assertSame([], $available['cards']);
+    }
+
+    public function test_issued_card_ends_when_vehicle_customer_changes(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $template = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->createTemplate(
+            $tenantId, null, $actorId, [
+                'code' => 'OWNER-CARD', 'name' => 'Owner card',
+                'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+                'benefits' => [['kind' => 'direct', 'item_id' => (int) $context['service']->id,
+                    'discount_type' => 'free', 'use_limit' => 2]],
+            ],
+        ));
+        $card = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->issue(
+            $tenantId, null, $actorId, [
+                'template_id' => $template['id'], 'card_number' => 'OWNER-CARD-1',
+                'customer_id' => $context['customer_id'], 'vehicle_id' => $context['vehicle_id'],
+            ],
+        ));
+        $newCustomerId = $this->customer($tenantId, 'NEW-OWNER');
+        $this->withTenantExecutionContext($tenantId, fn () => app(VehicleOwnershipCommandService::class)->create(
+            new CreateVehicleOwnershipData(
+                (int) $context['vehicle_id'], VehicleOwnerType::Customer, $newCustomerId,
+                VehicleOwnershipType::CustomerOwned, now()->addDay()->toDateTimeString(), null, true, null,
+            ), $tenantId, null,
+        ));
+
+        $this->assertDatabaseHas('promotion_cards', ['id' => $card['id'], 'status' => 'ended', 'row_version' => 2]);
+        $this->assertDatabaseHas('promotion_card_lifecycle_events', ['card_id' => $card['id'], 'action' => 'ownership_ended']);
+        $available = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, $newCustomerId, (int) $context['vehicle_id'],
+        ));
+        $this->assertSame([], $available['cards']);
+    }
+
+    public function test_card_line_quantity_consumes_remaining_uses_and_ends_card(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $actorId = $this->cancellationActor($context);
+        $template = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->createTemplate(
+            $tenantId, null, $actorId, [
+                'code' => 'TWO-USES', 'name' => 'Two uses',
+                'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31',
+                'benefits' => [['kind' => 'direct', 'item_id' => (int) $context['service']->id,
+                    'discount_type' => 'free', 'use_limit' => 2]],
+            ],
+        ));
+        $card = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionCardService::class)->issue(
+            $tenantId, null, $actorId, [
+                'template_id' => $template['id'], 'card_number' => 'TWO-USES-1',
+                'customer_id' => $context['customer_id'], 'vehicle_id' => $context['vehicle_id'],
+            ],
+        ));
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '2.000000', '200.000000');
+        $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->choose(
+            $tenantId, null, $actorId, (int) $job->id, (int) $line->id,
+            $this->currentJobVersion($job), ['card_id' => $card['id'], 'card_benefit_id' => $template['benefits'][0]['id']],
+        ));
+        $this->assertSame('400.000000', (string) $line->refresh()->promotion_discount_amount);
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($job, VehicleServiceJobStatus::Completed);
+        $invoice = $this->createServiceInvoice($job, '2026-06-07');
+
+        $this->assertDatabaseHas('promotion_cards', ['id' => $card['id'], 'status' => 'exhausted']);
+        $available = $this->withTenantExecutionContext($tenantId, fn (): array => app(PromotionRuntimeService::class)->available(
+            $tenantId, null, (int) $context['customer_id'], (int) $context['vehicle_id'],
+        ));
+        $this->assertSame([], $available['cards']);
+        $this->reverseBillingInvoice($invoice, $actorId);
+        $this->assertDatabaseHas('promotion_cards', ['id' => $card['id'], 'status' => 'active']);
     }
 
     public function test_card_transfer_keeps_old_vehicle_count_history_without_carrying_progress(): void
@@ -1196,6 +1274,96 @@ final class VehicleServiceEngineTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Add at least one active job line before starting this service job.');
         $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+    }
+
+    public function test_quick_completion_posts_invoice_from_draft_without_fake_intermediate_statuses(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
+
+        $response = $this->tenantPatchJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/complete-and-bill", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+        ])->assertOk();
+
+        $invoice = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): Invoice => Invoice::query()->findOrFail($response->json('data.invoice_id')),
+        );
+        $this->assertSame(InvoiceStatus::Posted, $invoice->status);
+        $this->assertSame(VehicleServiceJobStatus::Invoiced, $this->refreshJob($job)->status);
+        $this->assertEqualsCanonicalizing(['draft', 'completed', 'invoiced'], $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => $job->statusHistories()->get()
+                ->map(fn ($history): string => $history->new_status->value)
+                ->all(),
+        ));
+    }
+
+    public function test_quick_completion_issues_reserved_stock_before_posting_the_invoice(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $this->receiveStock($context, '1.000000');
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '20.000000');
+
+        $this->tenantPatchJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/complete-and-bill", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+        ])->assertOk();
+
+        $this->assertNotNull($line->refresh()->inventory_movement_id);
+        $this->assertSame(VehicleServiceJobStatus::Invoiced, $this->refreshJob($job)->status);
+    }
+
+    public function test_quick_completion_without_a_billable_line_rolls_back_the_job(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '20.000000', true);
+        $version = $this->currentJobVersion($job);
+
+        $this->tenantPatchJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/complete-and-bill", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $version,
+        ])->assertUnprocessable()
+            ->assertJsonPath('error.message', 'Add at least one billable job line before completing and billing this job.');
+
+        $this->assertSame(VehicleServiceJobStatus::Draft, $this->refreshJob($job)->status);
+        $this->assertSame($version, $this->currentJobVersion($job));
+        $this->assertSame(0, $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): int => $job->invoiceLinks()->count(),
+        ));
+    }
+
+    public function test_quick_completion_rejects_a_stale_job_version(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $job = $this->createJob($context);
+        $staleVersion = $this->currentJobVersion($job);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
+
+        $this->tenantPatchJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/complete-and-bill", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $staleVersion,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('expected_version');
+
+        $this->assertSame(VehicleServiceJobStatus::Draft, $this->refreshJob($job)->status);
+        $this->assertSame(0, $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): int => $job->invoiceLinks()->count(),
+        ));
     }
 
     public function test_status_workflow_rejects_invalid_transitions_and_records_history(): void

@@ -24,6 +24,7 @@ use Modules\VehicleService\Services\VehicleServiceInspectionService;
 use Modules\VehicleService\Services\VehicleServiceJobCancellationService;
 use Modules\VehicleService\Services\VehicleServiceJobQueryService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
+use Modules\VehicleService\Services\VehicleServiceQuickCompletionService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
 
 final class VehicleServiceJobController extends VehicleServiceController
@@ -150,6 +151,23 @@ final class VehicleServiceJobController extends VehicleServiceController
         VehicleServiceStatusService $service,
     ): VehicleServiceJobResource {
         return $this->changeStatus($request, $job, VehicleServiceJobStatus::Completed, $service);
+    }
+
+    public function completeAndBill(
+        VehicleServiceActionRequest $request,
+        int $job,
+        VehicleServiceQuickCompletionService $service,
+    ): JsonResponse {
+        $invoice = $service->completeAndBill(
+            $this->job($request, $job),
+            $request->expectedVersion(),
+            $request->currentUserId(),
+        );
+
+        return response()->json(['data' => [
+            'invoice_id' => (int) $invoice->getKey(),
+            'balance_due' => (string) $invoice->balance_due,
+        ]]);
     }
 
     public function cancel(

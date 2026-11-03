@@ -38,8 +38,8 @@ final class VehicleServiceStatusService
 
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
-        'draft' => ['inspected', 'in_progress', 'cancelled'],
-        'inspected' => ['in_progress', 'cancelled'],
+        'draft' => ['inspected', 'in_progress', 'completed', 'cancelled'],
+        'inspected' => ['in_progress', 'completed', 'cancelled'],
         'in_progress' => ['completed', 'cancelled'],
         'completed' => ['invoiced', 'cancelled'],
         'invoiced' => ['partially_paid', 'paid'],
@@ -114,6 +114,12 @@ final class VehicleServiceStatusService
             }
 
             if ($status === VehicleServiceJobStatus::Completed) {
+                $this->assertHasActiveJobLine($job);
+                if (in_array($old, [VehicleServiceJobStatus::Draft, VehicleServiceJobStatus::Inspected], true)) {
+                    $this->admission->assertAdmissible($job);
+                    $this->assertVehicleCanEnterService($vehicle);
+                    $this->inventory->issueReservedOnStart($job, $changedBy);
+                }
                 $this->assertInventoryIssuedForCompletion($job);
             }
 

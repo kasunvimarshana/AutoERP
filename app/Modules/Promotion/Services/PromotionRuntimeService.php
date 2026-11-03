@@ -32,6 +32,7 @@ final class PromotionRuntimeService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PromotionOfferService $offers,
+        private readonly PromotionCardService $cards,
         private readonly VehicleServiceValidationService $jobs,
         private readonly VehicleServiceLineCalculationService $calculations,
     ) {}
@@ -72,7 +73,18 @@ final class PromotionRuntimeService
             })->all();
 
             return $row;
-        })->all();
+        })->filter(static function (array $card): bool {
+            $directBenefits = array_filter($card['benefits'], static fn (array $benefit): bool => $benefit['kind'] === PromotionBenefitKind::Direct->value);
+            $earnedBenefits = array_filter($card['benefits'], static fn (array $benefit): bool => $benefit['kind'] === PromotionBenefitKind::Earned->value);
+
+            foreach ($directBenefits as $benefit) {
+                if ($benefit['remaining_uses'] > 0) {
+                    return true;
+                }
+            }
+
+            return $earnedBenefits !== [];
+        })->values()->all();
         $assignments = DB::table('promotion_offer_assignments as assignment')
             ->join('promotion_offers as offer', 'offer.id', '=', 'assignment.offer_id')
             ->join('items as qualifying', 'qualifying.id', '=', 'offer.qualifying_item_id')
@@ -299,6 +311,7 @@ final class PromotionRuntimeService
     public function recordPostedInvoice(VehicleServiceJob $job, Invoice $invoice, ?int $actorId): void
     {
         $tenantId = (int) $job->tenant_id;
+        $redeemedCardIds = [];
         $invoiceLines = $invoice->lines()->where('source_line_type', self::SOURCE_LINE_TYPE)->get();
         $serviceBase = $this->math->sum($invoiceLines->map(fn ($line): string => $this->math->sub(
             $this->math->mul((string) $line->quantity, (string) $line->unit_price),
@@ -322,6 +335,9 @@ final class PromotionRuntimeService
                     'discount_amount_snapshot' => $discount, 'reverses_event_id' => null,
                     'actor_id' => $actorId, 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
                 ]);
+                if ($choice->card_benefit_id !== null) {
+                    $redeemedCardIds[(int) $choice->card_id] = true;
+                }
             }
             $chargedServiceAmount = $this->math->sub(
                 $this->math->mul((string) $invoiceLine->quantity, (string) $invoiceLine->unit_price),
@@ -356,6 +372,9 @@ final class PromotionRuntimeService
                     'reverses_event_id' => null, 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
+        }
+        foreach (array_keys($redeemedCardIds) as $cardId) {
+            $this->cards->syncExhausted($tenantId, $cardId);
         }
     }
 
@@ -396,19 +415,22 @@ final class PromotionRuntimeService
                 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
+        foreach ($redemptions->pluck('card_id')->filter()->unique() as $cardId) {
+            $this->cards->syncExhausted($tenantId, (int) $cardId);
+        }
     }
 
     private function resolveChoice(int $tenantId, VehicleServiceJob $job, VehicleServiceJobLine $line, array $input): array
     {
         $today = now()->toDateString();
-        if ($this->math->compare((string) $line->quantity, self::ONE_USE) !== 0) {
-            throw new InvalidArgumentException('Add one promotion service per line.');
-        }
         $base = $this->math->sub($this->math->mul((string) $line->quantity, (string) $line->unit_price), (string) $line->discount_amount);
         if ($this->math->compare($base, self::ZERO) <= 0) {
             throw new InvalidArgumentException('This line has no remaining amount for an automatic offer.');
         }
         if (! empty($input['card_benefit_id'])) {
+            if (! preg_match('/^[1-9][0-9]*(?:\.0+)?$/', (string) $line->quantity)) {
+                throw new InvalidArgumentException('Card service quantity must be a whole number of uses.');
+            }
             $benefit = DB::table('promotion_card_benefits')->where('tenant_id', $tenantId)->find((int) $input['card_benefit_id']);
             $card = DB::table('promotion_cards as card')
                 ->join('promotion_card_templates as template', 'template.id', '=', 'card.template_id')
@@ -438,6 +460,9 @@ final class PromotionRuntimeService
 
             return ['discount' => $discount, 'card_id' => $card->id,
                 'card_benefit_id' => $benefit->id, 'offer_assignment_id' => null];
+        }
+        if ($this->math->compare((string) $line->quantity, self::ONE_USE) !== 0) {
+            throw new InvalidArgumentException('Add one earned free service per line.');
         }
         $assignment = DB::table('promotion_offer_assignments')->where('tenant_id', $tenantId)
             ->lockForUpdate()->find((int) $input['offer_assignment_id']);

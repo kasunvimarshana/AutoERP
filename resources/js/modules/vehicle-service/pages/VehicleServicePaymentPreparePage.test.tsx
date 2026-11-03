@@ -194,6 +194,37 @@ describe('VehicleServicePaymentPreparePage', () => {
         expect(JSON.stringify(apiMocks.createVehicleServicePayment.mock.calls[0])).not.toContain('5000');
     });
 
+    it('applies cash to the full balance when every other method amount is zero', async () => {
+        apiMocks.getVehicleServiceJob.mockResolvedValue(job('1900.000000'));
+        apiMocks.getVehicleServicePaymentOptions.mockResolvedValue({
+            job_version: 7,
+            credit_allowed: false,
+            methods: [
+                { id: 3, code: 'CASH', name: 'Cash', method_type: 'cash', requires_reference: false, requires_instrument_details: false },
+                { id: 4, code: 'CARD', name: 'Card', method_type: 'card', requires_reference: false, requires_instrument_details: false },
+                { id: 5, code: 'BANK', name: 'Bank transfer', method_type: 'bank_transfer', requires_reference: false, requires_instrument_details: false },
+            ],
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        const cash = await screen.findByLabelText('Cash received');
+        await user.type(cash, '2000');
+
+        expect(screen.getByRole('combobox', { name: 'Invoice number' })).toHaveValue('11');
+        expect(cash).toHaveValue('2000');
+        expect(screen.getByLabelText('Card amount')).toHaveValue('0.00');
+        expect(screen.getByLabelText('Bank transfer amount')).toHaveValue('0.00');
+        expect(screen.getByText('Cash amount applied').parentElement).toHaveTextContent(/1,900\.00/);
+        expect(screen.getByText('Change to return').parentElement).toHaveTextContent(/100\.00/);
+        expect(screen.getByText('Payment total').parentElement).toHaveTextContent(/1,900\.00/);
+
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
+        await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
+            lines: [{ amount: '1900.000000', payment_method_id: 3, reference_number: undefined }],
+        })));
+    });
+
     it('shows card brands as radio choices and submits the selected brand', async () => {
         apiMocks.getVehicleServicePaymentOptions.mockResolvedValue({
             job_version: 7,

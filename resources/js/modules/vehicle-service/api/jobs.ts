@@ -57,9 +57,11 @@ export const startVehicleServiceJob = (id: number, expectedVersion: number) =>
     apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/start`, { expected_version: expectedVersion })
         .then((response) => response.data.data);
 
-export const completeVehicleServiceJob = (id: number, expectedVersion: number) =>
-    apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/complete`, { expected_version: expectedVersion })
-        .then((response) => response.data.data);
+export const completeAndBillVehicleServiceJob = (id: number, expectedVersion: number) =>
+    apiClient.patch<ApiResource<{ invoice_id: number; balance_due: string }>>(
+        `${jobs}/${id}/complete-and-bill`,
+        { expected_version: expectedVersion },
+    ).then((response) => response.data.data);
 
 export const getVehicleServiceCancellationPreview = (id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<VehicleServiceCancellationPreview>>(`${jobs}/${id}/cancellation-preview`, { signal })

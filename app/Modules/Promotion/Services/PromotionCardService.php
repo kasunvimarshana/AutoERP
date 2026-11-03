@@ -14,6 +14,7 @@ use Modules\Promotion\Enums\PromotionCardAction;
 use Modules\Promotion\Enums\PromotionCountScope;
 use Modules\Promotion\Enums\PromotionDiscountType;
 use Modules\Promotion\Enums\PromotionStatus;
+use Modules\Vehicle\Events\CurrentCustomerOwnershipEnded;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class PromotionCardService
@@ -177,6 +178,7 @@ final class PromotionCardService
                 }
                 $customerId = (int) $input['customer_id'];
                 $vehicleId = (int) $input['vehicle_id'];
+                DB::table('vehicles')->where('tenant_id', $tenantId)->where('id', $vehicleId)->lockForUpdate()->first();
                 $this->offers->customer($tenantId, $customerId);
                 $this->offers->customerVehicle($tenantId, $organizationUnitId, $customerId, $vehicleId);
                 $cardId = DB::table('promotion_cards')->insertGetId([
@@ -301,6 +303,9 @@ final class PromotionCardService
             if ($card->status === $status) {
                 throw new ConflictHttpException('The card already has this status.');
             }
+            if (in_array($card->status, [PromotionStatus::Ended->value, PromotionStatus::Exhausted->value], true)) {
+                throw new ConflictHttpException('An ended card cannot be reactivated.');
+            }
             if ($status === PromotionStatus::Active->value && $card->expires_on < now()->toDateString()) {
                 throw new ConflictHttpException('An expired card cannot be reactivated.');
             }
@@ -336,6 +341,93 @@ final class PromotionCardService
         });
     }
 
+    public function endForFormerOwner(CurrentCustomerOwnershipEnded $event): void
+    {
+        $cards = DB::table('promotion_cards')
+            ->where('tenant_id', $event->tenantId)
+            ->where('vehicle_id', $event->vehicleId)
+            ->where('customer_id', $event->customerId)
+            ->whereIn('status', [PromotionStatus::Active->value, PromotionStatus::Paused->value, PromotionStatus::Exhausted->value])
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($cards as $card) {
+            DB::table('promotion_cards')->where('id', $card->id)->update([
+                'status' => PromotionStatus::Ended->value,
+                'row_version' => (int) $card->row_version + 1,
+                'updated_at' => now(),
+            ]);
+            DB::table('promotion_offer_assignments')
+                ->where('tenant_id', $event->tenantId)
+                ->where('card_id', $card->id)
+                ->whereIn('status', [PromotionStatus::Active->value, PromotionStatus::Paused->value])
+                ->update([
+                    'status' => PromotionStatus::Ended->value,
+                    'row_version' => DB::raw('row_version + 1'),
+                    'updated_at' => now(),
+                ]);
+            $this->lifecycle(
+                $event->tenantId,
+                (int) $card->id,
+                PromotionCardAction::OwnershipEnded->value,
+                $event->vehicleId,
+                null,
+                null,
+                $card->status,
+                PromotionStatus::Ended->value,
+                'Current customer ownership ended.',
+            );
+        }
+    }
+
+    public function syncExhausted(int $tenantId, int $cardId): void
+    {
+        $card = DB::table('promotion_cards')->where('tenant_id', $tenantId)->where('id', $cardId)->lockForUpdate()->first();
+        if ($card === null || ! in_array($card->status, [PromotionStatus::Active->value, PromotionStatus::Exhausted->value], true)) {
+            return;
+        }
+        $benefits = DB::table('promotion_card_benefits')
+            ->where('tenant_id', $tenantId)
+            ->where('template_id', $card->template_id)
+            ->get();
+        if ($benefits->contains(static fn ($benefit): bool => $benefit->kind === PromotionBenefitKind::Earned->value)) {
+            return;
+        }
+        $directBenefits = $benefits->where('kind', PromotionBenefitKind::Direct->value);
+        if ($directBenefits->isEmpty()) {
+            return;
+        }
+        $allUsed = $directBenefits->every(function ($benefit) use ($tenantId, $cardId): bool {
+            $used = $this->math->sum(DB::table('promotion_redemption_events')
+                ->where('tenant_id', $tenantId)
+                ->where('card_id', $cardId)
+                ->where('card_benefit_id', $benefit->id)
+                ->pluck('quantity'));
+
+            return $this->math->compare($used, (string) $benefit->use_limit) >= 0;
+        });
+        $nextStatus = $allUsed ? PromotionStatus::Exhausted : PromotionStatus::Active;
+        if ($card->status === $nextStatus->value) {
+            return;
+        }
+        DB::table('promotion_cards')->where('id', $cardId)->update([
+            'status' => $nextStatus->value,
+            'row_version' => (int) $card->row_version + 1,
+            'updated_at' => now(),
+        ]);
+        $this->lifecycle(
+            $tenantId,
+            $cardId,
+            $allUsed ? PromotionCardAction::Exhausted->value : PromotionCardAction::UsesRestored->value,
+            (int) $card->vehicle_id,
+            (int) $card->vehicle_id,
+            null,
+            $card->status,
+            $nextStatus->value,
+        );
+    }
+
     private function lockedCard(int $tenantId, int $cardId, int $expectedVersion): object
     {
         $card = DB::table('promotion_cards')->where('tenant_id', $tenantId)->lockForUpdate()->find($cardId);
@@ -355,7 +447,7 @@ final class PromotionCardService
         string $action,
         ?int $fromVehicleId,
         ?int $toVehicleId,
-        int $actorId,
+        ?int $actorId,
         ?string $oldStatus,
         string $newStatus,
         ?string $reason = null,

@@ -8,6 +8,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
@@ -20,7 +21,7 @@ import { VehicleServiceCancellationDialog } from '../components/VehicleServiceCa
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus, VehicleServiceJobTotals } from '../vehicleServiceTypes';
-import { completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
+import { completeAndBillVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
 import { vehicleServicePermissions } from '../vehicleServicePermissions';
 import { createVehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 
@@ -131,9 +132,14 @@ export default function VehicleServiceJobDetailPage() {
                 return;
             }
             if (name === 'complete') {
-                const updated = await completeVehicleServiceJob(job.id, expectedVersion);
-                setJob((current) => current ? withStatusUpdate(current, updated.status, updated.row_version ?? expectedVersion + 1, updated.completed_at ?? null) : current);
-                bumpHistory();
+                const invoice = await completeAndBillVehicleServiceJob(job.id, expectedVersion);
+                const canReceivePayment = hasPermission(auth, vehicleServicePermissions.paymentsView)
+                    && hasPermission(auth, vehicleServicePermissions.paymentsCreate);
+                navigate(canReceivePayment && compareDecimalStrings(invoice.balance_due, '0') > 0
+                    ? `/vehicle-service/jobs/${job.id}/payment?invoice_id=${invoice.invoice_id}`
+                    : hasPermission(auth, vehicleServicePermissions.invoicesView)
+                        ? `/invoices/${invoice.invoice_id}?from=vehicle-service&job_id=${job.id}`
+                        : `/vehicle-service/jobs/${job.id}`);
                 return;
             }
             if (name === 'delete') {
@@ -148,26 +154,29 @@ export default function VehicleServiceJobDetailPage() {
         }
     };
 
-    const nextAction = job.status === 'draft'
-        ? { label: 'Mark inspected', action: 'inspect' as const }
-        : job.status === 'inspected'
-            ? { label: 'Start work', action: 'start' as const }
-            : job.status === 'in_progress'
-                ? { label: 'Complete job', action: 'complete' as const }
-                : null;
+    const canTransition = hasPermission(auth, vehicleServicePermissions.jobsTransition);
+    const canCompleteAndBill = canTransition && hasPermission(auth, vehicleServicePermissions.invoicesCreate);
+    const canInspect = canTransition && job.status === 'draft';
+    const canStart = canTransition && ['draft', 'inspected'].includes(job.status);
+    const canComplete = canCompleteAndBill && ['draft', 'inspected', 'in_progress'].includes(job.status);
     return (
         <>
             <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
             <PromotionJobStrip customerId={job.customer_id} vehicleId={job.vehicle_id} />
             <WorkflowHeader
-                status={<VehicleServiceStatusBadge status={job.status} />}
-                nextAction={nextAction
-                    ? <Button type="button" loading={busy} onClick={() => action(nextAction.action)}>{nextAction.label}</Button>
-                    : job.status === 'completed'
+                status={<>
+                    <VehicleServiceStatusBadge status={job.status} />
+                    {canComplete && <span className="text-sm text-slate-600">Invoice total <MoneyDisplay value={job.grand_total} /></span>}
+                </>}
+                nextAction={canComplete
+                    ? <Button type="button" loading={busy} onClick={() => action('complete')} title="Complete the job, post its invoice, and open payment">Complete & bill</Button>
+                    : job.status === 'completed' && hasPermission(auth, vehicleServicePermissions.invoicesCreate)
                         ? <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`}>Create & post invoice</LinkButton>
                         : undefined}
                 historyAction={<Button type="button" variant="ghost" onClick={() => tabs.openTab('history')}>History</Button>}
                 secondaryActions={<>
+                    {canInspect && <Button type="button" variant="secondary" loading={busy} onClick={() => action('inspect')}>Mark inspected</Button>}
+                    {canStart && <Button type="button" variant="secondary" loading={busy} onClick={() => action('start')}>Start work</Button>}
                     {['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
                     {(canCancel || job.status === 'draft') && (
                         <ActionMenu>

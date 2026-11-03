@@ -7,7 +7,7 @@ import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { promotionApi, searchPromotionJobItems, type AvailablePromotions } from '../promotionApi';
 
-type Choice = { card_id?: number; card_benefit_id?: number; offer_assignment_id?: number };
+type Choice = { card_id?: number; card_benefit_id?: number; offer_assignment_id?: number; quantity?: string };
 
 export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices = [] }: {
     customerId: number | null;
@@ -53,6 +53,26 @@ export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices
         finally { setBusy(false); }
     };
 
+    const addAvailableCardItems = async () => {
+        if (!onAdd || !selectedCard) return;
+        const benefits = selectedCard.benefits?.filter((benefit) => benefit.kind === 'direct'
+            && benefit.available_today && (benefit.remaining_uses ?? 0) > pendingForBenefit(benefit.id)) ?? [];
+        if (benefits.length === 0) return;
+        setBusy(true); setError('');
+        try {
+            const items = await Promise.all(benefits.map(async (benefit) => {
+                const result = await searchPromotionJobItems({ search: benefit.item_code!, page: 1, perPage: 50, signal: new AbortController().signal });
+                const item = result.data.find((candidate) => (candidate.item_id ?? candidate.id) === benefit.item_id);
+                if (!item || Number(item.resolved_service_unit_price ?? 0) <= 0) {
+                    throw new Error(`Set a job price for ${benefit.item_name} before adding card items.`);
+                }
+                return { item, choice: { card_id: selectedCard.id, card_benefit_id: benefit.id } };
+            }));
+            items.forEach(({ item, choice }) => onAdd(item, choice));
+        } catch (reason) { setError(reason instanceof Error ? reason.message : toApiError(reason).message); }
+        finally { setBusy(false); }
+    };
+
     const assign = async (offerId: number) => {
         if (!customerId || !vehicleId) return;
         setBusy(true); setError('');
@@ -66,7 +86,12 @@ export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices
     const selectedCard = available?.cards.find((card) => String(card.id) === cardId) ?? available?.cards[0];
     const cardOffers = available?.offers.filter((offer) => offer.card_id === selectedCard?.id) ?? [];
     const standaloneOffers = available?.offers.filter((offer) => offer.card_id === null) ?? [];
-    const pendingForBenefit = (id: number) => pendingChoices.filter((choice) => choice.card_benefit_id === id).length;
+    const pendingForBenefit = (id: number) => pendingChoices
+        .filter((choice) => choice.card_benefit_id === id)
+        .reduce((total, choice) => {
+            const quantity = Number(choice.quantity ?? 1);
+            return total + (Number.isFinite(quantity) ? quantity : 0);
+        }, 0);
     const pendingForOffer = (id: number) => pendingChoices.filter((choice) => choice.offer_assignment_id === id).length;
 
     return <section className="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-4" aria-label="Service cards and offers">
@@ -84,7 +109,10 @@ export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices
         {available && available.cards.length === 0 && standaloneOffers.length === 0 && (!canAssign || available.unassigned_offers.length === 0) && <p className="mt-3 text-sm text-slate-600">No active card or offer for this vehicle.</p>}
         {available && available.cards.length > 0 && <div className="mt-3 max-w-sm"><Select label="Service card" value={selectedCard ? String(selectedCard.id) : ''}
             options={available.cards.map((card) => ({ value: String(card.id), label: `${card.template_name} · ${card.card_number}` }))}
-            onChange={(event) => setCardId(event.target.value)} /></div>}
+            onChange={(event) => setCardId(event.target.value)} />
+            {selectedCard && <label className="mt-2 flex items-center gap-2 text-sm text-emerald-800"><input type="checkbox" checked readOnly aria-label={`${selectedCard.template_name} active for this owner and vehicle`} /> Active for this owner and vehicle</label>}
+            {onAdd && canRedeem && selectedCard && <Button type="button" variant="secondary" className="mt-3" disabled={busy || !selectedCard.benefits?.some((benefit) => benefit.kind === 'direct' && benefit.available_today && (benefit.remaining_uses ?? 0) > pendingForBenefit(benefit.id))} onClick={() => void addAvailableCardItems()}>Add available card items</Button>}
+        </div>}
         {selectedCard && <div className="mt-3 flex flex-wrap gap-2">{selectedCard.benefits?.filter((benefit) => benefit.kind === 'direct').map((benefit) =>
             <div key={benefit.id} className="min-w-48 rounded-lg border border-sky-100 bg-white p-3 text-sm">
                 <p className="font-medium text-slate-900">{benefit.item_name}</p>
@@ -93,7 +121,6 @@ export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{Math.max(0, (benefit.remaining_uses ?? 0) - pendingForBenefit(benefit.id))} uses left</span>
                     {!benefit.available_today && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Not valid today</span>}
                 </div>
-                {onAdd && canRedeem && <Button type="button" variant="secondary" className="mt-3" disabled={busy || !benefit.available_today || (benefit.remaining_uses ?? 0) <= pendingForBenefit(benefit.id)} onClick={() => void add(benefit.item_id!, benefit.item_code!, benefit.item_name!, { card_id: selectedCard.id, card_benefit_id: benefit.id })}>Add job line</Button>}
             </div>)}</div>}
         {[...cardOffers, ...standaloneOffers].length > 0 && <div className="mt-3 flex flex-wrap gap-2">{[...cardOffers, ...standaloneOffers].map((offer) =>
             <div key={offer.id} className="min-w-52 rounded-lg border border-sky-100 bg-white p-3 text-sm">
