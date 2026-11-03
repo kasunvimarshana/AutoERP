@@ -146,11 +146,13 @@ export default function RentalDashboardPage() {
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Operations & Workflow Hub</h3>
                         <div className="mt-3 flex flex-wrap gap-2">
+                            <Link to="/vehicle-rental/vehicles/available"><Button variant="secondary">Check Availability</Button></Link>
                             <Link to={RESERVATION_REGISTER_PATH}><Button variant="secondary">Advance Reservations</Button></Link>
                             <Link to={agreementPath(AgreementKind.Customer)}><Button variant="secondary">Customer Agreements</Button></Link>
                             <Link to={agreementPath(AgreementKind.Owner)}><Button variant="secondary">Owner Agreements</Button></Link>
                             <Link to={USE_REGISTER_PATH}><Button variant="secondary">Vehicle Use & Custody</Button></Link>
                             <Link to={CHART_REGISTER_PATH}><Button variant="secondary">Running Charts</Button></Link>
+                            <Link to="/vehicle-rental/running-chart/report"><Button variant="secondary">Print Running Chart</Button></Link>
                             <Link to={EXPENSE_REGISTER_PATH}><Button variant="secondary">Fleet Expenses</Button></Link>
                             <Link to={FINANCE_REGISTER_PATH}><Button variant="secondary">Vehicle Finance</Button></Link>
                             <Link to={INCIDENT_REGISTER_PATH}><Button variant="secondary">Damage Incidents</Button></Link>

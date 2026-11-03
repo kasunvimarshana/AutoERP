@@ -150,6 +150,7 @@ export function ReservationEditor({
                     label="Requested End Date & Time"
                     type="datetime-local"
                     value={endAt}
+                    min={startAt || undefined}
                     onChange={e => setEndAt(e.target.value)}
                     required
                     error={error?.fields.requested_end_at?.[0]}

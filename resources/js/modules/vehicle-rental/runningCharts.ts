@@ -25,8 +25,8 @@ export interface ChartHistory { version: number; action: string; reason: string 
 export const CHART_REGISTER_PATH = '/vehicle-rental/running-charts';
 export interface ChartRegisterRow extends RunningChart {
     vehicle_use: { id: number; vehicle_label: string; version: number };
-    customer_agreement: { reference: string; party_name: string };
-    owner_agreement: { reference: string; party_name: string } | null;
+    customer_agreement: { id?: number; reference: string; party_name: string };
+    owner_agreement: { id?: number; reference: string; party_name: string } | null;
     replaces_vehicle: string | null;
 }
 export interface ChartRegisterFilters { search?: string; chart_status?: RunningChartStatus; from?: string; until?: string }

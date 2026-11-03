@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -258,8 +259,13 @@ export default function ReservationsPage() {
                     )}
 
                     {selected.converted_agreement && (
-                        <p className="text-sm font-medium text-blue-600">
-                            Converted to Customer Agreement: {selected.converted_agreement.reference}
+                        <p className="text-sm font-medium">
+                            <Link
+                                to="/vehicle-rental/customer/agreements"
+                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                                Converted to Customer Agreement: {selected.converted_agreement.reference}
+                            </Link>
                         </p>
                     )}
 

@@ -49,6 +49,19 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [showSuccessor, setShowSuccessor] = useState(false);
     const [search, setSearch] = useState('');
     const [query, setQuery] = useState('');
+    const [vehicleIdParam, setVehicleIdParam] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null;
+        return new URLSearchParams(window.location.search).get('vehicle_id');
+    });
+
+    function clearVehicleParam() {
+        setVehicleIdParam(null);
+        if (typeof window !== 'undefined' && window.location.search.includes('vehicle_id')) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('vehicle_id');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }
     useEffect(() => {
         const controller = new AbortController();
         listAgreements(kind, page, controller.signal, query).then(result => {
@@ -69,6 +82,12 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         <ContentHeader title={kind === AgreementKind.Customer ? 'Customer Rental Agreements' : 'Owner Rental Agreements'} description={kind === AgreementKind.Customer ? 'Record customer commercial terms, vehicle use, billing and deposit context while preserving history.' : 'Record owner/lessor payable terms and supplied vehicle context independently from customer billing.'}
             actions={<><Button variant="secondary" onClick={reload} disabled={loading || saving || editing !== null}>Reload</Button>{canManage && <Button onClick={() => { setEditing('new'); setSelected(null); }} disabled={loading || saving || editing !== null}>New agreement</Button>}</>} />
         <ErrorAlert error={error} inline />
+        {vehicleIdParam && (
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50/80 p-3 text-sm text-blue-900">
+                <span>Vehicle selected for dispatch. Select an active customer agreement to assign this vehicle.</span>
+                <Button type="button" variant="ghost" onClick={clearVehicleParam}>Dismiss</Button>
+            </div>
+        )}
         {editing !== null && <AgreementEditor key={editing === 'new' ? 'new' : editing.id} kind={kind} record={editing === 'new' ? undefined : editing} onSaved={reload} onCancel={() => setEditing(null)} />}
         <form
             onSubmit={event => {
@@ -105,12 +124,45 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         </form>
         {loading ? <LoadingState label="Loading agreements…" /> : error ? null : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm"><caption className="sr-only">Rental agreements</caption><thead><tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">{['Reference', 'Party', 'Period', 'Basis', 'Status', 'Details'].map(label => <th className="px-4 py-3" key={label}>{label}</th>)}</tr></thead>
-                <tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="transition-colors hover:bg-blue-50/40"><td className="px-4 py-3 font-medium text-slate-900">{row.reference}</td><td className="px-4 py-3 text-slate-700">{row.party.name}</td><td className="px-4 py-3 text-slate-600">{formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}</td><td className="px-4 py-3 text-slate-700">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="px-4 py-3"><StatusBadge status={row.status} /></td><td className="px-4 py-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
+                <tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="transition-colors hover:bg-blue-50/40"><td className="px-4 py-3 font-medium text-slate-900">{row.reference}</td><td className="px-4 py-3 text-slate-700">{row.party.name}</td><td className="px-4 py-3 text-slate-600">{formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}</td><td className="px-4 py-3 text-slate-700">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="px-4 py-3"><StatusBadge status={row.status} /></td><td className="px-4 py-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { if (selected?.id === row.id) { setSelected(null); } else { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); } }}>{selected?.id === row.id ? 'Close review' : `Review ${row.reference}`}</Button></td></tr>)}</tbody>
             </table>{rows.length === 0 && <p className="p-5 text-slate-500">No agreements have been recorded.</p>}
         </div>}
         <Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
-        {selected && <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-5" aria-label="Agreement review">
-            <div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold text-slate-900">{selected.reference} · {selected.party.name}</h2><StatusBadge status={selected.status} /></div>
+        {selected && <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-label="Agreement review">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="text-xl font-semibold text-slate-900">{selected.reference} · {selected.party.name}</h2>
+                    <StatusBadge status={selected.status} />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    {canManage && !action && !showSuccessor && (
+                        <>
+                            {selected.status === AgreementStatus.Draft && (
+                                <>
+                                    <Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit draft</Button>
+                                    <Button onClick={() => setAction(AgreementAction.Activate)}>Activate</Button>
+                                </>
+                            )}
+                            {selected.status === AgreementStatus.Active && (
+                                <>
+                                    <Button variant="secondary" onClick={() => setShowSuccessor(true)}>Create successor</Button>
+                                    <Button variant="danger" onClick={() => setAction(AgreementAction.Close)}>Close agreement</Button>
+                                </>
+                            )}
+                        </>
+                    )}
+                    <Button variant="secondary" onClick={() => setSelected(null)}>Close review</Button>
+                </div>
+            </div>
+            {action && <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                <p className="text-sm text-slate-700">{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
+                {action === AgreementAction.Close && <Textarea label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
+                <div className="flex flex-wrap gap-2">
+                    <Button variant={action === AgreementAction.Close ? 'danger' : 'primary'} onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>
+                    <Button type="button" variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
+                </div>
+            </div>}
+            {showSuccessor && selected.status === AgreementStatus.Active && <AgreementSuccessorForm kind={kind} agreement={selected} onSaved={reload} onCancel={() => setShowSuccessor(false)} />}
             <p className="text-sm text-slate-600">{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
             <p className="text-xs text-slate-500">Agreement date: {formatBusinessDate(selected.agreed_on)} · Executing date: {formatBusinessDate(selected.executing_on, 'Not recorded')}</p>
             {selected.supersedes_agreement && <p className="text-xs text-blue-600 font-medium">Successor of {selected.supersedes_agreement.reference}</p>}
@@ -124,17 +176,6 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             {kind === AgreementKind.Customer && canViewUse && showVehicles && <VehicleUsePanel key={selected.id} agreement={selected} canManage={canManageUse} />}
             <Button variant="secondary" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
             {showHistory && <AgreementHistoryPanel key={selected.id} kind={kind} id={selected.id} />}
-            {canManage && !action && !showSuccessor && <div className="flex flex-wrap gap-2">
-                {selected.status === AgreementStatus.Draft && <><Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit draft</Button><Button onClick={() => setAction(AgreementAction.Activate)}>Activate</Button></>}
-                {selected.status === AgreementStatus.Active && <><Button variant="secondary" onClick={() => setShowSuccessor(true)}>Create successor</Button><Button variant="danger" onClick={() => setAction(AgreementAction.Close)}>Close agreement</Button></>}
-            </div>}
-            {showSuccessor && selected.status === AgreementStatus.Active && <AgreementSuccessorForm kind={kind} agreement={selected} onSaved={reload} onCancel={() => setShowSuccessor(false)} />}
-            {action && <div className="space-y-3 border-t pt-4">
-                <p className="text-sm text-slate-600">{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
-                {action === AgreementAction.Close && <Textarea label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
-                <Button variant={action === AgreementAction.Close ? 'danger' : 'primary'} onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>
-                <Button type="button" variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
-            </div>}
         </section>}
     </div>;
 }

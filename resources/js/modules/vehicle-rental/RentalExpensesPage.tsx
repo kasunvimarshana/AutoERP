@@ -3,6 +3,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -43,10 +44,13 @@ export default function RentalExpensesPage() {
     const [allocType, setAllocType] = useState<'company_cost' | 'customer_recovery' | 'owner_deduction'>('customer_recovery');
     const [allocCustomerAgreement, setAllocCustomerAgreement] = useState<NamedResource | null>(null);
     const [allocOwnerAgreement, setAllocOwnerAgreement] = useState<NamedResource | null>(null);
+    const [search, setSearch] = useState('');
+    const [query, setQuery] = useState('');
 
     useEffect(() => {
         const controller = new AbortController();
-        listRentalExpenses(page, controller.signal)
+        const filters = query ? { search: query } : undefined;
+        listRentalExpenses(page, controller.signal, filters)
             .then(result => {
                 if (!controller.signal.aborted) {
                     setRows(result.data);
@@ -65,7 +69,7 @@ export default function RentalExpensesPage() {
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [page, revision]);
+    }, [page, revision, query]);
 
     function reload() {
         setCreating(false);
@@ -122,6 +126,40 @@ export default function RentalExpensesPage() {
                     onCancel={() => setCreating(false)}
                 />
             )}
+
+            <form
+                onSubmit={event => {
+                    event.preventDefault();
+                    setPage(1);
+                    setQuery(search.trim());
+                }}
+                className="mt-4 flex flex-wrap items-center gap-2"
+            >
+                <div className="w-80">
+                    <Input
+                        name="search"
+                        placeholder="Search by expense #, reference, or vehicle…"
+                        value={search}
+                        onChange={event => setSearch(event.target.value)}
+                    />
+                </div>
+                <Button type="submit" variant="secondary" disabled={loading}>
+                    Search
+                </Button>
+                {query && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                            setSearch('');
+                            setQuery('');
+                            setPage(1);
+                        }}
+                    >
+                        Clear
+                    </Button>
+                )}
+            </form>
 
             {loading ? (
                 <LoadingState label="Loading rental fleet expenses…" />

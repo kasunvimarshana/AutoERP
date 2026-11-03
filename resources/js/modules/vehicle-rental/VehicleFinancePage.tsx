@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -302,7 +303,12 @@ export default function VehicleFinancePage() {
                                         <td className="px-3 py-2"><StatusBadge status={inst.status} /></td>
                                         <td className="px-3 py-2">
                                             {inst.invoice ? (
-                                                <span className="font-medium text-blue-600">{inst.invoice.invoice_number} ({inst.invoice.status})</span>
+                                                <Link
+                                                    to={`/invoices/${inst.invoice.id}`}
+                                                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                >
+                                                    {inst.invoice.invoice_number} ({inst.invoice.status})
+                                                </Link>
                                             ) : canManage && selected.status === FinanceStatus.Active ? (
                                                 <Button
                                                     variant="secondary"

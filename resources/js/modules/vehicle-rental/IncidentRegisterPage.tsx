@@ -14,7 +14,7 @@ import { Textarea } from '@/shared/components/Textarea';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { useApi } from '@/shared/hooks/useApi';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
+import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import { CHART_LABELS } from './runningCharts';
 import { IncidentReviewAction, IncidentStatus, IncidentType, INCIDENT_PERMISSION, INCIDENT_TYPE_LABELS, type RentalIncident } from './incidentEvidence';
 import { listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
@@ -40,7 +40,7 @@ export default function IncidentRegisterPage() {
     const [chartPage, setChartPage] = useState(1);
     const [selectedChart, setSelectedChart] = useState('');
     const [type, setType] = useState<IncidentType | ''>('');
-    const [occurredOn, setOccurredOn] = useState('');
+    const [occurredOn, setOccurredOn] = useState(businessDateInputValue);
     const [evidenceReference, setEvidenceReference] = useState('');
     const [description, setDescription] = useState('');
     const [reviewing, setReviewing] = useState<RentalIncident | null>(null);
@@ -113,8 +113,52 @@ export default function IncidentRegisterPage() {
         {canRecord && <Panel title="Record new incident">
             <form aria-label="Record rental incident" className="space-y-3" onSubmit={create}>
                 <div className="flex flex-wrap items-end gap-2">
-                    <Input label="Find a vehicle use (vehicle, agreement or party)" value={vehicleSearch} onChange={event => setVehicleSearch(event.target.value)} />
-                    <Button type="button" variant="secondary" onClick={() => { setSelectedUse(''); setSelectedChart(''); setChartPage(1); setVehiclePage(1); setQuery(vehicleSearch.trim()); }}>Find assignments</Button>
+                    <div className="w-80">
+                        <Input
+                            label="Find a vehicle use (vehicle, agreement or party)"
+                            value={vehicleSearch}
+                            onChange={event => setVehicleSearch(event.target.value)}
+                            onKeyDown={event => {
+                                if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    setSelectedUse('');
+                                    setSelectedChart('');
+                                    setChartPage(1);
+                                    setVehiclePage(1);
+                                    setQuery(vehicleSearch.trim());
+                                }
+                            }}
+                        />
+                    </div>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                            setSelectedUse('');
+                            setSelectedChart('');
+                            setChartPage(1);
+                            setVehiclePage(1);
+                            setQuery(vehicleSearch.trim());
+                        }}
+                    >
+                        Find assignments
+                    </Button>
+                    {query && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                                setVehicleSearch('');
+                                setQuery('');
+                                setSelectedUse('');
+                                setSelectedChart('');
+                                setChartPage(1);
+                                setVehiclePage(1);
+                            }}
+                        >
+                            Clear
+                        </Button>
+                    )}
                 </div>
                 <Select label="Vehicle assignment" required placeholder="Select a vehicle and customer agreement"
                     options={uses.map(use => ({ value: String(use.id), label: `${use.vehicle_label} — ${use.customer_agreement_reference ?? 'No agreement'} — ${use.customer_party_name ?? 'Unnamed party'}` }))}
