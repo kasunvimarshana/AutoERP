@@ -3,12 +3,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import RentalRunningChartReportPage from './RentalRunningChartReportPage';
 import * as runningChartApi from './runningChartApi';
+import * as agreementApi from './agreementApi';
+import type { Agreement } from './agreements';
 
 vi.mock('./runningChartApi', async (importOriginal) => {
     const actual = await importOriginal<typeof runningChartApi>();
     return {
         ...actual,
         fetchRunningChartReport: vi.fn(),
+    };
+});
+
+vi.mock('./agreementApi', async (importOriginal) => {
+    const actual = await importOriginal<typeof agreementApi>();
+    return {
+        ...actual,
+        getAgreement: vi.fn(),
+        searchCustomerAgreements: vi.fn(),
     };
 });
 
@@ -65,13 +76,25 @@ const mockReportData: runningChartApi.RunningChartReportData = {
     },
 };
 
+const mockCustomerAgreement = {
+    id: 1,
+    reference: 'CA-TEST-001',
+    party: { id: 10, name: 'Lanka Industrial Corp' },
+} as unknown as Agreement;
+
 describe('RentalRunningChartReportPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(runningChartApi.fetchRunningChartReport).mockResolvedValue(mockReportData);
+        vi.mocked(agreementApi.getAgreement).mockResolvedValue(mockCustomerAgreement);
+        vi.mocked(agreementApi.searchCustomerAgreements).mockResolvedValue({
+            data: [{ id: 1, name: 'CA-TEST-001 — Lanka Industrial Corp' }],
+            links: { first: '', last: '', prev: null, next: null },
+            meta: { current_page: 1, from: 1, to: 1, last_page: 1, per_page: 15, total: 1, path: '' },
+        });
     });
 
-    it('renders report parameters form and loads matrix sheet', async () => {
+    it('renders report parameters form and loads matrix sheet when agreement_id is provided', async () => {
         render(
             <MemoryRouter initialEntries={['/vehicle-rental/running-chart/report?agreement_id=1']}>
                 <RentalRunningChartReportPage />
@@ -81,6 +104,7 @@ describe('RentalRunningChartReportPage', () => {
         expect(screen.getByText('Running Chart report (31-day matrix sheet)')).toBeInTheDocument();
 
         await waitFor(() => {
+            expect(agreementApi.getAgreement).toHaveBeenCalledWith('customer', 1);
             expect(runningChartApi.fetchRunningChartReport).toHaveBeenCalledWith({
                 agreement_id: 1,
                 start_date: expect.any(String),
@@ -99,19 +123,25 @@ describe('RentalRunningChartReportPage', () => {
         });
     });
 
-    it('generates report on manual form submission', async () => {
+    it('generates report on manual form submission with LookupSelect', async () => {
         render(
             <MemoryRouter initialEntries={['/vehicle-rental/running-chart/report']}>
                 <RentalRunningChartReportPage />
             </MemoryRouter>
         );
 
-        const agreementInput = screen.getByLabelText('Customer Agreement ID');
-        fireEvent.change(agreementInput, { target: { value: '1' } });
+        const agreementCombobox = screen.getByRole('combobox', { name: 'Customer Agreement' });
+        fireEvent.change(agreementCombobox, { target: { value: 'CA-TEST' } });
+        fireEvent.click(await screen.findByRole('option', { name: 'CA-TEST-001 — Lanka Industrial Corp' }));
+
         fireEvent.click(screen.getByRole('button', { name: 'Generate Sheet' }));
 
         await waitFor(() => {
-            expect(runningChartApi.fetchRunningChartReport).toHaveBeenCalled();
+            expect(runningChartApi.fetchRunningChartReport).toHaveBeenCalledWith({
+                agreement_id: 1,
+                start_date: expect.any(String),
+                end_date: expect.any(String),
+            });
             expect(screen.getByText('Lanka Industrial Corp')).toBeInTheDocument();
         });
     });

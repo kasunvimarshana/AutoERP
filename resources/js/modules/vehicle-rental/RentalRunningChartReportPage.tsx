@@ -5,9 +5,13 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Panel } from '@/shared/components/Panel';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { AgreementKind } from './agreements';
+import { getAgreement, searchCustomerAgreements } from './agreementApi';
 import { fetchRunningChartReport, getRunningChartReportExportUrl, type RunningChartReportData } from './runningChartApi';
 
 export default function RentalRunningChartReportPage() {
@@ -15,7 +19,7 @@ export default function RentalRunningChartReportPage() {
     const today = businessDateInputValue();
     const firstDayOfMonth = today.slice(0, 8) + '01';
 
-    const [agreementId, setAgreementId] = useState<string>(searchParams.get('agreement_id') || '');
+    const [agreement, setAgreement] = useState<NamedResource | null>(null);
     const [startDate, setStartDate] = useState<string>(searchParams.get('start_date') || firstDayOfMonth);
     const [endDate, setEndDate] = useState<string>(searchParams.get('end_date') || today);
     const [loading, setLoading] = useState(false);
@@ -27,6 +31,16 @@ export default function RentalRunningChartReportPage() {
         if (agId) {
             const parsed = parseInt(agId, 10);
             if (!isNaN(parsed) && parsed > 0) {
+                void getAgreement(AgreementKind.Customer, parsed)
+                    .then(ag => {
+                        setAgreement({
+                            id: ag.id,
+                            name: `${ag.reference} — ${ag.party.name}`,
+                        });
+                    })
+                    .catch(() => {
+                        // ignore prefetch error
+                    });
                 void loadReport(parsed, startDate, endDate);
             }
         }
@@ -55,11 +69,10 @@ export default function RentalRunningChartReportPage() {
 
     function handleGenerate(e: FormEvent) {
         e.preventDefault();
-        const id = parseInt(agreementId.trim(), 10);
-        if (isNaN(id) || id <= 0) {
+        if (!agreement?.id) {
             return;
         }
-        void loadReport(id, startDate, endDate);
+        void loadReport(agreement.id, startDate, endDate);
     }
 
     const exportPdfUrl = report
@@ -79,14 +92,13 @@ export default function RentalRunningChartReportPage() {
 
             <Panel title="Report Parameters">
                 <form aria-label="Generate running chart report" onSubmit={handleGenerate} className="grid gap-3 md:grid-cols-4 items-end">
-                    <Input
-                        label="Customer Agreement ID"
-                        type="number"
-                        min="1"
+                    <LookupSelect
+                        label="Customer Agreement"
+                        placeholder="Search agreement or customer..."
+                        value={agreement}
+                        onChange={setAgreement}
+                        search={searchCustomerAgreements}
                         required
-                        placeholder="e.g. 1"
-                        value={agreementId}
-                        onChange={e => setAgreementId(e.target.value)}
                         error={error?.fields.agreement_id?.[0]}
                     />
                     <Input
@@ -107,7 +119,7 @@ export default function RentalRunningChartReportPage() {
                         error={error?.fields.end_date?.[0]}
                     />
                     <div>
-                        <Button type="submit" loading={loading} className="w-full">
+                        <Button type="submit" loading={loading} disabled={!agreement} className="w-full">
                             Generate Sheet
                         </Button>
                     </div>

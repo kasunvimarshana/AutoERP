@@ -42,7 +42,7 @@ final class AgreementService
         $this->authorization->assert($context, $kind, false);
 
         return $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)->with($this->relations($kind))
-            ->when($search !== null && $search !== '', fn ($q) => $q->where('reference', 'like', '%'.$search.'%'))->orderByDesc('id')->paginate($perPage);
+            ->when($search !== null && $search !== '', fn ($q) => $q->where(fn ($query) => $query->where('reference', 'like', '%'.$search.'%')->orWhereHas('party', fn ($p) => $p->where('name', 'like', '%'.$search.'%'))))->orderByDesc('id')->paginate($perPage);
     }
 
     public function find(AgreementKind $kind, AgreementContext $context, int $id): Agreement
