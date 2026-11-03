@@ -9,6 +9,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 use Modules\Invoice\Http\Resources\InvoiceResource;
 use Modules\VehicleRental\Http\Requests\ActivateVehicleFinanceAgreementRequest;
+use Modules\VehicleRental\Http\Requests\CancelVehicleFinanceAgreementRequest;
 use Modules\VehicleRental\Http\Requests\CreateVehicleFinancePayableRequest;
 use Modules\VehicleRental\Http\Requests\RefreshVehicleFinanceDueStatusesRequest;
 use Modules\VehicleRental\Http\Requests\StoreVehicleFinanceAgreementRequest;
@@ -85,6 +86,25 @@ final class VehicleFinanceController extends Controller
         );
 
         return new VehicleFinanceAgreementResource($activated);
+    }
+
+    public function cancel(CancelVehicleFinanceAgreementRequest $request, VehicleFinanceAgreement $agreement): VehicleFinanceAgreementResource
+    {
+        $context = $request->context();
+        $this->auth->assertFinance($context, write: true);
+
+        $agreement = VehicleFinanceAgreement::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->findOrFail($agreement->getKey());
+
+        $cancelled = $this->service->cancel(
+            $agreement,
+            $request->expectedVersion(),
+            $context->actorId,
+            $request->validated('reason'),
+        );
+
+        return new VehicleFinanceAgreementResource($cancelled);
     }
 
     public function createPayable(CreateVehicleFinancePayableRequest $request, VehicleFinanceInstallment $installment): JsonResponse

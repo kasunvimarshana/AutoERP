@@ -67,6 +67,9 @@ final class RunningChartValidation
                     throw ValidationException::withMessages([$field => ['Recorded distance cannot exceed total physical distance.']]);
                 }
             }
+            if ($data['garage_km'] !== null && $data['commercial_km'] !== null && bccomp(bcadd($data['garage_km'], $data['commercial_km'], AgreementFields::DECIMAL_SCALE), $total, AgreementFields::DECIMAL_SCALE) > 0) {
+                throw ValidationException::withMessages(['commercial_km' => ['Combined commercial and garage distance cannot exceed total physical distance.']]);
+            }
         }
 
         return $data;

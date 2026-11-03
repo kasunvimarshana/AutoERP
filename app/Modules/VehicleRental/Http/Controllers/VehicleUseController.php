@@ -9,6 +9,8 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
+use Modules\VehicleRental\Http\Requests\VehicleAvailabilityQueryRequest;
+use Modules\VehicleRental\Http\Requests\VehicleUseRegisterRequest;
 use Modules\VehicleRental\Http\Resources\OwnerSourceResource;
 use Modules\VehicleRental\Http\Resources\VehicleUseHistoryResource;
 use Modules\VehicleRental\Http\Resources\VehicleUseResource;
@@ -21,18 +23,18 @@ final class VehicleUseController
 {
     public function __construct(private readonly VehicleUseService $uses) {}
 
-    public function register(AgreementRequest $request, VehicleUseRegisterService $register): AnonymousResourceCollection
+    public function register(VehicleUseRegisterRequest $request, VehicleUseRegisterService $register): AnonymousResourceCollection
     {
         return VehicleUseResource::collection($register->list($request->context(), $request->only(['search', 'use_status', 'from', 'until']), $request->perPage()));
     }
 
-    public function available(AgreementRequest $request): JsonResponse
+    public function available(VehicleAvailabilityQueryRequest $request): JsonResponse
     {
         $categoryId = $request->input('category_id') ? (int) $request->input('category_id') : null;
         $vehicles = $this->uses->availableVehicles(
             $request->context(),
-            $request->input('starts_at'),
-            $request->input('ends_at'),
+            (string) $request->validated('starts_at'),
+            $request->validated('ends_at') ? (string) $request->validated('ends_at') : null,
             $categoryId,
         );
 

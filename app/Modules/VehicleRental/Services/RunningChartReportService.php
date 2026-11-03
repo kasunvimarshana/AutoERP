@@ -197,7 +197,8 @@ final class RunningChartReportService
             $current = $current->addDay();
         }
 
-        $includedKm = $agreement->included_km !== null ? (float) $agreement->included_km : 0.0;
+        $termsIncludedKm = $agreement->terms['included_km'] ?? null;
+        $includedKm = $termsIncludedKm !== null ? (float) $termsIncludedKm : ($agreement->included_km !== null ? (float) $agreement->included_km : 0.0);
         $finalCumulative = (int) round($cumulativeMileage);
         $excessKm = ($includedKm > 0 && $finalCumulative > $includedKm)
             ? (int) round($finalCumulative - $includedKm)

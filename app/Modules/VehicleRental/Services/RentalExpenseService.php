@@ -192,6 +192,25 @@ final class RentalExpenseService
         $sequence = 1;
 
         foreach ($allocations as $row) {
+            if (! empty($row['target_customer_agreement_id'])) {
+                CustomerAgreement::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['target_customer_agreement_id']);
+            }
+            if (! empty($row['target_owner_agreement_id'])) {
+                OwnerAgreement::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['target_owner_agreement_id']);
+            }
+            if (! empty($row['target_vehicle_use_id'])) {
+                VehicleUse::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['target_vehicle_use_id']);
+            }
+            if (! empty($row['customer_id'])) {
+                Customer::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['customer_id']);
+            }
+            if (! empty($row['supplier_id'])) {
+                Supplier::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['supplier_id']);
+            }
+            if (! empty($row['employee_id'])) {
+                HrEmployee::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['employee_id']);
+            }
+
             $net = (string) $row['net_amount'];
             $tax = (string) ($row['tax_amount'] ?? '0.000000');
             $markup = (string) ($row['markup_amount'] ?? '0.000000');

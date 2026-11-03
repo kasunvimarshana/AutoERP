@@ -296,7 +296,7 @@ final class RentalReservationService
     private function validateReferences(array $data, int $tenantId, ?int $organizationUnitId): void
     {
         Customer::query()->forTenant($tenantId)->findOrFail((int) $data['customer_id']);
-        CurrencyModel::query()->findOrFail((int) $data['currency_id']);
+        CurrencyModel::query()->where('is_active', true)->findOrFail((int) $data['currency_id']);
 
         if (! empty($data['requested_vehicle_id'])) {
             Vehicle::query()->forTenant($tenantId)->findOrFail((int) $data['requested_vehicle_id']);

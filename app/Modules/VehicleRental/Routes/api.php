@@ -46,6 +46,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::post('/', [VehicleFinanceController::class, 'store']);
         Route::get('{agreement}', [VehicleFinanceController::class, 'show'])->whereNumber('agreement');
         Route::patch('{agreement}/activate', [VehicleFinanceController::class, 'activate'])->whereNumber('agreement');
+        Route::patch('{agreement}/cancel', [VehicleFinanceController::class, 'cancel'])->whereNumber('agreement');
         Route::post('installments/{installment}/payable', [VehicleFinanceController::class, 'createPayable'])->whereNumber('installment');
         Route::patch('installments/refresh-due-statuses', [VehicleFinanceController::class, 'refreshDueStatuses']);
     });

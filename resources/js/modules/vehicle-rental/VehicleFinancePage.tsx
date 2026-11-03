@@ -15,6 +15,7 @@ import {
     listFinanceAgreements,
     getFinanceAgreement,
     activateFinanceAgreement,
+    cancelFinanceAgreement,
     createInstallmentPayable,
     refreshFinanceDueStatuses,
     FinanceStatus,
@@ -87,6 +88,19 @@ export default function VehicleFinancePage() {
         setError(null);
         try {
             await activateFinanceAgreement(agreement.id, agreement.row_version);
+            reload();
+        } catch (failure) {
+            setError(toApiError(failure));
+        } finally {
+            setActionLoading(false);
+        }
+    }
+
+    async function handleCancel(agreement: VehicleFinanceAgreement) {
+        setActionLoading(true);
+        setError(null);
+        try {
+            await cancelFinanceAgreement(agreement.id, agreement.row_version, 'Cancelled by operator');
             reload();
         } catch (failure) {
             setError(toApiError(failure));
@@ -214,9 +228,14 @@ export default function VehicleFinancePage() {
                         <div className="flex items-center gap-2">
                             <StatusBadge status={selected.status} />
                             {canManage && selected.status === FinanceStatus.Draft && (
-                                <Button onClick={() => handleActivate(selected)} loading={actionLoading}>
-                                    Activate Agreement
-                                </Button>
+                                <>
+                                    <Button onClick={() => handleActivate(selected)} loading={actionLoading}>
+                                        Activate Agreement
+                                    </Button>
+                                    <Button variant="danger" onClick={() => handleCancel(selected)} loading={actionLoading}>
+                                        Cancel
+                                    </Button>
+                                </>
                             )}
                             <Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>
                         </div>
