@@ -430,10 +430,10 @@ function DocumentCard({
     compact?: boolean;
 }) {
     const tones = {
-        emerald: 'from-emerald-500 to-teal-500',
-        blue: 'from-blue-600 to-indigo-600',
-        amber: 'from-amber-400 to-orange-500',
-        rose: 'from-rose-500 to-pink-600',
+        emerald: 'from-emerald-500 to-emerald-600',
+        blue: 'from-blue-600 to-blue-700',
+        amber: 'from-amber-400 to-amber-500',
+        rose: 'from-rose-500 to-rose-600',
     };
 
     return (

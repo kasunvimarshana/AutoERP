@@ -556,7 +556,7 @@ export default function PostingProfilePage() {
             render: (row) => (
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     row.organization_unit_id
-                        ? 'bg-purple-100 text-purple-800'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200/80'
                         : 'bg-slate-100 text-slate-700'
                 }`}>
                     {scopeLabel(row.organization_unit_id, row.organization_unit)}
@@ -719,7 +719,7 @@ export default function PostingProfilePage() {
             render: (row) => (
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     row.organization_unit_id
-                        ? 'bg-purple-100 text-purple-800'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200/80'
                         : 'bg-slate-100 text-slate-700'
                 }`}>
                     {scopeLabel(row.organization_unit_id, row.organization_unit)}
@@ -1888,7 +1888,7 @@ export default function PostingProfilePage() {
                                                                 {line.resolved_account?.scope === 'tenant_default' ? (
                                                                     <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-700">Tenant Default</span>
                                                                 ) : line.resolved_account?.scope === 'organization' ? (
-                                                                    <span className="rounded bg-purple-100 px-2 py-0.5 text-purple-800">Branch Override</span>
+                                                                    <span className="rounded bg-blue-100 px-2 py-0.5 text-blue-800 border border-blue-200/80">Branch Override</span>
                                                                 ) : (
                                                                     '-'
                                                                 )}

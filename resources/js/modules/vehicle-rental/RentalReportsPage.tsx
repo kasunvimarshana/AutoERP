@@ -34,7 +34,7 @@ export default function RentalReportsPage() {
                     description: 'Regulatory compliance countdown for fleet revenue licences, owner names, expiration alerts, and renewal status.',
                     to: '/vehicle-rental/reports/revenue-licenses',
                     badge: 'Compliance',
-                    badgeColor: 'bg-red-100 text-red-800 border-red-200',
+                    badgeColor: 'bg-rose-100 text-rose-800 border-rose-200',
                 },
                 {
                     title: 'Running Chart 31-Day Matrix Sheet',
@@ -61,7 +61,7 @@ export default function RentalReportsPage() {
                     description: 'Customer agreement revenue totals, base rent billing, excess distance charges, overtime, night outs, and toll reimbursements.',
                     to: '/vehicle-rental/reports/rental-revenue',
                     badge: 'Revenue P&L',
-                    badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+                    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
                 },
                 {
                     title: "Lessee's Outstanding Age Analysis",
@@ -75,7 +75,7 @@ export default function RentalReportsPage() {
                     description: 'Active commercial customer contracts, base rent billing cycles, usage charge assessments, and security deposit receipts.',
                     to: '/vehicle-rental/customer/agreements',
                     badge: 'Contracts',
-                    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+                    badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
                 },
             ],
         },
@@ -88,7 +88,7 @@ export default function RentalReportsPage() {
                     description: 'Lessor settlements, monthly base lease entitlements, usage revenue sharing, toll/fuel deductions, and withholding tax (WHT) ledger statements.',
                     to: '/vehicle-rental/reports/owner-disbursements',
                     badge: 'Lessor Payables',
-                    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+                    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
                 },
                 {
                     title: 'Fleet Vehicle Profitability & Unit Economics',
@@ -109,7 +109,7 @@ export default function RentalReportsPage() {
                     description: 'Bank leasing contracts, installment amortization schedules, due status sync, and inbound supplier invoices.',
                     to: '/vehicle-rental/finance-agreements',
                     badge: 'Bank Leases',
-                    badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+                    badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
                 },
             ],
         },
@@ -123,7 +123,7 @@ export default function RentalReportsPage() {
             />
 
             {/* Featured Running Chart Banner */}
-            <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-slate-50 to-white p-6 shadow-sm">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">

@@ -26,7 +26,7 @@ const statusStyles: Record<string, { border: string; badge: string }> = {
     inspected: { border: 'border-l-blue-500', badge: 'bg-blue-50 text-blue-800' },
     in_progress: { border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-800' },
     completed: { border: 'border-l-emerald-500', badge: 'bg-emerald-50 text-emerald-800' },
-    invoiced: { border: 'border-l-indigo-500', badge: 'bg-indigo-50 text-indigo-800' },
+    invoiced: { border: 'border-l-blue-600', badge: 'bg-blue-50 text-blue-800' },
     partially_paid: { border: 'border-l-amber-500', badge: 'bg-amber-50 text-amber-800' },
     paid: { border: 'border-l-emerald-600', badge: 'bg-emerald-50 text-emerald-800' },
     cancelled: { border: 'border-l-rose-500', badge: 'bg-rose-50 text-rose-800' },

@@ -138,7 +138,7 @@ export default function VehicleServiceSalesSummaryReportPage() {
 }
 
 function Metric({ label, value, tone, detail }: { label: string; value: string; tone: 'blue' | 'sky' | 'amber' | 'green' | 'red'; detail?: string }) {
-    const accents = { blue: 'bg-blue-600', sky: 'bg-indigo-500', amber: 'bg-amber-500', green: 'bg-emerald-600', red: 'bg-rose-600' };
+    const accents = { blue: 'bg-blue-600', sky: 'bg-blue-500', amber: 'bg-amber-500', green: 'bg-emerald-600', red: 'bg-rose-600' };
     const valueTone = tone === 'green' ? 'text-emerald-800' : tone === 'red' ? 'text-rose-800' : 'text-slate-950';
     return (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -173,7 +173,7 @@ function StockItemsPanel({ result, params }: { result: VehicleServiceSalesSummar
 function ComboItemsPanel({ result, params }: { result: VehicleServiceSalesSummaryResult; params: VehicleServiceSalesSummaryParams }) {
     const combo = result.summary.combo;
     return (
-        <Panel className="border-l-4 border-l-indigo-500">
+        <Panel className="border-l-4 border-l-blue-500">
             <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="font-semibold text-slate-900">Combo item performance</h2>
                 <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...params, export_section: 'combo' }} formats={sectionExportFormats} compact />

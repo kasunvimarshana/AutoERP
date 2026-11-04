@@ -31,7 +31,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
                 id={selectId}
                 aria-invalid={Boolean(error)}
                 aria-describedby={error || hint ? messageId : undefined}
-                className={`min-h-10 w-full rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-2xs transition-colors focus:outline-hidden focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 ${error ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-300 focus:border-blue-600 focus:ring-blue-500/20'} ${className}`}
+                className={`min-h-10 w-full cursor-pointer rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-2xs transition-colors focus:outline-hidden focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 ${error ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-300 focus:border-blue-600 focus:ring-blue-500/20'} ${className}`}
                 {...props}
             >
                 <option value="">{placeholder}</option>

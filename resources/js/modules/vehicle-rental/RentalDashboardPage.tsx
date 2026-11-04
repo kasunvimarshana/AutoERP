@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -128,7 +128,7 @@ export default function RentalDashboardPage() {
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Incidents</span>
                             <div className="mt-2 flex items-baseline justify-between">
-                                <span className="text-2xl font-bold text-red-600">{m.active_vehicle_incidents}</span>
+                                <span className="text-2xl font-bold text-rose-600">{m.active_vehicle_incidents}</span>
                                 <Link to={INCIDENT_REGISTER_PATH} className="text-xs font-medium text-blue-600 hover:underline">Incidents</Link>
                             </div>
                         </div>
@@ -146,17 +146,17 @@ export default function RentalDashboardPage() {
                     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Operations & Workflow Hub</h3>
                         <div className="mt-3 flex flex-wrap gap-2">
-                            <Link to="/vehicle-rental/vehicles/available"><Button variant="secondary">Check Availability</Button></Link>
-                            <Link to={RESERVATION_REGISTER_PATH}><Button variant="secondary">Advance Reservations</Button></Link>
-                            <Link to={agreementPath(AgreementKind.Customer)}><Button variant="secondary">Customer Agreements</Button></Link>
-                            <Link to={agreementPath(AgreementKind.Owner)}><Button variant="secondary">Owner Agreements</Button></Link>
-                            <Link to={USE_REGISTER_PATH}><Button variant="secondary">Vehicle Use & Custody</Button></Link>
-                            <Link to={CHART_REGISTER_PATH}><Button variant="secondary">Running Charts</Button></Link>
-                            <Link to="/vehicle-rental/running-chart/report"><Button variant="secondary">Print Running Chart</Button></Link>
-                            <Link to={EXPENSE_REGISTER_PATH}><Button variant="secondary">Fleet Expenses</Button></Link>
-                            <Link to={FINANCE_REGISTER_PATH}><Button variant="secondary">Vehicle Finance</Button></Link>
-                            <Link to={INCIDENT_REGISTER_PATH}><Button variant="secondary">Damage Incidents</Button></Link>
-                            <Link to="/vehicle-rental/reports"><Button variant="secondary">Reports & Intelligence</Button></Link>
+                            <LinkButton to="/vehicle-rental/vehicles/available" variant="secondary">Check Availability</LinkButton>
+                            <LinkButton to={RESERVATION_REGISTER_PATH} variant="secondary">Advance Reservations</LinkButton>
+                            <LinkButton to={agreementPath(AgreementKind.Customer)} variant="secondary">Customer Agreements</LinkButton>
+                            <LinkButton to={agreementPath(AgreementKind.Owner)} variant="secondary">Owner Agreements</LinkButton>
+                            <LinkButton to={USE_REGISTER_PATH} variant="secondary">Vehicle Use & Custody</LinkButton>
+                            <LinkButton to={CHART_REGISTER_PATH} variant="secondary">Running Charts</LinkButton>
+                            <LinkButton to="/vehicle-rental/running-chart/report" variant="secondary">Print Running Chart</LinkButton>
+                            <LinkButton to={EXPENSE_REGISTER_PATH} variant="secondary">Fleet Expenses</LinkButton>
+                            <LinkButton to={FINANCE_REGISTER_PATH} variant="secondary">Vehicle Finance</LinkButton>
+                            <LinkButton to={INCIDENT_REGISTER_PATH} variant="secondary">Damage Incidents</LinkButton>
+                            <LinkButton to="/vehicle-rental/reports" variant="secondary">Reports & Intelligence</LinkButton>
                         </div>
                     </div>
 

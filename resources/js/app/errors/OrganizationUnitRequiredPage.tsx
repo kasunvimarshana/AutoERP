@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
 import { DASHBOARD_PATH } from '@/app/routePaths';
+import { LinkButton } from '@/shared/components/Button';
 
 export function OrganizationUnitRequiredPage() {
     return (
@@ -10,13 +10,13 @@ export function OrganizationUnitRequiredPage() {
                 <p className="mt-3 text-sm leading-relaxed text-slate-600">
                     This operational page requires an active branch or department context. Select an organization unit before continuing.
                 </p>
-                <Link
+                <LinkButton
                     to={DASHBOARD_PATH}
                     replace
-                    className="mt-6 inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    className="mt-6"
                 >
                     Return to Dashboard
-                </Link>
+                </LinkButton>
             </section>
         </main>
     );

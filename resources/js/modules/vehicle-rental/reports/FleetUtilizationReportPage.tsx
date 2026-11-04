@@ -162,7 +162,7 @@ export default function FleetUtilizationReportPage() {
             </Panel>
 
             {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
                     {error}
                 </div>
             )}
@@ -183,17 +183,17 @@ export default function FleetUtilizationReportPage() {
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">Available / Idle</div>
                             <div className="mt-1 text-2xl font-bold text-emerald-900">{data.summary.available_count}</div>
                         </div>
-                        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-purple-700">Average Utilization</div>
-                            <div className="mt-1 text-2xl font-bold text-purple-900">{data.summary.average_utilization_rate}%</div>
+                        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">Average Utilization</div>
+                            <div className="mt-1 text-2xl font-bold text-blue-900">{data.summary.average_utilization_rate}%</div>
                         </div>
                         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">Total KM Driven</div>
                             <div className="mt-1 text-2xl font-bold text-amber-900">{data.summary.total_distance_km.toLocaleString()}</div>
                         </div>
-                        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">Owner Leased</div>
-                            <div className="mt-1 text-2xl font-bold text-indigo-900">{data.summary.owner_leased_count}</div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-700">Owner Leased</div>
+                            <div className="mt-1 text-2xl font-bold text-slate-900">{data.summary.owner_leased_count}</div>
                         </div>
                     </div>
 
@@ -226,7 +226,7 @@ export default function FleetUtilizationReportPage() {
                                             <td className="py-2.5 px-3">
                                                 <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
                                                     row.ownership_type === 'Owner Leased'
-                                                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : 'bg-slate-100 text-slate-700'
                                                 }`}>
                                                     {row.ownership_type}

@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
 import { DASHBOARD_PATH } from '@/app/routePaths';
 import type { TenantModuleCode } from '@/app/access/tenantModules';
 import { TENANT_MODULES } from '@/app/access/tenantModules';
+import { LinkButton } from '@/shared/components/Button';
 
 export function ModuleUnavailablePage({ modules }: { modules: readonly TenantModuleCode[] }) {
     const labels = modules.map((code) => TENANT_MODULES.find((module) => module.code === code)?.label ?? code);
@@ -14,13 +14,13 @@ export function ModuleUnavailablePage({ modules }: { modules: readonly TenantMod
                 <p className="mt-3 text-sm leading-relaxed text-slate-600">
                     Required module{labels.length === 1 ? '' : 's'}: {labels.join(', ')}. Ask a platform administrator to review the tenant plan.
                 </p>
-                <Link
+                <LinkButton
                     to={DASHBOARD_PATH}
                     replace
-                    className="mt-6 inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    className="mt-6"
                 >
                     Return to Dashboard
-                </Link>
+                </LinkButton>
             </section>
         </main>
     );

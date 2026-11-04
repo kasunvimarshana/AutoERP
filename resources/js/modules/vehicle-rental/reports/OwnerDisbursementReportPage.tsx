@@ -184,7 +184,7 @@ export default function OwnerDisbursementReportPage() {
             </div>
 
             {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
                     {error}
                 </div>
             )}
@@ -203,15 +203,15 @@ export default function OwnerDisbursementReportPage() {
                                 {Number(data.summary.total_base_payable).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
-                        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-3.5 shadow-sm">
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-purple-700">Usage Share</div>
-                            <div className="mt-1 text-lg font-bold text-purple-900">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 shadow-sm">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-700">Usage Share</div>
+                            <div className="mt-1 text-lg font-bold text-slate-900">
                                 {(Number(data.summary.total_mileage_payable) + Number(data.summary.total_overtime_payable)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
-                        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3.5 shadow-sm">
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Gross Payable</div>
-                            <div className="mt-1 text-lg font-bold text-indigo-900">
+                        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3.5 shadow-sm">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-700">Gross Payable</div>
+                            <div className="mt-1 text-lg font-bold text-blue-900">
                                 {Number(data.summary.total_gross_payable).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
@@ -221,9 +221,9 @@ export default function OwnerDisbursementReportPage() {
                                 {Number(data.summary.total_deductions).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
-                        <div className="rounded-xl border border-red-200 bg-red-50/50 p-3.5 shadow-sm">
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-red-700">WHT ({params.wht_rate ?? 10}%)</div>
-                            <div className="mt-1 text-lg font-bold text-red-900">
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3.5 shadow-sm">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700">WHT ({params.wht_rate ?? 10}%)</div>
+                            <div className="mt-1 text-lg font-bold text-rose-900">
                                 {Number(data.summary.total_wht_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
@@ -282,7 +282,7 @@ export default function OwnerDisbursementReportPage() {
                                                 <td className="py-2.5 px-3 text-right font-mono text-rose-600">
                                                     {Number(row.deductions).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
-                                                <td className="py-2.5 px-3 text-right font-mono font-medium text-red-700">
+                                                <td className="py-2.5 px-3 text-right font-mono font-medium text-rose-700">
                                                     {Number(row.wht_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-800">
@@ -323,7 +323,7 @@ export default function OwnerDisbursementReportPage() {
                                                 <td className="py-2.5 px-3 font-bold text-blue-700">{entry.reference}</td>
                                                 <td className="py-2.5 px-3 text-slate-800 font-sans font-medium">{entry.description}</td>
                                                 <td className="py-2.5 px-3 text-right text-slate-500">{entry.debit || '-'}</td>
-                                                <td className="py-2.5 px-3 text-right font-bold text-red-700">{entry.credit}</td>
+                                                <td className="py-2.5 px-3 text-right font-bold text-rose-700">{entry.credit}</td>
                                                 <td className="py-2.5 px-3 text-right font-bold text-slate-900">{entry.balance}</td>
                                             </tr>
                                         ))}
@@ -339,7 +339,7 @@ export default function OwnerDisbursementReportPage() {
                                         <tfoot>
                                             <tr className="border-t-2 border-slate-300 bg-slate-50 font-mono font-bold">
                                                 <td colSpan={4} className="py-2.5 px-3 text-right font-sans">Total WHT Deducted:</td>
-                                                <td className="py-2.5 px-3 text-right text-red-700">-{Number(data.summary.total_wht_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                                <td className="py-2.5 px-3 text-right text-rose-700">-{Number(data.summary.total_wht_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                                 <td className="py-2.5 px-3 text-right text-slate-900">-{Number(data.summary.total_wht_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                             </tr>
                                         </tfoot>

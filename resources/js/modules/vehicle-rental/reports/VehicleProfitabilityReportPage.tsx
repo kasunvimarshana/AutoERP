@@ -148,7 +148,7 @@ export default function VehicleProfitabilityReportPage() {
             </Panel>
 
             {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
                     {error}
                 </div>
             )}
@@ -163,9 +163,9 @@ export default function VehicleProfitabilityReportPage() {
                                 {Number(data.summary.fleet_total_revenue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
-                        <div className="rounded-xl border border-red-200 bg-red-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-red-700">Direct Costs</div>
-                            <div className="mt-1 text-xl font-bold text-red-900">
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-700">Direct Costs</div>
+                            <div className="mt-1 text-xl font-bold text-rose-900">
                                 {Number(data.summary.fleet_total_direct_costs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
@@ -175,13 +175,13 @@ export default function VehicleProfitabilityReportPage() {
                                 {Number(data.summary.fleet_gross_margin).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
-                        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-purple-700">Margin %</div>
-                            <div className="mt-1 text-2xl font-bold text-purple-900">{data.summary.fleet_margin_percentage}%</div>
+                        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">Margin %</div>
+                            <div className="mt-1 text-2xl font-bold text-blue-900">{data.summary.fleet_margin_percentage}%</div>
                         </div>
-                        <div className="rounded-xl border border-cyan-200 bg-cyan-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-cyan-700">Distance Driven</div>
-                            <div className="mt-1 text-2xl font-bold text-cyan-900">{data.summary.fleet_total_distance_km.toLocaleString()} km</div>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-700">Distance Driven</div>
+                            <div className="mt-1 text-2xl font-bold text-slate-900">{data.summary.fleet_total_distance_km.toLocaleString()} km</div>
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Fleet Evaluated</div>
@@ -219,7 +219,7 @@ export default function VehicleProfitabilityReportPage() {
                                             <td className="py-2.5 px-3">
                                                 <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
                                                     row.ownership_type === 'Owner Leased'
-                                                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : 'bg-slate-100 text-slate-700'
                                                 }`}>
                                                     {row.ownership_type}
@@ -244,12 +244,12 @@ export default function VehicleProfitabilityReportPage() {
                                                 {Number(row.total_direct_costs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td className="py-2.5 px-3 text-right font-mono font-bold">
-                                                <span className={Number(row.gross_margin) >= 0 ? 'text-emerald-700' : 'text-red-700'}>
+                                                <span className={Number(row.gross_margin) >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
                                                     {Number(row.gross_margin).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </td>
                                             <td className="py-2.5 px-3 text-right font-semibold">
-                                                <span className={row.margin_percentage >= 0 ? 'text-emerald-700' : 'text-red-700'}>
+                                                <span className={row.margin_percentage >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
                                                     {row.margin_percentage}%
                                                 </span>
                                             </td>

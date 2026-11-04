@@ -51,7 +51,7 @@ export function CashFlowChart({ rows, currency }: { rows: DashboardSummary['cash
 
 export function ServiceStatusChart({ rows }: { rows: DashboardSummary['service_jobs'] }) {
     const total = rows.reduce((sum, row) => sum + row.count, 0);
-    const palette = ['bg-slate-400', 'bg-sky-500', 'bg-blue-600', 'bg-indigo-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-slate-600'];
+    const palette = ['bg-slate-400', 'bg-blue-500', 'bg-blue-600', 'bg-blue-700', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-slate-600'];
 
     return (
         <ChartPanel title="Service job status" description="Jobs created inside the selected period.">
@@ -122,7 +122,7 @@ export function ProfitabilityOverview({
     const rows = [
         ['Revenue', profitability.total_income, 'bg-blue-600'],
         ['Cost of sales', profitability.cost_of_sales, 'bg-amber-500'],
-        ['Gross profit', profitability.gross_profit, 'bg-indigo-600'],
+        ['Gross profit', profitability.gross_profit, 'bg-blue-700'],
         ['Other expenses', profitability.other_expenses, 'bg-slate-500'],
         ['Net profit', profitability.net_profit, Number(profitability.net_profit) < 0 ? 'bg-rose-600' : 'bg-emerald-600'],
     ] as const;

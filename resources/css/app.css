@@ -11,6 +11,7 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    accent-color: #2563eb;
 }
 
 body {
@@ -18,6 +19,12 @@ body {
     min-height: 100vh;
     background-color: #f8fafc;
     color: #0f172a;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+select:not(:disabled) {
+    cursor: pointer;
 }
 
 button,
@@ -28,6 +35,30 @@ a {
 :focus-visible {
     outline: 2px solid #2563eb;
     outline-offset: 2px;
+}
+
+/* Thin modern enterprise scrollbars */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 @media (prefers-reduced-motion: reduce) {

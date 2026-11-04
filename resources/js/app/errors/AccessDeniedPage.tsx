@@ -1,6 +1,7 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { PLATFORM_HOME_PATH, DASHBOARD_PATH } from '@/app/routePaths';
+import { LinkButton } from '@/shared/components/Button';
 
 interface AccessDeniedPageProps {
     title?: string;
@@ -24,13 +25,13 @@ export function AccessDeniedPage({
                 <p className="mt-3 break-all rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
                     Requested page: {location.pathname}
                 </p>
-                <Link
+                <LinkButton
                     to={homePath}
                     replace
-                    className="mt-6 inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    className="mt-6"
                 >
                     Return to {auth.isPlatformOperator ? 'Platform Administration' : 'Dashboard'}
-                </Link>
+                </LinkButton>
             </section>
         </main>
     );

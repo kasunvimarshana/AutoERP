@@ -180,7 +180,7 @@ function OperationalDashboard() {
     );
 }
 
-const KPI_TONES = { emerald: 'bg-emerald-500', blue: 'bg-blue-600', amber: 'bg-amber-500', rose: 'bg-rose-500', sky: 'bg-indigo-500', slate: 'bg-slate-600' } as const;
+const KPI_TONES = { emerald: 'bg-emerald-500', blue: 'bg-blue-600', amber: 'bg-amber-500', rose: 'bg-rose-500', sky: 'bg-blue-600', slate: 'bg-slate-600' } as const;
 type DatePreset = 'today' | 'last30' | 'month' | 'year';
 
 function datePreset(preset: DatePreset): DashboardDateRange {

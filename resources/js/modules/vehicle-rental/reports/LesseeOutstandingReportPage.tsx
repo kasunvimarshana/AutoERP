@@ -138,7 +138,7 @@ export default function LesseeOutstandingReportPage() {
             </Panel>
 
             {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
                     {error}
                 </div>
             )}
@@ -155,15 +155,15 @@ export default function LesseeOutstandingReportPage() {
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">Open Invoices</div>
                             <div className="mt-1 text-2xl font-bold text-blue-900">{data.summary.total_invoices_count}</div>
                         </div>
-                        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-purple-700">Total Invoiced</div>
-                            <div className="mt-1 text-2xl font-bold text-purple-900">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-700">Total Invoiced</div>
+                            <div className="mt-1 text-2xl font-bold text-slate-900">
                                 {Number(data.summary.grand_total_original_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
-                        <div className="rounded-xl border border-red-200 bg-red-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-red-700">Total Outstanding</div>
-                            <div className="mt-1 text-2xl font-bold text-red-900">
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-700">Total Outstanding</div>
+                            <div className="mt-1 text-2xl font-bold text-rose-900">
                                 {Number(data.summary.grand_total_balance_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
@@ -212,7 +212,7 @@ export default function LesseeOutstandingReportPage() {
                                                         {Number(inv.balance_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </td>
                                                     <td className="py-2 px-3 text-center font-semibold">
-                                                        <span className={inv.age_days > 90 ? 'text-red-600 font-bold' : inv.age_days > 30 ? 'text-amber-600' : 'text-slate-700'}>
+                                                        <span className={inv.age_days > 90 ? 'text-rose-600 font-bold' : inv.age_days > 30 ? 'text-amber-600' : 'text-slate-700'}>
                                                             {inv.age_days}
                                                         </span>
                                                     </td>
@@ -225,7 +225,7 @@ export default function LesseeOutstandingReportPage() {
                                                 <td className="py-2.5 px-3 text-right font-mono text-slate-700">
                                                     {Number(grp.subtotal_original_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
-                                                <td className="py-2.5 px-3 text-right font-mono text-red-700">
+                                                <td className="py-2.5 px-3 text-right font-mono text-rose-700">
                                                     {Number(grp.subtotal_balance_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td></td>

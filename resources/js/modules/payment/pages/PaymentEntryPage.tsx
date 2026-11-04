@@ -42,7 +42,7 @@ const ZERO_AMOUNT = '0.000000';
 const SELLING_PAYMENT_METHODS = [
     { kind: 'cash', label: 'Cash', section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/40', badge: 'bg-emerald-100 text-emerald-900' },
     { kind: 'card', label: 'Card', section: 'border-blue-200 border-l-blue-500 bg-blue-50/40', badge: 'bg-blue-100 text-blue-900' },
-    { kind: 'bank_transfer', label: 'Bank transfer', section: 'border-teal-200 border-l-teal-500 bg-teal-50/40', badge: 'bg-teal-100 text-teal-900' },
+    { kind: 'bank_transfer', label: 'Bank transfer', section: 'border-slate-200 border-l-blue-600 bg-slate-50/60', badge: 'bg-slate-100 text-slate-800 border border-slate-200/80' },
 ] as const;
 type SellingPaymentKind = typeof SELLING_PAYMENT_METHODS[number]['kind'];
 type SellingPaymentRow = PaymentLineDraft & { kind: SellingPaymentKind; cashReceivedAmount: string };

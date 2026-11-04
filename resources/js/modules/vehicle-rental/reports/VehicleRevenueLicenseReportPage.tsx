@@ -143,7 +143,7 @@ export default function VehicleRevenueLicenseReportPage() {
             </Panel>
 
             {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
                     {error}
                 </div>
             )}
@@ -156,9 +156,9 @@ export default function VehicleRevenueLicenseReportPage() {
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Fleet Checked</div>
                             <div className="mt-1 text-2xl font-bold text-slate-900">{data.summary.total_vehicles}</div>
                         </div>
-                        <div className="rounded-xl border border-red-200 bg-red-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-red-700">Expired Licences</div>
-                            <div className="mt-1 text-2xl font-bold text-red-900">{data.summary.expired_count}</div>
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-700">Expired Licences</div>
+                            <div className="mt-1 text-2xl font-bold text-rose-900">{data.summary.expired_count}</div>
                         </div>
                         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">Expiring in 30 Days</div>
@@ -192,7 +192,7 @@ export default function VehicleRevenueLicenseReportPage() {
                                             <td className="py-2.5 px-3">
                                                 <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
                                                     row.ownership_type === 'Owner Leased'
-                                                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : 'bg-slate-100 text-slate-700'
                                                 }`}>
                                                     {row.ownership_type}
@@ -203,7 +203,7 @@ export default function VehicleRevenueLicenseReportPage() {
                                                 {row.days_remaining !== null ? (
                                                     <span className={`font-semibold ${
                                                         row.days_remaining < 0
-                                                            ? 'text-red-700'
+                                                            ? 'text-rose-700'
                                                             : row.days_remaining <= 30
                                                             ? 'text-amber-700'
                                                             : 'text-emerald-700'
@@ -216,7 +216,7 @@ export default function VehicleRevenueLicenseReportPage() {
                                             </td>
                                             <td className="py-2.5 px-3 text-center">
                                                 {row.status === 'expired' && (
-                                                    <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                                                    <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800 border border-rose-200/80">
                                                         EXPIRED
                                                     </span>
                                                 )}

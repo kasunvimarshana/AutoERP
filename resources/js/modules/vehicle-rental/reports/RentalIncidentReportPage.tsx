@@ -166,7 +166,7 @@ export default function RentalIncidentReportPage() {
             </Panel>
 
             {error && (
-                <div className="rounded-md border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
                     {error}
                 </div>
             )}
@@ -183,9 +183,9 @@ export default function RentalIncidentReportPage() {
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">Under Review</div>
                             <div className="mt-1 text-2xl font-bold text-amber-900">{data.summary.recorded_count}</div>
                         </div>
-                        <div className="rounded-xl border border-red-200 bg-red-50/50 p-4 shadow-sm">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-red-700">Confirmed Liability</div>
-                            <div className="mt-1 text-2xl font-bold text-red-900">{data.summary.confirmed_count}</div>
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-sm">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-rose-700">Confirmed Liability</div>
+                            <div className="mt-1 text-2xl font-bold text-rose-900">{data.summary.confirmed_count}</div>
                         </div>
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">Rejected Claims</div>
@@ -228,10 +228,10 @@ export default function RentalIncidentReportPage() {
                                             <td className="py-2.5 px-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                                     row.status === 'confirmed'
-                                                        ? 'bg-red-100 text-red-800'
+                                                        ? 'bg-rose-100 text-rose-800 border border-rose-200/80'
                                                         : row.status === 'rejected'
-                                                        ? 'bg-slate-100 text-slate-700'
-                                                        : 'bg-amber-100 text-amber-800'
+                                                        ? 'bg-slate-100 text-slate-700 border border-slate-200/80'
+                                                        : 'bg-amber-100 text-amber-800 border border-amber-200/80'
                                                 }`}>
                                                     {row.status.toUpperCase()}
                                                 </span>
