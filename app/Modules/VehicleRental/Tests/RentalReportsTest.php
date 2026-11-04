@@ -210,11 +210,24 @@ final class RentalReportsTest extends TestCase
             $ownerData = $ownerService->generate($context, [
                 'start_date' => '2026-09-01',
                 'end_date' => '2026-09-30',
+                'wht_rate' => 10.0,
             ]);
 
             self::assertArrayHasKey('header', $ownerData);
             self::assertArrayHasKey('summary', $ownerData);
             self::assertArrayHasKey('rows', $ownerData);
+            self::assertArrayHasKey('wht_ledger', $ownerData);
+            self::assertArrayHasKey('total_gross_payable', $ownerData['summary']);
+            self::assertArrayHasKey('total_wht_amount', $ownerData['summary']);
+
+            $whtLedgerData = $ownerService->generate($context, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'report_type' => 'wht_ledger',
+                'wht_rate' => 10.0,
+            ]);
+            self::assertSame('wht_ledger', $whtLedgerData['header']['report_type']);
+            self::assertSame(':3305-000 WHT', $whtLedgerData['header']['account_code']);
 
             $profitService = app(VehicleProfitabilityReportService::class);
             $profitData = $profitService->generate($context, [
@@ -268,5 +281,14 @@ final class RentalReportsTest extends TestCase
         $outPrint = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
             ->get(self::ROOT.'/reports/lessee-outstanding/export/print?as_of_date=2026-09-30');
         $outPrint->assertOk()->assertSee('Outstanding', false);
+
+        // Test Owner Disbursement endpoint & WHT ledger print preview
+        $ownerResp = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/owner-disbursements?start_date=2026-09-01&end_date=2026-09-30&wht_rate=10');
+        $ownerResp->assertOk()->assertJsonStructure(['header', 'summary', 'rows', 'wht_ledger']);
+
+        $ownerWhtPrint = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->get(self::ROOT.'/reports/owner-disbursements/export/print?start_date=2026-09-01&end_date=2026-09-30&report_type=wht_ledger&wht_rate=10');
+        $ownerWhtPrint->assertOk()->assertSee('3305-000 WHT', false);
     }
 }

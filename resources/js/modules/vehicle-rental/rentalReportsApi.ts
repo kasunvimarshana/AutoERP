@@ -129,16 +129,43 @@ export interface OwnerDisbursementReportParams {
     end_date: string;
     supplier_id?: number | null;
     owner_agreement_id?: number | null;
+    wht_rate?: number;
+    report_type?: 'summary' | 'wht_ledger';
+}
+
+export interface WhtLedgerEntry {
+    date: string;
+    raw_date: string;
+    reference: string;
+    description: string;
+    debit: string;
+    credit: string;
+    balance: string;
+    owner_name: string;
+    owner_code: string;
+    vehicle_number: string;
+    wht_amount: string;
 }
 
 export interface OwnerDisbursementReportData {
-    header: ReportHeader;
-    filters: { supplier_id: number | null; owner_agreement_id: number | null };
+    header: ReportHeader & {
+        account_code?: string;
+        report_type?: string;
+        wht_rate?: number;
+    };
+    filters: {
+        supplier_id: number | null;
+        owner_agreement_id: number | null;
+        wht_rate?: number;
+        report_type?: string;
+    };
     summary: {
         total_owner_agreements: number;
         total_base_payable: string;
         total_mileage_payable: string;
         total_overtime_payable: string;
+        total_gross_payable: string;
+        total_wht_amount: string;
         total_deductions: string;
         total_net_payable: string;
     };
@@ -156,9 +183,13 @@ export interface OwnerDisbursementReportData {
         base_payable: string;
         mileage_payable: string;
         overtime_payable: string;
+        gross_payable: string;
+        wht_rate: number;
+        wht_amount: string;
         deductions: string;
         net_payable: string;
     }>;
+    wht_ledger?: WhtLedgerEntry[];
     footer: ReportFooter;
 }
 
@@ -171,6 +202,8 @@ export const getOwnerDisbursementReportExportUrl = (params: OwnerDisbursementRep
         end_date: params.end_date,
         ...(params.supplier_id ? { supplier_id: String(params.supplier_id) } : {}),
         ...(params.owner_agreement_id ? { owner_agreement_id: String(params.owner_agreement_id) } : {}),
+        ...(params.wht_rate !== undefined ? { wht_rate: String(params.wht_rate) } : {}),
+        ...(params.report_type ? { report_type: params.report_type } : {}),
     });
     return `/api/v1/vehicle-rental/reports/owner-disbursements/export/${format}?${query.toString()}`;
 };

@@ -43,9 +43,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [action, setAction] = useState<AgreementAction | null>(null);
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
-    const [showVehicles, setShowVehicles] = useState(false);
-    const [showDeposits, setShowDeposits] = useState(false);
-    const [showHistory, setShowHistory] = useState(false);
+    const [activeReviewTab, setActiveReviewTab] = useState<'billing' | 'vehicles' | 'deposits' | 'history'>('billing');
     const [showSuccessor, setShowSuccessor] = useState(false);
     const [search, setSearch] = useState('');
     const [query, setQuery] = useState('');
@@ -124,7 +122,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         </form>
         {loading ? <LoadingState label="Loading agreements…" /> : error ? null : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm"><caption className="sr-only">Rental agreements</caption><thead><tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">{['Reference', 'Party', 'Period', 'Basis', 'Status', 'Details'].map(label => <th className="px-4 py-3" key={label}>{label}</th>)}</tr></thead>
-                <tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="transition-colors hover:bg-blue-50/40"><td className="px-4 py-3 font-medium text-slate-900">{row.reference}</td><td className="px-4 py-3 text-slate-700">{row.party.name}</td><td className="px-4 py-3 text-slate-600">{formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}</td><td className="px-4 py-3 text-slate-700">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="px-4 py-3"><StatusBadge status={row.status} /></td><td className="px-4 py-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { if (selected?.id === row.id) { setSelected(null); } else { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(Boolean(vehicleIdParam && kind === AgreementKind.Customer && row.status === AgreementStatus.Active)); setShowDeposits(false); setShowSuccessor(false); } }}>{selected?.id === row.id ? 'Close review' : `Review ${row.reference}`}</Button></td></tr>)}</tbody>
+                <tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="transition-colors hover:bg-blue-50/40"><td className="px-4 py-3 font-medium text-slate-900">{row.reference}</td><td className="px-4 py-3 text-slate-700">{row.party.name}</td><td className="px-4 py-3 text-slate-600">{formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}</td><td className="px-4 py-3 text-slate-700">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="px-4 py-3"><StatusBadge status={row.status} /></td><td className="px-4 py-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { if (selected?.id === row.id) { setSelected(null); } else { setSelected(row); setAction(null); setReason(''); setShowSuccessor(false); setActiveReviewTab(vehicleIdParam && kind === AgreementKind.Customer && row.status === AgreementStatus.Active ? 'vehicles' : 'billing'); } }}>{selected?.id === row.id ? 'Close review' : `Review ${row.reference}`}</Button></td></tr>)}</tbody>
             </table>{rows.length === 0 && <p className="p-5 text-slate-500">No agreements have been recorded.</p>}
         </div>}
         <Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
@@ -168,12 +166,68 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             {selected.supersedes_agreement && <p className="text-xs text-blue-600 font-medium">Successor of {selected.supersedes_agreement.reference}</p>}
             <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
             {selected.notes && <p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">Notes:</span> {selected.notes}</p>}
-            <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
-            {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
-            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" aria-expanded={showDeposits} onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
-            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && showDeposits && <DepositPanel key={selected.id} agreement={selected} canCreate={hasPermission(auth, DEPOSIT_PERMISSION.create)} />}
-            {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" aria-expanded={showVehicles} onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
-            {kind === AgreementKind.Customer && canViewUse && showVehicles && (
+
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 pt-3">
+                <button
+                    type="button"
+                    onClick={() => setActiveReviewTab('billing')}
+                    className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
+                        activeReviewTab === 'billing'
+                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                    Billing & Rate Estimates
+                </button>
+                {kind === AgreementKind.Customer && canViewUse && (
+                    <button
+                        type="button"
+                        onClick={() => setActiveReviewTab('vehicles')}
+                        className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
+                            activeReviewTab === 'vehicles'
+                                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        }`}
+                    >
+                        Assigned Vehicles & Handover
+                    </button>
+                )}
+                {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && (
+                    <button
+                        type="button"
+                        onClick={() => setActiveReviewTab('deposits')}
+                        className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
+                            activeReviewTab === 'deposits'
+                                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        }`}
+                    >
+                        Security Deposits
+                    </button>
+                )}
+                <button
+                    type="button"
+                    onClick={() => setActiveReviewTab('history')}
+                    className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
+                        activeReviewTab === 'history'
+                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                    Audit History
+                </button>
+            </div>
+
+            {activeReviewTab === 'billing' && (
+                <div className="space-y-4 pt-1">
+                    <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
+                    {canBill && selected.status !== AgreementStatus.Draft && (
+                        <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
+                    )}
+                </div>
+            )}
+
+            {activeReviewTab === 'vehicles' && kind === AgreementKind.Customer && canViewUse && (
                 <VehicleUsePanel
                     key={selected.id}
                     agreement={selected}
@@ -182,8 +236,14 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                     onVehicleAssigned={clearVehicleParam}
                 />
             )}
-            <Button variant="secondary" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
-            {showHistory && <AgreementHistoryPanel key={selected.id} kind={kind} id={selected.id} />}
+
+            {activeReviewTab === 'deposits' && kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && (
+                <DepositPanel key={selected.id} agreement={selected} canCreate={hasPermission(auth, DEPOSIT_PERMISSION.create)} />
+            )}
+
+            {activeReviewTab === 'history' && (
+                <AgreementHistoryPanel key={selected.id} kind={kind} id={selected.id} />
+            )}
         </section>}
     </div>;
 }

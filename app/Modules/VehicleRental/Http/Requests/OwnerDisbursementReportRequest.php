@@ -18,6 +18,8 @@ final class OwnerDisbursementReportRequest extends TenantScopedRequest
             'end_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:start_date'],
             'supplier_id' => ['nullable', 'integer', 'min:1'],
             'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'wht_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'report_type' => ['nullable', 'string', 'in:summary,wht_ledger'],
         ];
     }
 

@@ -119,7 +119,7 @@ final class RentalReportsController
     {
         $data = $this->ownerDisbursementService->generate(
             $request->context(),
-            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id']),
+            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id', 'wht_rate', 'report_type']),
         );
 
         return response()->json($data);
@@ -129,7 +129,7 @@ final class RentalReportsController
     {
         $data = $this->ownerDisbursementService->generate(
             $request->context(),
-            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id']),
+            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id', 'wht_rate', 'report_type']),
         );
 
         return $this->respondExport('reports.vehicle-rental.owner-disbursement', 'owner-disbursement', $data, $format, $request, 'landscape');

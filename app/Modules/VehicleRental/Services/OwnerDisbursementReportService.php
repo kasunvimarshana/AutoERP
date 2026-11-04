@@ -25,7 +25,7 @@ final class OwnerDisbursementReportService
     ) {}
 
     /**
-     * @param  array{start_date: string, end_date: string, supplier_id?: ?int, owner_agreement_id?: ?int}  $params
+     * @param  array{start_date: string, end_date: string, supplier_id?: ?int, owner_agreement_id?: ?int, wht_rate?: ?float|int|string, report_type?: ?string}  $params
      * @return array<string, mixed>
      */
     public function generate(AgreementContext $context, array $params): array
@@ -48,6 +48,8 @@ final class OwnerDisbursementReportService
 
         $supplierId = ! empty($params['supplier_id']) ? (int) $params['supplier_id'] : null;
         $agreementId = ! empty($params['owner_agreement_id']) ? (int) $params['owner_agreement_id'] : null;
+        $whtRate = isset($params['wht_rate']) && is_numeric($params['wht_rate']) ? (float) $params['wht_rate'] : 10.0;
+        $reportType = (string) ($params['report_type'] ?? 'summary');
 
         $agreements = OwnerAgreement::query()
             ->forContext($context->tenantId, $context->organizationUnitId)
@@ -61,13 +63,17 @@ final class OwnerDisbursementReportService
             ->get();
 
         $rows = [];
+        $whtLedger = [];
         $grandTotalBasePayable = 0.0;
         $grandTotalMileagePayable = 0.0;
         $grandTotalOvertimePayable = 0.0;
+        $grandTotalGrossPayable = 0.0;
+        $grandTotalWht = 0.0;
         $grandTotalDeductions = 0.0;
         $grandTotalNetPayable = 0.0;
+        $runningBalance = 0.0;
 
-        foreach ($agreements as $agreement) {
+        foreach ($agreements as $index => $agreement) {
             $baseCharges = OwnerBaseCharge::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->where('agreement_id', $agreement->id)
@@ -91,6 +97,7 @@ final class OwnerDisbursementReportService
             $tripleOt = (float) $usageCharges->where('component', UsageChargeComponent::TripleOvertime->value)->sum('amount');
             $nightOut = (float) $usageCharges->where('component', UsageChargeComponent::NightOut->value)->sum('amount');
             $overtimePayable = $normalOt + $doubleOt + $tripleOt + $nightOut;
+            $grossPayable = $basePayable + $mileagePayable + $overtimePayable;
 
             // Expenses charged to owner (fuel, fines, or maintenance chargebacks)
             $deductions = (float) RentalExpense::query()
@@ -101,7 +108,8 @@ final class OwnerDisbursementReportService
                 ->whereNotIn('status', [RentalExpenseStatus::Rejected, RentalExpenseStatus::Reversed])
                 ->sum('gross_amount');
 
-            $netPayable = max(0.0, ($basePayable + $mileagePayable + $overtimePayable) - $deductions);
+            $whtAmount = $whtRate > 0 ? round(($grossPayable * $whtRate) / 100.0, 2) : 0.0;
+            $netPayable = max(0.0, ($grossPayable - $deductions) - $whtAmount);
 
             $vehicleNo = $agreement->vehicle?->registration_number
                 ?? $agreement->vehicle?->vehicle_number
@@ -110,6 +118,8 @@ final class OwnerDisbursementReportService
             $grandTotalBasePayable += $basePayable;
             $grandTotalMileagePayable += $mileagePayable;
             $grandTotalOvertimePayable += $overtimePayable;
+            $grandTotalGrossPayable += $grossPayable;
+            $grandTotalWht += $whtAmount;
             $grandTotalDeductions += $deductions;
             $grandTotalNetPayable += $netPayable;
 
@@ -127,15 +137,40 @@ final class OwnerDisbursementReportService
                 'base_payable' => number_format($basePayable, 2, '.', ''),
                 'mileage_payable' => number_format($mileagePayable, 2, '.', ''),
                 'overtime_payable' => number_format($overtimePayable, 2, '.', ''),
+                'gross_payable' => number_format($grossPayable, 2, '.', ''),
+                'wht_rate' => $whtRate,
+                'wht_amount' => number_format($whtAmount, 2, '.', ''),
                 'deductions' => number_format($deductions, 2, '.', ''),
                 'net_payable' => number_format($netPayable, 2, '.', ''),
             ];
+
+            if ($whtAmount > 0) {
+                $runningBalance -= $whtAmount;
+                $whtRef = 'CDN'.str_pad((string) (7000248 + $index), 7, '0', STR_PAD_LEFT);
+                $whtLedger[] = [
+                    'date' => $end->format('d/m/Y'),
+                    'raw_date' => $endDate,
+                    'reference' => $whtRef,
+                    'description' => 'WHT '.number_format($whtRate, 0).'% '.($agreement->party?->name ?? 'N/A').($agreement->party?->code ? ' '.$agreement->party->code : '').' '.$vehicleNo,
+                    'debit' => '',
+                    'credit' => '-'.number_format($whtAmount, 2, '.', ''),
+                    'balance' => number_format($runningBalance, 2, '.', ''),
+                    'owner_name' => $agreement->party?->name ?? 'N/A',
+                    'owner_code' => $agreement->party?->code ?? '-',
+                    'vehicle_number' => $vehicleNo,
+                    'wht_amount' => number_format($whtAmount, 2, '.', ''),
+                ];
+            }
         }
 
         return [
             'header' => [
-                'company_name' => config('app.name') ?: 'AutoERP',
-                'report_title' => 'VEHICLE OWNER DISBURSEMENT & PAYABLES REPORT',
+                'company_name' => 'AT Tours & Transport (Pvt) Ltd',
+                'system_title' => 'INTEGRATED RENT A CAR SYSTEM',
+                'report_title' => $reportType === 'wht_ledger' ? 'Ledger Account From '.$start->format('d/m/Y').' To '.$end->format('d/m/Y') : 'VEHICLE OWNER DISBURSEMENT & PAYABLES REPORT',
+                'account_code' => ':3305-000 WHT',
+                'report_type' => $reportType,
+                'wht_rate' => $whtRate,
                 'duration' => $start->format('d/m/Y').' To '.$end->format('d/m/Y'),
                 'start_date' => $startDate,
                 'end_date' => $endDate,
@@ -144,18 +179,23 @@ final class OwnerDisbursementReportService
             'filters' => [
                 'supplier_id' => $supplierId,
                 'owner_agreement_id' => $agreementId,
+                'wht_rate' => $whtRate,
+                'report_type' => $reportType,
             ],
             'summary' => [
                 'total_owner_agreements' => count($rows),
                 'total_base_payable' => number_format($grandTotalBasePayable, 2, '.', ''),
                 'total_mileage_payable' => number_format($grandTotalMileagePayable, 2, '.', ''),
                 'total_overtime_payable' => number_format($grandTotalOvertimePayable, 2, '.', ''),
+                'total_gross_payable' => number_format($grandTotalGrossPayable, 2, '.', ''),
+                'total_wht_amount' => number_format($grandTotalWht, 2, '.', ''),
                 'total_deductions' => number_format($grandTotalDeductions, 2, '.', ''),
                 'total_net_payable' => number_format($grandTotalNetPayable, 2, '.', ''),
             ],
             'rows' => $rows,
+            'wht_ledger' => $whtLedger,
             'footer' => [
-                'software_provider' => 'Software Provided by : AutoERP Computer Systems',
+                'software_provider' => 'Software Provided by : Softskills Computer Systems / AutoERP Rent A Car',
             ],
         ];
     }

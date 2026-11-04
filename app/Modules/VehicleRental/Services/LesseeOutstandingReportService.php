@@ -38,6 +38,7 @@ final class LesseeOutstandingReportService
         // Fetch customer agreements in tenant to cross-reference vehicles and durations
         $customerAgreements = CustomerAgreement::query()
             ->forTenant($context->tenantId)
+            ->with(['vehicleUses.vehicle'])
             ->when($selectedAgreementId !== null, fn ($q) => $q->where('id', $selectedAgreementId))
             ->when($selectedCustomerId !== null, fn ($q) => $q->where('customer_id', $selectedCustomerId))
             ->get();
@@ -49,6 +50,10 @@ final class LesseeOutstandingReportService
         $invoicesQuery = DB::table('invoices')
             ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
             ->leftJoin('customers', 'customers.id', '=', 'invoices.party_id')
+            ->leftJoin('invoice_document_snapshots', function ($join) {
+                $join->on('invoice_document_snapshots.invoice_id', '=', 'invoices.id')
+                    ->on('invoice_document_snapshots.tenant_id', '=', 'invoices.tenant_id');
+            })
             ->where('invoices.tenant_id', $context->tenantId)
             ->where('invoices.party_type', 'customer')
             ->where('invoice_balances.remaining_amount', '>', 0)
@@ -62,6 +67,8 @@ final class LesseeOutstandingReportService
                 'invoices.grand_total',
                 'invoice_balances.remaining_amount',
                 'invoices.party_id as customer_id',
+                'invoice_document_snapshots.supply_period_start',
+                'invoice_document_snapshots.supply_period_end',
             ])
             ->selectRaw("COALESCE(NULLIF(customers.name, ''), invoices.party_name_snapshot, 'Valued Customer') as customer_name")
             ->selectRaw("COALESCE(NULLIF(customers.code, ''), invoices.party_code_snapshot, 'CUST') as customer_code")
@@ -134,14 +141,19 @@ final class LesseeOutstandingReportService
                 continue;
             }
 
-            $periodLabel = ($matchedAgreement?->starts_on && $matchedAgreement?->ends_on)
-                ? $matchedAgreement->starts_on->format('d/m/Y').' To '.$matchedAgreement->ends_on->format('d/m/Y')
-                : ($agreementRef ?? 'Regular Billing');
+            $periodLabel = ($inv->supply_period_start && $inv->supply_period_end)
+                ? CarbonImmutable::parse($inv->supply_period_start)->format('d/m/Y').' To '.CarbonImmutable::parse($inv->supply_period_end)->format('d/m/Y')
+                : (($matchedAgreement?->starts_on && $matchedAgreement?->ends_on)
+                    ? $matchedAgreement->starts_on->format('d/m/Y').' To '.$matchedAgreement->ends_on->format('d/m/Y')
+                    : ($agreementRef ?? 'Regular Billing'));
 
             $vehicleNo = '-';
-            if ($matchedAgreement?->vehicle_id) {
-                $vehicle = DB::table('vehicles')->where('id', $matchedAgreement->vehicle_id)->select('registration_number', 'vehicle_number')->first();
-                $vehicleNo = $vehicle?->registration_number ?? $vehicle?->vehicle_number ?? '-';
+            if ($matchedAgreement !== null && $matchedAgreement->vehicleUses->isNotEmpty()) {
+                $primaryUse = $matchedAgreement->vehicleUses->firstWhere('replaces_use_id', null) ?? $matchedAgreement->vehicleUses->first();
+                $vehicleNo = $primaryUse?->vehicle_label_snapshot
+                    ?? $primaryUse?->vehicle?->registration_number
+                    ?? $primaryUse?->vehicle?->vehicle_number
+                    ?? '-';
             }
 
             $customerModel = $customersWithContacts->get($inv->customer_id);
