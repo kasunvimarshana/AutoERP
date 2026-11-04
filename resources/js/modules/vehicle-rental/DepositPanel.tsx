@@ -24,7 +24,7 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
     const [revision, setRevision] = useState(0);
     const [busy, setBusy] = useState(false);
     const [date, setDate] = useState(businessDateInputValue);
-    const [rate, setRate] = useState('');
+    const [rate, setRate] = useState('1.00');
     const [lines, setLines] = useState<PaymentLineDraft[]>([emptyLine(FIRST_LINE)]);
     const nextLine = useRef(FIRST_LINE + 1);
     const inFlight = useRef(false);

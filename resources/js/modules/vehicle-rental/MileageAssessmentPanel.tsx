@@ -6,7 +6,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
+import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import { useApi } from '@/shared/hooks/useApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { AgreementKind } from './agreements';
@@ -18,7 +18,7 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
     const billing = rentalBillingPresentation(kind);
     const quoteRequest = useApi(signal => quoteMileage(kind, chart, signal), [kind, chart.id, chart.row_version]);
     const quote = quoteRequest.data;
-    const [date, setDate] = useState(''); const [exchange, setExchange] = useState(''); const [due, setDue] = useState('');
+    const [date, setDate] = useState(businessDateInputValue); const [exchange, setExchange] = useState('1.00'); const [due, setDue] = useState('');
     const [accepted, setAccepted] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState<ApiError | null>(null);
     const [recorded, setRecorded] = useState<MileageAssessment | null>(null); const inFlight = useRef(false);
     async function submit(event: FormEvent) {

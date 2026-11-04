@@ -4,12 +4,13 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { Textarea } from '@/shared/components/Textarea';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createAgreementSuccessor } from './agreementApi';
 import { AgreementKind, type Agreement } from './agreements';
 
 export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: { kind: AgreementKind; agreement: Agreement; onSaved: () => void; onCancel: () => void }) {
     const [reference, setReference] = useState('');
-    const [agreedOn, setAgreedOn] = useState('');
+    const [agreedOn, setAgreedOn] = useState(businessDateInputValue);
     const [executingOn, setExecutingOn] = useState('');
     const [startsOn, setStartsOn] = useState('');
     const [endsOn, setEndsOn] = useState('');

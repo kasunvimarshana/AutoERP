@@ -14,6 +14,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { MileageAssessmentPanel } from './MileageAssessmentPanel';
 import { AgreementKind } from './agreements';
 import { rentalBillingPresentation } from './billingPresentation';
@@ -39,7 +40,7 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
     const [component, setComponent] = useState<UsageChargeComponent | ''>('');
     const [selected, setSelected] = useState<UsageCharge | null>(null);
     const [action, setAction] = useState(ChargeAction.Create);
-    const [invoiceDate, setInvoiceDate] = useState(''); const [dueDate, setDueDate] = useState(''); const [exchange, setExchange] = useState('');
+    const [invoiceDate, setInvoiceDate] = useState(businessDateInputValue); const [dueDate, setDueDate] = useState(''); const [exchange, setExchange] = useState('1.00');
     const [reason, setReason] = useState(''); const [accepted, setAccepted] = useState(false);
     const [created, setCreated] = useState<CreatedRentalInvoice | null>(null); const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false); const [page, setPage] = useState(1); const [revision, setRevision] = useState(0); const inFlight = useRef(false);
