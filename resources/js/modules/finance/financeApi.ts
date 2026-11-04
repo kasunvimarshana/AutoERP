@@ -161,7 +161,7 @@ export async function getCustomerOutstanding(params: CustomerOutstandingParams, 
 
 export async function getCustomerOutstandingLocations(signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<Array<{ id: number; name: string }>>>(
-        `${endpoints.finance}/customer-outstanding/locations`,
+        `${endpoints.reports}/customer-outstanding/locations`,
         { signal },
     );
     return response.data.data;

@@ -1,0 +1,7 @@
+# Selected data import from source dump
+
+Prepared `autoerp_selected_data_import_2026-11-03.sql` in Downloads from `taprjfji_autoerp (18).sql` for the schema and seed-data snapshot in `deziutge_autoerpprod (1).sql`. The file contains data inserts only. It preserves target seed records and imports item, customer, vehicle, inventory, Vehicle Service, invoice, and payment records with their required related records. Historical source users are inserted under new IDs so authorship is not assigned to the target administrator. The target-only `payment_allocations.invoice_exchange_rate_snapshot` is populated from each original invoice exchange rate; `vehicle_service_job_lines.promotion_discount_amount` uses the target's zero default.
+
+The source contains four purchase invoices and one associated payment. These and their invoice/payment child rows were excluded because the request covers service bills. Finance journal entries and balances were not included in this scoped import. No schema or application code was changed.
+
+Verification: imported both supplied dumps into isolated local MariaDB databases. The generated SQL imported into a clean copy of the target dump with foreign-key enforcement enabled and `--abort-source-on-error`, without errors. Resulting counts: 745 items, 1,556 customers, 2,198 vehicles, 329 inventory stock balances, 777 service jobs, 725 service invoices, 703 payments, and 703 payment allocations. Verified no orphaned service invoice links or payment allocations.
