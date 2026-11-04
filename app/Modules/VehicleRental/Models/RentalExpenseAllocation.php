@@ -12,6 +12,7 @@ use Modules\Invoice\Models\Invoice;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\TaxGroup;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 
 final class RentalExpenseAllocation extends TenantOwnedModel
@@ -41,6 +42,7 @@ final class RentalExpenseAllocation extends TenantOwnedModel
             'withholding_amount' => 'decimal:6',
             'markup_amount' => 'decimal:6',
             'total_amount' => 'decimal:6',
+            'status' => RentalExpenseAllocationStatus::class,
             'invoice_id' => 'integer',
         ]);
     }

@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
@@ -100,7 +101,7 @@ final class RentalRevenueReportService
                 ->where('expense_type', RentalExpenseType::Toll)
                 ->where('expense_date', '>=', $startDate)
                 ->where('expense_date', '<=', $endDate)
-                ->whereNotIn('status', [RentalExpenseStatus::Rejected, RentalExpenseStatus::Reversed])
+                ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
                 ->get();
             $tollPass = (float) $tollExpenses->sum('gross_amount');
 
@@ -140,9 +141,11 @@ final class RentalRevenueReportService
             ];
         }
 
+        $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
+
         return [
             'header' => [
-                'company_name' => config('app.name') ?: 'AutoERP',
+                'company_name' => $tenantName,
                 'report_title' => 'RENTAL REVENUE & BILLING SUMMARY REPORT',
                 'duration' => $start->format('d/m/Y').' To '.$end->format('d/m/Y'),
                 'start_date' => $startDate,

@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Services\DecimalMath;
+use Modules\Tenant\Models\TenantModel;
 use Modules\Vehicle\Enums\VehicleDocumentType;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -122,9 +123,11 @@ final class VehicleRevenueLicenseReportService
             ? "For The Period From {$startDate} To {$endDate} - All Vehicle"
             : 'As of '.now()->format('d/m/Y').' - All Vehicle';
 
+        $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
+
         return [
             'header' => [
-                'company_name' => 'AT Tours & Transport (Pvt) Ltd',
+                'company_name' => $tenantName,
                 'system_title' => 'INTEGRATED RENT A CAR SYSTEM',
                 'report_title' => 'Vehicle Revenue Licence Expire Report',
                 'period_description' => $periodDescription,

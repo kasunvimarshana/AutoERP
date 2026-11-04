@@ -9,6 +9,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
+use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Models\CustomerAgreement;
 
@@ -201,10 +202,11 @@ final class LesseeOutstandingReportService
         }
 
         $lesseeGroups = array_values($groups);
+        $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
 
         return [
             'header' => [
-                'company_name' => 'AT Tours & Transport (Pvt) Ltd',
+                'company_name' => $tenantName,
                 'system_title' => 'INTEGRATED RENT A CAR SYSTEM',
                 'report_title' => "Lessee's Outstanding Age Analysis - 2 as at ".$asOfDate->format('d/m/Y'),
                 'as_of_date' => $asOfDate->toDateString(),

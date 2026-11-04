@@ -28,12 +28,12 @@ final class RentalReservationService
 {
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
-        'draft' => ['pending', 'confirmed', 'cancelled'],
-        'pending' => ['confirmed', 'cancelled', 'expired'],
-        'confirmed' => ['converted', 'cancelled', 'expired'],
-        'converted' => [],
-        'cancelled' => [],
-        'expired' => [],
+        RentalReservationStatus::Draft->value => [RentalReservationStatus::Pending->value, RentalReservationStatus::Confirmed->value, RentalReservationStatus::Cancelled->value],
+        RentalReservationStatus::Pending->value => [RentalReservationStatus::Confirmed->value, RentalReservationStatus::Cancelled->value, RentalReservationStatus::Expired->value],
+        RentalReservationStatus::Confirmed->value => [RentalReservationStatus::Converted->value, RentalReservationStatus::Cancelled->value, RentalReservationStatus::Expired->value],
+        RentalReservationStatus::Converted->value => [],
+        RentalReservationStatus::Cancelled->value => [],
+        RentalReservationStatus::Expired->value => [],
     ];
 
     public function __construct(

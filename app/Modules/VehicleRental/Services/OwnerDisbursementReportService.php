@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
@@ -105,7 +106,7 @@ final class OwnerDisbursementReportService
                 ->where('supplier_id', $agreement->supplier_id)
                 ->where('expense_date', '>=', $startDate)
                 ->where('expense_date', '<=', $endDate)
-                ->whereNotIn('status', [RentalExpenseStatus::Rejected, RentalExpenseStatus::Reversed])
+                ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
                 ->sum('gross_amount');
 
             $whtAmount = $whtRate > 0 ? round(($grossPayable * $whtRate) / 100.0, 2) : 0.0;
@@ -163,9 +164,11 @@ final class OwnerDisbursementReportService
             }
         }
 
+        $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
+
         return [
             'header' => [
-                'company_name' => 'AT Tours & Transport (Pvt) Ltd',
+                'company_name' => $tenantName,
                 'system_title' => 'INTEGRATED RENT A CAR SYSTEM',
                 'report_title' => $reportType === 'wht_ledger' ? 'Ledger Account From '.$start->format('d/m/Y').' To '.$end->format('d/m/Y') : 'VEHICLE OWNER DISBURSEMENT & PAYABLES REPORT',
                 'account_code' => ':3305-000 WHT',
@@ -195,7 +198,7 @@ final class OwnerDisbursementReportService
             'rows' => $rows,
             'wht_ledger' => $whtLedger,
             'footer' => [
-                'software_provider' => 'Software Provided by : Softskills Computer Systems / AutoERP Rent A Car',
+                'software_provider' => 'Software Provided by : '.(config('app.name') ?: 'AutoERP').' Computer Systems',
             ],
         ];
     }

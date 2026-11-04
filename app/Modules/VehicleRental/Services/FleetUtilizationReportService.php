@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Tenant\Models\TenantModel;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -135,9 +136,11 @@ final class FleetUtilizationReportService
             $daysInCustody = 0;
             foreach ($uses as $use) {
                 if (in_array($use->status, [VehicleUseStatus::InCustody, VehicleUseStatus::Returned], true)) {
-                    $useStart = max($start, CarbonImmutable::parse($use->starts_at));
+                    $parsedStart = CarbonImmutable::parse($use->starts_at);
+                    $useStart = $parsedStart->greaterThan($start) ? $parsedStart : $start;
                     $rawEnd = $use->returned_at ?? $use->ends_at ?? now();
-                    $useEnd = min($end, CarbonImmutable::parse($rawEnd));
+                    $parsedEnd = CarbonImmutable::parse($rawEnd);
+                    $useEnd = $parsedEnd->lessThan($end) ? $parsedEnd : $end;
                     if ($useStart->lessThanOrEqualTo($useEnd)) {
                         $daysInCustody += (int) ceil($useStart->floatDiffInDays($useEnd));
                     }
@@ -204,10 +207,11 @@ final class FleetUtilizationReportService
 
         $totalEvaluated = count($rows);
         $averageUtilization = $totalEvaluated > 0 ? round($utilizationSum / $totalEvaluated, 1) : 0.0;
+        $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
 
         return [
             'header' => [
-                'company_name' => config('app.name') ?: 'AutoERP',
+                'company_name' => $tenantName,
                 'report_title' => 'FLEET UTILIZATION & STATUS REPORT',
                 'duration' => $start->format('d/m/Y').' To '.$end->format('d/m/Y'),
                 'start_date' => $startDate,

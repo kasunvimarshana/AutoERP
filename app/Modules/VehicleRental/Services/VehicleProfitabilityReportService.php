@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Tenant\Models\TenantModel;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -90,7 +91,7 @@ final class VehicleProfitabilityReportService
             ->forTenant($context->tenantId)
             ->where('expense_date', '>=', $startDate)
             ->where('expense_date', '<=', $endDate)
-            ->whereNotIn('status', [RentalExpenseStatus::Rejected, RentalExpenseStatus::Reversed])
+            ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
             ->get()
             ->groupBy('vehicle_id');
 
@@ -208,9 +209,11 @@ final class VehicleProfitabilityReportService
         $fleetAvgRevenuePerKm = $fleetTotalDistance > 0 ? round($fleetTotalRevenue / $fleetTotalDistance, 2) : 0.0;
         $fleetAvgCostPerKm = $fleetTotalDistance > 0 ? round($fleetTotalDirectCosts / $fleetTotalDistance, 2) : 0.0;
 
+        $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
+
         return [
             'header' => [
-                'company_name' => config('app.name') ?: 'AutoERP',
+                'company_name' => $tenantName,
                 'report_title' => 'FLEET VEHICLE PROFITABILITY & PERFORMANCE REPORT',
                 'duration' => $start->format('d/m/Y').' To '.$end->format('d/m/Y'),
                 'start_date' => $startDate,

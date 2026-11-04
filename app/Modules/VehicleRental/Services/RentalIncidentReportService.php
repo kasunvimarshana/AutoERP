@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\IncidentStatus;
 use Modules\VehicleRental\Models\RentalIncident;
@@ -103,9 +104,11 @@ final class RentalIncidentReportService
             ];
         }
 
+        $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
+
         return [
             'header' => [
-                'company_name' => config('app.name') ?: 'AutoERP',
+                'company_name' => $tenantName,
                 'report_title' => 'RENTAL INCIDENT & DAMAGE RISK REPORT',
                 'duration' => $start->format('d/m/Y').' To '.$end->format('d/m/Y'),
                 'start_date' => $startDate,

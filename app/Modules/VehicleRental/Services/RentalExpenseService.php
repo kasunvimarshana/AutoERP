@@ -16,6 +16,7 @@ use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\TaxGroup;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
@@ -30,12 +31,12 @@ final class RentalExpenseService
 {
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
-        'draft' => ['submitted', 'reversed'],
-        'submitted' => ['approved', 'rejected', 'reversed'],
-        'approved' => ['allocated', 'reversed'],
-        'rejected' => ['draft', 'reversed'],
-        'allocated' => ['reversed'],
-        'reversed' => [],
+        RentalExpenseStatus::Draft->value => [RentalExpenseStatus::Submitted->value, RentalExpenseStatus::Reversed->value],
+        RentalExpenseStatus::Submitted->value => [RentalExpenseStatus::Approved->value, RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value],
+        RentalExpenseStatus::Approved->value => [RentalExpenseStatus::Allocated->value, RentalExpenseStatus::Reversed->value],
+        RentalExpenseStatus::Rejected->value => [RentalExpenseStatus::Draft->value, RentalExpenseStatus::Reversed->value],
+        RentalExpenseStatus::Allocated->value => [RentalExpenseStatus::Reversed->value],
+        RentalExpenseStatus::Reversed->value => [],
     ];
 
     public function __construct(
@@ -254,7 +255,7 @@ final class RentalExpenseService
                 'withholding_amount' => $withholding,
                 'markup_amount' => $markup,
                 'total_amount' => $total,
-                'status' => 'confirmed',
+                'status' => RentalExpenseAllocationStatus::Confirmed,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
