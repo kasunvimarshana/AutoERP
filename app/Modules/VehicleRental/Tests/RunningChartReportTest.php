@@ -171,6 +171,50 @@ final class RunningChartReportTest extends TestCase
             fn (PdfBuilder $pdf): bool => $pdf->viewName === 'reports.vehicle-rental.running-chart-sheet'
                 && $pdf->viewData['mode'] === 'pdf',
         );
+
+        // 10. Record Highway Toll Expense and verify Owner Sheet mode
+        DB::table('vehicle_rental_expenses')->insert([
+            'tenant_id' => $context->tenantId,
+            'organization_unit_id' => $context->organizationUnitId,
+            'expense_number' => 'EXP-2026-0001',
+            'customer_agreement_id' => $c['id'],
+            'vehicle_use_id' => $use['id'],
+            'running_chart_id' => $chart['id'],
+            'vehicle_id' => $ownerInput['vehicle_id'],
+            'vehicle_label_snapshot' => 'CAB-0242',
+            'expense_type' => 'toll',
+            'expense_date' => '2026-09-07',
+            'currency_id' => $customerInput['currency_id'],
+            'currency_code_snapshot' => 'LKR',
+            'net_amount' => 1900.00,
+            'tax_amount' => 0.00,
+            'gross_amount' => 1900.00,
+            'status' => 'approved',
+            'fingerprint' => 'fp-toll-1',
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $ownerParams = array_merge($params, ['sheet_mode' => 'owner']);
+        $ownerResponse = $this->getJson(self::ROOT.'/reports/running-chart-sheet?'.http_build_query($ownerParams));
+        $ownerResponse->assertOk()
+            ->assertJsonPath('header.is_owner_sheet', true)
+            ->assertJsonPath('header.report_title', "RUNNING CHART FOR VEHICLE OWNER - Monthly Basis Vehicles - With Lessee's Detail")
+            ->assertJsonPath('summary.total_pass', '1900.00');
+
+        $activeRow = collect($ownerResponse->json('rows'))->firstWhere('is_active_day', true);
+        self::assertNotNull($activeRow);
+        self::assertSame('1900.00', $activeRow['pass']);
+        self::assertNotEmpty($activeRow['lessee']);
+
+        // 11. HTML print view for owner sheet
+        $printOwner = $this->get(self::ROOT.'/reports/running-chart-sheet/export/print?'.http_build_query($ownerParams));
+        $printOwner->assertOk()
+            ->assertSee('RUNNING CHART FOR VEHICLE OWNER')
+            ->assertSee('Lessee')
+            ->assertSee('Owner / Authorized Signature')
+            ->assertSee('1900.00');
     }
 
     private function loginFixture(): array

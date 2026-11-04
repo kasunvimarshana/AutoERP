@@ -20,7 +20,7 @@ final class RunningChartReportController
     {
         $data = $this->reports->generate(
             $request->context(),
-            $request->only(['agreement_id', 'start_date', 'end_date', 'vehicle_use_id']),
+            $request->only(['agreement_id', 'start_date', 'end_date', 'vehicle_use_id', 'sheet_mode']),
         );
 
         return response()->json($data);
@@ -30,7 +30,7 @@ final class RunningChartReportController
     {
         $data = $this->reports->generate(
             $request->context(),
-            $request->only(['agreement_id', 'start_date', 'end_date', 'vehicle_use_id']),
+            $request->only(['agreement_id', 'start_date', 'end_date', 'vehicle_use_id', 'sheet_mode']),
         );
 
         if ($format === 'pdf') {

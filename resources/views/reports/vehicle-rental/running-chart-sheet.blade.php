@@ -157,6 +157,7 @@
         .col-cumul { width: 65px; }
         .col-on { width: 56px; }
         .col-off { width: 56px; }
+        .col-lessee { width: 110px; }
         .col-ot-hrs { width: 44px; }
         .col-ot-type { width: 32px; }
         .col-night { width: 48px; }
@@ -253,6 +254,34 @@
 
     <!-- Metadata Section -->
     <table class="meta-table">
+        @if (!empty($header['is_owner_sheet']))
+        <tr>
+            <td style="width: 58%;">
+                <span class="meta-label">Lessor ID :</span> <span class="meta-val">{{ $header['lessor_id'] }}</span>
+            </td>
+            <td style="width: 42%; text-align: right;">
+                <span class="meta-label">Page</span> <span class="meta-val">{{ $header['page'] }}</span>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <span class="meta-label">Report Date :</span> <span class="meta-val">{{ $header['report_date'] }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="meta-label">Name of Owner :</span> <span class="meta-val">{{ $header['owner_name'] }}</span>
+            </td>
+            <td style="text-align: right;">
+                <span class="meta-label">Agreement No :</span> <span class="meta-val">{{ $header['agreement_number'] }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="meta-label">Duration :</span> <span class="meta-val">{{ $header['duration'] }}</span>
+            </td>
+            <td style="text-align: right;">
+                <span class="meta-label">Agreement Vehicle No :</span> <span class="meta-val">{{ $header['agreement_vehicle_number'] }}</span>
+            </td>
+        </tr>
+        @else
         <tr>
             <td style="width: 58%;">
                 <span class="meta-label">Name of Client :</span> <span class="meta-val">{{ $header['client_name'] }}</span>
@@ -277,6 +306,7 @@
                 <span class="meta-label">Agreement Vehicle No :</span> <span class="meta-val">{{ $header['agreement_vehicle_number'] }}</span>
             </td>
         </tr>
+        @endif
     </table>
 
     <!-- Main Table -->
@@ -290,6 +320,9 @@
                 <th class="col-cumul">Cumulative<br>Mileage</th>
                 <th class="col-on">ON</th>
                 <th class="col-off">OFF</th>
+                @if (!empty($header['is_owner_sheet']))
+                <th class="col-lessee">Lessee</th>
+                @endif
                 <th class="col-ot-hrs">OT Hrs</th>
                 <th class="col-ot-type">OT<br>Type</th>
                 <th class="col-night">Night Out</th>
@@ -307,6 +340,9 @@
                 <td class="text-right font-bold">{{ $row['cumulative_mileage'] }}</td>
                 <td class="text-center nowrap">{{ $row['on_time'] }}</td>
                 <td class="text-center nowrap">{{ $row['off_time'] }}</td>
+                @if (!empty($header['is_owner_sheet']))
+                <td class="text-left nowrap">{{ $row['lessee'] }}</td>
+                @endif
                 <td class="text-right">{{ $row['ot_hours'] }}</td>
                 <td class="text-center font-bold">{{ $row['ot_type'] }}</td>
                 <td class="text-center">{{ $row['night_out'] }}</td>
@@ -330,7 +366,7 @@
                 <td class="text-right" style="vertical-align: top; padding: 6px 4px;">
                     <div>{{ $summary['final_cumulative_mileage'] }}</div>
                 </td>
-                <td colspan="2" style="text-align: right; vertical-align: top; padding: 6px 4px;">
+                <td colspan="{{ !empty($header['is_owner_sheet']) ? 3 : 2 }}" style="text-align: right; vertical-align: top; padding: 6px 4px;">
                     Normal OT Hrs
                 </td>
                 <td class="text-right" style="vertical-align: top; padding: 6px 4px;">
@@ -357,7 +393,7 @@
                 <div class="sig-line">Checked By (Fleet Operations)</div>
             </td>
             <td>
-                <div class="sig-line">Customer Authorized Signature</div>
+                <div class="sig-line">{{ !empty($header['is_owner_sheet']) ? 'Owner / Authorized Signature' : 'Customer Authorized Signature' }}</div>
             </td>
         </tr>
     </table>

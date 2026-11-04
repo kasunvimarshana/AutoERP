@@ -17,6 +17,7 @@ export interface RunningChartReportParams {
     start_date: string;
     end_date: string;
     vehicle_use_id?: number | null;
+    sheet_mode?: 'lessee' | 'owner';
 }
 
 export interface RunningChartReportData {
@@ -33,6 +34,9 @@ export interface RunningChartReportData {
         agreement_number: string;
         agreement_id: number;
         agreement_vehicle_number: string;
+        is_owner_sheet?: boolean;
+        lessor_id?: string;
+        owner_name?: string;
     };
     rows: Array<{
         date: string;
@@ -43,6 +47,7 @@ export interface RunningChartReportData {
         cumulative_mileage: number;
         on_time: string;
         off_time: string;
+        lessee?: string;
         ot_hours: string;
         ot_type: string;
         night_out: string;
@@ -79,6 +84,7 @@ export const getRunningChartReportExportUrl = (params: RunningChartReportParams,
         start_date: params.start_date,
         end_date: params.end_date,
         ...(params.vehicle_use_id ? { vehicle_use_id: String(params.vehicle_use_id) } : {}),
+        ...(params.sheet_mode ? { sheet_mode: params.sheet_mode } : {}),
     });
     return `/api/v1/vehicle-rental/reports/running-chart-sheet/export/${format}?${query.toString()}`;
 };

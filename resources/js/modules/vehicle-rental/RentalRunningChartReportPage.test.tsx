@@ -109,6 +109,7 @@ describe('RentalRunningChartReportPage', () => {
                 agreement_id: 1,
                 start_date: expect.any(String),
                 end_date: expect.any(String),
+                sheet_mode: 'lessee',
             });
             expect(screen.getByText('RUNNING CHART FOR LESSEE - Monthly Basis Vehicles')).toBeInTheDocument();
             expect(screen.getByText('Lanka Industrial Corp')).toBeInTheDocument();
@@ -141,8 +142,55 @@ describe('RentalRunningChartReportPage', () => {
                 agreement_id: 1,
                 start_date: expect.any(String),
                 end_date: expect.any(String),
+                sheet_mode: 'lessee',
             });
             expect(screen.getByText('Lanka Industrial Corp')).toBeInTheDocument();
+        });
+    });
+
+    it('supports owner sheet mode with lessee details', async () => {
+        const mockOwnerReport: runningChartApi.RunningChartReportData = {
+            ...mockReportData,
+            header: {
+                ...mockReportData.header,
+                is_owner_sheet: true,
+                report_title: "RUNNING CHART FOR VEHICLE OWNER - Monthly Basis Vehicles - With Lessee's Detail",
+                owner_name: 'Manohara Kudahetty',
+                lessor_id: 'SUP-001 - Manohara Kudahetty',
+            },
+            rows: [
+                {
+                    ...mockReportData.rows[0],
+                    lessee: 'Unilever Sri Lanka Ltd',
+                    pass: '1900.00',
+                },
+            ],
+            summary: {
+                ...mockReportData.summary,
+                total_pass: '1900.00',
+            },
+        };
+
+        vi.mocked(runningChartApi.fetchRunningChartReport).mockResolvedValueOnce(mockOwnerReport);
+
+        render(
+            <MemoryRouter initialEntries={['/vehicle-rental/running-chart/report?agreement_id=1&sheet_mode=owner']}>
+                <RentalRunningChartReportPage />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(runningChartApi.fetchRunningChartReport).toHaveBeenCalledWith({
+                agreement_id: 1,
+                start_date: expect.any(String),
+                end_date: expect.any(String),
+                sheet_mode: 'owner',
+            });
+            expect(screen.getByText("RUNNING CHART FOR VEHICLE OWNER - Monthly Basis Vehicles - With Lessee's Detail")).toBeInTheDocument();
+            expect(screen.getByText('Manohara Kudahetty')).toBeInTheDocument();
+            expect(screen.getByText('Unilever Sri Lanka Ltd')).toBeInTheDocument();
+            expect(screen.getAllByText('1900.00').length).toBeGreaterThanOrEqual(1);
+            expect(screen.getByText('Owner / Authorized Signature')).toBeInTheDocument();
         });
     });
 });

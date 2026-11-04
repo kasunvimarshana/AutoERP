@@ -7,12 +7,18 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Panel } from '@/shared/components/Panel';
+import { Select } from '@/shared/components/Select';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { AgreementKind } from './agreements';
 import { getAgreement, searchCustomerAgreements } from './agreementApi';
 import { fetchRunningChartReport, getRunningChartReportExportUrl, type RunningChartReportData } from './runningChartApi';
+
+const sheetModeOptions = [
+    { value: 'lessee', label: 'Lessee Sheet (Customer format)' },
+    { value: 'owner', label: "Owner Sheet (With Lessee's details)" },
+];
 
 export default function RentalRunningChartReportPage() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -22,6 +28,7 @@ export default function RentalRunningChartReportPage() {
     const [agreement, setAgreement] = useState<NamedResource | null>(null);
     const [startDate, setStartDate] = useState<string>(searchParams.get('start_date') || firstDayOfMonth);
     const [endDate, setEndDate] = useState<string>(searchParams.get('end_date') || today);
+    const [sheetMode, setSheetMode] = useState<'lessee' | 'owner'>(searchParams.get('sheet_mode') === 'owner' ? 'owner' : 'lessee');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [report, setReport] = useState<RunningChartReportData | null>(null);
@@ -41,13 +48,13 @@ export default function RentalRunningChartReportPage() {
                     .catch(() => {
                         // ignore prefetch error
                     });
-                void loadReport(parsed, startDate, endDate);
+                void loadReport(parsed, startDate, endDate, sheetMode);
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    async function loadReport(id: number, start: string, end: string) {
+    async function loadReport(id: number, start: string, end: string, mode: 'lessee' | 'owner' = sheetMode) {
         if (!id || !start || !end) return;
         setLoading(true);
         setError(null);
@@ -56,9 +63,15 @@ export default function RentalRunningChartReportPage() {
                 agreement_id: id,
                 start_date: start,
                 end_date: end,
+                sheet_mode: mode,
             });
             setReport(data);
-            setSearchParams({ agreement_id: String(id), start_date: start, end_date: end });
+            setSearchParams({
+                agreement_id: String(id),
+                start_date: start,
+                end_date: end,
+                sheet_mode: mode,
+            });
         } catch (err) {
             setError(toApiError(err));
             setReport(null);
@@ -72,26 +85,36 @@ export default function RentalRunningChartReportPage() {
         if (!agreement?.id) {
             return;
         }
-        void loadReport(agreement.id, startDate, endDate);
+        void loadReport(agreement.id, startDate, endDate, sheetMode);
     }
 
     const exportPdfUrl = report
-        ? getRunningChartReportExportUrl({ agreement_id: report.header.agreement_id, start_date: report.header.start_date, end_date: report.header.end_date }, 'pdf')
+        ? getRunningChartReportExportUrl({
+            agreement_id: report.header.agreement_id,
+            start_date: report.header.start_date,
+            end_date: report.header.end_date,
+            sheet_mode: report.header.is_owner_sheet ? 'owner' : 'lessee',
+        }, 'pdf')
         : '#';
 
     const exportPrintUrl = report
-        ? getRunningChartReportExportUrl({ agreement_id: report.header.agreement_id, start_date: report.header.start_date, end_date: report.header.end_date }, 'print')
+        ? getRunningChartReportExportUrl({
+            agreement_id: report.header.agreement_id,
+            start_date: report.header.start_date,
+            end_date: report.header.end_date,
+            sheet_mode: report.header.is_owner_sheet ? 'owner' : 'lessee',
+        }, 'print')
         : '#';
 
     return (
         <div className="space-y-5">
             <ContentHeader
                 title="Running Chart report (31-day matrix sheet)"
-                description="Generate the official running chart matrix sheet matching monthly basis vehicle operations with daily mileage, OT, night outs, and excess kilometer analysis."
+                description="Generate the official running chart matrix sheet matching monthly basis vehicle operations with daily mileage, OT, night outs, toll pass expenses, and excess kilometer analysis."
             />
 
             <Panel title="Report Parameters">
-                <form aria-label="Generate running chart report" onSubmit={handleGenerate} className="grid gap-3 md:grid-cols-4 items-end">
+                <form aria-label="Generate running chart report" onSubmit={handleGenerate} className="grid gap-3 md:grid-cols-5 items-end">
                     <LookupSelect
                         label="Customer Agreement"
                         placeholder="Search agreement or customer..."
@@ -118,6 +141,12 @@ export default function RentalRunningChartReportPage() {
                         onChange={e => setEndDate(e.target.value)}
                         error={error?.fields.end_date?.[0]}
                     />
+                    <Select
+                        label="Sheet Type"
+                        options={sheetModeOptions}
+                        value={sheetMode}
+                        onChange={e => setSheetMode(e.target.value as 'lessee' | 'owner')}
+                    />
                     <div>
                         <Button type="submit" loading={loading} disabled={!agreement} className="w-full">
                             Generate Sheet
@@ -141,6 +170,9 @@ export default function RentalRunningChartReportPage() {
                             </h2>
                             <p className="text-sm text-slate-600">
                                 Agreement: <strong className="text-slate-900">{report.header.agreement_number}</strong> • Client: <strong className="text-slate-900">{report.header.client_name}</strong> • Vehicle: <strong className="text-slate-900">{report.header.agreement_vehicle_number}</strong>
+                                {report.header.is_owner_sheet && report.header.owner_name && (
+                                    <> • Owner: <strong className="text-slate-900">{report.header.owner_name}</strong></>
+                                )}
                             </p>
                         </div>
                         <div className="flex gap-2">
@@ -174,9 +206,13 @@ export default function RentalRunningChartReportPage() {
                                     <th className="p-2 border-r border-slate-300 text-right font-black">Cumul. KM</th>
                                     <th className="p-2 border-r border-slate-300">On Time</th>
                                     <th className="p-2 border-r border-slate-300">Off Time</th>
+                                    {report.header.is_owner_sheet && (
+                                        <th className="p-2 border-r border-slate-300">Lessee</th>
+                                    )}
                                     <th className="p-2 border-r border-slate-300 text-right">OT Hours</th>
                                     <th className="p-2 border-r border-slate-300 text-center">OT Type</th>
                                     <th className="p-2 border-r border-slate-300 text-center">Night Out</th>
+                                    <th className="p-2 border-r border-slate-300 text-right">Pass</th>
                                     <th className="p-2 border-r border-slate-300 text-right">Garage KM</th>
                                     <th className="p-2 border-r border-slate-300">Driver</th>
                                     <th className="p-2">Remarks</th>
@@ -195,9 +231,13 @@ export default function RentalRunningChartReportPage() {
                                         <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-blue-900">{row.cumulative_mileage || '-'}</td>
                                         <td className="p-2 border-r border-slate-200">{row.on_time || '-'}</td>
                                         <td className="p-2 border-r border-slate-200">{row.off_time || '-'}</td>
+                                        {report.header.is_owner_sheet && (
+                                            <td className="p-2 border-r border-slate-200 font-medium">{row.lessee || '-'}</td>
+                                        )}
                                         <td className="p-2 border-r border-slate-200 text-right font-semibold text-amber-900">{row.ot_hours || '-'}</td>
                                         <td className="p-2 border-r border-slate-200 text-center">{row.ot_type || '-'}</td>
                                         <td className="p-2 border-r border-slate-200 text-center font-bold">{row.night_out || '-'}</td>
+                                        <td className="p-2 border-r border-slate-200 text-right font-mono font-semibold">{row.pass || '-'}</td>
                                         <td className="p-2 border-r border-slate-200 text-right">{row.garage_km || '-'}</td>
                                         <td className="p-2 border-r border-slate-200 font-medium">{row.driver_name || '-'}</td>
                                         <td className="p-2 text-slate-500 truncate max-w-xs">{row.remarks || '-'}</td>
@@ -208,7 +248,7 @@ export default function RentalRunningChartReportPage() {
                     </div>
 
                     {/* Summary Cards */}
-                    <div className="grid gap-4 md:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-5">
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <span className="text-xs font-semibold uppercase text-slate-500">Comparative Distance</span>
                             <p className="mt-1 text-2xl font-black text-slate-900">
@@ -240,6 +280,14 @@ export default function RentalRunningChartReportPage() {
                             </p>
                             <span className="text-xs text-slate-500">Night Out Halts: {report.summary.total_night_out}</span>
                         </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <span className="text-xs font-semibold uppercase text-slate-500">Toll / Pass Total</span>
+                            <p className="mt-1 text-2xl font-black text-slate-900">
+                                {report.summary.total_pass}
+                            </p>
+                            <span className="text-xs text-slate-500">Highway Toll Disbursements</span>
+                        </div>
                     </div>
 
                     {/* Signatures */}
@@ -253,7 +301,7 @@ export default function RentalRunningChartReportPage() {
                             </div>
                             <div>
                                 <div className="border-t border-dashed border-slate-400 pt-2 font-bold uppercase text-slate-800">
-                                    Lessee / Client Signature
+                                    {report.header.is_owner_sheet ? "Owner / Authorized Signature" : "Lessee / Client Signature"}
                                 </div>
                                 <span className="text-slate-400">Authorized Representative</span>
                             </div>

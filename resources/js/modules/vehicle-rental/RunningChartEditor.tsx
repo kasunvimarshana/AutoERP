@@ -25,15 +25,38 @@ const acOptions = [
     { value: AirConditioningMode.Dual, label: 'Dual AC' },
 ];
 
-export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }: { use: VehicleUse; chart?: RunningChart; correction?: boolean; onSaved: () => void; onCancel: () => void }) {
+export interface InitialDriverState {
+    source?: DriverIdentitySource;
+    employee?: NamedResource | null;
+    externalName?: string;
+    externalReference?: string;
+}
+
+export function RunningChartEditor({ use, chart, correction, initialDriver, onSaved, onCancel }: { use: VehicleUse; chart?: RunningChart; correction?: boolean; initialDriver?: InitialDriverState; onSaved: () => void; onCancel: () => void }) {
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
     const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : ''); const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
     const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries([...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [key, String(chart?.[key as keyof ChartFacts] ?? '')])));
     const [ac, setAc] = useState<AirConditioningMode | ''>(chart?.ac_mode ?? '');
-    const [driverSource, setDriverSource] = useState<DriverIdentitySource | ''>(chart?.driver_identity_source ?? '');
-    const [driverEmployee, setDriverEmployee] = useState<NamedResource | null>(() => chart?.driver?.source === DriverIdentitySource.Employee && chart.driver.employee_id ? { id: chart.driver.employee_id, name: chart.driver.name, code: chart.driver.reference } : null);
-    const [externalDriverName, setExternalDriverName] = useState(chart?.driver?.source === DriverIdentitySource.External ? chart.driver.name : '');
-    const [externalDriverReference, setExternalDriverReference] = useState(chart?.driver?.source === DriverIdentitySource.External ? chart.driver.reference : '');
+    const [driverSource, setDriverSource] = useState<DriverIdentitySource | ''>(chart?.driver_identity_source ?? (!chart && initialDriver?.source ? initialDriver.source : ''));
+    const [driverEmployee, setDriverEmployee] = useState<NamedResource | null>(() => {
+        if (chart?.driver?.source === DriverIdentitySource.Employee && chart.driver.employee_id) {
+            return { id: chart.driver.employee_id, name: chart.driver.name, code: chart.driver.reference };
+        }
+        if (!chart && initialDriver?.source === DriverIdentitySource.Employee && initialDriver.employee) {
+            return initialDriver.employee;
+        }
+        return null;
+    });
+    const [externalDriverName, setExternalDriverName] = useState(
+        chart?.driver?.source === DriverIdentitySource.External
+            ? chart.driver.name
+            : (!chart && initialDriver?.source === DriverIdentitySource.External ? initialDriver.externalName ?? '' : '')
+    );
+    const [externalDriverReference, setExternalDriverReference] = useState(
+        chart?.driver?.source === DriverIdentitySource.External
+            ? chart.driver.reference
+            : (!chart && initialDriver?.source === DriverIdentitySource.External ? initialDriver.externalReference ?? '' : '')
+    );
     const [driverObservation, setDriverObservation] = useState(chart?.driver_observation ?? ''); const [notes, setNotes] = useState(chart?.notes ?? '');
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
     async function submit(event: FormEvent) {

@@ -37,6 +37,8 @@ const invoiceColumns = [
         render: (row: CustomerOutstandingInvoiceRow) => <>
             <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/invoices/${row.invoice.id}`}>{row.invoice.number}</Link>
             {row.invoice.service_job_number && <span className="block text-xs text-slate-500">Service job: {row.invoice.service_job_number}</span>}
+            {row.invoice.rental_agreement_number && <span className="block text-xs text-slate-500">Agreement: {row.invoice.rental_agreement_number}</span>}
+            {row.invoice.line_description && <span className="block text-xs text-slate-400 truncate max-w-xs">{row.invoice.line_description}</span>}
         </>,
     },
     { key: 'date', header: 'Invoice date', render: (row: CustomerOutstandingInvoiceRow) => row.invoice.date },

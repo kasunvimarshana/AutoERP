@@ -90,6 +90,24 @@ final class CustomerOutstandingReportService
                     ->limit(1),
                 'service_job_number',
             )
+            ->selectSub(
+                DB::table('invoice_sources')
+                    ->select('source_document_number')
+                    ->whereColumn('invoice_sources.invoice_id', 'invoices.id')
+                    ->whereColumn('invoice_sources.tenant_id', 'invoices.tenant_id')
+                    ->whereIn('invoice_sources.source_type', ['base_rent', 'excess_mileage', 'overtime', 'extra_hours', 'night_out'])
+                    ->limit(1),
+                'rental_agreement_number',
+            )
+            ->selectSub(
+                DB::table('invoice_lines')
+                    ->select('description')
+                    ->whereColumn('invoice_lines.invoice_id', 'invoices.id')
+                    ->whereColumn('invoice_lines.tenant_id', 'invoices.tenant_id')
+                    ->orderBy('invoice_lines.line_number')
+                    ->limit(1),
+                'line_description',
+            )
             ->orderByRaw(self::DUE_DATE_EXPRESSION)
             ->orderBy('invoices.invoice_number');
 
@@ -101,6 +119,8 @@ final class CustomerOutstandingReportService
                 'date' => CarbonImmutable::parse($row->invoice_date)->toDateString(),
                 'due_date' => CarbonImmutable::parse($row->due_date ?? $row->invoice_date)->toDateString(),
                 'service_job_number' => $row->service_job_number === null ? null : (string) $row->service_job_number,
+                'rental_agreement_number' => $row->rental_agreement_number === null ? null : (string) $row->rental_agreement_number,
+                'line_description' => $row->line_description === null ? null : (string) $row->line_description,
             ],
             'currency' => ['code' => $row->currency_code_snapshot ?: 'N/A'],
             'invoice_total' => (string) $row->grand_total,

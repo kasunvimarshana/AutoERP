@@ -299,7 +299,7 @@ export interface CustomerOutstandingReportResult {
 }
 
 export interface CustomerOutstandingInvoiceRow {
-    invoice: { id: number; number: string; date: string; due_date: string; service_job_number: string | null };
+    invoice: { id: number; number: string; date: string; due_date: string; service_job_number: string | null; rental_agreement_number?: string | null; line_description?: string | null };
     currency: { code: string };
     invoice_total: string;
     paid_amount: string;
