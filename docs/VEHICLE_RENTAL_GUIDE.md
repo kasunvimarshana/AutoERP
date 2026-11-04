@@ -2,6 +2,9 @@
 
 Welcome to the comprehensive, beginner-friendly technical guide for the **Vehicle Rental** module in **AutoERP**. Whether you are a newly joined software engineer, a business analyst, a QA engineer, or a technical operator, this document will guide you through the entire module from high-level business architecture down to database tables, API payloads, React components, and background calculations.
 
+> [!NOTE]
+> For day-to-day depot staff, dispatchers, billing clerks, and rental managers looking for a step-by-step UI operations manual with click paths and screen guides, see the [Vehicle Rental End-User Operations Guide](VEHICLE_RENTAL_USER_GUIDE.md).
+
 ---
 
 ## Table of Contents

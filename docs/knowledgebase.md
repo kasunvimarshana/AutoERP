@@ -3,7 +3,8 @@
 **Status:** Canonical Vehicle Rental Business Domain, Architectural Policy, and Operational Reference for AutoERP.
 **Owning Module:** `app/Modules/VehicleRental` & `resources/js/modules/vehicle-rental`
 **Architecture Policy:** Root `AGENTS.md` and `RULES.md`
-**Technical & Operational Guide:** [`VEHICLE_RENTAL_GUIDE.md`](VEHICLE_RENTAL_GUIDE.md)
+**Technical & Architecture Guide:** [`VEHICLE_RENTAL_GUIDE.md`](VEHICLE_RENTAL_GUIDE.md)
+**End-User Operations Guide:** [`VEHICLE_RENTAL_USER_GUIDE.md`](VEHICLE_RENTAL_USER_GUIDE.md)
 **Shared Memory & Change History:** `docs/changes/`
 
 ---
