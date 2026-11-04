@@ -11,6 +11,7 @@ import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
+import { DriverMode, RentalBasis } from './agreements';
 import { createReservation, updateReservation, type RentalReservation, type StoreReservationPayload } from './reservationApi';
 
 const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
@@ -31,8 +32,8 @@ export function ReservationEditor({
     const isEdit = Boolean(reservation);
     const [customer, setCustomer] = useState<NamedResource | null>(reservation?.customer ? { id: reservation.customer.id, name: reservation.customer.name } : null);
     const [vehicle, setVehicle] = useState<NamedResource | null>(reservation?.requested_vehicle ? { id: reservation.requested_vehicle.id, name: reservation.requested_vehicle.label } : null);
-    const [rentalMode, setRentalMode] = useState(reservation ? reservation.rental_mode : 'self_drive');
-    const [billingCycle, setBillingCycle] = useState(reservation ? reservation.billing_cycle : 'daily');
+    const [rentalMode, setRentalMode] = useState(reservation ? reservation.rental_mode : DriverMode.SelfDrive);
+    const [billingCycle, setBillingCycle] = useState(reservation ? reservation.billing_cycle : RentalBasis.Daily);
     const [startAt, setStartAt] = useState(reservation ? reservation.requested_start_at.slice(0, 16) : '');
     const [endAt, setEndAt] = useState(reservation ? reservation.requested_end_at.slice(0, 16) : '');
     const [currency, setCurrency] = useState<NamedResource | null>(reservation?.currency ? { id: reservation.currency.id, name: reservation.currency.code, code: reservation.currency.code } : null);
@@ -122,8 +123,8 @@ export function ReservationEditor({
                     value={rentalMode}
                     onChange={e => setRentalMode(e.target.value)}
                     options={[
-                        { value: 'self_drive', label: 'Self Drive' },
-                        { value: 'with_driver', label: 'With Driver' },
+                        { value: DriverMode.SelfDrive, label: 'Self Drive' },
+                        { value: DriverMode.WithDriver, label: 'With Driver' },
                     ]}
                 />
                 <Select
@@ -131,8 +132,8 @@ export function ReservationEditor({
                     value={billingCycle}
                     onChange={e => setBillingCycle(e.target.value)}
                     options={[
-                        { value: 'daily', label: 'Daily Rental' },
-                        { value: 'monthly', label: 'Monthly Rental' },
+                        { value: RentalBasis.Daily, label: 'Daily Rental' },
+                        { value: RentalBasis.Monthly, label: 'Monthly Rental' },
                     ]}
                 />
             </div>

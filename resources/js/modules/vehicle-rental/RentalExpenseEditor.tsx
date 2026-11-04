@@ -12,7 +12,7 @@ import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { createRentalExpense, type StoreRentalExpensePayload } from './rentalExpenseApi';
+import { createRentalExpense, ExpenseType, type StoreRentalExpensePayload } from './rentalExpenseApi';
 
 const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params)
@@ -27,7 +27,7 @@ export function RentalExpenseEditor({
 }) {
     const [expenseNumber, setExpenseNumber] = useState('');
     const [vehicle, setVehicle] = useState<NamedResource | null>(null);
-    const [expenseType, setExpenseType] = useState('fuel');
+    const [expenseType, setExpenseType] = useState<ExpenseType>(ExpenseType.Fuel);
     const [expenseDate, setExpenseDate] = useState(businessDateInputValue());
     const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [netAmount, setNetAmount] = useState('0.00');
@@ -91,13 +91,13 @@ export function RentalExpenseEditor({
                 <Select
                     label="Expense Type"
                     value={expenseType}
-                    onChange={e => setExpenseType(e.target.value)}
+                    onChange={e => setExpenseType(e.target.value as ExpenseType)}
                     options={[
-                        { value: 'fuel', label: 'Fuel' },
-                        { value: 'toll', label: 'Highway Toll' },
-                        { value: 'maintenance', label: 'Maintenance & Repairs' },
-                        { value: 'fine', label: 'Traffic Fine' },
-                        { value: 'other', label: 'Other Operational Cost' },
+                        { value: ExpenseType.Fuel, label: 'Fuel' },
+                        { value: ExpenseType.Toll, label: 'Highway Toll' },
+                        { value: ExpenseType.Maintenance, label: 'Maintenance & Repairs' },
+                        { value: ExpenseType.Fine, label: 'Traffic Fine' },
+                        { value: ExpenseType.Other, label: 'Other Operational Cost' },
                     ]}
                 />
                 <Input

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     fetchLesseeOutstandingReport,
     getLesseeOutstandingReportExportUrl,
@@ -10,7 +11,7 @@ import {
 } from '../rentalReportsApi';
 
 export default function LesseeOutstandingReportPage() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessDateInputValue();
 
     const [params, setParams] = useState<LesseeOutstandingReportParams>({
         as_of_date: today,
