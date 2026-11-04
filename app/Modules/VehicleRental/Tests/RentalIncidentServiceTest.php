@@ -53,6 +53,8 @@ final class RentalIncidentServiceTest extends TestCase
             self::assertSame('Receipt 101', $incident->evidence_reference);
             self::assertSame($chart->id, $incident->running_chart_id);
             self::assertSame(1, $service->list($context, 10)->total());
+            self::assertSame(1, $service->list($context, 10, 'Receipt 101')->total());
+            self::assertSame(0, $service->list($context, 10, 'NonExistentRef')->total());
             self::assertSame(1, $service->history($context, $incident->id, 10)->total());
             self::assertSame(0, \Illuminate\Support\Facades\DB::table('invoices')->where('tenant_id', $context->tenantId)->count());
 

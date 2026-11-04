@@ -14,8 +14,11 @@ export const listIncidentRunningCharts = (vehicleUseId: number, page: number, si
         { params: { page, per_page: PAGE_SIZE }, signal },
     ).then(result => result.data);
 
-export const listRentalIncidents = (page: number, signal?: AbortSignal) =>
-    apiClient.get<ApiCollection<RentalIncident>>(INCIDENT_API, { params: { page, per_page: PAGE_SIZE }, signal }).then(result => result.data);
+export const listRentalIncidents = (page: number, signal?: AbortSignal, search?: string) =>
+    apiClient.get<ApiCollection<RentalIncident>>(INCIDENT_API, {
+        params: { page, per_page: PAGE_SIZE, search: search || undefined },
+        signal,
+    }).then(result => result.data);
 
 export const incidentHistory = (incidentId: number, page: number, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<IncidentHistoryEvent>>(`${INCIDENT_API}/${incidentId}/history`, {

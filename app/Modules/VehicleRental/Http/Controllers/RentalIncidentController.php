@@ -34,7 +34,11 @@ final class RentalIncidentController
 
     public function index(AgreementRequest $request): AnonymousResourceCollection
     {
-        return RentalIncidentResource::collection($this->incidents->list($request->context(), $request->perPage()));
+        return RentalIncidentResource::collection($this->incidents->list(
+            $request->context(),
+            $request->perPage(),
+            $request->validated('search'),
+        ));
     }
 
     public function store(AgreementRequest $request): JsonResponse

@@ -158,6 +158,18 @@ describe('Rental incident evidence register', () => {
         ));
         expect(recordRentalIncident).not.toHaveBeenCalled();
     });
+
+    it('allows searching recorded incidents by reference or keyword', async () => {
+        render(<IncidentRegisterPage />);
+        await screen.findByText('Receipt supplied by driver');
+
+        fireEvent.change(screen.getByPlaceholderText('Search by incident ref, vehicle, or doc ref…'), {
+            target: { value: 'RIN-TEST-12' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+        await waitFor(() => expect(listRentalIncidents).toHaveBeenCalledWith(1, expect.any(AbortSignal), 'RIN-TEST-12'));
+    });
 });
 
 it('uploads proof against the displayed revision and refreshes the register', async () => {

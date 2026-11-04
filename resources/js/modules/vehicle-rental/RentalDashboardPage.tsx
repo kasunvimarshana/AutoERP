@@ -156,6 +156,7 @@ export default function RentalDashboardPage() {
                             <Link to={EXPENSE_REGISTER_PATH}><Button variant="secondary">Fleet Expenses</Button></Link>
                             <Link to={FINANCE_REGISTER_PATH}><Button variant="secondary">Vehicle Finance</Button></Link>
                             <Link to={INCIDENT_REGISTER_PATH}><Button variant="secondary">Damage Incidents</Button></Link>
+                            <Link to="/vehicle-rental/reports"><Button variant="secondary">Reports & Intelligence</Button></Link>
                         </div>
                     </div>
 

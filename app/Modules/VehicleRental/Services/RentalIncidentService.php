@@ -60,12 +60,28 @@ final class RentalIncidentService
             ->paginate($perPage);
     }
 
-    public function list(AgreementContext $context, int $perPage): LengthAwarePaginator
+    public function list(AgreementContext $context, int $perPage, ?string $search = null): LengthAwarePaginator
     {
         $this->authorization->assertIncident($context, IncidentPermission::View);
-        return RentalIncident::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart', 'attachments'])
-            ->orderByDesc('occurred_on')->orderByDesc('id')->paginate($perPage);
+        $query = RentalIncident::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart', 'attachments']);
+
+        $search = trim($search ?? '');
+        if ($search !== '') {
+            $pattern = '%'.$search.'%';
+            $query->where(function ($match) use ($pattern): void {
+                $match->where('reference', 'like', $pattern)
+                    ->orWhere('evidence_reference', 'like', $pattern)
+                    ->orWhere('description', 'like', $pattern)
+                    ->orWhereHas('vehicleUse', function ($use) use ($pattern): void {
+                        $use->where('vehicle_label_snapshot', 'like', $pattern)
+                            ->orWhereHas('vehicle', fn ($v) => $v->where('vehicle_number', 'like', $pattern)->orWhere('registration_number', 'like', $pattern))
+                            ->orWhereHas('customerAgreement', fn ($agr) => $agr->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));
+                    });
+            });
+        }
+
+        return $query->orderByDesc('occurred_on')->orderByDesc('id')->paginate($perPage);
     }
 
     public function find(AgreementContext $context, int $id): RentalIncident

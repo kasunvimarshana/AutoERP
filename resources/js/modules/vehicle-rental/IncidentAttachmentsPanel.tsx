@@ -22,6 +22,7 @@ export function IncidentAttachmentsPanel({ incident, canRecord, busy, setBusy, o
         setError(null);
         try {
             await attachIncidentFile(incident, file);
+            setFile(null);
             onUpdated();
         } catch (failure) {
             setError(toApiError(failure));
@@ -29,8 +30,8 @@ export function IncidentAttachmentsPanel({ incident, canRecord, busy, setBusy, o
             setBusy(false);
         }
     }
-    return <details className="rounded-lg border p-3">
-        <summary className="cursor-pointer font-medium">File proofs ({incident.attachments.length})</summary>
+    return <details className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+        <summary className="cursor-pointer font-semibold text-slate-900">File proofs ({incident.attachments.length})</summary>
         <div className="mt-3 space-y-3">
             {error && <ErrorAlert error={error} />}
             {incident.attachments.map(attachment => <div key={attachment.id} className="flex items-center justify-between gap-3">

@@ -63,9 +63,12 @@ export default function IncidentRegisterPage() {
     const chartMeta = runningCharts.data?.meta;
     const chartsLoading = runningCharts.loading;
 
+    const [incidentSearch, setIncidentSearch] = useState('');
+    const [incidentQuery, setIncidentQuery] = useState('');
+
     useEffect(() => {
         const controller = new AbortController();
-        listRentalIncidents(page, controller.signal)
+        listRentalIncidents(page, controller.signal, incidentQuery)
             .then(result => {
                 if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setListFailed(false); setError(null); }
             })
@@ -76,7 +79,7 @@ export default function IncidentRegisterPage() {
             })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
-    }, [page, revision]);
+    }, [page, revision, incidentQuery]);
 
     function reload() { setLoading(true); setRevision(value => value + 1); }
     async function create(event: FormEvent) {
@@ -193,6 +196,39 @@ export default function IncidentRegisterPage() {
             </form>
         </Panel>}
         <Panel title="Recorded incidents">
+            <form
+                onSubmit={event => {
+                    event.preventDefault();
+                    setPage(1);
+                    setIncidentQuery(incidentSearch.trim());
+                }}
+                className="mb-4 flex flex-wrap items-center gap-2"
+            >
+                <div className="w-80">
+                    <Input
+                        name="incidentSearch"
+                        placeholder="Search by incident ref, vehicle, or doc ref…"
+                        value={incidentSearch}
+                        onChange={event => setIncidentSearch(event.target.value)}
+                    />
+                </div>
+                <Button type="submit" variant="secondary" disabled={loading}>
+                    Search
+                </Button>
+                {incidentQuery && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                            setIncidentSearch('');
+                            setIncidentQuery('');
+                            setPage(1);
+                        }}
+                    >
+                        Clear
+                    </Button>
+                )}
+            </form>
             {loading ? <LoadingState label="Loading rental incidents…" /> : listFailed ? null : rows.length === 0 ? <p className="text-slate-500">No incident evidence recorded.</p> : <div className="space-y-4">
                 {rows.map(incident => <article key={incident.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
