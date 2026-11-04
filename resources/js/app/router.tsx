@@ -109,6 +109,13 @@ const RentalExpensesPage = lazy(() => import("@/modules/vehicle-rental/RentalExp
 const VehicleAvailabilityPage = lazy(() => import("@/modules/vehicle-rental/VehicleAvailabilityPage"));
 const RentalRunningChartReportPage = lazy(() => import("@/modules/vehicle-rental/RentalRunningChartReportPage"));
 const RentalReportsPage = lazy(() => import("@/modules/vehicle-rental/RentalReportsPage"));
+const FleetUtilizationReportPage = lazy(() => import("@/modules/vehicle-rental/reports/FleetUtilizationReportPage"));
+const VehicleRevenueLicenseReportPage = lazy(() => import("@/modules/vehicle-rental/reports/VehicleRevenueLicenseReportPage"));
+const RentalRevenueReportPage = lazy(() => import("@/modules/vehicle-rental/reports/RentalRevenueReportPage"));
+const LesseeOutstandingReportPage = lazy(() => import("@/modules/vehicle-rental/reports/LesseeOutstandingReportPage"));
+const OwnerDisbursementReportPage = lazy(() => import("@/modules/vehicle-rental/reports/OwnerDisbursementReportPage"));
+const VehicleProfitabilityReportPage = lazy(() => import("@/modules/vehicle-rental/reports/VehicleProfitabilityReportPage"));
+const RentalIncidentReportPage = lazy(() => import("@/modules/vehicle-rental/reports/RentalIncidentReportPage"));
 const VehicleListPage = lazy(() => import("@/modules/vehicle/VehicleListPage"));
 const VehicleCreatePage = lazy(
     () => import("@/modules/vehicle/VehicleCreatePage"),
@@ -1062,6 +1069,13 @@ const appRouter = createBrowserRouter(
                         <Route path="/vehicle-rental/vehicles/available" element={<PermissionRoute permission={USE_PERMISSION.view}><VehicleAvailabilityPage /></PermissionRoute>} />
                         <Route path="/vehicle-rental/running-chart/report" element={<PermissionRoute permission={CHART_PERMISSION.view}><RentalRunningChartReportPage /></PermissionRoute>} />
                         <Route path="/vehicle-rental/reports" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><RentalReportsPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports/fleet-utilization" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><FleetUtilizationReportPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports/revenue-licenses" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><VehicleRevenueLicenseReportPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports/rental-revenue" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><RentalRevenueReportPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports/lessee-outstanding" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><LesseeOutstandingReportPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports/owner-disbursements" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><OwnerDisbursementReportPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports/vehicle-profitability" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><VehicleProfitabilityReportPage /></PermissionRoute>} />
+                        <Route path="/vehicle-rental/reports/incidents-summary" element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><RentalIncidentReportPage /></PermissionRoute>} />
                         <Route
                             path="/vehicle-service/jobs"
                             element={<VehicleServiceJobListPage />}

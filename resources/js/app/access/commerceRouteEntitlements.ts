@@ -24,6 +24,13 @@ export const commerceRouteEntitlements: readonly EntitlementRule[] = [
     operational('/vehicle-rental/vehicles/available', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [USE_PERMISSION.view]),
     operational('/vehicle-rental/running-chart/report', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [CHART_PERMISSION.view]),
     operational('/vehicle-rental/reports', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
+    operational('/vehicle-rental/reports/fleet-utilization', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
+    operational('/vehicle-rental/reports/revenue-licenses', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
+    operational('/vehicle-rental/reports/rental-revenue', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
+    operational('/vehicle-rental/reports/lessee-outstanding', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
+    operational('/vehicle-rental/reports/owner-disbursements', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
+    operational('/vehicle-rental/reports/vehicle-profitability', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
+    operational('/vehicle-rental/reports/incidents-summary', [TENANT_MODULE_CODE.VEHICLE_RENTAL], [RENTAL_DASHBOARD_PERMISSION]),
     operational('/purchase/fast-purchase', ['purchase'], [
         purchasePermissions.fastPurchasesView,
         purchasePermissions.fastPurchasesExecute,

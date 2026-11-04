@@ -17,6 +17,7 @@ use Modules\VehicleRental\Http\Controllers\RentalDashboardController;
 use Modules\VehicleRental\Http\Controllers\RentalExpenseController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentAttachmentController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentController;
+use Modules\VehicleRental\Http\Controllers\RentalReportsController;
 use Modules\VehicleRental\Http\Controllers\RentalReservationController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
 use Modules\VehicleRental\Http\Controllers\RunningChartReportController;
@@ -119,6 +120,30 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::post('running-charts/{chart}/{action}', [RunningChartController::class, 'transition'])->whereNumber('chart')->whereIn('action', [RunningChartAction::Finalize->value, RunningChartAction::Reverse->value]);
 
     Route::get('vehicles/available', [VehicleUseController::class, 'available']);
-    Route::get('reports/running-chart-sheet', [RunningChartReportController::class, 'show']);
-    Route::get('reports/running-chart-sheet/export/{format}', [RunningChartReportController::class, 'export'])->whereIn('format', ['pdf', 'print', 'html']);
+
+    Route::prefix('reports')->group(function (): void {
+        Route::get('running-chart-sheet', [RunningChartReportController::class, 'show']);
+        Route::get('running-chart-sheet/export/{format}', [RunningChartReportController::class, 'export'])->whereIn('format', ['pdf', 'print', 'html']);
+
+        Route::get('fleet-utilization', [RentalReportsController::class, 'fleetUtilization']);
+        Route::get('fleet-utilization/export/{format}', [RentalReportsController::class, 'exportFleetUtilization'])->whereIn('format', ['pdf', 'print', 'html']);
+
+        Route::get('revenue-licenses', [RentalReportsController::class, 'revenueLicenses']);
+        Route::get('revenue-licenses/export/{format}', [RentalReportsController::class, 'exportRevenueLicenses'])->whereIn('format', ['pdf', 'print', 'html']);
+
+        Route::get('rental-revenue', [RentalReportsController::class, 'rentalRevenue']);
+        Route::get('rental-revenue/export/{format}', [RentalReportsController::class, 'exportRentalRevenue'])->whereIn('format', ['pdf', 'print', 'html']);
+
+        Route::get('lessee-outstanding', [RentalReportsController::class, 'lesseeOutstanding']);
+        Route::get('lessee-outstanding/export/{format}', [RentalReportsController::class, 'exportLesseeOutstanding'])->whereIn('format', ['pdf', 'print', 'html']);
+
+        Route::get('owner-disbursements', [RentalReportsController::class, 'ownerDisbursements']);
+        Route::get('owner-disbursements/export/{format}', [RentalReportsController::class, 'exportOwnerDisbursements'])->whereIn('format', ['pdf', 'print', 'html']);
+
+        Route::get('vehicle-profitability', [RentalReportsController::class, 'vehicleProfitability']);
+        Route::get('vehicle-profitability/export/{format}', [RentalReportsController::class, 'exportVehicleProfitability'])->whereIn('format', ['pdf', 'print', 'html']);
+
+        Route::get('incidents-summary', [RentalReportsController::class, 'incidentsSummary']);
+        Route::get('incidents-summary/export/{format}', [RentalReportsController::class, 'exportIncidentsSummary'])->whereIn('format', ['pdf', 'print', 'html']);
+    });
 });

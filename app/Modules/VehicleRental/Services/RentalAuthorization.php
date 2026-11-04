@@ -51,6 +51,8 @@ class RentalAuthorization
 
     public const DASHBOARD_VIEW = 'vehicle-rental.dashboard.view';
 
+    public const REPORT_VIEW = 'vehicle-rental.reports.view';
+
     public function __construct(private readonly UserAccessResolver $access) {}
 
     public static function descriptions(): array
@@ -78,6 +80,7 @@ class RentalAuthorization
             self::EXPENSE_VIEW => 'View vehicle rental expenses and allocations.',
             self::EXPENSE_MANAGE => 'Record, approve, allocate, and reverse vehicle rental expenses.',
             self::DASHBOARD_VIEW => 'View the vehicle rental operational overview dashboard.',
+            self::REPORT_VIEW => 'View vehicle rental operational and financial reports.',
         ];
     }
 
@@ -148,6 +151,17 @@ class RentalAuthorization
         $permission = $write ? self::EXPENSE_MANAGE : self::EXPENSE_VIEW;
         if (! $this->access->can($context->actorId, $context->tenantId, $permission)) {
             throw new AuthorizationException('This Rental action requires permission: '.$permission);
+        }
+    }
+
+    public function assertReport(AgreementContext $context): void
+    {
+        if (! $this->access->can($context->actorId, $context->tenantId, self::REPORT_VIEW)
+            && ! $this->access->can($context->actorId, $context->tenantId, self::DASHBOARD_VIEW)
+            && ! $this->access->can($context->actorId, $context->tenantId, self::CUSTOMER_VIEW)
+            && ! $this->access->can($context->actorId, $context->tenantId, self::USE_VIEW)
+            && ! $this->access->can($context->actorId, $context->tenantId, self::CHART_VIEW)) {
+            throw new AuthorizationException('This Rental action requires report viewing permission.');
         }
     }
 
