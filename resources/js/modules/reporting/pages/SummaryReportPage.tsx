@@ -101,11 +101,11 @@ export default function SummaryReportPage() {
             {result ? (
                 <div className="space-y-5">
                     <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-7 text-white shadow-xl shadow-slate-200 sm:px-8">
-                        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-sky-400/15 blur-3xl" />
+                        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-blue-400/20 blur-3xl" />
                         <div className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
                         <div className="relative grid gap-7 lg:grid-cols-[1.2fr_1fr] lg:items-end">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300">
+                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-300">
                                     Net result
                                 </p>
                                 <p className={`mt-3 text-4xl font-bold tracking-tight sm:text-5xl ${netProfit < 0 ? 'text-rose-300' : 'text-white'}`}>
@@ -192,7 +192,7 @@ export default function SummaryReportPage() {
                                     value={result.performance.other_expenses}
                                     currency={currency}
                                     width={ratio(result.performance.other_expenses, result.performance.total_income)}
-                                    tone="bg-sky-500"
+                                    tone="bg-blue-500"
                                 />
                                 <div className="flex items-center justify-between border-t border-slate-200 pt-4">
                                     <span className="font-semibold text-slate-900">Net profit / loss</span>
@@ -259,10 +259,10 @@ function OperatingExpenseSnapshot({
     const topShare = top && positiveTotal > 0 ? Math.round((Number(top.net_amount) / positiveTotal) * 100) : 0;
 
     return (
-        <section className="overflow-hidden rounded-2xl border border-sky-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs">
             <div className="grid lg:grid-cols-[0.8fr_1.2fr]">
-                <div className="border-b border-sky-100 bg-sky-50 px-5 py-6 lg:border-b-0 lg:border-r sm:px-6">
-                    <h2 className="text-sm font-medium text-sky-800">Total expenses</h2>
+                <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-6 lg:border-b-0 lg:border-r sm:px-6">
+                    <h2 className="text-sm font-medium text-slate-700">Total expenses</h2>
                     <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-slate-950">
                         {money(overview.summary.net_amount, currency)}
                     </p>
@@ -294,7 +294,7 @@ function OperatingExpenseSnapshot({
                                 </div>
                                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                                     <div
-                                        className="h-full rounded-full bg-sky-600"
+                                        className="h-full rounded-full bg-blue-600"
                                         style={{ width: `${positiveTotal > 0 ? Math.max(3, (Number(row.net_amount) / positiveTotal) * 100) : 0}%` }}
                                     />
                                 </div>
@@ -351,7 +351,7 @@ function SalesSettlementStrip({
                     amount={settlement.card.amount}
                     documentCount={settlement.card.document_count}
                     currency={currency}
-                    accent="sky"
+                    accent="blue"
                 />
                 <SettlementTile
                     label="On credit"
@@ -385,11 +385,11 @@ function SettlementTile({
     amount: string;
     documentCount: number;
     currency: string;
-    accent: 'emerald' | 'sky' | 'amber';
+    accent: 'emerald' | 'blue' | 'amber';
 }) {
     const accentClasses = {
         emerald: 'bg-emerald-500',
-        sky: 'bg-sky-500',
+        blue: 'bg-blue-600',
         amber: 'bg-amber-500',
     };
 
@@ -431,7 +431,7 @@ function DocumentCard({
 }) {
     const tones = {
         emerald: 'from-emerald-500 to-teal-500',
-        blue: 'from-sky-500 to-blue-600',
+        blue: 'from-blue-600 to-indigo-600',
         amber: 'from-amber-400 to-orange-500',
         rose: 'from-rose-500 to-pink-600',
     };

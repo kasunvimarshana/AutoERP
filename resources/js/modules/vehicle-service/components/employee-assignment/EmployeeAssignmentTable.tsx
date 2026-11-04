@@ -150,12 +150,12 @@ function WorkforceLine({
     const commission = (line as CommissionAwareVehicleServiceJobLine).commission_default;
 
     return (
-        <div className={`border-l-4 p-4 transition-colors sm:p-5 ${isPickerOpen ? 'border-l-sky-600 bg-sky-50/70' : 'border-l-sky-200 bg-sky-50/25'}`}>
+        <div className={`border-l-4 p-4 transition-colors sm:p-5 ${isPickerOpen ? 'border-l-blue-600 bg-blue-50/70' : 'border-l-blue-200 bg-blue-50/20'}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <h4 className="break-words font-semibold text-slate-900">{line.line_number}. {line.description}</h4>
                     {supervisorLine && (
-                        <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800">Supervisor</span>
+                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800">Supervisor</span>
                     )}
                 </div>
                 <div className="shrink-0 text-sm text-slate-600">
@@ -167,22 +167,22 @@ function WorkforceLine({
             {!supervisorAssigned && (
                 <div className="mt-3">
                     {supervisorLine ? (
-                        <div className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-sm text-slate-700">
+                        <div className="rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2 text-sm text-slate-700">
                             {jobSupervisor ? formatNamedResource(jobSupervisor) : <span className="text-amber-700">Select a Job Card supervisor first.</span>}
                         </div>
                     ) : (
                         <button
                             type="button"
                             disabled={assigning}
-                            className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-slate-50 ${isPickerOpen ? 'border-sky-400 bg-white ring-1 ring-sky-200' : 'border-sky-200 bg-sky-50/70 hover:border-sky-400 hover:bg-sky-50'}`}
+                            className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50 ${isPickerOpen ? 'border-blue-500 bg-white ring-1 ring-blue-200' : 'border-blue-200 bg-blue-50/40 hover:border-blue-400 hover:bg-blue-50/70'}`}
                             onClick={onOpenPicker}
                         >
                             <span className={selectedEmployees.length > 0 ? 'font-medium text-slate-800' : 'text-slate-500'}>
                                 {selectedEmployees.length > 0
-                                    ? `${selectedEmployees.length} selected · Add employees`
+                                     ? `${selectedEmployees.length} selected · Add employees`
                                     : 'Select or add employees'}
                             </span>
-                            <span className="shrink-0 font-semibold text-sky-700">Choose</span>
+                            <span className="shrink-0 font-semibold text-blue-600">Choose</span>
                         </button>
                     )}
 
@@ -233,7 +233,7 @@ function WorkforceLine({
                                 </div>
                             </div>
                             <div className="flex items-center justify-end gap-1 border-t border-slate-200 pt-2 sm:border-0 sm:pt-0">
-                                <button type="button" className="min-h-9 rounded-md px-3 text-sm font-semibold text-sky-700 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onEdit(row)}>Edit</button>
+                                <button type="button" className="min-h-9 rounded-md px-3 text-sm font-semibold text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500" onClick={() => onEdit(row)}>Edit</button>
                                 <button type="button" className="min-h-9 rounded-md px-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={() => onRemove(row)}>Remove</button>
                             </div>
                         </div>

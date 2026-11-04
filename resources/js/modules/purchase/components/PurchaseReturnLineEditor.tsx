@@ -35,7 +35,7 @@ export function PurchaseReturnLineEditor({ lines, onChange, linesError, errorFor
     )));
     const clearQuantities = () => onChange(lines.map((line) => ({ ...line, include: false, returned_quantity: '0.000000' })));
     const columns: DataColumn<EditableReturnLine & { rowIndex: number }>[] = [
-        { key: 'include', header: 'Include', render: (line) => <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" checked={line.include} onChange={(event) => toggleInclude(line.rowIndex, event.target.checked)} /> },
+        { key: 'include', header: 'Include', render: (line) => <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={line.include} onChange={(event) => toggleInclude(line.rowIndex, event.target.checked)} /> },
         { key: 'item', header: 'Item', render: formatReturnItem },
         { key: 'quantity', header: 'Quantity now', render: (line) => line.returned_quantity, className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (line) => line.source.uom?.code ?? '-' },
@@ -43,7 +43,7 @@ export function PurchaseReturnLineEditor({ lines, onChange, linesError, errorFor
         { key: 'returnable', header: 'Remaining quantity', render: (line) => line.source.remaining_returnable_quantity, className: 'tabular-nums' },
         { key: 'reason', header: 'Reason', render: (line) => line.reason || '-' },
         { key: 'issue', header: 'Issue', render: (line) => <LineIssue line={line} errorForLine={errorForLine} /> },
-        { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
+        { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
     ];
     const rows = lines.map((line, index) => ({ ...line, rowIndex: index }));
 
@@ -55,7 +55,7 @@ export function PurchaseReturnLineEditor({ lines, onChange, linesError, errorFor
                 <Button type="button" variant="secondary" onClick={returnSelected}>Return Selected</Button>
             </div>
             {linesError ? <p className="mb-3 text-sm font-medium text-rose-700">{linesError}</p> : null}
-            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." mobileSummary={formatReturnItem} mobileDetails={(line) => <ReturnLineMobileDetails line={line} errorForLine={errorForLine} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
+            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." mobileSummary={formatReturnItem} mobileDetails={(line) => <ReturnLineMobileDetails line={line} errorForLine={errorForLine} />} mobileActions={(line) => <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
             <FormDrawer open={Boolean(dialog)} title="Edit return line" onClose={() => setDialog(null)}>
                 {dialog && (
                     <PurchaseReturnLineForm
@@ -95,7 +95,7 @@ function PurchaseReturnLineForm({ line, errorFor, onSave, onCancel }: {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                        <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" checked={draft.include} onChange={(event) => set('include', event.target.checked)} />
+                        <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={draft.include} onChange={(event) => set('include', event.target.checked)} />
                         Include
                     </label>
                     <DecimalInput label="Return quantity" value={draft.returned_quantity} error={errorFor('returned_quantity')} onChange={(event) => set('returned_quantity', event.target.value)} />

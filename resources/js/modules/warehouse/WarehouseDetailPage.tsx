@@ -21,7 +21,7 @@ export default function WarehouseDetailPage() {
     const record = warehouse.data;
     const locationColumns: DataColumn<WarehouseLocationSummary>[] = [
         { key: 'code', header: 'Code', render: (row) => row.code || '-' },
-        { key: 'name', header: 'Name', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/warehouse-locations/${row.id}`}>{row.name}</Link> },
+        { key: 'name', header: 'Name', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/warehouse-locations/${row.id}`}>{row.name}</Link> },
         { key: 'type', header: 'Type', render: (row) => row.type_label ?? humanize(row.type) },
         { key: 'path', header: 'Path', render: (row) => row.path ?? '-' },
         { key: 'default', header: 'Default', render: (row) => row.is_default ? <StatusBadge status="default" /> : '-' },

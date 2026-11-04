@@ -13,6 +13,8 @@ describe('Vehicle Rental navigation', () => {
             'Fleet Expenses',
             'Vehicle Finance',
             'Incident Evidence',
+            'Vehicle Availability',
+            'Reports & Matrix Sheet',
         ]);
     });
 });

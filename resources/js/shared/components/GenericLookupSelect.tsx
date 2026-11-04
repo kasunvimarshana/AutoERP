@@ -339,7 +339,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                     id={listboxId}
                     role="listbox"
                     aria-label={`${label} options`}
-                    className={`absolute z-30 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg ${dropdownPlacement === 'top' ? 'bottom-full mb-1' : 'mt-1'}`}
+                    className={`absolute z-30 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl ${dropdownPlacement === 'top' ? 'bottom-full mb-1' : 'mt-1'}`}
                 >
                     {minimumMessage && <LookupMessage>{minimumMessage}</LookupMessage>}
                     {(loading || waitingForDebounce) && visibleOptions.length === 0 && (
@@ -350,7 +350,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                             <p>{searchError}</p>
                             <button
                                 type="button"
-                                className="mt-1 font-medium text-sky-700 hover:underline"
+                                className="mt-1 font-medium text-blue-600 hover:text-blue-800 hover:underline"
                                 onMouseDown={(event) => event.preventDefault()}
                                 onClick={() => loadPage(searchText, 1, 'replace')}
                             >
@@ -373,7 +373,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                             type="button"
                             role="option"
                             aria-selected={selected}
-                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${active ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
+                            className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${active ? 'bg-blue-50 text-blue-900 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
                             onMouseDown={(event) => event.preventDefault()}
                             onMouseEnter={() => setActiveIndex(index)}
                             onClick={() => selectOption(option)}
@@ -387,7 +387,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                         <div className="mt-1 border-t border-slate-100 pt-1">
                             <button
                                 type="button"
-                                className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                                className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-400"
                                 disabled={loading || loadingMore}
                                 onMouseDown={(event) => event.preventDefault()}
                                 onClick={() => loadPage(loadedSearch, (meta?.current_page ?? 1) + 1, 'append')}

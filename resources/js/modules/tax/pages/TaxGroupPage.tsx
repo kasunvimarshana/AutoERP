@@ -39,7 +39,7 @@ export default function TaxGroupPage() {
             key: 'group',
             header: 'Group',
             render: (row) => canManage
-                ? <button type="button" className="text-left font-semibold text-sky-700 hover:underline" onClick={() => { setSelectedId(row.id); setForm({ code: row.code, name: row.name, is_default: row.is_default, active: row.active, lines: row.lines ?? [] }); }}>{row.code}<span className="block text-xs font-normal text-slate-500">{row.name}</span></button>
+                ? <button type="button" className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => { setSelectedId(row.id); setForm({ code: row.code, name: row.name, is_default: row.is_default, active: row.active, lines: row.lines ?? [] }); }}>{row.code}<span className="block text-xs font-normal text-slate-500">{row.name}</span></button>
                 : <span className="font-semibold text-slate-700">{row.code}<span className="block text-xs font-normal text-slate-500">{row.name}</span></span>,
         },
         { key: 'default', header: 'Default', render: (row) => row.is_default ? 'Yes' : 'No' },
@@ -55,7 +55,7 @@ export default function TaxGroupPage() {
 
     return (
         <>
-            <ContentHeader title="Tax groups" description="Sequence-driven reusable tax bundles for item, party, and document determination." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/tax/taxes">Taxes</Link>} />
+            <ContentHeader title="Tax groups" description="Sequence-driven reusable tax bundles for item, party, and document determination." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/tax/taxes">Taxes</Link>} />
             <ErrorAlert error={error ?? groups.error ?? lookups.error} />
             <div className={canManage ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
                 <div>

@@ -22,6 +22,7 @@ use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Models\RentalReservationHistory;
+use Modules\VehicleRental\Services\OperationalTime;
 
 final class RentalReservationService
 {
@@ -54,8 +55,8 @@ final class RentalReservationService
                 $this->assertVehicleAvailable(
                     $tenantId,
                     (int) $data['requested_vehicle_id'],
-                    $start->toIso8601String(),
-                    $end->toIso8601String(),
+                    OperationalTime::database($start),
+                    OperationalTime::database($end),
                 );
             }
 
@@ -116,21 +117,37 @@ final class RentalReservationService
                 $this->assertVehicleAvailable(
                     (int) $reservation->tenant_id,
                     (int) $merged['requested_vehicle_id'],
-                    $start->toIso8601String(),
-                    $end->toIso8601String(),
+                    OperationalTime::database($start),
+                    OperationalTime::database($end),
                     excludeReservationId: (int) $reservation->getKey(),
                 );
             }
 
+            $customerId = $data['customer_id'] ?? $reservation->customer_id;
+            $customerNameSnapshot = $reservation->customer_name_snapshot;
+            if (isset($data['customer_id']) && (int) $data['customer_id'] !== (int) $reservation->customer_id) {
+                $customer = Customer::query()->forTenant((int) $reservation->tenant_id)->findOrFail((int) $data['customer_id']);
+                $customerNameSnapshot = $customer->name;
+            }
+
+            $currencyId = $data['currency_id'] ?? $reservation->currency_id;
+            $currencyCodeSnapshot = $reservation->currency_code_snapshot;
+            if (isset($data['currency_id']) && (int) $data['currency_id'] !== (int) $reservation->currency_id) {
+                $currency = CurrencyModel::query()->where('is_active', true)->findOrFail((int) $data['currency_id']);
+                $currencyCodeSnapshot = $currency->code;
+            }
+
             $reservation->fill([
-                'customer_id' => $data['customer_id'] ?? $reservation->customer_id,
+                'customer_id' => $customerId,
+                'customer_name_snapshot' => $customerNameSnapshot,
                 'requested_vehicle_id' => array_key_exists('requested_vehicle_id', $data) ? $data['requested_vehicle_id'] : $reservation->requested_vehicle_id,
                 'requested_vehicle_category_id' => array_key_exists('requested_vehicle_category_id', $data) ? $data['requested_vehicle_category_id'] : $reservation->requested_vehicle_category_id,
                 'rental_mode' => isset($data['rental_mode']) ? ($data['rental_mode'] instanceof DriverMode ? $data['rental_mode'] : DriverMode::from((string) $data['rental_mode'])) : $reservation->rental_mode,
                 'billing_cycle' => isset($data['billing_cycle']) ? ($data['billing_cycle'] instanceof RentalBasis ? $data['billing_cycle'] : RentalBasis::from((string) $data['billing_cycle'])) : $reservation->billing_cycle,
                 'requested_start_at' => $start,
                 'requested_end_at' => $end,
-                'currency_id' => $data['currency_id'] ?? $reservation->currency_id,
+                'currency_id' => $currencyId,
+                'currency_code_snapshot' => $currencyCodeSnapshot,
                 'estimated_amount' => $data['estimated_amount'] ?? $reservation->estimated_amount,
                 'estimated_deposit_amount' => $data['estimated_deposit_amount'] ?? $reservation->estimated_deposit_amount,
                 'source' => $data['source'] ?? $reservation->source,
@@ -164,11 +181,13 @@ final class RentalReservationService
             }
 
             if ($to === RentalReservationStatus::Confirmed && $reservation->requested_vehicle_id !== null) {
+                $start = CarbonImmutable::parse((string) $reservation->requested_start_at);
+                $end = CarbonImmutable::parse((string) $reservation->requested_end_at);
                 $this->assertVehicleAvailable(
                     (int) $reservation->tenant_id,
                     (int) $reservation->requested_vehicle_id,
-                    $reservation->requested_start_at->toIso8601String(),
-                    $reservation->requested_end_at->toIso8601String(),
+                    OperationalTime::database($start),
+                    OperationalTime::database($end),
                     excludeReservationId: (int) $reservation->getKey(),
                 );
             }
@@ -276,27 +295,30 @@ final class RentalReservationService
 
     private function assertVehicleAvailable(int $tenantId, int $vehicleId, string $start, string $end, ?int $excludeReservationId = null): void
     {
-        if ($this->availability->conflicts($tenantId, $vehicleId, $start, $end)) {
+        if ($this->availability->conflicts($tenantId, $vehicleId, $start, $end, null, $excludeReservationId)) {
+            $hasReservationConflict = RentalReservation::query()
+                ->forTenant($tenantId)
+                ->where('requested_vehicle_id', $vehicleId)
+                ->where('status', RentalReservationStatus::Confirmed->value)
+                ->when($excludeReservationId !== null, fn (Builder $q) => $q->whereKeyNot($excludeReservationId))
+                ->where(function (Builder $q) use ($start, $end): void {
+                    $q->where('requested_end_at', '>', $start)
+                        ->where('requested_start_at', '<', $end);
+                })
+                ->exists();
+
+            if ($hasReservationConflict) {
+                throw new InvalidArgumentException('The vehicle has a conflicting confirmed reservation.');
+            }
+
             throw new InvalidArgumentException(VehicleUseAvailabilityBlocker::REASON);
-        }
-
-        $conflictingReservation = RentalReservation::query()
-            ->forTenant($tenantId)
-            ->where('requested_vehicle_id', $vehicleId)
-            ->where('status', RentalReservationStatus::Confirmed->value)
-            ->when($excludeReservationId !== null, fn (Builder $q) => $q->whereKeyNot($excludeReservationId))
-            ->where(fn (Builder $q) => $q->where('requested_start_at', '<', $end)->where('requested_end_at', '>', $start))
-            ->exists();
-
-        if ($conflictingReservation) {
-            throw new InvalidArgumentException('The vehicle has a conflicting confirmed reservation.');
         }
     }
 
     private function validateReferences(array $data, int $tenantId, ?int $organizationUnitId): void
     {
         Customer::query()->forTenant($tenantId)->findOrFail((int) $data['customer_id']);
-        CurrencyModel::query()->findOrFail((int) $data['currency_id']);
+        CurrencyModel::query()->where('is_active', true)->findOrFail((int) $data['currency_id']);
 
         if (! empty($data['requested_vehicle_id'])) {
             Vehicle::query()->forTenant($tenantId)->findOrFail((int) $data['requested_vehicle_id']);

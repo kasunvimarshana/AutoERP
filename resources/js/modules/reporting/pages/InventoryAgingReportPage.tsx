@@ -66,7 +66,7 @@ export default function InventoryAgingReportPage() {
     }));
 
     return <>
-        <ContentHeader title="Item Wise Ageing Report" description="Current stock by entry age." actions={<Link className="text-sm text-sky-700 hover:underline" to="/reports">All reports</Link>} />
+        <ContentHeader title="Item Wise Ageing Report" description="Current stock by entry age." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/reports">All reports</Link>} />
         <div className="space-y-5">
             <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-[1.3fr_1.2fr_1.2fr_1fr_1fr_auto] xl:items-end">
                 <Input label="Item Search" value={params.search ?? ''} onChange={(event) => setParams((current) => ({ ...current, page: 1, search: event.target.value }))} />

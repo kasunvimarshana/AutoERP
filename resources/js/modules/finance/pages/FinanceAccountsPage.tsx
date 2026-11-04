@@ -24,15 +24,15 @@ export default function FinanceAccountsPage() {
     const debounced = useDebounce(search);
     const result = useApi((signal) => listAccounts({ search: debounced || undefined, page, per_page: 25 }, signal), [debounced, page]);
     const columns: DataColumn<FinanceAccount>[] = [
-        { key: 'account', header: 'Account', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/finance/accounts/${row.id}`}>{row.code} - {row.name}</Link> },
+        { key: 'account', header: 'Account', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/finance/accounts/${row.id}`}>{row.code} - {row.name}</Link> },
         { key: 'type', header: 'Type', render: (row) => readableRelation(row.account_type) },
         { key: 'category', header: 'Category', render: (row) => readableRelation(row.account_category) },
         { key: 'normal', header: 'Normal balance', render: (row) => row.normal_balance ?? '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];
-    const actions = canManage || canViewReports ? <div className="flex gap-3 text-sm font-semibold">
-        {canViewReports && <Link className="text-sky-700 hover:underline" to="/finance/account-balances">Account balances</Link>}
-        {canManage && <Link className="rounded-lg bg-sky-600 px-4 py-2 text-white hover:bg-sky-700" to="/finance/accounts/create">New account</Link>}
+    const actions = canManage || canViewReports ? <div className="flex items-center gap-3 text-sm font-semibold">
+        {canViewReports && <Link className="text-blue-600 hover:text-blue-800 hover:underline" to="/finance/account-balances">Account balances</Link>}
+        {canManage && <Link className="rounded-lg bg-blue-600 px-4 py-2 text-white shadow-xs hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" to="/finance/accounts/create">New account</Link>}
     </div> : undefined;
 
     return (

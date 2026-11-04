@@ -23,7 +23,7 @@ export default function PurchaseDebitNoteListPage() {
     const debouncedSearch = useDebounce(search);
     const result = useApi((signal) => listPurchaseDebitNotes({ page, search: debouncedSearch || undefined, per_page: 15 }, signal), [page, debouncedSearch]);
     const columns: DataColumn<PurchaseDebitNote>[] = [
-        { key: 'number', header: 'Debit note', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/debit-notes/${row.id}`}>{row.debit_note_number ?? 'Debit note'}</Link> },
+        { key: 'number', header: 'Debit note', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/debit-notes/${row.id}`}>{row.debit_note_number ?? 'Debit note'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.debit_note_date) },
         { key: 'supplier', header: 'Supplier', render: (row) => row.supplier?.name ?? '-' },
         { key: 'amount', header: 'Amount', render: (row) => formatMoney(row.amount) },

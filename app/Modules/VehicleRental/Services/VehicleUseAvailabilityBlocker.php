@@ -6,7 +6,9 @@ namespace Modules\VehicleRental\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Vehicle\Contracts\VehicleAvailabilityBlockerInterface;
+use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
+use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Models\VehicleUse;
 
 final class VehicleUseAvailabilityBlocker implements VehicleAvailabilityBlockerInterface
@@ -18,10 +20,10 @@ final class VehicleUseAvailabilityBlocker implements VehicleAvailabilityBlockerI
         return $this->conflicts($tenantId, $vehicleId, $startsAt, $endsAt) ? self::REASON : null;
     }
 
-    public function conflicts(int $tenant, int $vehicle, string $start, ?string $end, ?int $exclude = null): bool
+    public function conflicts(int $tenant, int $vehicle, string $start, ?string $end, ?int $exclude = null, ?int $excludeReservation = null): bool
     {
         // A shared physical vehicle has one timeline across branches. Disclose no branch details.
-        return VehicleUse::query()->forTenant($tenant)->where('vehicle_id', $vehicle)
+        $hasUseConflict = VehicleUse::query()->forTenant($tenant)->where('vehicle_id', $vehicle)
             ->when($exclude !== null, fn (Builder $q) => $q->whereKeyNot($exclude))
             ->where(function (Builder $q) use ($start, $end): void {
                 $q->where(function (Builder $planned) use ($start, $end): void {
@@ -35,6 +37,18 @@ final class VehicleUseAvailabilityBlocker implements VehicleAvailabilityBlockerI
                     $returned->where('status', VehicleUseStatus::Returned->value)->where('returned_at', '>', $start)
                         ->when($end !== null, fn (Builder $range) => $range->where('handed_over_at', '<', $end));
                 });
+            })->lockForUpdate()->first(['id']) !== null;
+
+        if ($hasUseConflict) {
+            return true;
+        }
+
+        return RentalReservation::query()->forTenant($tenant)->where('requested_vehicle_id', $vehicle)
+            ->where('status', RentalReservationStatus::Confirmed->value)
+            ->when($excludeReservation !== null, fn (Builder $q) => $q->whereKeyNot($excludeReservation))
+            ->where(function (Builder $q) use ($start, $end): void {
+                $q->where('requested_end_at', '>', $start)
+                    ->when($end !== null, fn (Builder $range) => $range->where('requested_start_at', '<', $end));
             })->lockForUpdate()->first(['id']) !== null;
     }
 }

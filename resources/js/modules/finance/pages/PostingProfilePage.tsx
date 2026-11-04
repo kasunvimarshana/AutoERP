@@ -533,7 +533,7 @@ export default function PostingProfilePage() {
                     <div className="space-y-0.5">
                         <button
                             type="button"
-                            className="text-left font-semibold text-sky-700 hover:underline"
+                            className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                             onClick={() => viewOrEditProfile(row)}
                         >
                             {row.name}
@@ -621,7 +621,7 @@ export default function PostingProfilePage() {
             render: (row) => (
                 <div className="space-y-0.5">
                     {canManage ? (
-                        <button type="button" className="text-left font-semibold text-sky-700 hover:underline" onClick={() => editRole(row)}>
+                        <button type="button" className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => editRole(row)}>
                             {row.name}
                         </button>
                     ) : (
@@ -1126,10 +1126,10 @@ export default function PostingProfilePage() {
 
             {/* Architecture Explainer Banner (Collapsible) */}
             {!guideDismissed && (
-                <div className="rounded-xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-blue-50 p-5 shadow-sm">
+                <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/80 via-white to-blue-50/40 p-5 shadow-2xs">
                     <div className="flex items-start justify-between">
                         <div>
-                            <h3 className="text-base font-semibold text-sky-950">
+                            <h3 className="text-base font-semibold text-slate-900">
                                 The 3-Tier Finance Posting Pipeline
                             </h3>
                             <p className="mt-1 text-sm text-slate-600">
@@ -1142,42 +1142,42 @@ export default function PostingProfilePage() {
                     </div>
 
                     <div className="mt-4 grid gap-4 md:grid-cols-3">
-                        <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs">
+                        <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
                             <div className="flex items-center gap-2">
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">1</span>
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
                                 <h4 className="font-semibold text-slate-800">Posting Profiles</h4>
                             </div>
                             <p className="mt-1.5 text-xs text-slate-600">
                                 <strong>What:</strong> Blueprints for transaction events (e.g. Sales Invoice).
                             </p>
                             <p className="mt-1 text-xs text-slate-600">
-                                <strong>Role:</strong> Maps operational event line keys (e.g. <code className="text-sky-700">receivable</code>, <code className="text-sky-700">revenue</code>) to semantic Account Roles.
+                                <strong>Role:</strong> Maps operational event line keys (e.g. <code className="text-blue-700">receivable</code>, <code className="text-blue-700">revenue</code>) to semantic Account Roles.
                             </p>
                         </div>
 
-                        <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs">
+                        <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
                             <div className="flex items-center gap-2">
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">2</span>
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
                                 <h4 className="font-semibold text-slate-800">Account Roles</h4>
                             </div>
                             <p className="mt-1.5 text-xs text-slate-600">
-                                <strong>What:</strong> Abstract financial concepts (e.g. <code className="text-sky-700">Receivable</code>, <code className="text-sky-700">Sales Revenue</code>, <code className="text-sky-700">Cash</code>).
+                                <strong>What:</strong> Abstract financial concepts (e.g. <code className="text-blue-700">Receivable</code>, <code className="text-blue-700">Sales Revenue</code>, <code className="text-blue-700">Cash</code>).
                             </p>
                             <p className="mt-1 text-xs text-slate-600">
                                 <strong>Role:</strong> The semantic bridge. Ensures invoicing and payments don't hardcode General Ledger account codes.
                             </p>
                         </div>
 
-                        <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs">
+                        <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-2xs">
                             <div className="flex items-center gap-2">
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">3</span>
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
                                 <h4 className="font-semibold text-slate-800">Effective Assignments</h4>
                             </div>
                             <p className="mt-1.5 text-xs text-slate-600">
-                                <strong>What:</strong> Direct links between Account Roles and actual General Ledger accounts (e.g. <code className="text-sky-700">1100 - Accounts Receivable</code>).
+                                <strong>What:</strong> Direct links between Account Roles and actual General Ledger accounts (e.g. <code className="text-blue-700">1100 - Accounts Receivable</code>).
                             </p>
                             <p className="mt-1 text-xs text-slate-600">
-                                <strong>Role:</strong> Scope-specific (Branch vs Tenant Default) and time-bounded (<code className="text-sky-700">effective_from</code> to <code className="text-sky-700">effective_to</code>).
+                                <strong>Role:</strong> Scope-specific (Branch vs Tenant Default) and time-bounded (<code className="text-blue-700">effective_from</code> to <code className="text-blue-700">effective_to</code>).
                             </p>
                         </div>
                     </div>
@@ -1264,11 +1264,11 @@ export default function PostingProfilePage() {
                                     )}
 
                                     {!selectedProfile && !isReadOnlyProfileView && (
-                                        <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50/60 p-3">
-                                            <label className="block text-xs font-semibold uppercase tracking-wider text-sky-900">
+                                        <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+                                            <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900">
                                                 Quick-Fill with Standard Preset Template
                                             </label>
-                                            <p className="mt-0.5 text-xs text-sky-700">
+                                            <p className="mt-0.5 text-xs text-blue-700">
                                                 Select a canonical transaction event to auto-populate standard line keys and matching roles.
                                             </p>
                                             <div className="mt-2">
@@ -1532,7 +1532,7 @@ export default function PostingProfilePage() {
                                                 required
                                             />
                                             <p className="text-[11px] text-slate-500">
-                                                Normalized to lowercased snake_case (e.g. <code className="text-sky-700">receivable</code>, <code className="text-sky-700">tax_payable</code>).
+                                                Normalized to lowercased snake_case (e.g. <code className="text-blue-700">receivable</code>, <code className="text-blue-700">tax_payable</code>).
                                             </p>
                                         </div>
 
@@ -1922,7 +1922,7 @@ export default function PostingProfilePage() {
                                 <div>
                                     <h3 className="text-lg font-bold text-slate-900">1. Why does AutoERP use a 3-tier posting architecture?</h3>
                                     <p className="mt-1">
-                                        Traditional accounting systems hardcode specific General Ledger account numbers (such as <code className="text-sky-700">1100</code> or <code className="text-sky-700">4100</code>) directly into billing and checkout code. This causes severe limitations:
+                                        Traditional accounting systems hardcode specific General Ledger account numbers (such as <code className="text-blue-700">1100</code> or <code className="text-blue-700">4100</code>) directly into billing and checkout code. This causes severe limitations:
                                     </p>
                                     <ul className="list-disc pl-5 space-y-1">
                                         <li>Multi-branch enterprises cannot have different branches post to branch-specific cash or inventory accounts without duplicating transaction code.</li>
@@ -1931,20 +1931,20 @@ export default function PostingProfilePage() {
                                     </ul>
                                 </div>
 
-                                <div className="rounded-xl border border-sky-100 bg-sky-50/50 p-4">
-                                    <h4 className="font-semibold text-sky-950">The Solution: 3-Tier Semantic Abstraction</h4>
+                                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                                    <h4 className="font-semibold text-blue-950">The Solution: 3-Tier Semantic Abstraction</h4>
                                     <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                                        <div className="rounded-lg bg-white p-3 border border-sky-200">
+                                        <div className="rounded-lg bg-white p-3 border border-blue-200/80">
                                             <div className="font-semibold text-slate-900">Tier 1: Posting Profile</div>
                                             <div className="mt-1 text-xs text-slate-600">The blueprint. Answers: <em>"What lines does a Sales Invoice contain?"</em> (receivable, revenue, tax).</div>
                                         </div>
-                                        <div className="rounded-lg bg-white p-3 border border-sky-200">
+                                        <div className="rounded-lg bg-white p-3 border border-blue-200/80">
                                             <div className="font-semibold text-slate-900">Tier 2: Account Role</div>
-                                            <div className="mt-1 text-xs text-slate-600">The semantic meaning. Answers: <em>"What role does this line play?"</em> (<code className="text-sky-700">Receivable</code>, <code className="text-sky-700">Sales Revenue</code>).</div>
+                                            <div className="mt-1 text-xs text-slate-600">The semantic meaning. Answers: <em>"What role does this line play?"</em> (<code className="text-blue-700">Receivable</code>, <code className="text-blue-700">Sales Revenue</code>).</div>
                                         </div>
-                                        <div className="rounded-lg bg-white p-3 border border-sky-200">
+                                        <div className="rounded-lg bg-white p-3 border border-blue-200/80">
                                             <div className="font-semibold text-slate-900">Tier 3: Effective Assignment</div>
-                                            <div className="mt-1 text-xs text-slate-600">The GL account binding. Answers: <em>"For this branch and date, which GL account is Receivable?"</em> (<code className="text-sky-700">1100</code>).</div>
+                                            <div className="mt-1 text-xs text-slate-600">The GL account binding. Answers: <em>"For this branch and date, which GL account is Receivable?"</em> (<code className="text-blue-700">1100</code>).</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1956,18 +1956,18 @@ export default function PostingProfilePage() {
                                     </p>
                                     <ul className="list-disc pl-5 space-y-1">
                                         <li><strong>Tenant Default:</strong> Fallback configurations that apply across all branches unless overridden. Created once by central administration.</li>
-                                        <li><strong>Organization Unit:</strong> Branch or location-specific overrides. For instance, Branch Colombo can assign Account Role <code className="text-sky-700">cash</code> to <code className="text-sky-700">1011 - Cash Colombo</code>, while sharing the global Tenant Default for <code className="text-sky-700">tax_payable</code>.</li>
+                                        <li><strong>Organization Unit:</strong> Branch or location-specific overrides. For instance, Branch Colombo can assign Account Role <code className="text-blue-700">cash</code> to <code className="text-blue-700">1011 - Cash Colombo</code>, while sharing the global Tenant Default for <code className="text-blue-700">tax_payable</code>.</li>
                                     </ul>
                                 </div>
 
                                 <div>
                                     <h3 className="text-lg font-bold text-slate-900">3. Effective Dating & Audit Safety</h3>
                                     <p className="mt-1">
-                                        Both rules and assignments support <code className="text-sky-700">effective_from</code> and <code className="text-sky-700">effective_to</code> dates:
+                                        Both rules and assignments support <code className="text-blue-700">effective_from</code> and <code className="text-blue-700">effective_to</code> dates:
                                     </p>
                                     <ul className="list-disc pl-5 space-y-1">
                                         <li>Backdated invoice postings resolve through the rules and assignments that were valid on that posting date, maintaining true financial history.</li>
-                                        <li>Never delete historical rules or assignments. Always set an <code className="text-sky-700">effective_to</code> end date or deactivate with audit safety.</li>
+                                        <li>Never delete historical rules or assignments. Always set an <code className="text-blue-700">effective_to</code> end date or deactivate with audit safety.</li>
                                     </ul>
                                 </div>
                             </div>

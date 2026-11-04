@@ -27,7 +27,7 @@ export default function LedgerReportPage() {
     }, signal), [accountId, dateFrom, dateTo, page]);
 
     return <>
-        <ContentHeader title="General ledger" description="Posted ledger entries preserve transaction-currency evidence and expose base-currency accounting impact. Base balance after is a rebuildable chronological projection." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/reports/finance.ledger">Export report</Link>} />
+        <ContentHeader title="General ledger" description="Posted ledger entries preserve transaction-currency evidence and expose base-currency accounting impact. Base balance after is a rebuildable chronological projection." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/reports/finance.ledger">Export report</Link>} />
         <div className="mb-4 grid gap-3 md:grid-cols-3">
             <Select
                 value={accountId}
@@ -42,7 +42,7 @@ export default function LedgerReportPage() {
         {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} rowKey={(row) => row.id} columns={[
             { key: 'date', header: 'Date', render: (row) => formatDate(row.entry_date) },
             { key: 'account', header: 'Account', render: (row) => row.account ? `${row.account.code} - ${row.account.name}` : '-' },
-            { key: 'journal', header: 'Journal', render: (row) => row.journal_entry ? <Link className="text-sky-700 hover:underline" to={`/finance/journals/${row.journal_entry.id}`}>{row.journal_entry.journal_number}</Link> : '-' },
+            { key: 'journal', header: 'Journal', render: (row) => row.journal_entry ? <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/finance/journals/${row.journal_entry.id}`}>{row.journal_entry.journal_number}</Link> : '-' },
             { key: 'source', header: 'Source', render: (row) => row.source_number ?? row.source_type ?? '-' },
             { key: 'debit', header: 'Transaction debit', render: (row) => <MoneyDisplay value={row.debit} /> },
             { key: 'credit', header: 'Transaction credit', render: (row) => <MoneyDisplay value={row.credit} /> },

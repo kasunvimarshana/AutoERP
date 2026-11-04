@@ -156,7 +156,7 @@ function RelatedDocumentTimeline({ order }: { order: PurchaseOrder }) {
     ].sort((left, right) => (left.date ?? '').localeCompare(right.date ?? ''));
     const columns: DataColumn<PurchaseRelatedDocument>[] = [
         { key: 'type', header: 'Type', render: (row) => row.type.replaceAll('_', ' ') },
-        { key: 'document', header: 'Document', render: (row) => row.url ? <Link className="font-semibold text-sky-700 hover:underline" to={row.url}>{row.number ?? 'Document number unavailable'}</Link> : row.number ?? 'Document number unavailable' },
+        { key: 'document', header: 'Document', render: (row) => row.url ? <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={row.url}>{row.number ?? 'Document number unavailable'}</Link> : row.number ?? 'Document number unavailable' },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.date) },
         { key: 'status', header: 'Status', render: (row) => row.status ? <StatusBadge status={row.status} /> : '-' },
     ];

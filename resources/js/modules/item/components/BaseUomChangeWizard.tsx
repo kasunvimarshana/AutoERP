@@ -44,7 +44,7 @@ export default function BaseUomChangeWizard({ itemId, onApplied }: { itemId: num
                 <div className="flex flex-wrap gap-2">
                     {['Usage audit', 'Select UOM', 'Preview', 'Confirm', 'Result'].map((label, index) => {
                         const number = index + 1;
-                        return <span key={label} className={`rounded-full px-3 py-1 text-xs font-semibold ${step === number ? 'bg-sky-600 text-white' : step > number ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{number}. {label}</span>;
+                        return <span key={label} className={`rounded-full px-3 py-1 text-xs font-semibold ${step === number ? 'bg-blue-600 text-white' : step > number ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{number}. {label}</span>;
                     })}
                 </div>
             </Panel>

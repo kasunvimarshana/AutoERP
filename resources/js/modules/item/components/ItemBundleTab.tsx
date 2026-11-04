@@ -96,7 +96,7 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
             lookupKind="bundle-child"
         />
         {child?.is_stockable && (
-            <p className="rounded-lg bg-sky-50 p-3 text-sm text-sky-800">
+            <p className="rounded-lg border border-blue-100 bg-blue-50/80 p-3 text-sm text-blue-900">
                 This quantity is consumed from inventory when the service job starts. Its cost comes from the item’s inventory valuation.
             </p>
         )}
@@ -136,7 +136,7 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
 }
 
 function Actions({ edit, remove }: { edit: () => void; remove: () => void }) {
-    return <div className="flex items-center justify-end gap-2"><button type="button" className="rounded px-2 py-1 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={edit}>Edit line</button><button type="button" className="rounded px-2 py-1 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={remove}>Remove line</button></div>;
+    return <div className="flex items-center justify-end gap-2"><button type="button" className="rounded-md px-2.5 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" onClick={edit}>Edit line</button><button type="button" className="rounded-md px-2.5 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500" onClick={remove}>Remove line</button></div>;
 }
 
 function resolveBundleLineType(item: ItemSummary): BundleLineType {

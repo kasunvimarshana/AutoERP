@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from './Button';
+import { Input } from './Input';
 import { Modal } from './Modal';
+import { Textarea } from './Textarea';
 
 const DATE_PART_WIDTH = 2;
 const MINIMUM_REASON_LENGTH = 1;
@@ -80,30 +82,24 @@ function ReversalDialogContent({
                     Reversal creates opposite financial entries. The original document and its audit evidence remain unchanged.
                 </p>
 
-                <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-                    <span>Reversal date</span>
-                    <input
-                        type="date"
-                        required
-                        value={reversalDate}
-                        onChange={(event) => setReversalDate(event.target.value)}
-                        disabled={loading}
-                        className="min-h-10 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
-                    />
-                </label>
+                <Input
+                    label="Reversal date"
+                    type="date"
+                    required
+                    value={reversalDate}
+                    onChange={(event) => setReversalDate(event.target.value)}
+                    disabled={loading}
+                />
 
-                <label className="block space-y-1.5 text-sm font-medium text-slate-700">
-                    <span>Business reason</span>
-                    <textarea
-                        required
-                        rows={4}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                        disabled={loading}
-                        placeholder="Explain why the posted document must be reversed."
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
-                    />
-                </label>
+                <Textarea
+                    label="Business reason"
+                    required
+                    rows={4}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    disabled={loading}
+                    placeholder="Explain why the posted document must be reversed."
+                />
 
                 {error ? <p role="alert" className="text-sm font-medium text-rose-600">{error}</p> : null}
 

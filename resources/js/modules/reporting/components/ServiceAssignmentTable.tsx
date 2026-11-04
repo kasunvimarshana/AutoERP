@@ -52,7 +52,7 @@ export function ServiceAssignmentTable({
                             {columns.map(([key, label, sort]) => (
                                 <th key={key} className="whitespace-nowrap px-4 py-3">
                                     {sort ? (
-                                        <button type="button" className="font-semibold transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 rounded px-1" onClick={() => onSort(sort)}>
+                                        <button type="button" className="font-semibold transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1" onClick={() => onSort(sort)}>
                                             {label}{sortKey === sort ? ` ${direction === 'asc' ? 'Asc' : 'Desc'}` : ''}
                                         </button>
                                     ) : label}

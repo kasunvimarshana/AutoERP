@@ -45,7 +45,7 @@ export default function PaymentMethodListPage() {
     }
 
     const columns: DataColumn<PaymentMethod>[] = [
-        { key: 'code', header: 'Code', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/methods/${row.id}/edit`}>{row.code}</Link> },
+        { key: 'code', header: 'Code', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/payments/methods/${row.id}/edit`}>{row.code}</Link> },
         { key: 'name', header: 'Name', render: (row) => row.name },
         { key: 'type', header: 'Type', render: (row) => humanize(row.method_type) },
         { key: 'direction', header: 'Direction', render: (row) => humanize(row.direction_allowed) },

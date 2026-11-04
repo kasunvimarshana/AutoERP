@@ -57,7 +57,7 @@ export default function VoucherListPage() {
             header: 'Voucher',
             render: (row) => (
                 <div className="min-w-44">
-                    <Link className="font-semibold text-sky-700 hover:text-sky-900" to={row.voucher_url ?? `/vouchers/${row.voucher_type}/${row.source_id}?source_kind=${row.source_kind ?? ''}`}>
+                    <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={row.voucher_url ?? `/vouchers/${row.voucher_type}/${row.source_id}?source_kind=${row.source_kind ?? ''}`}>
                         {row.voucher_number}
                     </Link>
                     <div className="text-xs text-slate-500">{row.voucher_label ?? humanize(row.voucher_type)}</div>
@@ -70,7 +70,7 @@ export default function VoucherListPage() {
         { key: 'amount', header: 'Amount', className: 'text-right', render: (row) => <MoneyDisplay value={row.transaction_amount} currency={row.currency_code ?? undefined} /> },
         { key: 'document_status', header: 'Document', render: (row) => <StatusBadge status={row.document_status} /> },
         { key: 'posting_status', header: 'Posting', render: (row) => <StatusBadge status={row.posting_status} /> },
-        { key: 'actions', header: '', className: 'text-right', mobile: false, render: (row) => <Link className="text-sm font-semibold text-sky-700" to={row.voucher_url ?? `/vouchers/${row.voucher_type}/${row.source_id}?source_kind=${row.source_kind ?? ''}`}>Open</Link> },
+        { key: 'actions', header: '', className: 'text-right', mobile: false, render: (row) => <Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={row.voucher_url ?? `/vouchers/${row.voucher_type}/${row.source_id}?source_kind=${row.source_kind ?? ''}`}>Open</Link> },
     ];
 
     return (
@@ -114,7 +114,7 @@ export default function VoucherListPage() {
                         emptyMessage="No vouchers found."
                         mobileSummary={(row) => row.voucher_number ?? '-'}
                         rowBadge={(row) => <StatusBadge status={row.document_status} />}
-                        mobileActions={(row) => <Link className="text-sm font-semibold text-sky-700" to={row.voucher_url ?? `/vouchers/${row.voucher_type}/${row.source_id}?source_kind=${row.source_kind ?? ''}`}>Open</Link>}
+                        mobileActions={(row) => <Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={row.voucher_url ?? `/vouchers/${row.voucher_type}/${row.source_id}?source_kind=${row.source_kind ?? ''}`}>Open</Link>}
                     />
                     <Pagination meta={vouchers.data?.meta} onPageChange={(nextPage) => setFilter('page', String(nextPage))} />
                 </>

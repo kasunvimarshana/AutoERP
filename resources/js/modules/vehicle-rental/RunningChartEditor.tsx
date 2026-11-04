@@ -59,19 +59,32 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
     return <form aria-label="Running Chart" onSubmit={submit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h4 className="font-semibold">{correction ? `Correct ${chart?.reference}` : chart ? 'Edit draft Running Chart' : 'Record Running Chart'}</h4>
         <p>Record actual usage in {operationalTimeZoneLabel()}. Leave unknown observations blank; enter zero only when verified.</p><ErrorAlert error={error} inline />
-        <fieldset disabled={saving} className="space-y-3">
+        <fieldset disabled={saving} className="space-y-4">
             <Input label="Chart reference" required value={reference} onChange={e => setReference(e.target.value)} error={error?.fields.reference?.[0]} />
-            <Input label="Usage start" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={start} onChange={e => setStart(e.target.value)} error={error?.fields.starts_at?.[0]} />
-            <Input label="Usage end" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={start || undefined} required value={end} onChange={e => setEnd(e.target.value)} error={error?.fields.ends_at?.[0]} />
-            {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}{decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
+            <div className="grid gap-3 sm:grid-cols-2">
+                <Input label="Usage start" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={start} onChange={e => setStart(e.target.value)} error={error?.fields.starts_at?.[0]} />
+                <Input label="Usage end" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={start || undefined} required value={end} onChange={e => setEnd(e.target.value)} error={error?.fields.ends_at?.[0]} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+                {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}
+                {decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
+            </div>
             <details><summary className="cursor-pointer font-medium">Additional usage observations</summary><div className="space-y-3 pt-3">
-                {decimal('garage_km', DISTANCE_LABELS.garage_km)}{decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
-                {Object.entries(COUNT_LABELS).map(([key, label]) => count(key, label))}
-                <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} error={error?.fields.ac_mode?.[0]} />
-                <Select label="Driver identity" placeholder="Not recorded" options={driverSourceOptions} value={driverSource} onChange={e => { const source = e.target.value as DriverIdentitySource | ''; setDriverSource(source); if (source !== DriverIdentitySource.Employee) setDriverEmployee(null); }} error={error?.fields.driver_identity_source?.[0]} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {decimal('garage_km', DISTANCE_LABELS.garage_km)}
+                    {decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {Object.entries(COUNT_LABELS).map(([key, label]) => count(key, label))}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} error={error?.fields.ac_mode?.[0]} />
+                    <Select label="Driver identity" placeholder="Not recorded" options={driverSourceOptions} value={driverSource} onChange={e => { const source = e.target.value as DriverIdentitySource | ''; setDriverSource(source); if (source !== DriverIdentitySource.Employee) setDriverEmployee(null); }} error={error?.fields.driver_identity_source?.[0]} />
+                </div>
                 {driverSource === DriverIdentitySource.Employee && <LookupSelect label="Employee driver" value={driverEmployee} onChange={setDriverEmployee} search={employees} required error={error?.fields.driver_employee_id?.[0]} />}
-                {driverSource === DriverIdentitySource.External && <><Input label="External driver name" value={externalDriverName} onChange={e => setExternalDriverName(e.target.value)} required error={error?.fields.driver_name_snapshot?.[0]} /><Input label="External driver reference" value={externalDriverReference} onChange={e => setExternalDriverReference(e.target.value)} required error={error?.fields.driver_reference_snapshot?.[0]} hint="Use a stable business reference, not a temporary note." /></>}
-                <Textarea label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
+                {driverSource === DriverIdentitySource.External && <div className="grid gap-3 sm:grid-cols-2"><Input label="External driver name" value={externalDriverName} onChange={e => setExternalDriverName(e.target.value)} required error={error?.fields.driver_name_snapshot?.[0]} /><Input label="External driver reference" value={externalDriverReference} onChange={e => setExternalDriverReference(e.target.value)} required error={error?.fields.driver_reference_snapshot?.[0]} hint="Use a stable business reference, not a temporary note." /></div>}
+                <Textarea label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} />
+                <p className="text-xs text-slate-500">This is operational evidence only; employee pay remains owned by HR.</p>
                 <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
             </div></details>
         </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !start || !end || (driverSource === DriverIdentitySource.Employee && !driverEmployee) || (driverSource === DriverIdentitySource.External && (!externalDriverName.trim() || !externalDriverReference.trim()))}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>

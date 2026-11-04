@@ -38,16 +38,16 @@ export default function SupplierListPage() {
     }, signal), [debounced, page]);
 
     const columns: DataColumn<SupplierSummary>[] = [
-        { key: 'supplier', header: 'Supplier', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/suppliers/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code} / {row.supplier_number}</span></Link> },
+        { key: 'supplier', header: 'Supplier', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/suppliers/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code} / {row.supplier_number}</span></Link> },
         { key: 'type', header: 'Type', render: (row) => row.supplier_type.replaceAll('_', ' ') },
         { key: 'contact', header: 'Contact', render: (row) => <WhatsAppContactCell contact={row.whatsapp_contact} email={row.email} phone={row.phone} /> },
         { key: 'total_due', header: 'Total Due', render: (row) => <div className="space-y-1">{(row.total_due ?? []).map((total, index) => <div key={`${total.currency_code ?? 'default'}-${index}`}><MoneyDisplay value={total.amount} currency={total.currency_code ?? row.default_currency?.code ?? undefined} /></div>)}</div> },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'actions', header: '', className: 'text-right', render: (row) => canUpdate ? (
             <div className="flex items-center justify-end gap-2">
-                <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500" to={`/suppliers/${row.id}/edit`}>Edit</Link>
-                <button type="button" className={`rounded px-2 py-1 text-sm font-semibold transition focus:outline-none focus:ring-2 ${row.status === 'active' ? 'text-amber-700 hover:bg-amber-50 hover:text-amber-800 focus:ring-amber-500' : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 focus:ring-emerald-500'}`} onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button>
-                <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-sky-700 transition hover:bg-sky-50 hover:text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => { setStatusSupplier(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button>
+                <Link className="rounded-md px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" to={`/suppliers/${row.id}/edit`}>Edit</Link>
+                <button type="button" className={`rounded-md px-2 py-1 text-sm font-semibold transition focus-visible:outline-hidden focus-visible:ring-2 ${row.status === 'active' ? 'text-amber-700 hover:bg-amber-50 hover:text-amber-800 focus-visible:ring-amber-500' : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:ring-emerald-500'}`} onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+                <button type="button" className="rounded-md px-2 py-1 text-sm font-semibold text-blue-600 transition hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" onClick={() => { setStatusSupplier(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button>
             </div>
         ) : null },
     ];

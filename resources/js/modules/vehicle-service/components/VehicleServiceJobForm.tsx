@@ -281,7 +281,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                                         <p className="text-sm text-slate-500">No matching vehicle found.</p>
                                         <button
                                             type="button"
-                                            className="w-full rounded-lg border border-dashed border-sky-200 bg-sky-50 px-3 py-3 text-left text-sm text-sky-900 hover:border-sky-300 hover:bg-sky-100"
+                                            className="w-full rounded-lg border border-dashed border-blue-200 bg-blue-50/70 px-3 py-3 text-left text-sm text-blue-900 hover:border-blue-300 hover:bg-blue-100/70 transition"
                                             onMouseDown={(event) => event.preventDefault()}
                                             onClick={() => {
                                                 setQuickVehicleNumber(vehicleNumber);
@@ -289,7 +289,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                                             }}
                                         >
                                             <span className="block font-semibold">Register new vehicle</span>
-                                            <span className="mt-1 block text-xs text-sky-700">Create vehicle {vehicleNumber} and continue this job without leaving the screen.</span>
+                                            <span className="mt-1 block text-xs text-blue-700">Create vehicle {vehicleNumber} and continue this job without leaving the screen.</span>
                                         </button>
                                     </div>
                                 );
@@ -351,7 +351,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             onChange={(event) => applyJobType(event.target.value as VehicleServiceJobType | '')}
                         />
                     </div>
-                    {vehicle && <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
+                    {vehicle && <div className="mt-4 grid gap-3 rounded-lg border border-blue-100 bg-blue-50/50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
                         <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
                         <VehicleContext label="Make" value={vehicle.make?.name ?? '-'} />
                         <VehicleContext label="Model" value={vehicle.model?.name ?? '-'} />

@@ -42,7 +42,7 @@ export default function TaxEditPage() {
     if (!canViewTax) {
         return (
             <>
-                <ContentHeader title="Edit tax" actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/tax/taxes">Back to taxes</Link>} />
+                <ContentHeader title="Edit tax" actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/tax/taxes">Back to taxes</Link>} />
                 <Panel title="Tax view permission required">
                     <p className="text-sm text-slate-600">Tax details must be viewable before they can be edited.</p>
                 </Panel>
@@ -54,7 +54,7 @@ export default function TaxEditPage() {
     if (!tax.data) {
         return (
             <>
-                <ContentHeader title="Edit tax" actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/tax/taxes">Back to taxes</Link>} />
+                <ContentHeader title="Edit tax" actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/tax/taxes">Back to taxes</Link>} />
                 <ErrorAlert error={tax.error} />
             </>
         );
@@ -121,7 +121,7 @@ function TaxEditor({ tax, lookups, loadError, reload }: {
 
     return (
         <>
-            <ContentHeader title={`Edit ${tax.code}`} description="Maintain tax metadata and effective-dated rates." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/tax/taxes">Back to taxes</Link>} />
+            <ContentHeader title={`Edit ${tax.code}`} description="Maintain tax metadata and effective-dated rates." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/tax/taxes">Back to taxes</Link>} />
             <ErrorAlert error={error ?? loadError} />
             <Panel title="Tax details">
                 <div className="grid gap-4 md:grid-cols-2">

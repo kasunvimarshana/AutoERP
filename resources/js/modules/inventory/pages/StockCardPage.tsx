@@ -162,7 +162,7 @@ export default function StockCardPage() {
                                 {result.rows.map((row) => <tr key={row.movement_number} className="transition-colors hover:bg-blue-50/40">
                                     <td className="whitespace-nowrap px-4 py-3 text-slate-700">{new Date(row.posted_at).toLocaleString()}</td>
                                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.document_date ?? '—'}</td>
-                                    <td className="px-4 py-3">{row.document?.url ? <Link className="font-medium text-sky-700 hover:underline" to={row.document.url}>{row.document.label}</Link> : row.document?.label ?? row.movement_number}</td>
+                                    <td className="px-4 py-3">{row.document?.url ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={row.document.url}>{row.document.label}</Link> : row.document?.label ?? row.movement_number}</td>
                                     <td className="px-4 py-3 text-slate-700">{row.description ?? row.type}</td>
                                     <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.quantity_in === '0.000000' ? '—' : row.quantity_in}</td>
                                     <td className="px-4 py-3 text-right tabular-nums text-slate-700">{row.quantity_out === '0.000000' ? '—' : row.quantity_out}</td>

@@ -7,6 +7,7 @@ import {
     type RentalExpense,
 } from './rentalExpenseApi';
 import * as rentalExpenseApi from './rentalExpenseApi';
+import * as agreementApi from './agreementApi';
 
 const session = vi.hoisted(() => ({ roles: [] as string[], permissions: [] as string[], permissionsLoaded: true }));
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => session }));
@@ -18,6 +19,10 @@ vi.mock('./rentalExpenseApi', async (importOriginal) => {
         transitionRentalExpense: vi.fn(),
     };
 });
+vi.mock('./agreementApi', () => ({
+    searchCustomerAgreements: vi.fn(),
+    searchOwnerAgreements: vi.fn(),
+}));
 
 const mockExpense: RentalExpense = {
     id: 1,
@@ -45,6 +50,9 @@ beforeEach(() => {
     vi.mocked(rentalExpenseApi.listRentalExpenses).mockResolvedValue({
         data: [mockExpense],
         meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
+    });
+    vi.mocked(agreementApi.searchCustomerAgreements).mockResolvedValue({
+        data: [{ id: 44, name: 'CA-2026-0044 — Metro Logistics' }],
     });
 });
 
@@ -81,7 +89,7 @@ describe('RentalExpensesPage', () => {
                 1,
                 1,
                 ExpenseStatus.Submitted,
-                undefined
+                undefined,
             );
         });
     });
@@ -106,7 +114,48 @@ describe('RentalExpensesPage', () => {
                 1,
                 1,
                 ExpenseStatus.Reversed,
-                undefined
+                undefined,
+            );
+        });
+    });
+
+    it('allows manager to allocate approved expense to customer agreement', async () => {
+        session.permissions = ['vehicle-rental.expenses.view', 'vehicle-rental.expenses.manage'];
+        vi.mocked(rentalExpenseApi.listRentalExpenses).mockResolvedValue({
+            data: [{ ...mockExpense, status: ExpenseStatus.Approved }],
+            meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
+        });
+        vi.mocked(rentalExpenseApi.transitionRentalExpense).mockResolvedValue({
+            ...mockExpense,
+            status: ExpenseStatus.Allocated,
+            row_version: 2,
+        });
+
+        render(<RentalExpensesPage />);
+        const reviewBtn = await screen.findByRole('button', { name: 'Review' });
+        fireEvent.click(reviewBtn);
+
+        const allocateBtn = await screen.findByRole('button', { name: 'Allocate to Agreement' });
+        fireEvent.click(allocateBtn);
+
+        // Select Customer Agreement
+        fireEvent.change(screen.getByRole('combobox', { name: 'Target Customer Agreement' }), { target: { value: 'Metro' } });
+        fireEvent.click(await screen.findByRole('option', { name: 'CA-2026-0044 — Metro Logistics' }));
+
+        const confirmBtn = screen.getByRole('button', { name: 'Confirm Allocation' });
+        expect(confirmBtn).toBeEnabled();
+        fireEvent.click(confirmBtn);
+
+        await waitFor(() => {
+            expect(rentalExpenseApi.transitionRentalExpense).toHaveBeenCalledWith(
+                1,
+                1,
+                ExpenseStatus.Allocated,
+                [{
+                    allocation_type: 'customer_recovery',
+                    net_amount: '15000.00',
+                    target_customer_agreement_id: 44,
+                }],
             );
         });
     });

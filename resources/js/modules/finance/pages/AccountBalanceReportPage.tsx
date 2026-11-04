@@ -26,7 +26,7 @@ export default function AccountBalanceReportPage() {
     }, signal), [debounced, dateFrom, dateTo, page]);
 
     return <>
-        <ContentHeader title="Account balances" description="Opening, period movement, and closing balances from posted ledger entries." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/reports/finance.account-balances">Export report</Link>} />
+        <ContentHeader title="Account balances" description="Opening, period movement, and closing balances from posted ledger entries." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/reports/finance.account-balances">Export report</Link>} />
         <div className="mb-4 grid gap-3 md:grid-cols-3">
             <Input type="search" placeholder="Search account code or name" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
             <Input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} />
@@ -34,7 +34,7 @@ export default function AccountBalanceReportPage() {
         </div>
         <ErrorAlert error={result.error} />
         {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} rowKey={(row) => row.account_id} columns={[
-            { key: 'account', header: 'Account', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/finance/accounts/${row.account_id}`}>{row.account_code} - {row.account_name}</Link> },
+            { key: 'account', header: 'Account', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/finance/accounts/${row.account_id}`}>{row.account_code} - {row.account_name}</Link> },
             { key: 'openingDr', header: 'Opening Dr', render: (row) => <MoneyDisplay value={row.opening_debit} /> },
             { key: 'openingCr', header: 'Opening Cr', render: (row) => <MoneyDisplay value={row.opening_credit} /> },
             { key: 'periodDr', header: 'Period Dr', render: (row) => <MoneyDisplay value={row.period_debit} /> },

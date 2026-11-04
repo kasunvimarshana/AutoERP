@@ -63,7 +63,7 @@ export function EmployeeCommissionTable({
                                 {columns.map(([key, label, sort]) => (
                                     <th key={key} className="whitespace-nowrap px-4 py-3">
                                         {sort ? (
-                                            <button type="button" className="font-semibold transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 rounded px-1" onClick={() => onSort(sort)}>
+                                            <button type="button" className="font-semibold transition hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1" onClick={() => onSort(sort)}>
                                                 {label}{sortKey === sort ? ` ${direction === 'asc' ? 'Asc' : 'Desc'}` : ''}
                                             </button>
                                         ) : label}
@@ -79,11 +79,11 @@ export function EmployeeCommissionTable({
 
                                 if (groupChanged) {
                                     result.push(
-                                        <tr key={`group-${row.group_key}-${row.id}`} className="bg-sky-50">
-                                            <td colSpan={columns.length} className="px-3 py-2 font-semibold text-sky-950">
+                                        <tr key={`group-${row.group_key}-${row.id}`} className="bg-blue-50/70">
+                                            <td colSpan={columns.length} className="px-3 py-2 font-semibold text-blue-950">
                                                 {row.group_label}
                                                 {group && (
-                                                    <span className="ml-3 font-normal text-sky-800">
+                                                    <span className="ml-3 font-normal text-blue-800">
                                                         {group.total_jobs} jobs · {formatQuantity(group.total_hours)} hours · {formatMoney(group.earned_commission)} earned · {formatMoney(group.pending_commission)} pending · {formatMoney(group.total_commission)} total
                                                     </span>
                                                 )}
@@ -95,11 +95,11 @@ export function EmployeeCommissionTable({
                                 result.push(
                                     <tr key={row.id} className="transition-colors hover:bg-blue-50/40">
                                         <td className="whitespace-nowrap px-3 py-3">
-                                            <button type="button" className="font-semibold text-sky-700 hover:underline" onClick={() => select(row)}>
+                                            <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => select(row)}>
                                                 {row.employee_code} {row.employee_name}
                                             </button>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3"><Link className="text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link></td>
+                                        <td className="whitespace-nowrap px-3 py-3"><Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link></td>
                                         <td className="whitespace-nowrap px-3 py-3">{formatDate(row.job_date)}</td>
                                         <td className="whitespace-nowrap px-3 py-3">{row.vehicle_label || '-'}</td>
                                         <td className="max-w-xs px-3 py-3 text-slate-700">{row.line_description || '-'}</td>

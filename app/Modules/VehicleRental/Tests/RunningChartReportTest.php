@@ -69,6 +69,25 @@ final class RunningChartReportTest extends TestCase
             self::assertSame(50, $data['summary']['final_cumulative_mileage']);
             self::assertSame('1.50', $data['summary']['total_normal_ot_hours']);
             self::assertSame('1.50', $data['summary']['total_ot_hours']);
+
+            // Verify that agreed included_km in terms is accurately read and excess_km is computed
+            $currentTerms = DB::table('vehicle_rental_customer_agreements')
+                ->where('id', $use->customer_agreement_id)
+                ->value('terms');
+            $decodedTerms = json_decode((string) $currentTerms, true) ?? [];
+            $decodedTerms['included_km'] = '30.000000';
+            DB::table('vehicle_rental_customer_agreements')
+                ->where('id', $use->customer_agreement_id)
+                ->update(['terms' => json_encode($decodedTerms)]);
+
+            $dataWithTerms = $reports->generate($context, [
+                'agreement_id' => (int) $use->customer_agreement_id,
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+            ]);
+
+            self::assertSame(30, $dataWithTerms['summary']['included_km']);
+            self::assertSame(20, $dataWithTerms['summary']['excess_km']); // 50 km total - 30 km included = 20 km excess
         });
     }
 

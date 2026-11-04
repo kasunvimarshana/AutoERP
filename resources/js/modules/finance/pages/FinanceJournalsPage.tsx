@@ -32,7 +32,7 @@ export default function FinanceJournalsPage() {
         per_page: 25,
     }, signal), [debounced, status, page]);
     const columns: DataColumn<JournalEntry>[] = [
-        { key: 'journal', header: 'Journal', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/finance/journals/${row.id}`}>{row.journal_number}</Link> },
+        { key: 'journal', header: 'Journal', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/finance/journals/${row.id}`}>{row.journal_number}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.journal_date) },
         { key: 'type', header: 'Type', render: (row) => row.journal_type.replaceAll('_', ' ') },
         { key: 'source', header: 'Source', render: (row) => row.source_number ?? row.source_type ?? '-' },
@@ -45,7 +45,7 @@ export default function FinanceJournalsPage() {
         <ContentHeader
             title="Journal entries"
             description="Draft, posted, cancelled, and reversed accounting journals."
-            actions={canCreate ? <Link className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700" to="/finance/journals/create">New journal</Link> : undefined}
+            actions={canCreate ? <Link className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" to="/finance/journals/create">New journal</Link> : undefined}
         />
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(16rem,1fr)_14rem]">
             <Input type="search" placeholder="Search journal or source number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

@@ -93,7 +93,7 @@ export default function StockBalanceReportPage() {
     const resetOpen = () => { setOpenKey(null); setDetails(null); };
 
     return <>
-        <ContentHeader title="Stock Balance" description="Current item quantities by warehouse and location." actions={<Link to="/reports" className="text-sm text-sky-700 hover:underline">All reports</Link>} />
+        <ContentHeader title="Stock Balance" description="Current item quantities by warehouse and location." actions={<Link to="/reports" className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline">All reports</Link>} />
         <div className="space-y-5">
             <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_auto_auto] xl:items-end">
                 <Input label="Item search" placeholder="Name, code or SKU" value={params.search ?? ''} onChange={(event) => { resetOpen(); setParams((current) => ({ ...current, page: 1, search: event.target.value })); }} />

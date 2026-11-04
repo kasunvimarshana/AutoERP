@@ -35,7 +35,7 @@ const invoiceColumns = [
         key: 'invoice',
         header: 'Invoice',
         render: (row: CustomerOutstandingInvoiceRow) => <>
-            <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${row.invoice.id}`}>{row.invoice.number}</Link>
+            <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/invoices/${row.invoice.id}`}>{row.invoice.number}</Link>
             {row.invoice.service_job_number && <span className="block text-xs text-slate-500">Service job: {row.invoice.service_job_number}</span>}
         </>,
     },
@@ -79,7 +79,7 @@ export function CustomerOutstandingGroupTable({ rows, selected, invoiceResult, i
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {rows.map((row) => <Fragment key={`${row.customer.id}-${row.currency.code}`}>
-                        <tr className={`transition-colors ${isSelected(row) ? 'bg-sky-50' : 'hover:bg-blue-50/40'}`}>
+                        <tr className={`transition-colors ${isSelected(row) ? 'bg-blue-50/70' : 'hover:bg-blue-50/40'}`}>
                             <td className="px-4 py-3"><CustomerToggle row={row} open={isSelected(row)} detailsId={detailsId(row, 'desktop')} onSelect={onSelect} /></td>
                             <td className="px-4 py-3 text-right">{row.invoice_count}</td>
                             <td className="px-4 py-3 text-right"><MoneyDisplay value={row.current} currency={row.currency.code} /></td>
@@ -107,7 +107,7 @@ function CustomerToggle({ row, open, detailsId, onSelect }: {
     detailsId: string;
     onSelect: (row: CustomerOutstandingRow) => void;
 }) {
-    return <button type="button" className="text-left font-semibold text-sky-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600" aria-expanded={open} aria-controls={open ? detailsId : undefined} onClick={() => onSelect(row)}>
+    return <button type="button" className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" aria-expanded={open} aria-controls={open ? detailsId : undefined} onClick={() => onSelect(row)}>
         <span aria-hidden="true">{open ? '▾ ' : '▸ '}</span>{row.customer.name}
         <span className="mt-0.5 block text-xs font-normal text-slate-500">{row.customer.customer_number}</span>
     </button>;

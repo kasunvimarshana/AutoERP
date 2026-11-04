@@ -94,6 +94,14 @@ export interface StoreFinanceAgreementPayload {
     payment_term_days?: number;
     tax_group_id?: number | null;
     remarks?: string | null;
+    schedule?: Array<{
+        installment_number?: number;
+        due_date: string;
+        principal_due: string;
+        interest_due: string;
+        fee_due?: string;
+        tax_due?: string;
+    }>;
 }
 
 export const FINANCE_PERMISSION = {
@@ -131,6 +139,14 @@ export async function createFinanceAgreement(payload: StoreFinanceAgreementPaylo
 export async function activateFinanceAgreement(id: number, version: number): Promise<VehicleFinanceAgreement> {
     const response = await apiClient.patch<{ data: VehicleFinanceAgreement }>(`/api/v1/vehicle-rental/finance-agreements/${id}/activate`, {
         expected_version: version,
+    });
+    return response.data.data;
+}
+
+export async function cancelFinanceAgreement(id: number, version: number, reason?: string): Promise<VehicleFinanceAgreement> {
+    const response = await apiClient.patch<{ data: VehicleFinanceAgreement }>(`/api/v1/vehicle-rental/finance-agreements/${id}/cancel`, {
+        expected_version: version,
+        reason: reason || null,
     });
     return response.data.data;
 }

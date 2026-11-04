@@ -94,15 +94,15 @@ export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices
         }, 0);
     const pendingForOffer = (id: number) => pendingChoices.filter((choice) => choice.offer_assignment_id === id).length;
 
-    return <section className="rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-4" aria-label="Service cards and offers">
+    return <section className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-4" aria-label="Service cards and offers">
         <div className="flex flex-wrap items-start justify-between gap-3">
             <div><p className="text-sm font-semibold text-slate-900">Service card & offers</p>
                 <p className="text-xs text-slate-600">Benefits available for this customer and vehicle. Savings are confirmed when invoiced.</p></div>
-            {selectedCard && <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-sky-800">Expires {selectedCard.expires_on}</span>}
+            {selectedCard && <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-blue-800">Expires {selectedCard.expires_on}</span>}
         </div>
         {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
         {available && canAssign && available.unassigned_offers.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{available.unassigned_offers.map((offer) =>
-            <label key={offer.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-slate-800">
+            <label key={offer.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-800">
                 <input type="checkbox" checked={false} disabled={busy} onChange={() => void assign(offer.id)} />
                 <span>Add {offer.name} · {offer.count_scope === 'vehicle' ? 'this vehicle' : 'customer'}<span className="block text-xs text-slate-500">Counts {offer.paid_item_code} · {offer.paid_item_name} after invoice posting</span></span>
             </label>)}</div>}
@@ -114,7 +114,7 @@ export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices
             {onAdd && canRedeem && selectedCard && <Button type="button" variant="secondary" className="mt-3" disabled={busy || !selectedCard.benefits?.some((benefit) => benefit.kind === 'direct' && benefit.available_today && (benefit.remaining_uses ?? 0) > pendingForBenefit(benefit.id))} onClick={() => void addAvailableCardItems()}>Add available card items</Button>}
         </div>}
         {selectedCard && <div className="mt-3 flex flex-wrap gap-2">{selectedCard.benefits?.filter((benefit) => benefit.kind === 'direct').map((benefit) =>
-            <div key={benefit.id} className="min-w-48 rounded-lg border border-sky-100 bg-white p-3 text-sm">
+            <div key={benefit.id} className="min-w-48 rounded-lg border border-slate-200/80 bg-white p-3 text-sm shadow-2xs">
                 <p className="font-medium text-slate-900">{benefit.item_name}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">{benefit.discount_type === 'free' ? 'Free' : `${benefit.discount_rate}% off`}</span>
@@ -123,12 +123,12 @@ export function PromotionJobStrip({ customerId, vehicleId, onAdd, pendingChoices
                 </div>
             </div>)}</div>}
         {[...cardOffers, ...standaloneOffers].length > 0 && <div className="mt-3 flex flex-wrap gap-2">{[...cardOffers, ...standaloneOffers].map((offer) =>
-            <div key={offer.id} className="min-w-52 rounded-lg border border-sky-100 bg-white p-3 text-sm">
+            <div key={offer.id} className="min-w-52 rounded-lg border border-slate-200/80 bg-white p-3 text-sm shadow-2xs">
                 <span className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-emerald-800"><input type="checkbox" checked readOnly aria-label={`${offer.offer_name} added`} /> Added</span>
                 <p className="font-medium text-slate-900">{offer.offer_name}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{Number(offer.progress_quantity)}/{offer.paid_quantity} paid</span>
-                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">{Number(offer.remaining_to_next)} to next free</span>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">{Number(offer.remaining_to_next)} to next free</span>
                     {Number(offer.available_rewards) > pendingForOffer(offer.id) && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">{Number(offer.available_rewards) - pendingForOffer(offer.id)} free ready</span>}
                 </div>
                 <p className="mt-2 text-xs text-slate-500">Paid item: {offer.qualifying_item_code} · {offer.qualifying_item_name}. Count updates after invoice posting.</p>

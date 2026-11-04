@@ -70,7 +70,7 @@ export default function PurchaseDebitNoteDetailPage() {
                     { label: 'Allocated', value: formatMoney(note.allocated_amount) },
                     { label: 'Remaining', value: formatMoney(note.remaining_amount) },
                     { label: 'Source', value: note.source?.number ?? note.source?.type?.replaceAll('_', ' ') ?? '-' },
-                    { label: 'Purchase return', value: note.purchase_return_id ? <Link className="text-sky-700 hover:underline" to={`/purchase/returns/${note.purchase_return_id}`}>{note.purchase_return?.return_number ?? note.source?.number ?? 'Purchase return'}</Link> : '-' },
+                    { label: 'Purchase return', value: note.purchase_return_id ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/returns/${note.purchase_return_id}`}>{note.purchase_return?.return_number ?? note.source?.number ?? 'Purchase return'}</Link> : '-' },
                     { label: 'Reason', value: note.reason ?? '-' },
                 ]} />
             </Panel>

@@ -123,14 +123,14 @@ export default function GoodsReceiptDetailPage() {
                             { key: 'amount', header: 'Amount', render: (row) => formatMoney(row.amount) },
                         ]} rowKey={(row) => row.id ?? row.name} />}
                         {tab === 'linked' && <DetailGrid items={[
-                            { label: 'Purchase order', value: grn.purchase_order?.id ? <Link className="text-sky-700 hover:underline" to={`/purchase/orders/${grn.purchase_order.id}`}>{grn.purchase_order.purchase_order_number ?? grn.purchase_order.name}</Link> : '-' },
-                            { label: 'Returns', value: capabilities.can_return && can(purchasePermissions.returnsCreate) ? <Link className="text-sky-700 hover:underline" to={`/purchase/returns/create?goods_receipt_id=${grn.id}`}>Create referenced return</Link> : '-' },
+                            { label: 'Purchase order', value: grn.purchase_order?.id ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/orders/${grn.purchase_order.id}`}>{grn.purchase_order.purchase_order_number ?? grn.purchase_order.name}</Link> : '-' },
+                            { label: 'Returns', value: capabilities.can_return && can(purchasePermissions.returnsCreate) ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/returns/create?goods_receipt_id=${grn.id}`}>Create referenced return</Link> : '-' },
                             { label: 'Invoices', value: (grn.linked_invoices?.length || canCreateInvoice) ? <div className="space-y-2">
                                 {grn.linked_invoices?.map((invoice) => <div key={invoice.id}>
-                                    <Link className="font-medium text-sky-700 hover:underline" to={invoice.url}>{invoice.number}</Link>
+                                    <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={invoice.url}>{invoice.number}</Link>
                                     <span className="ml-2 text-xs text-slate-500">{invoice.status.replaceAll('_', ' ')}</span>
                                 </div>)}
-                                {canCreateInvoice && <Link className="text-sky-700 hover:underline" to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`}>Create supplier invoice</Link>}
+                                {canCreateInvoice && <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/invoices/create?goods_receipt_id=${grn.id}`}>Create supplier invoice</Link>}
                             </div> : '-' },
                         ]} />}
                     </div>

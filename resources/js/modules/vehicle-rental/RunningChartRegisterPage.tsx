@@ -12,7 +12,7 @@ import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
-import { listChartRegister } from './runningChartApi';
+import { getRunningChartReportExportUrl, listChartRegister } from './runningChartApi';
 import { AC_LABELS, CHART_LABELS, COUNT_LABELS, DISTANCE_LABELS, RunningChartStatus, type ChartRegisterFilters, type ChartRegisterRow } from './runningCharts';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset } from './vehicleUse';
 import { UsageChargePanel } from './UsageChargePanel';
@@ -68,8 +68,23 @@ export default function RunningChartRegisterPage() {
                     <p>{formatBusinessDateTime(row.starts_at)} — {formatBusinessDateTime(row.ends_at)}</p>
                     <p className="sm:col-span-2">Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
                 </div>
-                {row.replaces_vehicle && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p className="text-sm font-medium text-sky-700">Corrects chart {row.corrects_chart.reference}</p>}
-                <div><Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button></div>
+                {row.replaces_vehicle && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p className="text-sm font-medium text-blue-600">Corrects chart {row.corrects_chart.reference}</p>}
+                <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button>
+                    {row.customer_agreement.id && (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                                const s = row.starts_at.slice(0, 10);
+                                const e = row.ends_at ? row.ends_at.slice(0, 10) : s;
+                                window.open(getRunningChartReportExportUrl({ agreement_id: row.customer_agreement.id!, start_date: s, end_date: e, vehicle_use_id: row.vehicle_use.id }, 'print'), '_blank');
+                            }}
+                        >
+                            Print Sheet
+                        </Button>
+                    )}
+                </div>
                 {selected === row.id && <div className="space-y-3 border-t border-slate-200 pt-3">
                     <dl className="grid gap-3 sm:grid-cols-2">
                         {Object.entries(DISTANCE_LABELS).map(([key, label]) => <div key={key} className="rounded-lg bg-slate-50 p-2.5"><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 font-medium text-slate-900">{row[key as keyof typeof DISTANCE_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={row[key as keyof typeof DISTANCE_LABELS] as string} />}</dd></div>)}

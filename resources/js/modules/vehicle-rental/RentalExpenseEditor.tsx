@@ -1,14 +1,22 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { apiClient } from '@/shared/api/apiClient';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { lookupApi } from '@/shared/api/lookupApi';
+import { requestLookup } from '@/shared/api/lookupRequest';
+import { endpoints } from '@/shared/api/endpoints';
+import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createRentalExpense, type StoreRentalExpensePayload } from './rentalExpenseApi';
 
-interface Option { value: number; label: string }
+const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
+const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params)
+    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number ?? row.vehicle_number), code: String(row.vehicle_number) })) }));
 
 export function RentalExpenseEditor({
     onSaved,
@@ -18,52 +26,34 @@ export function RentalExpenseEditor({
     onCancel: () => void;
 }) {
     const [expenseNumber, setExpenseNumber] = useState('');
-    const [vehicleId, setVehicleId] = useState('');
+    const [vehicle, setVehicle] = useState<NamedResource | null>(null);
     const [expenseType, setExpenseType] = useState('fuel');
-    const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10));
-    const [currencyId, setCurrencyId] = useState('');
+    const [expenseDate, setExpenseDate] = useState(businessDateInputValue());
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [netAmount, setNetAmount] = useState('0.00');
     const [taxAmount, setTaxAmount] = useState('0.00');
-    const [supplierId, setSupplierId] = useState('');
+    const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [referenceNumber, setReferenceNumber] = useState('');
     const [description, setDescription] = useState('');
-
-    const [vehicles, setVehicles] = useState<Option[]>([]);
-    const [suppliers, setSuppliers] = useState<Option[]>([]);
-    const [currencies, setCurrencies] = useState<Option[]>([]);
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
-    useEffect(() => {
-        apiClient.get<{ data: Array<{ id: number; vehicle_number: string; registration_number?: string }> }>('/api/v1/vehicles?per_page=100')
-            .then(r => setVehicles(r.data.data.map(v => ({ value: v.id, label: v.registration_number ?? v.vehicle_number }))))
-            .catch(() => {});
-        apiClient.get<{ data: Array<{ id: number; name: string }> }>('/api/v1/suppliers?per_page=100')
-            .then(r => setSuppliers(r.data.data.map(s => ({ value: s.id, label: s.name }))))
-            .catch(() => {});
-        apiClient.get<{ data: Array<{ id: number; code: string; name: string }> }>('/api/v1/reference-data/currencies')
-            .then(r => {
-                setCurrencies(r.data.data.map(c => ({ value: c.id, label: `${c.code} – ${c.name}` })));
-                if (!currencyId && r.data.data.length > 0) setCurrencyId(String(r.data.data[0].id));
-            })
-            .catch(() => {});
-    }, [currencyId]);
-
     async function submit(event: FormEvent) {
         event.preventDefault();
+        if (!vehicle || !currency) return;
         setSaving(true);
         setError(null);
 
         const payload: StoreRentalExpensePayload = {
             expense_number: expenseNumber.trim() || undefined,
-            vehicle_id: Number(vehicleId),
+            vehicle_id: vehicle.id,
             expense_type: expenseType,
             expense_date: expenseDate,
-            currency_id: Number(currencyId),
+            currency_id: currency.id,
             net_amount: netAmount,
             tax_amount: taxAmount,
-            supplier_id: supplierId ? Number(supplierId) : null,
+            supplier_id: supplier ? supplier.id : null,
             reference_number: referenceNumber.trim() || null,
             description: description.trim() || null,
         };
@@ -90,12 +80,12 @@ export function RentalExpenseEditor({
                     onChange={e => setExpenseNumber(e.target.value)}
                     placeholder="Auto-generated if blank"
                 />
-                <Select
+                <LookupSelect
                     label="Vehicle"
-                    value={vehicleId}
-                    onChange={e => setVehicleId(e.target.value)}
+                    value={vehicle}
+                    onChange={setVehicle}
+                    search={vehicles}
                     required
-                    options={[{ value: '', label: 'Select vehicle…' }, ...vehicles]}
                     error={error?.fields.vehicle_id?.[0]}
                 />
                 <Select
@@ -121,12 +111,12 @@ export function RentalExpenseEditor({
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <Select
+                <LookupSelect
                     label="Currency"
-                    value={currencyId}
-                    onChange={e => setCurrencyId(e.target.value)}
+                    value={currency}
+                    onChange={setCurrency}
+                    search={currencies}
                     required
-                    options={[{ value: '', label: 'Select currency…' }, ...currencies]}
                     error={error?.fields.currency_id?.[0]}
                 />
                 <Input
@@ -144,11 +134,11 @@ export function RentalExpenseEditor({
                     inputMode="decimal"
                     error={error?.fields.tax_amount?.[0]}
                 />
-                <Select
+                <LookupSelect
                     label="Supplier / Station (Optional)"
-                    value={supplierId}
-                    onChange={e => setSupplierId(e.target.value)}
-                    options={[{ value: '', label: 'None / Cash purchase' }, ...suppliers]}
+                    value={supplier}
+                    onChange={setSupplier}
+                    search={lookupApi.suppliers}
                 />
             </div>
 
@@ -168,7 +158,7 @@ export function RentalExpenseEditor({
             </div>
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                <Button type="submit" loading={saving}>Save Expense Record</Button>
+                <Button type="submit" loading={saving} disabled={!vehicle || !currency || !expenseDate || !netAmount}>Save Expense Record</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
             </div>
         </form>

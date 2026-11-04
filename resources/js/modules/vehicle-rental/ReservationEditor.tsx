@@ -1,72 +1,78 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { apiClient } from '@/shared/api/apiClient';
+import { lookupApi } from '@/shared/api/lookupApi';
+import { requestLookup } from '@/shared/api/lookupRequest';
+import { endpoints } from '@/shared/api/endpoints';
+import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createReservation, updateReservation, type RentalReservation, type StoreReservationPayload } from './reservationApi';
 
-interface Option { value: number; label: string }
+const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
+const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params)
+    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number ?? row.vehicle_number), code: String(row.vehicle_number) })) }));
 
 export function ReservationEditor({
     reservation,
+    initialVehicleId,
     onSaved,
     onCancel,
 }: {
     reservation?: RentalReservation;
+    initialVehicleId?: number;
     onSaved: () => void;
     onCancel: () => void;
 }) {
     const isEdit = Boolean(reservation);
-    const [customerId, setCustomerId] = useState(reservation ? String(reservation.customer.id) : '');
-    const [vehicleId, setVehicleId] = useState(reservation?.requested_vehicle ? String(reservation.requested_vehicle.id) : '');
+    const [customer, setCustomer] = useState<NamedResource | null>(reservation?.customer ? { id: reservation.customer.id, name: reservation.customer.name } : null);
+    const [vehicle, setVehicle] = useState<NamedResource | null>(reservation?.requested_vehicle ? { id: reservation.requested_vehicle.id, name: reservation.requested_vehicle.label } : null);
     const [rentalMode, setRentalMode] = useState(reservation ? reservation.rental_mode : 'self_drive');
     const [billingCycle, setBillingCycle] = useState(reservation ? reservation.billing_cycle : 'daily');
     const [startAt, setStartAt] = useState(reservation ? reservation.requested_start_at.slice(0, 16) : '');
     const [endAt, setEndAt] = useState(reservation ? reservation.requested_end_at.slice(0, 16) : '');
-    const [currencyId, setCurrencyId] = useState(reservation ? String(reservation.currency.id) : '');
+    const [currency, setCurrency] = useState<NamedResource | null>(reservation?.currency ? { id: reservation.currency.id, name: reservation.currency.code, code: reservation.currency.code } : null);
     const [estimatedAmount, setEstimatedAmount] = useState(reservation ? reservation.estimated_amount : '0.00');
     const [estimatedDeposit, setEstimatedDeposit] = useState(reservation ? reservation.estimated_deposit_amount : '0.00');
     const [source, setSource] = useState(reservation?.source ?? 'phone');
     const [remarks, setRemarks] = useState(reservation?.remarks ?? '');
 
-    const [customers, setCustomers] = useState<Option[]>([]);
-    const [vehicles, setVehicles] = useState<Option[]>([]);
-    const [currencies, setCurrencies] = useState<Option[]>([]);
-
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
     useEffect(() => {
-        apiClient.get<{ data: Array<{ id: number; name: string }> }>('/api/v1/customers?per_page=100')
-            .then(r => setCustomers(r.data.data.map(c => ({ value: c.id, label: c.name }))))
-            .catch(() => {});
-        apiClient.get<{ data: Array<{ id: number; vehicle_number: string; registration_number?: string }> }>('/api/v1/vehicles?per_page=100')
-            .then(r => setVehicles(r.data.data.map(v => ({ value: v.id, label: v.registration_number ?? v.vehicle_number }))))
-            .catch(() => {});
-        apiClient.get<{ data: Array<{ id: number; code: string; name: string }> }>('/api/v1/reference-data/currencies')
-            .then(r => {
-                setCurrencies(r.data.data.map(c => ({ value: c.id, label: `${c.code} – ${c.name}` })));
-                if (!currencyId && r.data.data.length > 0) setCurrencyId(String(r.data.data[0].id));
-            })
-            .catch(() => {});
-    }, [currencyId]);
+        if (!reservation && initialVehicleId && !vehicle) {
+            const controller = new AbortController();
+            vehicles({ search: '', page: 1, perPage: 100, signal: controller.signal })
+                .then(result => {
+                    const found = result.data.find(v => v.id === initialVehicleId);
+                    if (found) {
+                        setVehicle(found);
+                    }
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [initialVehicleId, reservation, vehicle]);
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+        if (!customer || !currency || !startAt || !endAt) return;
         setSaving(true);
         setError(null);
 
         const payload: StoreReservationPayload = {
-            customer_id: Number(customerId),
-            requested_vehicle_id: vehicleId ? Number(vehicleId) : null,
+            customer_id: customer.id,
+            requested_vehicle_id: vehicle ? vehicle.id : null,
             rental_mode: rentalMode,
             billing_cycle: billingCycle,
             requested_start_at: startAt,
             requested_end_at: endAt,
-            currency_id: Number(currencyId),
+            currency_id: currency.id,
             estimated_amount: estimatedAmount,
             estimated_deposit_amount: estimatedDeposit,
             source,
@@ -93,19 +99,19 @@ export function ReservationEditor({
             <ErrorAlert error={error} inline />
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Select
+                <LookupSelect
                     label="Customer"
-                    value={customerId}
-                    onChange={e => setCustomerId(e.target.value)}
+                    value={customer}
+                    onChange={setCustomer}
+                    search={lookupApi.customers}
                     required
-                    options={[{ value: '', label: 'Select customer…' }, ...customers]}
                     error={error?.fields.customer_id?.[0]}
                 />
-                <Select
+                <LookupSelect
                     label="Requested Vehicle (Optional)"
-                    value={vehicleId}
-                    onChange={e => setVehicleId(e.target.value)}
-                    options={[{ value: '', label: 'Any available vehicle' }, ...vehicles]}
+                    value={vehicle}
+                    onChange={setVehicle}
+                    search={vehicles}
                     error={error?.fields.requested_vehicle_id?.[0]}
                 />
             </div>
@@ -144,6 +150,7 @@ export function ReservationEditor({
                     label="Requested End Date & Time"
                     type="datetime-local"
                     value={endAt}
+                    min={startAt || undefined}
                     onChange={e => setEndAt(e.target.value)}
                     required
                     error={error?.fields.requested_end_at?.[0]}
@@ -151,12 +158,12 @@ export function ReservationEditor({
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Select
+                <LookupSelect
                     label="Currency"
-                    value={currencyId}
-                    onChange={e => setCurrencyId(e.target.value)}
+                    value={currency}
+                    onChange={setCurrency}
+                    search={currencies}
                     required
-                    options={[{ value: '', label: 'Select currency…' }, ...currencies]}
                     error={error?.fields.currency_id?.[0]}
                 />
                 <Input
@@ -197,7 +204,7 @@ export function ReservationEditor({
             </div>
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                <Button type="submit" loading={saving}>{isEdit ? 'Save Changes' : 'Create Reservation'}</Button>
+                <Button type="submit" loading={saving} disabled={!customer || !currency || !startAt || !endAt}>{isEdit ? 'Save Changes' : 'Create Reservation'}</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
             </div>
         </form>

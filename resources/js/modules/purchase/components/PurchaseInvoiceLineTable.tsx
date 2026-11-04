@@ -28,9 +28,9 @@ export function PurchaseInvoiceLineTable({ lines, sourceIndex, onChange, errorFo
     return (
         <div className="space-y-3">
         <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: true })))}>Select All</button>
-            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: false, quantity: '' })))}>Clear</button>
-            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: true, quantity: line.remainingQty })))}>Invoice All Remaining</button>
+            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: true })))}>Select All</button>
+            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: false, quantity: '' })))}>Clear</button>
+            <button type="button" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500" onClick={() => onChange(lines.map((line) => ({ ...line, include: true, quantity: line.remainingQty })))}>Invoice All Remaining</button>
         </div>
         <div className="overflow-hidden rounded-xl border border-slate-200 md:overflow-x-auto shadow-sm">
             <table className="w-full divide-y divide-slate-200 text-left text-sm md:min-w-[860px]">

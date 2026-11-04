@@ -16,7 +16,7 @@ export function EntityDetailLayout({
             <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
                 {summary}
                 {actions && (
-                    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                    <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
                         <h2 className="mb-3 text-sm font-semibold text-slate-900">Quick actions</h2>
                         <div className="grid gap-2">
                             {actions}

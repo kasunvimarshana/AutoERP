@@ -124,7 +124,7 @@ export function OrganizationUnitEditorModal({
             >
                 <form className="space-y-5" onSubmit={(event) => void submit(event)}>
                     <ErrorAlert error={error} />
-                    <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm text-sky-900">
+                    <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-sm text-blue-900">
                         The parent determines the hierarchy depth. Only active types defined for that depth can be selected.
                     </div>
                     {!isRoot && (

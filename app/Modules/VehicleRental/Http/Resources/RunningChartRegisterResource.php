@@ -14,8 +14,8 @@ final class RunningChartRegisterResource extends JsonResource
         $use = $this->vehicleUse;
 
         return array_merge((new RunningChartResource($this->resource))->toArray($request), [
-            'customer_agreement' => ['reference' => $use->customerAgreement->reference, 'party_name' => $use->customerAgreement->party_name_snapshot],
-            'owner_agreement' => $use->ownerAgreement === null ? null : ['reference' => $use->ownerAgreement->reference, 'party_name' => $use->ownerAgreement->party_name_snapshot],
+            'customer_agreement' => ['id' => $use->customer_agreement_id, 'reference' => $use->customerAgreement->reference, 'party_name' => $use->customerAgreement->party_name_snapshot],
+            'owner_agreement' => $use->ownerAgreement === null ? null : ['id' => $use->owner_agreement_id, 'reference' => $use->ownerAgreement->reference, 'party_name' => $use->ownerAgreement->party_name_snapshot],
             'replaces_vehicle' => $use->replacesUse?->vehicle_label_snapshot,
         ]);
     }

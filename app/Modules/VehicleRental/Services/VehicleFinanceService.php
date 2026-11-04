@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -93,10 +94,31 @@ final class VehicleFinanceService
                 'updated_by' => $userId,
             ]);
 
-            $this->generateSchedule($agreement, $userId);
+            $this->generateSchedule($agreement, $userId, $data['schedule'] ?? null);
             $this->recordHistory($agreement, null, VehicleFinanceAgreementStatus::Draft->value, $userId);
 
             return $agreement->load($this->relations());
+        });
+    }
+
+    public function cancel(VehicleFinanceAgreement $agreement, int $expectedVersion, ?int $userId, ?string $reason = null): VehicleFinanceAgreement
+    {
+        return DB::transaction(function () use ($agreement, $expectedVersion, $userId, $reason): VehicleFinanceAgreement {
+            $agreement = VehicleFinanceAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $this->assertAgreementVersion($agreement, $expectedVersion);
+
+            if ($agreement->status !== VehicleFinanceAgreementStatus::Draft) {
+                throw new InvalidArgumentException('Only draft finance agreements can be cancelled.');
+            }
+
+            $agreement->status = VehicleFinanceAgreementStatus::Cancelled;
+            $agreement->row_version = $expectedVersion + 1;
+            $agreement->updated_by = $userId;
+            $agreement->save();
+
+            $this->recordHistory($agreement, VehicleFinanceAgreementStatus::Draft->value, VehicleFinanceAgreementStatus::Cancelled->value, $userId);
+
+            return $agreement->refresh()->load($this->relations());
         });
     }
 
@@ -225,7 +247,7 @@ final class VehicleFinanceService
 
         VehicleFinanceInstallment::query()
             ->forContext($tenantId, $organizationUnitId)
-            ->with('invoice.balance')
+            ->with(['invoice.balance', 'financeAgreement'])
             ->whereNotIn('status', [VehicleFinanceInstallmentStatus::Waived->value, VehicleFinanceInstallmentStatus::Reversed->value])
             ->chunkById(200, function ($installments) use ($date, &$updated): void {
                 foreach ($installments as $installment) {
@@ -266,6 +288,17 @@ final class VehicleFinanceService
     public function paginate(int $tenantId, ?int $organizationUnitId, array $filters, int $perPage): LengthAwarePaginator
     {
         $query = VehicleFinanceAgreement::query()->forContext($tenantId, $organizationUnitId)->with($this->relations());
+
+        if (! empty($filters['search'])) {
+            $search = trim((string) $filters['search']);
+            $query->where(fn (Builder $scope) => $scope
+                ->where('agreement_number', 'like', "%{$search}%")
+                ->orWhere('supplier_name_snapshot', 'like', "%{$search}%")
+                ->orWhere('vehicle_label_snapshot', 'like', "%{$search}%")
+                ->orWhereHas('supplier', fn (Builder $s) => $s->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('vehicle', fn (Builder $v) => $v->where('vehicle_number', 'like', "%{$search}%")->orWhere('registration_number', 'like', "%{$search}%")));
+        }
+
         foreach (['supplier_id', 'vehicle_id', 'status'] as $key) {
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $query->where($key, $filters[$key]);
@@ -280,8 +313,37 @@ final class VehicleFinanceService
         return ['supplier', 'vehicle.make', 'vehicle.model', 'currency', 'taxGroup', 'installments.invoice'];
     }
 
-    private function generateSchedule(VehicleFinanceAgreement $agreement, ?int $userId): void
+    private function generateSchedule(VehicleFinanceAgreement $agreement, ?int $userId, ?array $customSchedule = null): void
     {
+        if (! empty($customSchedule)) {
+            foreach ($customSchedule as $index => $row) {
+                $principal = (string) ($row['principal_due'] ?? '0.000000');
+                $interest = (string) ($row['interest_due'] ?? '0.000000');
+                $fee = (string) ($row['fee_due'] ?? '0.000000');
+                $tax = (string) ($row['tax_due'] ?? '0.000000');
+                $total = $this->math->sum([$principal, $interest, $fee, $tax]);
+
+                $agreement->installments()->create([
+                    'tenant_id' => $agreement->tenant_id,
+                    'organization_unit_id' => $agreement->organization_unit_id,
+                    'installment_number' => $row['installment_number'] ?? ($index + 1),
+                    'due_date' => $row['due_date'],
+                    'principal_due' => $principal,
+                    'interest_due' => $interest,
+                    'fee_due' => $fee,
+                    'tax_due' => $tax,
+                    'total_due' => $total,
+                    'paid_amount' => '0.000000',
+                    'balance_due' => $total,
+                    'status' => VehicleFinanceInstallmentStatus::Scheduled,
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                ]);
+            }
+
+            return;
+        }
+
         $count = (int) $agreement->installment_count;
         $principalAfterDeposit = $this->math->sub((string) $agreement->principal_amount, (string) $agreement->initial_deposit_amount);
         $principalPer = $this->math->div($principalAfterDeposit, (string) $count);

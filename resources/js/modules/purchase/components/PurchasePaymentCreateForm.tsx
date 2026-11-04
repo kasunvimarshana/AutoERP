@@ -345,7 +345,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         <div className="space-y-5">
             <PurchaseTabs tabs={tabs} activeTab={activeTab} />
             <ErrorAlert error={error ?? paymentContext.error ?? invoiceResult.error} />
-            {sourceNotice && <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">{sourceNotice}</div>}
+            {sourceNotice && <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-sm text-blue-900">{sourceNotice}</div>}
             <PaymentSummary amount={amount} allocated={allocated} unallocated={unallocated} methodTotal={methodTotal} methodDifference={methodDifference} overAllocated={overAllocated} />
             {preview && <PaymentPreviewPanel preview={preview} />}
 
@@ -394,7 +394,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                                 <div className="grid gap-3 p-3 md:hidden">
                                     {(invoiceResult.data?.data ?? []).map((invoice) => (
                                         <article key={invoice.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                                            <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link>
+                                            <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link>
                                             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                                                 <Summary label="Date" value={formatDate(invoice.invoice_date)} />
                                                 <Summary label="Status" value={invoice.status ?? '-'} />
@@ -477,7 +477,7 @@ function AllocationRow({ invoice, value, error, onChange }: {
 }) {
     return (
         <tr className="transition-colors hover:bg-blue-50/40">
-            <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
+            <td className="px-4 py-3"><Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
             <td className="px-4 py-3">{formatDate(invoice.invoice_date)}</td>
             <td className="px-4 py-3">{invoice.status ? <StatusBadge status={invoice.status} /> : '-'}</td>
             <td className="px-4 py-3"><MoneyDisplay value={balanceOf(invoice)} currency={invoice.currency?.code ?? undefined} /></td>

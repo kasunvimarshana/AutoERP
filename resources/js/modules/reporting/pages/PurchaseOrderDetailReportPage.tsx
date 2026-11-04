@@ -160,7 +160,7 @@ function PurchaseOrderBlock({ order }: { order: PurchaseOrderDetailOrder }) {
         <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
             <div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <Link to={`/purchase/orders/${order.id}`} className="font-semibold text-sky-800 underline-offset-2 hover:underline">{order.purchase_order_number}</Link>
+                    <Link to={`/purchase/orders/${order.id}`} className="font-semibold text-blue-600 underline-offset-2 hover:underline hover:text-blue-800">{order.purchase_order_number}</Link>
                     <span className="text-sm text-slate-600">{order.purchase_order_date}</span>
                     <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{statusLabel(order.status)}</span>
                     <span className="text-sm text-slate-600">{order.status_action.label} <strong className="font-medium text-slate-800">{order.status_action.actor?.name ?? 'Not recorded'}</strong></span>

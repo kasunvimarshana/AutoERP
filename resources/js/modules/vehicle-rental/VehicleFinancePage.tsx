@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
+import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import {
     listFinanceAgreements,
     getFinanceAgreement,
     activateFinanceAgreement,
+    cancelFinanceAgreement,
     createInstallmentPayable,
     refreshFinanceDueStatuses,
     FinanceStatus,
@@ -38,10 +41,13 @@ export default function VehicleFinancePage() {
     const [creating, setCreating] = useState(false);
     const [selected, setSelected] = useState<VehicleFinanceAgreement | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [search, setSearch] = useState('');
+    const [query, setQuery] = useState('');
 
     useEffect(() => {
         const controller = new AbortController();
-        listFinanceAgreements(page, controller.signal)
+        const filters = query ? { search: query } : undefined;
+        listFinanceAgreements(page, controller.signal, filters)
             .then(result => {
                 if (!controller.signal.aborted) {
                     setRows(result.data);
@@ -60,7 +66,7 @@ export default function VehicleFinancePage() {
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [page, revision]);
+    }, [page, revision, query]);
 
     function reload() {
         setCreating(false);
@@ -95,11 +101,24 @@ export default function VehicleFinancePage() {
         }
     }
 
+    async function handleCancel(agreement: VehicleFinanceAgreement) {
+        setActionLoading(true);
+        setError(null);
+        try {
+            await cancelFinanceAgreement(agreement.id, agreement.row_version, 'Cancelled by operator');
+            reload();
+        } catch (failure) {
+            setError(toApiError(failure));
+        } finally {
+            setActionLoading(false);
+        }
+    }
+
     async function handleCreatePayable(installment: FinanceInstallment) {
         setActionLoading(true);
         setError(null);
         try {
-            const today = new Date().toISOString().slice(0, 10);
+            const today = businessDateInputValue();
             await createInstallmentPayable(installment.id, installment.row_version, today);
             if (selected) {
                 const updated = await getFinanceAgreement(selected.id);
@@ -155,6 +174,40 @@ export default function VehicleFinancePage() {
                     onCancel={() => setCreating(false)}
                 />
             )}
+
+            <form
+                onSubmit={event => {
+                    event.preventDefault();
+                    setPage(1);
+                    setQuery(search.trim());
+                }}
+                className="mt-4 flex flex-wrap items-center gap-2"
+            >
+                <div className="w-80">
+                    <Input
+                        name="search"
+                        placeholder="Search by agreement, supplier, or vehicle…"
+                        value={search}
+                        onChange={event => setSearch(event.target.value)}
+                    />
+                </div>
+                <Button type="submit" variant="secondary" disabled={loading}>
+                    Search
+                </Button>
+                {query && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                            setSearch('');
+                            setQuery('');
+                            setPage(1);
+                        }}
+                    >
+                        Clear
+                    </Button>
+                )}
+            </form>
 
             {loading ? (
                 <LoadingState label="Loading vehicle finance agreements…" />
@@ -214,9 +267,14 @@ export default function VehicleFinancePage() {
                         <div className="flex items-center gap-2">
                             <StatusBadge status={selected.status} />
                             {canManage && selected.status === FinanceStatus.Draft && (
-                                <Button onClick={() => handleActivate(selected)} loading={actionLoading}>
-                                    Activate Agreement
-                                </Button>
+                                <>
+                                    <Button onClick={() => handleActivate(selected)} loading={actionLoading}>
+                                        Activate Agreement
+                                    </Button>
+                                    <Button variant="danger" onClick={() => handleCancel(selected)} loading={actionLoading}>
+                                        Cancel
+                                    </Button>
+                                </>
                             )}
                             <Button variant="secondary" onClick={() => setSelected(null)}>Close</Button>
                         </div>
@@ -245,7 +303,12 @@ export default function VehicleFinancePage() {
                                         <td className="px-3 py-2"><StatusBadge status={inst.status} /></td>
                                         <td className="px-3 py-2">
                                             {inst.invoice ? (
-                                                <span className="font-medium text-sky-700">{inst.invoice.invoice_number} ({inst.invoice.status})</span>
+                                                <Link
+                                                    to={`/invoices/${inst.invoice.id}`}
+                                                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                >
+                                                    {inst.invoice.invoice_number} ({inst.invoice.status})
+                                                </Link>
                                             ) : canManage && selected.status === FinanceStatus.Active ? (
                                                 <Button
                                                     variant="secondary"

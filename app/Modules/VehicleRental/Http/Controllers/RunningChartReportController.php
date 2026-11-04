@@ -6,7 +6,7 @@ namespace Modules\VehicleRental\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
-use Modules\VehicleRental\Http\Requests\AgreementRequest;
+use Modules\VehicleRental\Http\Requests\RunningChartReportRequest;
 use Modules\VehicleRental\Services\RunningChartReportService;
 use Spatie\LaravelPdf\Facades\Pdf;
 
@@ -16,7 +16,7 @@ final class RunningChartReportController
         private readonly RunningChartReportService $reports,
     ) {}
 
-    public function show(AgreementRequest $request): JsonResponse
+    public function show(RunningChartReportRequest $request): JsonResponse
     {
         $data = $this->reports->generate(
             $request->context(),
@@ -26,7 +26,7 @@ final class RunningChartReportController
         return response()->json($data);
     }
 
-    public function export(AgreementRequest $request, string $format): Response
+    public function export(RunningChartReportRequest $request, string $format): Response
     {
         $data = $this->reports->generate(
             $request->context(),

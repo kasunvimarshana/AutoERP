@@ -74,7 +74,7 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
             </fieldset>}
             {summary.payments.length === 0 ? <p className="text-sm text-slate-500">No deposit receipts have been recorded.</p> : <ul className="space-y-2">{summary.payments.map(payment => <li key={payment.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm text-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Link to={`/payments/${payment.id}`} className="font-semibold text-sky-700 hover:underline">{payment.payment_number}</Link>
+                    <Link to={`/payments/${payment.id}`} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">{payment.payment_number}</Link>
                     <StatusBadge status={payment.document_status} />
                     <StatusBadge status={payment.posting_status} />
                 </div>

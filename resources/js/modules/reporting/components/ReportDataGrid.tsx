@@ -18,7 +18,7 @@ export function ReportDataGrid({ columns, rows, sort, direction, onSort }: {
             </Button>
         ) : column.label,
         render: (row) => column.format === 'link' && typeof row[`${column.key}_url`] === 'string'
-            ? <Link className="font-medium text-sky-700 hover:underline" to={String(row[`${column.key}_url`])}>{formatValue(row[column.key], column.format)}</Link>
+            ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={String(row[`${column.key}_url`])}>{formatValue(row[column.key], column.format)}</Link>
             : formatValue(row[column.key], column.format),
         className: ['money', 'decimal'].includes(column.format) ? 'tabular-nums' : undefined,
     }));

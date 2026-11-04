@@ -39,7 +39,7 @@ export default function ChequeTemplateListPage() {
             mobile: false,
             render: (row) => (
                 <div className="flex justify-end gap-3">
-                    <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/cheque-templates/${row.id}/edit`}>Edit</Link>
+                    <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/payments/cheque-templates/${row.id}/edit`}>Edit</Link>
                     <button type="button" className="font-semibold text-rose-700" onClick={() => setDeleting(row)}>Delete</button>
                 </div>
             ),

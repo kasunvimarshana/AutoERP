@@ -108,7 +108,7 @@ export default function PaymentMethodWiseSummaryReportPage() {
                                     return <Fragment key={key}>
                                     <tr className="transition-colors hover:bg-blue-50/40">
                                     <td className="px-4 py-3 font-medium">
-                                        <button type="button" aria-expanded={expanded} onClick={() => setOpenKey(expanded ? null : key)} className="text-left font-semibold text-sky-700 hover:underline focus:outline-none focus:ring-2 focus:ring-sky-500 rounded">
+                                        <button type="button" aria-expanded={expanded} onClick={() => setOpenKey(expanded ? null : key)} className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
                                             <span aria-hidden="true">{expanded ? '▾' : '▸'} </span>{day.date}
                                             <span className="block pl-4 text-xs font-normal text-slate-500">{day.currency}</span>
                                         </button>
@@ -125,8 +125,8 @@ export default function PaymentMethodWiseSummaryReportPage() {
                                                 <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Type</th><th className="px-4 py-3">Document</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Method</th><th className="px-4 py-3 text-right">Amount</th></tr></thead>
                                                 <tbody className="divide-y divide-slate-100">{documents.map((document, index) => <tr key={`${document.type}-${document.payment?.id ?? 'credit'}-${document.invoice.id}-${index}`} className="transition-colors hover:bg-blue-50/40">
                                                     <td className="px-4 py-3">{document.type === 'receipt' ? 'Receipt' : 'Credit sale'}</td>
-                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/payments/${document.payment.id}`} className="font-semibold text-sky-700 hover:underline">{document.payment.number}</Link> : <Link to={`/invoices/${document.invoice.id}`} className="font-semibold text-sky-700 hover:underline">{document.invoice.number}</Link>}</td>
-                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/invoices/${document.invoice.id}`} className="text-sky-700 hover:underline">{document.invoice.number}</Link> : '—'}</td>
+                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/payments/${document.payment.id}`} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">{document.payment.number}</Link> : <Link to={`/invoices/${document.invoice.id}`} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">{document.invoice.number}</Link>}</td>
+                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/invoices/${document.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">{document.invoice.number}</Link> : '—'}</td>
                                                     <td className="px-4 py-3">{Object.entries(document.methods).map(([method, amount]) => `${result.methods.find((entry) => entry.key === method)?.name ?? method}: ${formatMoney(amount, day.currency)}`).join(', ') || '—'}</td>
                                                     <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(document.amount, day.currency)}</td>
                                                 </tr>)}</tbody>

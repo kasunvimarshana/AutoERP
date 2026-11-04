@@ -107,7 +107,7 @@ export default function PurchaseReturnDetailPage() {
                     ]} rowKey={(allocation) => String(allocation.id ?? allocation.adjustment_type)} />}
                     {tab === 'linked' && <DetailGrid items={[
                         { label: 'Source', value: row.source?.number ?? (row.source?.type ? row.source.type.replaceAll('_', ' ') : '-') },
-                        { label: 'Debit note', value: row.debit_note_id ? <Link className="text-sky-700 hover:underline" to={`/purchase/debit-notes/${row.debit_note_id}`}>{row.debit_note?.debit_note_number ?? 'Debit note'}</Link> : '-' },
+                        { label: 'Debit note', value: row.debit_note_id ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={`/purchase/debit-notes/${row.debit_note_id}`}>{row.debit_note?.debit_note_number ?? 'Debit note'}</Link> : '-' },
                     ]} />}
                 </div>
             </Panel>

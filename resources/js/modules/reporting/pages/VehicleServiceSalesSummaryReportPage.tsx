@@ -138,7 +138,7 @@ export default function VehicleServiceSalesSummaryReportPage() {
 }
 
 function Metric({ label, value, tone, detail }: { label: string; value: string; tone: 'blue' | 'sky' | 'amber' | 'green' | 'red'; detail?: string }) {
-    const accents = { blue: 'bg-blue-600', sky: 'bg-sky-600', amber: 'bg-amber-500', green: 'bg-emerald-600', red: 'bg-rose-600' };
+    const accents = { blue: 'bg-blue-600', sky: 'bg-indigo-500', amber: 'bg-amber-500', green: 'bg-emerald-600', red: 'bg-rose-600' };
     const valueTone = tone === 'green' ? 'text-emerald-800' : tone === 'red' ? 'text-rose-800' : 'text-slate-950';
     return (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -173,7 +173,7 @@ function StockItemsPanel({ result, params }: { result: VehicleServiceSalesSummar
 function ComboItemsPanel({ result, params }: { result: VehicleServiceSalesSummaryResult; params: VehicleServiceSalesSummaryParams }) {
     const combo = result.summary.combo;
     return (
-        <Panel className="border-l-4 border-l-sky-600">
+        <Panel className="border-l-4 border-l-indigo-500">
             <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="font-semibold text-slate-900">Combo item performance</h2>
                 <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...params, export_section: 'combo' }} formats={sectionExportFormats} compact />
@@ -226,7 +226,7 @@ function RankedItemRow({ item, rank, kind }: { item: VehicleServiceSalesSummaryR
                 <td className="py-2 pl-3 pr-2 tabular-nums text-slate-400">{rank}</td>
                 <td className="min-w-40 px-2 py-2">
                     <div className="flex items-center gap-1">
-                        {hasComponents && <button type="button" className="rounded px-1 text-sky-700 hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600" aria-label={`${expanded ? 'Hide' : 'Show'} components for ${item.item.name}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? '−' : '+'}</button>}
+                        {hasComponents && <button type="button" className="rounded px-1 text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" aria-label={`${expanded ? 'Hide' : 'Show'} components for ${item.item.name}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? '−' : '+'}</button>}
                         <span className="font-medium text-slate-900">{item.item.name}</span>
                     </div>
                     <div className={hasComponents ? 'pl-6 text-xs text-slate-500' : 'text-xs text-slate-500'}>{item.item.code}</div>
@@ -242,7 +242,7 @@ function RankedItemRow({ item, rank, kind }: { item: VehicleServiceSalesSummaryR
                     {formatMoney(item.profit)}<div className="text-xs font-normal text-slate-500">{formatQuantity(item.margin)}%</div>
                 </td>
             </tr>
-            {expanded && hasComponents && <tr><td colSpan={7} className="bg-sky-50/40 px-4 py-3 sm:px-8"><ComboItemComponents components={item.components ?? []} /></td></tr>}
+            {expanded && hasComponents && <tr><td colSpan={7} className="bg-blue-50/30 px-4 py-3 sm:px-8"><ComboItemComponents components={item.components ?? []} /></td></tr>}
         </>
     );
 }
@@ -316,8 +316,8 @@ function DetailLines({ title, rows, empty }: { title: string; rows: VehicleServi
 
 function ComboDetails({ combo }: { combo: VehicleServiceSalesSummaryCombo }) {
     return (
-        <section className="rounded-md border border-sky-200 bg-white">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-sky-100 bg-sky-50 px-3 py-2">
+        <section className="rounded-md border border-blue-200 bg-white">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-blue-100 bg-blue-50/60 px-3 py-2">
                 <div><span className="font-semibold text-slate-900">{combo.item.name}</span><span className="ml-2 text-xs text-slate-500">{combo.item.code} · {formatQuantity(combo.quantity)} used</span></div>
                 <div className="text-sm tabular-nums text-slate-700">Sales {formatMoney(combo.sales_amount)} · components {formatMoney(combo.component_cost)} · profit before commission {formatMoney(combo.profit)}</div>
             </div>

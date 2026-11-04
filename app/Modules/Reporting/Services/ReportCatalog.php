@@ -374,6 +374,66 @@ final class ReportCatalog
                 $this->col('night_outs', 'Night Outs', sort: 'night_outs'),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['reference', 'driver_name_snapshot'], ['vehicleUse'], 'starts_at'),
+
+            $this->definition('vehicle-rental.customer-agreements', 'Customer Rental Agreements', 'Vehicle Rental', \Modules\VehicleRental\Models\CustomerAgreement::class, [
+                $this->col('reference', 'Agreement Ref', sort: 'reference'),
+                $this->col('customer', 'Customer', 'party_name_snapshot'),
+                $this->col('agreed_on', 'Agreed On', format: 'date', sort: 'agreed_on'),
+                $this->col('starts_on', 'Starts On', format: 'date', sort: 'starts_on'),
+                $this->col('ends_on', 'Ends On', format: 'date', sort: 'ends_on'),
+                $this->col('basis', 'Basis', format: 'enum', sort: 'basis'),
+                $this->col('driver_mode', 'Driver Mode', format: 'enum', sort: 'driver_mode'),
+                $this->col('currency', 'Currency', 'currency_code_snapshot'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['reference', 'party_name_snapshot'], [], 'starts_on'),
+
+            $this->definition('vehicle-rental.owner-agreements', 'Owner Rental Agreements', 'Vehicle Rental', \Modules\VehicleRental\Models\OwnerAgreement::class, [
+                $this->col('reference', 'Agreement Ref', sort: 'reference'),
+                $this->col('owner', 'Supplier/Owner', 'party_name_snapshot'),
+                $this->col('vehicle', 'Vehicle', 'vehicle_registration_snapshot'),
+                $this->col('agreed_on', 'Agreed On', format: 'date', sort: 'agreed_on'),
+                $this->col('starts_on', 'Starts On', format: 'date', sort: 'starts_on'),
+                $this->col('ends_on', 'Ends On', format: 'date', sort: 'ends_on'),
+                $this->col('basis', 'Basis', format: 'enum', sort: 'basis'),
+                $this->col('currency', 'Currency', 'currency_code_snapshot'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['reference', 'party_name_snapshot', 'vehicle_registration_snapshot'], [], 'starts_on'),
+
+            $this->definition('vehicle-rental.reservations', 'Rental Reservations', 'Vehicle Rental', \Modules\VehicleRental\Models\RentalReservation::class, [
+                $this->col('reservation_number', 'Reservation No', sort: 'reservation_number'),
+                $this->col('customer', 'Customer', 'customer_name_snapshot'),
+                $this->col('requested_start_at', 'Requested Start', format: 'datetime', sort: 'requested_start_at'),
+                $this->col('requested_end_at', 'Requested End', format: 'datetime', sort: 'requested_end_at'),
+                $this->col('rental_mode', 'Driver Mode', format: 'enum', sort: 'rental_mode'),
+                $this->col('billing_cycle', 'Cycle', format: 'enum', sort: 'billing_cycle'),
+                $this->money('estimated_amount', 'Est. Amount'),
+                $this->money('estimated_deposit_amount', 'Est. Deposit'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['reservation_number', 'customer_name_snapshot'], [], 'requested_start_at'),
+
+            $this->definition('vehicle-rental.lease-installments', 'Vehicle Lease Installments', 'Vehicle Rental', \Modules\VehicleRental\Models\VehicleFinanceInstallment::class, [
+                $this->col('installment_number', 'Installment #', sort: 'installment_number'),
+                $this->col('agreement', 'Agreement', 'financeAgreement.agreement_number'),
+                $this->col('due_date', 'Due Date', format: 'date', sort: 'due_date'),
+                $this->money('principal_due', 'Principal'),
+                $this->money('interest_due', 'Interest'),
+                $this->money('fee_due', 'Fee'),
+                $this->money('total_due', 'Total Due'),
+                $this->money('paid_amount', 'Paid'),
+                $this->money('balance_due', 'Balance Due'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['financeAgreement.agreement_number'], ['financeAgreement'], 'due_date'),
+
+            $this->definition('vehicle-rental.expenses', 'Fleet Rental Expenses', 'Vehicle Rental', \Modules\VehicleRental\Models\RentalExpense::class, [
+                $this->col('expense_number', 'Expense No', sort: 'expense_number'),
+                $this->col('expense_date', 'Date', format: 'date', sort: 'expense_date'),
+                $this->col('expense_type', 'Type', format: 'enum', sort: 'expense_type'),
+                $this->col('vehicle', 'Vehicle', 'vehicle_label_snapshot'),
+                $this->money('net_amount', 'Net'),
+                $this->money('tax_amount', 'Tax'),
+                $this->money('gross_amount', 'Gross'),
+                $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ], ['expense_number', 'vehicle_label_snapshot', 'reference_number'], [], 'expense_date'),
         ];
 
         return collect($reports)->keyBy->key->all();

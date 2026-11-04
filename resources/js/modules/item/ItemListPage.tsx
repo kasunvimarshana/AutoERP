@@ -48,7 +48,7 @@ export default function ItemListPage() {
     const collection = result.data;
 
     const columns: DataColumn<ItemSummary>[] = [
-        { key: 'item', header: 'Item', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/items/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
+        { key: 'item', header: 'Item', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/items/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
         { key: 'type', header: 'Type', render: (row) => row.item_type },
         { key: 'category', header: 'Category', render: (row) => readableRelation(row.category) },
         { key: 'brand', header: 'Brand', render: (row) => readableRelation(row.brand) },
@@ -56,9 +56,9 @@ export default function ItemListPage() {
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
         { key: 'actions', header: '', className: 'text-right', render: (row) => (
             <div className="flex items-center justify-end gap-2">
-                {canUpdate && <Link className="rounded px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500" to={`/items/${row.id}/edit`}>Edit</Link>}
-                {row.is_active && canDeactivate && <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 hover:text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-500" onClick={() => void toggle(row)}>Deactivate</button>}
-                {!row.is_active && canActivate && <button type="button" className="rounded px-2 py-1 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" onClick={() => void toggle(row)}>Activate</button>}
+                {canUpdate && <Link className="rounded-md px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" to={`/items/${row.id}/edit`}>Edit</Link>}
+                {row.is_active && canDeactivate && <button type="button" className="rounded-md px-2 py-1 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 hover:text-amber-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500" onClick={() => void toggle(row)}>Deactivate</button>}
+                {!row.is_active && canActivate && <button type="button" className="rounded-md px-2 py-1 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => void toggle(row)}>Activate</button>}
             </div>
         ) },
     ];

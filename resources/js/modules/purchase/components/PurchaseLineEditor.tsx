@@ -168,7 +168,7 @@ function lineHasError(
 }
 
 function LineActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {
-    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-sky-700" onClick={onEdit}>Edit line</button><button type="button" className="font-semibold text-rose-600" onClick={onRemove}>Remove line</button></div>;
+    return <div className="flex justify-end gap-3"><button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={onEdit}>Edit line</button><button type="button" className="font-semibold text-rose-600 hover:text-rose-800 hover:underline" onClick={onRemove}>Remove line</button></div>;
 }
 
 function PreviewValue({ label, value }: { label: string; value: string }) {

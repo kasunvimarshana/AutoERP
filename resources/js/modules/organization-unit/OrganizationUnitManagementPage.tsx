@@ -128,7 +128,7 @@ export default function OrganizationUnitManagementPage() {
             header: 'Organization unit',
             render: (unit) => (
                 <button type="button" className="text-left" onClick={() => setSelected(unit)}>
-                    <span className="block font-semibold text-sky-700 hover:underline">{unit.name}</span>
+                    <span className="block font-semibold text-blue-600 hover:text-blue-800 hover:underline">{unit.name}</span>
                     <span className="block text-xs text-slate-500">{unit.code} · {unit.path}</span>
                 </button>
             ),
@@ -183,7 +183,7 @@ export default function OrganizationUnitManagementPage() {
                             columns={columns}
                             rowKey={(unit) => unit.id}
                             emptyMessage="No organization units match the selected filters."
-                            mobileSummary={(unit) => <button type="button" className="text-left text-sky-700" onClick={() => setSelected(unit)}>{unit.name}</button>}
+                            mobileSummary={(unit) => <button type="button" className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => setSelected(unit)}>{unit.name}</button>}
                             mobileDetails={(unit) => <div className="space-y-1"><p>{unit.code} · {unit.path}</p><p>{unit.type?.name ?? 'No type'} · level {unit.depth}</p></div>}
                             mobileActions={actions}
                             rowBadge={(unit) => <StatusBadge status={unit.lifecycle_status} />}

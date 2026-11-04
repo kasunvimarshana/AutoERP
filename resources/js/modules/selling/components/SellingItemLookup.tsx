@@ -32,7 +32,7 @@ export function SellingItemLookup({
                         <div className={`mt-1 text-xs ${Number(item.available_stock_quantity ?? 0) > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                             Available: {item.available_stock_quantity ?? '0.000000'} {item.base_uom?.code ?? item.base_uom?.name ?? ''}
                         </div>
-                        <div className="mt-1 text-xs font-semibold text-sky-700">
+                        <div className="mt-1 text-xs font-semibold text-blue-700">
                             Sale price: {item.tenant_base_currency?.symbol ?? item.tenant_base_currency?.code ?? ''} {item.resolved_sales_unit_price ?? 'Not configured'}
                         </div>
                         {item.available_batches && item.available_batches.length > 0 && (

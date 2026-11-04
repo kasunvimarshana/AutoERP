@@ -48,7 +48,7 @@ export default function ItemPriceTab({ itemId, trackingType = 'none', defaultCur
             header: '',
             className: 'text-right',
             render: (row) => row.is_current_revision
-                ? <button type="button" className="font-semibold text-sky-700" onClick={() => crud.startEdit(row)}>Supersede</button>
+                ? <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => crud.startEdit(row)}>Supersede</button>
                 : null,
         });
     }
@@ -177,7 +177,7 @@ function BatchPriceSection({ itemId, defaultCurrency, defaultUom, readOnly }: {
             header: '',
             className: 'text-right',
             render: (row) => row.is_current_revision
-                ? <button type="button" className="font-semibold text-sky-700" onClick={() => crud.startEdit(row)}>Supersede</button>
+                ? <button type="button" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" onClick={() => crud.startEdit(row)}>Supersede</button>
                 : null,
         });
     }

@@ -39,7 +39,7 @@ export function EmployeeCommissionJobList({ employeeId, params }: { employeeId: 
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {(result.data?.data ?? []).map((row) => <tr key={row.job.id} className="transition-colors hover:bg-blue-50/40">
-                            <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job.number}</Link>{row.entry_count > 1 && <span className="block text-xs text-slate-500">{row.entry_count} commission entries</span>}</td>
+                            <td className="px-4 py-3"><Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job.number}</Link>{row.entry_count > 1 && <span className="block text-xs text-slate-500">{row.entry_count} commission entries</span>}</td>
                             <td className="whitespace-nowrap px-3 py-2.5">{row.last_earned_at ? formatDate(row.last_earned_at.slice(0, 10)) : '—'}</td>
                             <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(row.job_date)}</td>
                             <td className="px-3 py-2.5"><span className="block">{row.customer_name || '—'}</span><span className="block text-xs text-slate-500">{row.vehicle_label || '—'}</span></td>
@@ -59,7 +59,7 @@ export function EmployeeCommissionJobList({ employeeId, params }: { employeeId: 
 function JobCard({ row }: { row: EmployeeCommissionJobRow }) {
     return <article className="rounded-lg border border-slate-200 bg-white p-3">
         <div className="flex items-start justify-between gap-3">
-            <div><Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job.number}</Link><div className="text-xs text-slate-500">Job {formatDate(row.job_date)}{row.last_earned_at ? ` · Completed ${formatDate(row.last_earned_at.slice(0, 10))}` : ''}</div></div>
+            <div><Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job.number}</Link><div className="text-xs text-slate-500">Job {formatDate(row.job_date)}{row.last_earned_at ? ` · Completed ${formatDate(row.last_earned_at.slice(0, 10))}` : ''}</div></div>
             <strong className="text-right tabular-nums">{formatMoney(row.total_commission)}</strong>
         </div>
         <p className="mt-2 text-sm">{row.customer_name || '—'} <span className="text-slate-500">{row.vehicle_label || ''}</span></p>

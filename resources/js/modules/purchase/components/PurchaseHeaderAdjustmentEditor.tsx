@@ -154,7 +154,7 @@ function adjustmentHasError(index: number, errorFor: (field: string) => string |
 }
 
 function AdjustmentActions({ disabled, onEdit, onRemove }: { disabled: boolean; onEdit: () => void; onRemove: () => void }) {
-    return <div className="flex justify-end gap-3"><button type="button" disabled={disabled} className="font-semibold text-sky-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={onEdit}>Edit adjustment</button><button type="button" disabled={disabled} className="font-semibold text-rose-600 disabled:cursor-not-allowed disabled:opacity-50" onClick={onRemove}>Remove adjustment</button></div>;
+    return <div className="flex justify-end gap-3"><button type="button" disabled={disabled} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline disabled:cursor-not-allowed disabled:opacity-50" onClick={onEdit}>Edit adjustment</button><button type="button" disabled={disabled} className="font-semibold text-rose-600 hover:text-rose-800 hover:underline disabled:cursor-not-allowed disabled:opacity-50" onClick={onRemove}>Remove adjustment</button></div>;
 }
 
 function AdjustmentMobileDetails({ adjustment }: { adjustment: EditableHeaderAdjustment }) {

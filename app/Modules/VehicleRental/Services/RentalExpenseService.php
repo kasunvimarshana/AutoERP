@@ -179,7 +179,21 @@ final class RentalExpenseService
 
     public function relations(): array
     {
-        return ['vehicle.make', 'vehicle.model', 'customerAgreement', 'vehicleUse', 'runningChart', 'supplier', 'employee', 'currency', 'taxGroup', 'allocations'];
+        return [
+            'vehicle.make',
+            'vehicle.model',
+            'customerAgreement',
+            'vehicleUse',
+            'runningChart',
+            'supplier',
+            'employee',
+            'currency',
+            'taxGroup',
+            'allocations.customer',
+            'allocations.supplier',
+            'allocations.targetCustomerAgreement',
+            'allocations.targetOwnerAgreement',
+        ];
     }
 
     private function createAllocations(RentalExpense $expense, array $allocations, ?int $userId): void
@@ -192,6 +206,30 @@ final class RentalExpenseService
         $sequence = 1;
 
         foreach ($allocations as $row) {
+            $customerId = ! empty($row['customer_id']) ? (int) $row['customer_id'] : null;
+            $supplierId = ! empty($row['supplier_id']) ? (int) $row['supplier_id'] : null;
+
+            if (! empty($row['target_customer_agreement_id'])) {
+                $targetCustomer = CustomerAgreement::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['target_customer_agreement_id']);
+                $customerId = $customerId ?? (int) $targetCustomer->customer_id;
+            }
+            if (! empty($row['target_owner_agreement_id'])) {
+                $targetOwner = OwnerAgreement::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['target_owner_agreement_id']);
+                $supplierId = $supplierId ?? (int) $targetOwner->supplier_id;
+            }
+            if (! empty($row['target_vehicle_use_id'])) {
+                VehicleUse::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['target_vehicle_use_id']);
+            }
+            if ($customerId !== null) {
+                Customer::query()->forTenant((int) $expense->tenant_id)->findOrFail($customerId);
+            }
+            if ($supplierId !== null) {
+                Supplier::query()->forTenant((int) $expense->tenant_id)->findOrFail($supplierId);
+            }
+            if (! empty($row['employee_id'])) {
+                HrEmployee::query()->forTenant((int) $expense->tenant_id)->findOrFail((int) $row['employee_id']);
+            }
+
             $net = (string) $row['net_amount'];
             $tax = (string) ($row['tax_amount'] ?? '0.000000');
             $markup = (string) ($row['markup_amount'] ?? '0.000000');
@@ -207,8 +245,8 @@ final class RentalExpenseService
                 'target_customer_agreement_id' => $row['target_customer_agreement_id'] ?? null,
                 'target_owner_agreement_id' => $row['target_owner_agreement_id'] ?? null,
                 'target_vehicle_use_id' => $row['target_vehicle_use_id'] ?? null,
-                'customer_id' => $row['customer_id'] ?? null,
-                'supplier_id' => $row['supplier_id'] ?? null,
+                'customer_id' => $customerId,
+                'supplier_id' => $supplierId,
                 'employee_id' => $row['employee_id'] ?? null,
                 'net_amount' => $net,
                 'tax_group_id' => $row['tax_group_id'] ?? null,

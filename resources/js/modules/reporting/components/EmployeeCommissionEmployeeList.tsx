@@ -91,7 +91,7 @@ function EmployeeCommissionPeriodDetails({ employeeId, params }: { employeeId: n
     return <div className="space-y-4">
         <EmployeeCommissionJobList employeeId={employeeId} params={params} />
         <div className="rounded-lg border border-slate-200 bg-white p-3">
-            <button type="button" className="text-sm font-medium text-sky-700 hover:underline" aria-expanded={showEntries} onClick={() => setShowEntries((current) => !current)}>
+            <button type="button" className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" aria-expanded={showEntries} onClick={() => setShowEntries((current) => !current)}>
                 {showEntries ? 'Hide commission entries' : 'View commission entries'}
             </button>
             {showEntries && <div className="mt-3"><EmployeeCommissionDetails employeeId={employeeId} params={params} /></div>}
@@ -144,7 +144,7 @@ function EmployeeCommissionDetails({ employeeId, params }: {
                                 {(result.data?.data ?? []).map((row) => (
                                     <tr key={row.id} className="transition-colors hover:bg-blue-50/40">
                                         <td className="whitespace-nowrap px-4 py-3">
-                                            <Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link>
+                                            <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link>
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">{formatDate(row.job_date)}</td>
                                         <td className="max-w-48 px-3 py-2.5 text-slate-700">
@@ -180,7 +180,7 @@ function MobileCommissionJob({ row }: { row: EmployeeCommissionReportRow }) {
         <article className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link>
+                    <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link>
                     <p className="mt-0.5 text-xs text-slate-500">{formatDate(row.job_date)}</p>
                 </div>
                 <CommissionStatus status={row.commission_status} />

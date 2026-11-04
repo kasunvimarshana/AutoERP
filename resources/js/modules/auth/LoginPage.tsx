@@ -74,10 +74,10 @@ export default function LoginPage() {
 
     return (
         <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
-            <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-7 shadow-xl">
                 <div className="mb-6">
-                    <p className="text-sm font-semibold uppercase tracking-wide text-sky-600">AutoERP</p>
-                    <h1 className="mt-2 text-2xl font-bold text-slate-950">{authMode === 'platform' ? 'Platform administration' : 'Sign in'}</h1>
+                    <p className="text-sm font-bold uppercase tracking-wider text-blue-600">AutoERP</p>
+                    <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{authMode === 'platform' ? 'Platform administration' : 'Sign in'}</h1>
                     <p className="mt-2 text-sm text-slate-500">
                         {authMode === 'platform'
                             ? 'Use a dedicated platform operator account. Sensitive control-plane actions require recent authentication.'
@@ -90,7 +90,7 @@ export default function LoginPage() {
                         <button
                             key={mode}
                             type="button"
-                            className={`rounded-md px-3 py-2 text-sm font-medium ${authMode === mode ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600'}`}
+                            className={`rounded-md px-3 py-2 text-sm font-semibold transition-all ${authMode === mode ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
                             onClick={() => changeAuthMode(mode)}
                         >
                             {mode === 'tenant' ? 'Tenant workspace' : 'Platform operator'}

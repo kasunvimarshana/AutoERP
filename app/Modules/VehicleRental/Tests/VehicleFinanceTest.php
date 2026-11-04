@@ -116,5 +116,87 @@ final class VehicleFinanceTest extends TestCase
         $this->patchJson($this->rentalRoot.'/finance-agreements/installments/refresh-due-statuses')
             ->assertOk()
             ->assertJsonStructure(['updated']);
+
+        // 7. Test cancelling a draft agreement with custom schedule
+        $customDraft = $this->postJson($this->rentalRoot.'/finance-agreements', [
+            'agreement_number' => 'VFA-CUSTOM-001',
+            'supplier_id' => $ownerData['party_id'],
+            'vehicle_id' => $ownerData['vehicle_id'],
+            'agreement_date' => '2026-03-01',
+            'starts_at' => '2026-03-01T00:00:00+05:30',
+            'matures_at' => '2026-05-01T00:00:00+05:30',
+            'currency_id' => $ownerData['currency_id'],
+            'principal_amount' => '200000.000000',
+            'annual_interest_rate' => '10.000000',
+            'installment_frequency' => 'monthly',
+            'installment_count' => 2,
+            'schedule' => [
+                [
+                    'installment_number' => 1,
+                    'due_date' => '2026-04-01',
+                    'principal_due' => '100000.000000',
+                    'interest_due' => '10000.000000',
+                ],
+                [
+                    'installment_number' => 2,
+                    'due_date' => '2026-05-01',
+                    'principal_due' => '100000.000000',
+                    'interest_due' => '5000.000000',
+                ],
+            ],
+        ])->assertCreated()->json('data');
+
+        $this->assertCount(2, $customDraft['installments']);
+        $this->assertSame('100000.000000', $customDraft['installments'][0]['principal_due']);
+        $this->assertSame('10000.000000', $customDraft['installments'][0]['interest_due']);
+
+        // Cancel the draft agreement
+        $this->patchJson($this->rentalRoot.'/finance-agreements/'.$customDraft['id'].'/cancel', [
+            'expected_version' => $customDraft['row_version'],
+            'reason' => 'Duplicate agreement entered in error',
+        ])->assertOk()->assertJsonPath('data.status', 'cancelled');
+    }
+
+    public function test_vehicle_finance_agreement_search_filtering(): void
+    {
+        [$context, , $ownerData] = $this->fixture();
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $ownerData): void {
+            $service = app(VehicleFinanceService::class);
+
+            $a1 = $service->create([
+                'agreement_number' => 'VFA-SEARCH-ALPHA',
+                'supplier_id' => $ownerData['party_id'],
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'agreement_date' => '2026-03-01',
+                'starts_at' => '2026-03-01T00:00:00+05:30',
+                'matures_at' => '2027-03-01T00:00:00+05:30',
+                'currency_id' => $ownerData['currency_id'],
+                'principal_amount' => '500000.000000',
+                'installment_frequency' => 'monthly',
+                'installment_count' => 6,
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $a2 = $service->create([
+                'agreement_number' => 'VFA-SEARCH-BETA',
+                'supplier_id' => $ownerData['party_id'],
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'agreement_date' => '2026-03-01',
+                'starts_at' => '2026-03-01T00:00:00+05:30',
+                'matures_at' => '2027-03-01T00:00:00+05:30',
+                'currency_id' => $ownerData['currency_id'],
+                'principal_amount' => '500000.000000',
+                'installment_frequency' => 'monthly',
+                'installment_count' => 6,
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $resultsAlpha = $service->paginate($context->tenantId, $context->organizationUnitId, ['search' => 'ALPHA'], 15);
+            $this->assertCount(1, $resultsAlpha->items());
+            $this->assertSame($a1->id, $resultsAlpha->items()[0]->id);
+
+            $resultsBeta = $service->paginate($context->tenantId, $context->organizationUnitId, ['search' => 'BETA'], 15);
+            $this->assertCount(1, $resultsBeta->items());
+            $this->assertSame($a2->id, $resultsBeta->items()[0]->id);
+        });
     }
 }
