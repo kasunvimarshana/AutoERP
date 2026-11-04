@@ -55,8 +55,8 @@ it('shows complete owner history with owner labels and hides customer-only depos
     expect(screen.queryByText(/3100\.000000/)).not.toBeInTheDocument();
 });
 
-it('shows an explicit loading state', () => {
+it('shows an explicit loading state', async () => {
     vi.mocked(agreementHistory).mockReturnValue(new Promise<never>(() => undefined));
     render(<AgreementHistoryPanel kind={AgreementKind.Customer} id={7} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Loading agreement history…');
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading agreement history…');
 });

@@ -92,7 +92,7 @@ export default function IncidentRegisterPage() {
                 incident_type: type, occurred_on: occurredOn,
                 evidence_reference: evidenceReference.trim(), description: description.trim(),
             });
-            setSelectedUse(''); setSelectedChart(''); setChartPage(1); setType(''); setOccurredOn(''); setEvidenceReference(''); setDescription('');
+            setSelectedUse(''); setSelectedChart(''); setChartPage(1); setType(''); setOccurredOn(businessDateInputValue()); setEvidenceReference(''); setDescription('');
             setPage(1); reload();
         } catch (failure) { setError(toApiError(failure)); }
         finally { setBusy(false); }

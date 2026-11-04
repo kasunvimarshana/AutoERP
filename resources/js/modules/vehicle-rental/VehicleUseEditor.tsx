@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -13,13 +13,28 @@ import { AGREEMENT_API, type Agreement } from './agreements';
 import { planVehicleUse, replaceVehicleUse } from './vehicleUseApi';
 import { operationalTimeZoneLabel, timestampWithOffset, OPERATIONAL_TIME_STEP_SECONDS, type VehicleUse } from './vehicleUse';
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params).then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number ?? row.vehicle_number) })) }));
-export function VehicleUseEditor({ agreement, replacement, onSaved, onCancel }: { agreement: Agreement; replacement?: VehicleUse; onSaved: () => void; onCancel: () => void }) {
+export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onSaved, onCancel }: { agreement: Agreement; replacement?: VehicleUse; initialVehicleId?: number; onSaved: () => void; onCancel: () => void }) {
     const [vehicle, setVehicle] = useState<NamedResource | null>(null);
     const [owner, setOwner] = useState<NamedResource | null>(null);
     const [company, setCompany] = useState(false);
     const [oldOdometer, setOldOdometer] = useState(''); const [newOdometer, setNewOdometer] = useState('');
     const [start, setStart] = useState(''); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (!replacement && initialVehicleId && !vehicle) {
+            const controller = new AbortController();
+            vehicles({ search: '', page: 1, perPage: 100, signal: controller.signal })
+                .then(result => {
+                    const found = result.data.find(v => v.id === initialVehicleId);
+                    if (found) {
+                        setVehicle(found);
+                    }
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [initialVehicleId, replacement, vehicle]);
     const sources = useCallback((params: LookupLoadParams) => requestLookup<NamedResource>(`${AGREEMENT_API}/vehicles/${vehicle?.id}/sources`, params, { starts_at: timestampWithOffset(start), ends_at: end ? timestampWithOffset(end) : '' }), [vehicle?.id, start, end]);
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!vehicle || !start || (!company && !owner)) return;

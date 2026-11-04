@@ -83,3 +83,10 @@ it('requires a replacement reason before confirming an atomic replacement', asyn
     fireEvent.change(screen.getByLabelText('Replacement reason'), { target: { value: 'Workshop replacement' } });
     expect(screen.getByRole('button', { name: 'Confirm replacement' })).toBeEnabled();
 });
+
+it('pre-selects the vehicle when initialVehicleId is provided', async () => {
+    render(<VehicleUseEditor agreement={agreement} initialVehicleId={11} onSaved={vi.fn()} onCancel={vi.fn()} />);
+    await waitFor(() => {
+        expect(screen.getByRole('combobox', { name: 'Vehicle' })).toHaveValue('CAR-123');
+    });
+});

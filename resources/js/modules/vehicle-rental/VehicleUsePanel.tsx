@@ -19,11 +19,22 @@ import { VehicleUseEditor } from './VehicleUseEditor';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 import { listVehicleUses, transitionVehicleUse } from './vehicleUseApi';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, VehicleUseStatus, VehicleUseAction, USE_ACTION_CONFIRM_LABELS, USE_ACTION_LABELS, USE_LABELS, type VehicleUse } from './vehicleUse';
-export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement; canManage: boolean }) {
+export function VehicleUsePanel({
+    agreement,
+    canManage,
+    initialVehicleId,
+    onVehicleAssigned,
+}: {
+    agreement: Agreement;
+    canManage: boolean;
+    initialVehicleId?: number;
+    onVehicleAssigned?: () => void;
+}) {
     const auth = useAuth(); const [charts, setCharts] = useState<number | null>(null);
     const [replacement, setReplacement] = useState<VehicleUse | null>(null);
     const [rows, setRows] = useState<VehicleUse[]>([]); const [page, setPage] = useState(1); const [meta, setMeta] = useState<PaginationMeta>(); const [revision, setRevision] = useState(0);
-    const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true); const [adding, setAdding] = useState(false);
+    const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true);
+    const [adding, setAdding] = useState(Boolean(initialVehicleId));
     const [action, setAction] = useState<{ row: VehicleUse; type: VehicleUseAction } | null>(null); const [at, setAt] = useState(''); const [odometer, setOdometer] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [history, setHistory] = useState<number | null>(null);
     useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
     function reload() { setReplacement(null); setLoading(true); setAdding(false); setAction(null); setHistory(null); setRevision(v => v + 1); }
@@ -36,7 +47,21 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
     return <section aria-label="Assigned vehicles" className="space-y-4 border-t pt-4">
         <div className="flex flex-wrap items-center gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={loading || saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={loading || saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
         <ErrorAlert error={error} inline />
-        {(adding || replacement) && <VehicleUseEditor replacement={replacement ?? undefined} agreement={agreement} onSaved={reload} onCancel={() => { setAdding(false); setReplacement(null); }} />}
+        {(adding || replacement) && (
+            <VehicleUseEditor
+                initialVehicleId={initialVehicleId}
+                replacement={replacement ?? undefined}
+                agreement={agreement}
+                onSaved={() => {
+                    onVehicleAssigned?.();
+                    reload();
+                }}
+                onCancel={() => {
+                    setAdding(false);
+                    setReplacement(null);
+                }}
+            />
+        )}
         {loading ? <LoadingState label="Loading assigned vehicles…" /> : error ? null : rows.map(row => <article key={row.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{row.vehicle.label}</p><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div><p className="text-sm text-slate-600">{formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>{row.replaces_use && <p className="text-xs text-blue-600 font-medium">Replaces {row.replaces_use.vehicle_label}</p>}<p className="text-sm text-slate-600">{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
             {row.handed_over_at && <p className="text-xs text-slate-500">Actual handover: {formatBusinessDateTime(row.handed_over_at)} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}{row.returned_at && <p className="text-xs text-slate-500">Actual return: {formatBusinessDateTime(row.returned_at)} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
