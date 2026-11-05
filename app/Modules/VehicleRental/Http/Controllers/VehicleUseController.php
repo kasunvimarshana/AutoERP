@@ -51,6 +51,11 @@ final class VehicleUseController
         return (new VehicleUseResource($this->uses->plan($request->context(), $agreement, $request->expectedVersion(), $request->only(OperationalFields::MUTABLE_USE))))->response()->setStatusCode(Response::HTTP_CREATED);
     }
 
+    public function show(AgreementRequest $request, int $use): VehicleUseResource
+    {
+        return new VehicleUseResource($this->uses->find($request->context(), $use));
+    }
+
     public function transition(AgreementRequest $request, int $use, string $action): VehicleUseResource
     {
         return new VehicleUseResource($this->uses->transition($request->context(), $use, $request->expectedVersion(), VehicleUseAction::from($action), $request->only(['occurred_at', 'odometer', 'reason'])));

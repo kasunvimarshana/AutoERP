@@ -50,6 +50,14 @@ it('requires the actual event time before a handover can be confirmed', async ()
     expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeEnabled();
 });
 
+it('displays guidance when agreement is in draft', async () => {
+    const draftAgreement = { ...agreement, status: AgreementStatus.Draft };
+    render(<VehicleUsePanel agreement={draftAgreement} canManage />);
+    expect(screen.getByText('This agreement is currently in Draft. Activate the agreement to assign and dispatch vehicles.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Assign vehicle' })).not.toBeInTheDocument();
+    await screen.findByText('CAR-1234');
+});
+
 it('removes stale rows when a vehicle-use reload fails', async () => {
     render(<VehicleUsePanel agreement={agreement} canManage={false} />);
     expect(await screen.findByText('CAR-1234')).toBeInTheDocument();

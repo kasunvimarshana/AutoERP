@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '@/shared/api/apiError';
 import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import VehicleUseRegisterPage from './VehicleUseRegisterPage';
@@ -13,13 +14,14 @@ const row: VehicleUse = {
     handed_over_at: '2026-09-07T03:30:00+00:00', returned_at: null, handover_odometer: '0.000000', return_odometer: null, notes: null,
     replaces_use: { id: 11, vehicle_label: 'CAR-OLD' },
 };
+const renderPage = () => render(<MemoryRouter><VehicleUseRegisterPage /></MemoryRouter>);
 beforeEach(() => { configureBusinessTimeZone('Asia/Colombo'); vi.clearAllMocks(); vi.mocked(listVehicleUseRegister).mockResolvedValue({ data: [row] }); vi.mocked(vehicleUseHistory).mockResolvedValue({ data: [] }); });
 afterEach(() => configureBusinessTimeZone(null));
 describe('Vehicle Use register', () => {
     it('shows planned and actual dates separately, replacement context and expandable custody evidence', async () => {
-        render(<VehicleUseRegisterPage />);
+        renderPage();
         expect(screen.queryByRole('main')).not.toBeInTheDocument();
-        expect(await screen.findByText('CAR-1234 · CUSTOMER-A')).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ })).toBeInTheDocument();
         expect(screen.getByText('Customer: Example Customer')).toBeInTheDocument();
         expect(screen.getByText(`Planned: ${formatBusinessDateTime(row.starts_at)} — Open-ended`)).toBeInTheDocument();
         expect(screen.getByText(`Handed over: ${formatBusinessDateTime(row.handed_over_at)}`)).toBeInTheDocument();
@@ -32,7 +34,7 @@ describe('Vehicle Use register', () => {
         await waitFor(() => expect(vehicleUseHistory).toHaveBeenCalledWith(row.id, 1, expect.any(AbortSignal)));
     });
     it('applies search, state and explicit-offset planned period filters', async () => {
-        render(<VehicleUseRegisterPage />); await screen.findByText('CAR-1234 · CUSTOMER-A');
+        renderPage(); await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ });
         vi.mocked(listVehicleUseRegister).mockResolvedValue({ data: [] });
         fireEvent.change(screen.getByLabelText('Vehicle, agreement or party'), { target: { value: ' SEARCH ' } });
         fireEvent.change(screen.getByLabelText('Use status'), { target: { value: VehicleUseStatus.Returned } });
@@ -50,31 +52,31 @@ describe('Vehicle Use register', () => {
         expect(listVehicleUseRegister).toHaveBeenLastCalledWith({ search: 'SEARCH', use_status: VehicleUseStatus.Returned, from: timestampWithOffset(start), until: undefined }, 1, expect.any(AbortSignal));
     });
     it('retries an unfiltered request when Clear filters follows an error', async () => {
-        render(<VehicleUseRegisterPage />); await screen.findByText('CAR-1234 · CUSTOMER-A');
+        renderPage(); await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ });
         vi.mocked(listVehicleUseRegister).mockRejectedValueOnce(new ApiError('Vehicle use could not be loaded.', 500));
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('Vehicle use could not be loaded.')).toBeInTheDocument();
         vi.mocked(listVehicleUseRegister).mockResolvedValueOnce({ data: [row] });
         fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
         await waitFor(() => expect(listVehicleUseRegister).toHaveBeenCalledTimes(3));
-        expect(await screen.findByText('CAR-1234 · CUSTOMER-A')).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ })).toBeInTheDocument();
     });
     it('hides old results after a failed filter request', async () => {
-        render(<VehicleUseRegisterPage />); await screen.findByText('CAR-1234 · CUSTOMER-A');
+        renderPage(); await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ });
         vi.mocked(listVehicleUseRegister).mockRejectedValue(new ApiError('Period end must follow its start.', 422));
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('Period end must follow its start.')).toBeInTheDocument();
-        expect(screen.queryByText('CAR-1234 · CUSTOMER-A')).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ })).not.toBeInTheDocument();
     });
 });
 
     it('clears applied filters and reloads the unfiltered register', async () => {
-        render(<VehicleUseRegisterPage />); await screen.findByText('CAR-1234 · CUSTOMER-A');
+        renderPage(); await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ });
         vi.mocked(listVehicleUseRegister).mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({ data: [row] });
         fireEvent.change(screen.getByLabelText('Vehicle, agreement or party'), { target: { value: 'CAR-OLD' } });
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         await screen.findByText('No vehicle uses match these filters.');
         fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-        expect(await screen.findByText('CAR-1234 · CUSTOMER-A')).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ })).toBeInTheDocument();
         expect(listVehicleUseRegister).toHaveBeenLastCalledWith({}, 1, expect.any(AbortSignal));
     });

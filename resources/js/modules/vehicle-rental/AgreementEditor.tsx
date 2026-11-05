@@ -17,14 +17,15 @@ import { AgreementKind, DriverMode, RentalBasis, termLabel, visibleTermKeys, typ
 
 const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params)
-    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number ?? row.vehicle_number), code: String(row.vehicle_number) })) }));
+    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number || row.vehicle_number), code: String(row.vehicle_number) })) }));
 const basisOptions = [{ value: RentalBasis.Daily, label: 'Daily' }, { value: RentalBasis.Monthly, label: 'Monthly' }];
 const driverOptions = [{ value: DriverMode.SelfDrive, label: 'Self-drive' }, { value: DriverMode.WithDriver, label: 'With driver' }];
 
 export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: AgreementKind; record?: Agreement; onSaved: () => void; onCancel: () => void }) {
+    const isSuccessor = Boolean(record?.supersedes_agreement);
     const [party, setParty] = useState<NamedResource | null>(record?.party ?? null);
     const [currency, setCurrency] = useState<NamedResource | null>(record?.currency ?? null);
-    const [vehicle, setVehicle] = useState<NamedResource | null>(record?.vehicle ? { id: record.vehicle.id, name: record.vehicle.registration_number ?? record.vehicle.vehicle_number } : null);
+    const [vehicle, setVehicle] = useState<NamedResource | null>(record?.vehicle ? { id: record.vehicle.id, name: record.vehicle.registration_number || record.vehicle.vehicle_number } : null);
     const [reference, setReference] = useState(record?.reference ?? '');
     const [agreedOn, setAgreedOn] = useState(record?.agreed_on ?? businessDateInputValue());
     const [executingOn, setExecutingOn] = useState(record?.executing_on ?? '');
@@ -55,8 +56,40 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
         <ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
             <Input label="Agreement reference" value={reference} onChange={e => setReference(e.target.value)} required error={fieldError('reference')} />
-            <LookupSelect label={kind === AgreementKind.Customer ? 'Customer' : 'Owner / supplier'} value={party} onChange={setParty} search={kind === AgreementKind.Customer ? lookupApi.customers : lookupApi.suppliers} required error={fieldError('party_id')} />
-            {kind === AgreementKind.Owner && <LookupSelect label="Vehicle" value={vehicle} onChange={setVehicle} search={vehicles} required error={fieldError('vehicle_id')} />}
+            <div>
+                <LookupSelect
+                    label={kind === AgreementKind.Customer ? 'Customer' : 'Owner / supplier'}
+                    value={party}
+                    onChange={setParty}
+                    search={kind === AgreementKind.Customer ? lookupApi.customers : lookupApi.suppliers}
+                    required
+                    disabled={isSuccessor}
+                    error={fieldError('party_id')}
+                />
+                {isSuccessor && (
+                    <p className="mt-1 text-xs text-slate-500">
+                        Successor agreements inherit the counterparty of the predecessor agreement.
+                    </p>
+                )}
+            </div>
+            {kind === AgreementKind.Owner && (
+                <div>
+                    <LookupSelect
+                        label="Vehicle"
+                        value={vehicle}
+                        onChange={setVehicle}
+                        search={vehicles}
+                        required
+                        disabled={isSuccessor}
+                        error={fieldError('vehicle_id')}
+                    />
+                    {isSuccessor && (
+                        <p className="mt-1 text-xs text-slate-500">
+                            Owner successor agreements inherit the supplied vehicle.
+                        </p>
+                    )}
+                </div>
+            )}
             <LookupSelect label="Currency" value={currency} onChange={setCurrency} search={currencies} required error={fieldError('currency_id')} />
             <Input label="Agreement date" type="date" value={agreedOn} onChange={e => setAgreedOn(e.target.value)} required error={fieldError('agreed_on')} />
             <Input label="Agreement executing date" type="date" value={executingOn} onChange={e => setExecutingOn(e.target.value)} error={fieldError('executing_on')} hint="Record the date stated in the agreement; leave blank if unknown." />

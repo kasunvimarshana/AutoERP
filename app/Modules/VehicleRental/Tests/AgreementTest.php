@@ -243,4 +243,40 @@ final class AgreementTest extends TestCase
             self::assertSame($owner['vehicle_id'], (int) $agreement->vehicle_id);
         });
     }
+
+    public function test_draft_agreement_can_be_closed_with_mandatory_reason_and_freezes_lifecycle(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $service = app(AgreementService::class);
+            $draft = $service->create(AgreementKind::Customer, $context, $customer);
+            self::assertSame(AgreementStatus::Draft, $draft->status);
+
+            try {
+                $service->change(AgreementKind::Customer, $context, $draft->id, $draft->row_version, AgreementAction::Close, reason: '');
+                self::fail('Closure without reason must fail.');
+            } catch (ValidationException $error) {
+                self::assertArrayHasKey('reason', $error->errors());
+            }
+
+            $closed = $service->change(AgreementKind::Customer, $context, $draft->id, $draft->row_version, AgreementAction::Close, reason: 'Negotiations abandoned');
+            self::assertSame(AgreementStatus::Closed, $closed->status);
+            self::assertNotNull($closed->closed_at);
+            self::assertNotNull($closed->closed_on);
+
+            try {
+                $service->change(AgreementKind::Customer, $context, $closed->id, $closed->row_version, AgreementAction::Activate);
+                self::fail('Closed agreement cannot be activated.');
+            } catch (ValidationException) {
+                self::assertSame(AgreementStatus::Closed, $closed->refresh()->status);
+            }
+
+            try {
+                $service->change(AgreementKind::Customer, $context, $closed->id, $closed->row_version, AgreementAction::Update, array_replace($customer, ['reference' => 'CHANGED']));
+                self::fail('Closed agreement cannot be updated.');
+            } catch (ValidationException) {
+                self::assertSame(AgreementStatus::Closed, $closed->refresh()->status);
+            }
+        });
+    }
 }

@@ -168,6 +168,7 @@ final class VehicleUseTest extends TestCase
             $response = $this->tenantPostJson($context->tenantId, $path, array_merge($input, ['expected_version' => $customer->row_version]));
             $response->assertCreated()->assertJsonPath('data.customer_agreement.reference', $customer->reference);
             $id = $response->json('data.id');
+            $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/vehicle-uses/'.$id)->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.customer_agreement.reference', $customer->reference);
             $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/vehicle-uses/'.$id.'/history')->assertOk()->assertJsonPath('data.0.action', 'plan')->assertJsonPath('data.0.actor.name', 'Test User');
         });
     }

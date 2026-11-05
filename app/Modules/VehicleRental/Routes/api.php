@@ -98,6 +98,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::get('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'index'])->whereNumber('agreement');
     Route::post('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'store'])->whereNumber('agreement');
     Route::get('vehicles/{vehicle}/sources', [VehicleUseController::class, 'sources'])->whereNumber('vehicle');
+    Route::get('vehicle-uses/{use}', [VehicleUseController::class, 'show'])->whereNumber('use');
     Route::post('vehicle-uses/{use}/replace', [VehicleUseController::class, 'replace'])->whereNumber('use');
     Route::get('vehicle-uses/{use}/history', [VehicleUseController::class, 'history'])->whereNumber('use');
     Route::post('vehicle-uses/{use}/{action}', [VehicleUseController::class, 'transition'])->whereNumber('use')->whereIn('action', [VehicleUseAction::Handover->value, VehicleUseAction::ReturnVehicle->value, VehicleUseAction::Cancel->value]);
@@ -115,6 +116,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     });
 
     Route::get('running-charts', [RunningChartController::class, 'register']);
+    Route::get('running-charts/{chart}', [RunningChartController::class, 'show'])->whereNumber('chart');
     Route::put('running-charts/{chart}', [RunningChartController::class, 'update'])->whereNumber('chart');
     Route::get('running-charts/{chart}/history', [RunningChartController::class, 'history'])->whereNumber('chart');
     Route::post('running-charts/{chart}/{action}', [RunningChartController::class, 'transition'])->whereNumber('chart')->whereIn('action', [RunningChartAction::Finalize->value, RunningChartAction::Reverse->value]);

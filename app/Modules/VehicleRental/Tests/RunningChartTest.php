@@ -15,6 +15,7 @@ use Modules\User\Services\UserAccessResolver;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseAction;
+use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\VehicleUseService;
@@ -182,6 +183,25 @@ final class RunningChartTest extends TestCase
             self::assertNull($chart->totalKm());
             self::assertSame('150.000000', $chart->end_odometer);
             self::assertNull($chart->history()->get()->last()->snapshot['start_odometer']);
+        });
+    }
+
+    public function test_api_can_fetch_single_chart_by_id(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $this->withoutMiddleware();
+            $this->app->resolving(AgreementRequest::class, function ($request) use ($context): void {
+                $request->attributes->set(config('core.current_tenant.id_attribute', 'current_tenant_id'), $context->tenantId);
+                $request->attributes->set(config('core.current_organization_unit.id_attribute', 'current_organization_unit_id'), $context->organizationUnitId);
+                $request->attributes->set(config('core.current_user.id_attribute', 'current_user_id'), $context->actorId);
+            });
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, $facts);
+
+            $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/running-charts/'.$chart->id)
+                ->assertOk()
+                ->assertJsonPath('data.id', $chart->id)
+                ->assertJsonPath('data.reference', $facts['reference']);
         });
     }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -59,7 +60,19 @@ export default function VehicleUseRegisterPage() {
         {loading ? <LoadingState label="Loading vehicle use register…" /> : error ? null : <>
             {rows.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-slate-500 shadow-sm">No vehicle uses match these filters.</p>}
             {rows.map(row => <article key={row.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3"><h2 className="text-base font-semibold text-slate-900">{row.vehicle.label} · {row.customer_agreement.reference}</h2><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        {row.vehicle.label} ·{' '}
+                        <Link
+                            to={`/vehicle-rental/customer/agreements?search=${encodeURIComponent(row.customer_agreement.reference)}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline"
+                            title="Review customer agreement"
+                        >
+                            {row.customer_agreement.reference}
+                        </Link>
+                    </h2>
+                    <StatusBadge status={row.status} label={USE_LABELS[row.status]} />
+                </div>
                 <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
                     <p>Customer: {row.customer_agreement.party_name}</p>
                     <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>

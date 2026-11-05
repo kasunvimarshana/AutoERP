@@ -139,6 +139,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                                 <>
                                     <Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit draft</Button>
                                     <Button onClick={() => setAction(AgreementAction.Activate)}>Activate</Button>
+                                    <Button variant="danger" onClick={() => setAction(AgreementAction.Close)}>Close draft</Button>
                                 </>
                             )}
                             {selected.status === AgreementStatus.Active && (
@@ -153,7 +154,13 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                 </div>
             </div>
             {action && <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
-                <p className="text-sm text-slate-700">{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
+                <p className="text-sm text-slate-700">
+                    {action === AgreementAction.Activate
+                        ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.'
+                        : selected.status === AgreementStatus.Draft
+                            ? 'Close this draft agreement without activating it while preserving its history.'
+                            : 'Close this agreement while preserving its original terms and history.'}
+                </p>
                 {action === AgreementAction.Close && <Textarea label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
                 <div className="flex flex-wrap gap-2">
                     <Button variant={action === AgreementAction.Close ? 'danger' : 'primary'} onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>

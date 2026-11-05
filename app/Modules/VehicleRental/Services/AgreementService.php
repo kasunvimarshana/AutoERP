@@ -171,7 +171,7 @@ final class AgreementService
                 }
                 $record->status = AgreementStatus::Active;
                 $record->activated_at = now();
-            } elseif ($action === AgreementAction::Close && $record->status === AgreementStatus::Active) {
+            } elseif ($action === AgreementAction::Close && ($record->status === AgreementStatus::Active || $record->status === AgreementStatus::Draft)) {
                 if (trim($reason ?? '') === '' || mb_strlen($reason) > AgreementFields::NOTES_LENGTH) {
                     throw ValidationException::withMessages(['reason' => ['Provide a closure reason within the notes length limit.']]);
                 }

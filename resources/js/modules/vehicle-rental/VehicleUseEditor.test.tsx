@@ -90,3 +90,29 @@ it('pre-selects the vehicle when initialVehicleId is provided', async () => {
         expect(screen.getByRole('combobox', { name: 'Vehicle' })).toHaveValue('CAR-123');
     });
 });
+
+it('prevents selecting the same vehicle during replacement', async () => {
+    const replacement = {
+        id: 73,
+        row_version: 3,
+        status: VehicleUseStatus.InCustody,
+        customer_agreement: { id: 3, reference: 'CUSTOMER-A', party_name: 'Customer', version: 2 },
+        owner_agreement: null,
+        vehicle: { id: 11, label: 'CAR-123' },
+        starts_at: '2026-09-07T09:00:00+05:30',
+        ends_at: null,
+        handed_over_at: '2026-09-07T09:00:00+05:30',
+        returned_at: null,
+        handover_odometer: null,
+        return_odometer: null,
+        notes: null,
+    } as VehicleUse;
+    render(<VehicleUseEditor agreement={agreement} replacement={replacement} onSaved={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: 'CAR' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'CAR-123' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Company-owned vehicle' }));
+    fireEvent.change(screen.getByLabelText('Replacement time'), { target: { value: '2026-09-08T09:00' } });
+    fireEvent.change(screen.getByLabelText('Replacement reason'), { target: { value: 'Workshop replacement' } });
+    expect(screen.getByText('Select a different physical vehicle.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm replacement' })).toBeDisabled();
+});

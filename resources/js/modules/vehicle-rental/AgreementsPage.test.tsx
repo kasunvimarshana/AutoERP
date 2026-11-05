@@ -81,6 +81,18 @@ describe('Rental agreement review', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create successor draft' }));
         await waitFor(() => expect(createAgreementSuccessor).toHaveBeenCalledWith(AgreementKind.Customer, expect.objectContaining({ id: record.id }), expect.objectContaining({ reference: 'LESSEE-R2', starts_on: '2026-10-01', reason: 'Future rate revision' })));
     });
+    it('allows closing a draft agreement with a reason', async () => {
+        session.permissions.push('vehicle-rental.customer-agreements.manage');
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close draft' }));
+        expect(screen.getByText('Close this draft agreement without activating it while preserving its history.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Confirm closure' })).toBeDisabled();
+        fireEvent.change(screen.getByLabelText('Closure reason'), { target: { value: 'Customer withdrew proposal' } });
+        expect(screen.getByRole('button', { name: 'Confirm closure' })).toBeEnabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm closure' }));
+        await waitFor(() => expect(transitionAgreement).toHaveBeenCalledWith(AgreementKind.Customer, record, 'close', 'Customer withdrew proposal'));
+    });
 });
 
 it('formats financial terms and included distance for operator review', async () => {

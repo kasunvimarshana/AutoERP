@@ -38,6 +38,11 @@ final class RunningChartController
         return (new RunningChartResource($this->charts->create($request->context(), $use, $request->expectedVersion(), $request->only(RunningChartFields::MUTABLE), isset($data['corrects_chart_id']) ? (int) $data['corrects_chart_id'] : null)))->response()->setStatusCode(Response::HTTP_CREATED);
     }
 
+    public function show(AgreementRequest $request, int $chart): RunningChartResource
+    {
+        return new RunningChartResource($this->charts->find($request->context(), $chart));
+    }
+
     public function update(AgreementRequest $request, int $chart): RunningChartResource
     {
         return new RunningChartResource($this->charts->change($request->context(), $chart, $request->expectedVersion(), RunningChartAction::Update, $request->only(RunningChartFields::MUTABLE)));

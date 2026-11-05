@@ -46,6 +46,11 @@ export function VehicleUsePanel({
     }
     return <section aria-label="Assigned vehicles" className="space-y-4 border-t pt-4">
         <div className="flex flex-wrap items-center gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={loading || saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={loading || saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
+        {agreement.status === AgreementStatus.Draft && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                This agreement is currently in Draft. Activate the agreement to assign and dispatch vehicles.
+            </div>
+        )}
         <ErrorAlert error={error} inline />
         {(adding || replacement) && (
             <VehicleUseEditor
@@ -65,8 +70,29 @@ export function VehicleUsePanel({
         {loading ? <LoadingState label="Loading assigned vehicles…" /> : error ? null : rows.map(row => <article key={row.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{row.vehicle.label}</p><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div><p className="text-sm text-slate-600">{formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>{row.replaces_use && <p className="text-xs text-blue-600 font-medium">Replaces {row.replaces_use.vehicle_label}</p>}<p className="text-sm text-slate-600">{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
             {row.handed_over_at && <p className="text-xs text-slate-500">Actual handover: {formatBusinessDateTime(row.handed_over_at)} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}{row.returned_at && <p className="text-xs text-slate-500">Actual return: {formatBusinessDateTime(row.returned_at)} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
-            <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={saving} aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>{history === row.id ? 'Hide vehicle-use history' : 'Vehicle-use history'}</Button>{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.Planned && <><Button onClick={() => choose(row, VehicleUseAction.Handover)}>Hand over vehicle</Button><Button variant="danger" onClick={() => choose(row, VehicleUseAction.Cancel)}>Cancel plan</Button></>}{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.InCustody && <><Button onClick={() => choose(row, VehicleUseAction.Return)}>Record return</Button><Button variant="secondary" onClick={() => setReplacement(row)}>Replace vehicle</Button></>}</div>
-            {hasPermission(auth, CHART_PERMISSION.view) && <Button type="button" variant="secondary" aria-expanded={charts === row.id} onClick={() => setCharts(charts === row.id ? null : row.id)}>{charts === row.id ? 'Hide Running Charts' : 'Running Charts'}</Button>}{charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
+            <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" disabled={saving} aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>
+                    {history === row.id ? 'Hide vehicle-use history' : 'Vehicle-use history'}
+                </Button>
+                {hasPermission(auth, CHART_PERMISSION.view) && (
+                    <Button type="button" variant="secondary" aria-expanded={charts === row.id} onClick={() => setCharts(charts === row.id ? null : row.id)}>
+                        {charts === row.id ? 'Hide Running Charts' : 'Running Charts'}
+                    </Button>
+                )}
+                {canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.Planned && (
+                    <>
+                        <Button onClick={() => choose(row, VehicleUseAction.Handover)}>Hand over vehicle</Button>
+                        <Button variant="danger" onClick={() => choose(row, VehicleUseAction.Cancel)}>Cancel plan</Button>
+                    </>
+                )}
+                {canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.InCustody && (
+                    <>
+                        <Button onClick={() => choose(row, VehicleUseAction.Return)}>Record return</Button>
+                        <Button variant="secondary" onClick={() => setReplacement(row)}>Replace vehicle</Button>
+                    </>
+                )}
+            </div>
+            {charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
             {history === row.id && <VehicleUseHistoryPanel key={row.id} id={row.id} />}
         </article>)}
         {!loading && !error && rows.length === 0 && <p className="text-sm text-slate-500">No vehicles assigned.</p>}<Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setAction(null); }} />
