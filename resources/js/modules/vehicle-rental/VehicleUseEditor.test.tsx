@@ -28,7 +28,7 @@ it('uses the planned period for owner lookup and clears its selection when dates
     fireEvent.change(screen.getByLabelText('Planned return (optional)'), { target: { value: end } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Owner agreement' }), { target: { value: 'OWNER' } });
     fireEvent.click(await screen.findByRole('option', { name: 'OWNER-A · Example Owner' }));
-    expect(requestLookup).toHaveBeenLastCalledWith(`${AGREEMENT_API}/vehicles/11/sources`, expect.any(Object), { starts_at: timestampWithOffset(start), ends_at: timestampWithOffset(end) });
+    expect(requestLookup).toHaveBeenLastCalledWith(`${AGREEMENT_API}/vehicles/11/sources`, expect.any(Object), { starts_at: timestampWithOffset(start), ends_at: timestampWithOffset(end), customer_agreement_id: 3 });
     fireEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
     await waitFor(() => expect(planVehicleUse).toHaveBeenCalledWith(agreement, expect.objectContaining({ owner_agreement_id: 21, starts_at: timestampWithOffset(start), ends_at: timestampWithOffset(end) })));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save assignment' })).toBeEnabled());
@@ -44,7 +44,25 @@ it('makes open-ended coverage explicit in the source request', async () => {
     fireEvent.change(screen.getByLabelText('Planned handover'), { target: { value: start } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Owner agreement' }), { target: { value: 'OWNER' } });
     await screen.findByRole('option', { name: 'OWNER-A · Example Owner' });
-    expect(requestLookup).toHaveBeenLastCalledWith(`${AGREEMENT_API}/vehicles/11/sources`, expect.any(Object), { starts_at: timestampWithOffset(start), ends_at: '' });
+    expect(requestLookup).toHaveBeenLastCalledWith(`${AGREEMENT_API}/vehicles/11/sources`, expect.any(Object), { starts_at: timestampWithOffset(start), ends_at: '', customer_agreement_id: 3 });
+});
+
+it('allows saving assignment with owner agreement when planned return is left blank', async () => {
+    render(<VehicleUseEditor agreement={agreement} onSaved={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: 'CAR' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'CAR-123' }));
+    const start = '2026-09-07T09:00';
+    fireEvent.change(screen.getByLabelText('Planned handover'), { target: { value: start } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Owner agreement' }), { target: { value: 'OWNER' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'OWNER-A · Example Owner' }));
+    expect(screen.getByRole('button', { name: 'Save assignment' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+    await waitFor(() => expect(planVehicleUse).toHaveBeenCalledWith(agreement, expect.objectContaining({
+        vehicle_id: 11,
+        owner_agreement_id: 21,
+        starts_at: timestampWithOffset(start),
+        ends_at: null,
+    })));
 });
 
 it('keeps company-owned assignment disabled until a planned handover is entered', async () => {

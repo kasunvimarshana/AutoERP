@@ -22,7 +22,7 @@ final class OperationalTime
     public static function plannedPeriod(mixed $startsAt, mixed $endsAt): array
     {
         $start = self::parse($startsAt, 'starts_at');
-        $end = $endsAt === null ? null : self::parse($endsAt, 'ends_at');
+        $end = ($endsAt === null || (is_string($endsAt) && trim($endsAt) === '')) ? null : self::parse($endsAt, 'ends_at');
         if ($end !== null && $end <= $start) {
             throw ValidationException::withMessages(['ends_at' => ['End must be later than start.']]);
         }

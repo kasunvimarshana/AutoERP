@@ -289,4 +289,50 @@ final class VehicleUseTest extends TestCase
             self::assertSame((int) $next->id, (int) $oldReplaced->replacedByUse->id);
         });
     }
+
+    public function test_vehicle_use_plan_with_owner_agreement_succeeds_when_planned_return_is_blank_and_owner_covers_customer(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
+            $agreements = app(AgreementService::class);
+            $customer = $agreements->create(AgreementKind::Customer, $context, array_replace($customerInput, ['ends_on' => '2026-09-10']));
+            $customer = $agreements->change(AgreementKind::Customer, $context, $customer->id, $customer->row_version, AgreementAction::Activate);
+
+            $owner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['ends_on' => '2026-09-15']));
+            $owner = $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
+
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $ownerInput['vehicle_id'],
+                'owner_agreement_id' => $owner->id,
+                'starts_at' => '2026-09-07T09:00:00+00:00',
+                'ends_at' => '',
+            ]);
+            self::assertNull($use->ends_at);
+            self::assertSame(VehicleUseStatus::Planned, $use->status);
+            self::assertSame($owner->id, (int) $use->owner_agreement_id);
+        });
+    }
+
+    public function test_vehicle_use_plan_with_owner_agreement_rejects_insufficient_coverage_when_planned_return_is_blank(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
+            $agreements = app(AgreementService::class);
+            $customer = $agreements->create(AgreementKind::Customer, $context, array_replace($customerInput, ['ends_on' => '2026-09-20']));
+            $customer = $agreements->change(AgreementKind::Customer, $context, $customer->id, $customer->row_version, AgreementAction::Activate);
+
+            $owner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['ends_on' => '2026-09-15']));
+            $owner = $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
+
+            $service = app(VehicleUseService::class);
+            $this->expectException(ValidationException::class);
+            $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $ownerInput['vehicle_id'],
+                'owner_agreement_id' => $owner->id,
+                'starts_at' => '2026-09-07T09:00:00+00:00',
+                'ends_at' => null,
+            ]);
+        });
+    }
 }

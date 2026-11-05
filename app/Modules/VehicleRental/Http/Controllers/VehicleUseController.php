@@ -73,6 +73,6 @@ final class VehicleUseController
 
     public function sources(AgreementRequest $request, int $vehicle, OwnerSourceService $sources): AnonymousResourceCollection
     {
-        return OwnerSourceResource::collection($sources->list($request->context(), $vehicle, $request->only(['search', 'starts_at', 'ends_at']), $request->perPage()));
+        return OwnerSourceResource::collection($sources->list($request->context(), $vehicle, $request->only(['search', 'starts_at', 'ends_at', 'customer_agreement_id']), $request->perPage()));
     }
 }

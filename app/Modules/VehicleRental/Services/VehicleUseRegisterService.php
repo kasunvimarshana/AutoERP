@@ -21,13 +21,18 @@ final class VehicleUseRegisterService
     public function list(AgreementContext $context, array $filters, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertUse($context, false);
+        foreach (['from', 'until', 'use_status', 'search'] as $key) {
+            if (isset($filters[$key]) && is_string($filters[$key]) && trim($filters[$key]) === '') {
+                $filters[$key] = null;
+            }
+        }
         $filters = Validator::make($filters, [
             'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
             'use_status' => ['nullable', Rule::enum(VehicleUseStatus::class)],
             'from' => ['nullable', 'string'], 'until' => ['nullable', 'string'],
         ])->validate();
-        $from = ($filters['from'] ?? null) === null ? null : OperationalTime::parse($filters['from'], 'from');
-        $until = ($filters['until'] ?? null) === null ? null : OperationalTime::parse($filters['until'], 'until');
+        $from = empty($filters['from']) ? null : OperationalTime::parse($filters['from'], 'from');
+        $until = empty($filters['until']) ? null : OperationalTime::parse($filters['until'], 'until');
         if ($from !== null && $until !== null && $until <= $from) {
             throw ValidationException::withMessages(['until' => ['Period end must follow its start.']]);
         }
