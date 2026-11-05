@@ -64,7 +64,7 @@ export default function PaymentMethodWiseSummaryReportPage() {
         <>
             <ContentHeader
                 title="Payment Method Wise Summary"
-                description="Receipts follow payment date. Credit sales include only invoices explicitly kept on credit."
+                description="Daily invoice receipts by method, alongside new credit sales."
                 actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} />

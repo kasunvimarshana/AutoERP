@@ -91,27 +91,21 @@ class VehicleServiceSalesSummaryExportTest extends TestCase
                 'customer' => ['name' => 'Nimal'], 'vehicle' => ['name' => 'ABC-1234'],
                 'used_stock_cost' => '30.125', 'stock_items' => [], 'combos' => [$combo], 'other_items' => [],
             ]],
-            'receipts' => [[
-                'date' => '2026-11-05', 'payment_number' => 'RV-001', 'job_number' => 'JOB-001',
-                'invoice_number' => 'SERVICE-001', 'methods' => ['Cash'], 'amount' => '70',
-            ]],
         ];
 
         $document = new VehicleServiceSalesSummaryExport;
         $rows = $document->rows($result);
 
-        self::assertCount(7, $rows);
+        self::assertCount(6, $rows);
         self::assertSame('100.555', $rows[0]['revenue']);
         self::assertSame('55.43', $rows[0]['profit']);
         self::assertSame('SVC — Oil service', $rows[1]['reference']);
         self::assertArrayNotHasKey('revenue', $rows[2]);
         self::assertSame('30.125', $rows[2]['stock_cost']);
         self::assertSame('JOB-001 | 2026-10-31 | Nimal | ABC-1234', $rows[3]['reference']);
-        self::assertArrayNotHasKey('collected', $rows[3]);
+        self::assertSame('70', $rows[3]['collected']);
         self::assertSame('40.125', $rows[4]['direct_cost']);
         self::assertStringContainsString('OIL — Engine oil', $rows[5]['reference']);
-        self::assertSame('2026-11-05 | RV-001 | JOB-001 | SERVICE-001 | Cash', $rows[6]['reference']);
-        self::assertSame('70', $rows[6]['collected']);
         self::assertSame('landscape', $document->definition()->orientation);
         foreach ($document->definition()->columns as $column) {
             self::assertFalse($column->summarize, 'Overlapping sections must not be summed together.');

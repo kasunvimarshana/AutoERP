@@ -65,7 +65,7 @@ export default function SummaryReportPage() {
         <>
             <ContentHeader
                 title="Summary Reports"
-                description="Sales use invoice date; payments use receipt date. Invoice balances show their current state."
+                description="A period snapshot of finalized trading documents, cash movement, and ledger performance."
                 actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
 
@@ -329,8 +329,8 @@ function SalesSettlementStrip({
         <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 shadow-sm">
             <div className="flex flex-col gap-2 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.17em] text-emerald-700">Current settlement of selected sales</p>
-                    <p className="mt-1 text-sm text-slate-600">Current settlement of invoices dated in the selected period. Receipts may have arrived later.</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.17em] text-emerald-700">Sales settlement mix</p>
+                    <p className="mt-1 text-sm text-slate-600">How the selected sales are currently settled.</p>
                 </div>
                 <p className="text-sm font-semibold tabular-nums text-slate-700">
                     Sales total {money(salesTotal, currency)}
@@ -354,7 +354,7 @@ function SalesSettlementStrip({
                     accent="blue"
                 />
                 <SettlementTile
-                    label="Outstanding now"
+                    label="On credit"
                     description="Current balance outstanding"
                     amount={settlement.credit.amount}
                     documentCount={settlement.credit.document_count}
@@ -456,7 +456,7 @@ function DocumentCard({
                     {!compact && <Metric label="Tax" value={money(metrics.tax_total, currency)} />}
                     {!compact && <Metric label="Charges" value={money(metrics.charge_total, currency)} />}
                     {metrics.paid_total !== undefined && (
-                        <Metric label="Paid to date" value={money(metrics.paid_total, currency)} strong />
+                        <Metric label="Settled" value={money(metrics.paid_total, currency)} strong />
                     )}
                     {metrics.adjustment_total !== undefined && (
                         <Metric label="Adjustments" value={money(metrics.adjustment_total, currency)} />

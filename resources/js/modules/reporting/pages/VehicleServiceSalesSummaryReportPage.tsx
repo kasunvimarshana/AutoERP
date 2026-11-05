@@ -6,7 +6,6 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { useApi } from '@/shared/hooks/useApi';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { formatQuantity } from '@/shared/utils/formatQuantity';
 import { ItemLookupSelect } from '@/modules/item/components/ItemLookupSelect';
@@ -86,7 +85,7 @@ export default function VehicleServiceSalesSummaryReportPage() {
                             <Button type="submit" loading={loading}>Apply filters</Button>
                         </div>
                     </form>
-                    <p className="mt-3 text-sm text-slate-500">Sales follow invoice date. Payments received follow payment date, including receipts for older invoices. Item filters apply to both lists.</p>
+                    <p className="mt-3 text-sm text-slate-500">Sales follow invoice date. Collected amounts follow payment date. Item filters show matching jobs with their full item breakdown.</p>
                 </Panel>
 
                 {loading ? <LoadingState label="Loading service job sales summary..." /> : result ? <>
@@ -98,32 +97,10 @@ export default function VehicleServiceSalesSummaryReportPage() {
                     </section>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-                        <span>{formatQuantity(result.summary.job_count)} jobs sold in this period</span>
-                        <span>Payments received in period: <strong className="font-semibold text-slate-900">{formatMoney(result.summary.collected)}</strong></span>
+                        <span>{formatQuantity(result.summary.job_count)} jobs in this period</span>
+                        <span>Collected: <strong className="font-semibold text-slate-900">{formatMoney(result.summary.collected)}</strong></span>
                         <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...filters, item_id: item?.id }} />
                     </div>
-
-                    <Panel title="Payments received in period">
-                        <p className="-mt-2 mb-4 text-sm text-slate-500">The invoice may have been issued before this period. Each receipt is shown on its payment date.</p>
-                        {result.receipts.length === 0 ? <p className="text-sm text-slate-500">No service invoice payments received in this period.</p> :
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                        <tr><th className="px-3 py-2">Received</th><th className="px-3 py-2">Receipt</th><th className="px-3 py-2">Service job</th><th className="px-3 py-2">Invoice</th><th className="px-3 py-2">Method</th><th className="px-3 py-2 text-right">Amount</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {result.receipts.map((receipt, index) => <tr key={`${receipt.payment_number}-${receipt.invoice_number}-${index}`}>
-                                            <td className="px-3 py-2">{formatBusinessDate(receipt.date)}</td>
-                                            <td className="px-3 py-2 font-medium">{receipt.payment_number}</td>
-                                            <td className="px-3 py-2">{receipt.job_number}</td>
-                                            <td className="px-3 py-2">{receipt.invoice_number}</td>
-                                            <td className="px-3 py-2">{receipt.methods.join(' + ') || '—'}</td>
-                                            <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(receipt.amount)}</td>
-                                        </tr>)}
-                                    </tbody>
-                                </table>
-                            </div>}
-                    </Panel>
 
                     <section className="grid gap-4 lg:grid-cols-2" aria-label="Stock and combo performance">
                         <StockItemsPanel result={result} params={{ ...filters, item_id: item?.id }} />

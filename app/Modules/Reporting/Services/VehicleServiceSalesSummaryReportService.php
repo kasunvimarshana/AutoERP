@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
-use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
@@ -43,7 +43,6 @@ final class VehicleServiceSalesSummaryReportService
         $organizationUnitId = isset($params['organization_unit_id'])
             ? (int) $params['organization_unit_id']
             : null;
-        $receipts = $this->receiptRows($tenantId, $organizationUnitId, $params);
 
         $sales = DB::table('invoice_source_lines as source_lines')
             ->join('invoices', function ($join): void {
@@ -121,6 +120,8 @@ final class VehicleServiceSalesSummaryReportService
             )
             ->get();
 
+        $invoiceIds = $sales->pluck('invoice_id')->unique()->all();
+        $payments = $this->paymentTotals($invoiceIds, $tenantId, $organizationUnitId, $params);
         $jobs = [];
         $lineQuantities = [];
         $lineBaseQuantities = [];
@@ -130,6 +131,12 @@ final class VehicleServiceSalesSummaryReportService
             $inSalesPeriod = (empty($params['date_from']) || $row->invoice_date >= $params['date_from'])
                 && (empty($params['date_to']) || $row->invoice_date <= $params['date_to']);
 
+            $invoiceTotal = (string) $row->invoice_total;
+            $invoicePaid = (string) ($payments->get($row->invoice_id)->collected_amount ?? self::ZERO);
+            $collected = $this->math->compare($invoiceTotal, self::ZERO) > 0
+                ? $this->math->mul($invoicePaid, $this->math->div($invoiceSales, $invoiceTotal, self::ALLOCATION_SCALE))
+                : self::ZERO;
+
             if ($inSalesPeriod) {
                 $jobId = (int) $row->job_id;
                 $lineId = (int) $row->job_line_id;
@@ -137,6 +144,7 @@ final class VehicleServiceSalesSummaryReportService
                     $jobs[$jobId] = $this->emptyJob($row);
                 }
                 $jobs[$jobId]['revenue'] = $this->math->add($jobs[$jobId]['revenue'], $invoiceSales);
+                $jobs[$jobId]['collected'] = $this->math->add($jobs[$jobId]['collected'], $collected);
                 $lineQuantities[$lineId] = $this->math->add($lineQuantities[$lineId] ?? self::ZERO, (string) $row->quantity);
                 $lineBaseQuantities[$lineId] = (string) $row->line_quantity;
                 $this->addSalesLine($jobs[$jobId], $row, $invoiceSales, (string) $row->quantity);
@@ -144,7 +152,7 @@ final class VehicleServiceSalesSummaryReportService
         }
 
         if ($jobs === []) {
-            return $this->result([], $receipts);
+            return $this->result([]);
         }
 
         $jobIds = array_keys($jobs);
@@ -261,32 +269,23 @@ final class VehicleServiceSalesSummaryReportService
         }
         unset($job);
 
-        return $this->result(array_values($jobs), $receipts);
+        return $this->result(array_values($jobs));
     }
 
-    /** @param array<string, mixed> $params @return list<array<string, mixed>> */
-    private function receiptRows(int $tenantId, ?int $organizationUnitId, array $params): array
+    /** @param list<int> $invoiceIds @param array<string, mixed> $params */
+    private function paymentTotals(array $invoiceIds, int $tenantId, ?int $organizationUnitId, array $params): Collection
     {
-        $rows = DB::table('payment_allocations as allocations')
+        if ($invoiceIds === []) {
+            return collect();
+        }
+
+        return DB::table('vehicle_service_payment_links as links')
             ->join('payments', function ($join): void {
-                $join->on('payments.id', '=', 'allocations.payment_id')
-                    ->on('payments.tenant_id', '=', 'allocations.tenant_id');
+                $join->on('payments.id', '=', 'links.payment_id')->on('payments.tenant_id', '=', 'links.tenant_id');
             })
-            ->join('vehicle_service_invoice_links as links', function ($join): void {
-                $join->on('links.invoice_id', '=', 'allocations.invoice_id')
-                    ->on('links.tenant_id', '=', 'allocations.tenant_id');
-            })
-            ->join('vehicle_service_jobs as jobs', function ($join): void {
-                $join->on('jobs.id', '=', 'links.vehicle_service_job_id')
-                    ->on('jobs.tenant_id', '=', 'links.tenant_id');
-            })
-            ->join('invoices', function ($join): void {
-                $join->on('invoices.id', '=', 'allocations.invoice_id')
-                    ->on('invoices.tenant_id', '=', 'allocations.tenant_id');
-            })
-            ->where('allocations.tenant_id', $tenantId)
-            ->where('allocations.status', AllocationStatus::Active->value)
+            ->where('links.tenant_id', $tenantId)
             ->where('links.status', self::ACTIVE_LINK_STATUS)
+            ->whereIn('links.invoice_id', $invoiceIds)
             ->whereNull('payments.deleted_at')
             ->whereNull('payments.reversed_at')
             ->where('payments.document_status', PaymentDocumentStatus::Approved->value)
@@ -297,43 +296,12 @@ final class VehicleServiceSalesSummaryReportService
                 fn ($query) => $query->whereNull('links.organization_unit_id'),
                 fn ($query) => $query->where('links.organization_unit_id', $organizationUnitId),
             )
-            ->when(! empty($params['item_id']), function ($query) use ($params): void {
-                $query->whereExists(function ($items) use ($params): void {
-                    $items->selectRaw('1')
-                        ->from('vehicle_service_job_lines as filter_lines')
-                        ->whereColumn('filter_lines.vehicle_service_job_id', 'jobs.id')
-                        ->whereColumn('filter_lines.tenant_id', 'jobs.tenant_id')
-                        ->where('filter_lines.item_id', (int) $params['item_id']);
-                });
-            })
             ->when(! empty($params['date_from']), fn ($query) => $query->whereDate('payments.payment_date', '>=', $params['date_from']))
             ->when(! empty($params['date_to']), fn ($query) => $query->whereDate('payments.payment_date', '<=', $params['date_to']))
-            ->orderBy('payments.payment_date')
-            ->orderBy('allocations.id')
-            ->get([
-                'payments.id as payment_id', 'payments.payment_number', 'payments.payment_date',
-                'invoices.invoice_number', 'jobs.job_number', 'allocations.allocated_amount',
-            ]);
-
-        if ($rows->isEmpty()) {
-            return [];
-        }
-
-        $methods = DB::table('payment_lines')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('payment_id', $rows->pluck('payment_id')->unique())
-            ->orderBy('line_number')
-            ->get(['payment_id', 'payment_method_name_snapshot'])
-            ->groupBy('payment_id');
-
-        return $rows->map(fn (object $row): array => [
-            'date' => (string) $row->payment_date,
-            'payment_number' => (string) $row->payment_number,
-            'invoice_number' => (string) $row->invoice_number,
-            'job_number' => (string) $row->job_number,
-            'methods' => $methods->get($row->payment_id)?->pluck('payment_method_name_snapshot')->unique()->values()->all() ?? [],
-            'amount' => (string) $row->allocated_amount,
-        ])->all();
+            ->selectRaw('links.invoice_id, SUM(links.allocated_amount) as collected_amount')
+            ->groupBy('links.invoice_id')
+            ->get()
+            ->keyBy('invoice_id');
     }
 
     private function allocatedInvoiceSales(object $row): string
@@ -359,6 +327,7 @@ final class VehicleServiceSalesSummaryReportService
             'customer' => ['name' => (string) ($row->customer_name ?? 'Walk-in customer')],
             'vehicle' => ['name' => (string) ($row->vehicle_name ?? '—')],
             'revenue' => self::ZERO,
+            'collected' => self::ZERO,
             'direct_cost' => self::ZERO,
             'stock_cost' => self::ZERO,
             'used_stock_cost' => self::ZERO,
@@ -497,7 +466,7 @@ final class VehicleServiceSalesSummaryReportService
     }
 
     /** @param list<array<string, mixed>> $jobs @return array<string, mixed> */
-    private function result(array $jobs, array $receipts): array
+    private function result(array $jobs): array
     {
         $summary = [
             'job_count' => count($jobs),
@@ -559,6 +528,7 @@ final class VehicleServiceSalesSummaryReportService
             $summary['stock']['profit'] = $this->math->sub($summary['stock']['revenue'], $summary['stock']['cost']);
             $summary['stock']['item_count'] = count($stockItems);
             $summary['revenue'] = $this->math->add($summary['revenue'], $job['revenue']);
+            $summary['collected'] = $this->math->add($summary['collected'], $job['collected']);
             $summary['direct_cost'] = $this->math->add($summary['direct_cost'], $job['direct_cost']);
             $summary['stock_cost'] = $this->math->add($summary['stock_cost'], $job['used_stock_cost']);
             $summary['commission'] = $this->math->add($summary['commission'], $job['commission']);
@@ -567,10 +537,6 @@ final class VehicleServiceSalesSummaryReportService
             unset($job['categories']);
         }
         unset($job);
-
-        foreach ($receipts as $receipt) {
-            $summary['collected'] = $this->math->add($summary['collected'], $receipt['amount']);
-        }
 
         $summary['stock']['items'] = $this->finalizeRankedItems($stockItems);
         $summary['stock']['item_count'] = count($summary['stock']['items']);
@@ -584,7 +550,6 @@ final class VehicleServiceSalesSummaryReportService
 
         return [
             'jobs' => $jobs,
-            'receipts' => $receipts,
             'summary' => $summary,
             'date_basis' => ['sales' => 'invoice_date', 'collected' => 'payment_date'],
         ];

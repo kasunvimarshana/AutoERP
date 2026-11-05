@@ -113,7 +113,7 @@ describe('SummaryReportPage', () => {
         expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Cash' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Card' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Outstanding now' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'On credit' })).toBeInTheDocument();
         expect(screen.getAllByText(/376,270\.00/)).toHaveLength(2);
         expect(screen.getByRole('heading', { name: 'Payments received' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Total expenses' })).toBeInTheDocument();
