@@ -80,6 +80,11 @@ final class AgreementService
         if (empty(trim((string) ($input['reference'] ?? '')))) {
             $input['reference'] = $this->numbers->next($kind, $context, $input['agreed_on'] ?? null);
         }
+        foreach (['executing_on', 'ends_on'] as $opt) {
+            if (isset($input[$opt]) && is_string($input[$opt]) && trim($input[$opt]) === '') {
+                $input[$opt] = null;
+            }
+        }
         $data = Validator::make($input, [
             'reference' => ['required', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
             'agreed_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
@@ -122,9 +127,9 @@ final class AgreementService
                 'party_id' => $kind === AgreementKind::Customer ? $predecessor->customer_id : $predecessor->supplier_id,
                 'currency_id' => $predecessor->currency_id,
                 'agreed_on' => $data['agreed_on'],
-                'executing_on' => $data['executing_on'] ?? null,
+                'executing_on' => empty($data['executing_on']) ? null : $data['executing_on'],
                 'starts_on' => $data['starts_on'],
-                'ends_on' => $data['ends_on'] ?? null,
+                'ends_on' => empty($data['ends_on']) ? null : $data['ends_on'],
                 'basis' => $predecessor->basis->value,
                 'driver_mode' => $predecessor->driver_mode->value,
                 'terms' => $successorTerms,
@@ -175,6 +180,9 @@ final class AgreementService
             }
 
             if ($action === AgreementAction::Update && $record->status === AgreementStatus::Draft) {
+                if (empty(trim((string) ($input['reference'] ?? '')))) {
+                    $input['reference'] = $record->reference;
+                }
                 $validated = $this->validation->validate($input, $kind, $context);
                 if ($record->supersedes_agreement_id !== null) {
                     $this->assertSuccessorIdentity($kind, $context, $record, $validated);
@@ -323,6 +331,12 @@ final class AgreementService
         } catch (UniqueConstraintViolationException $error) {
             throw new ConflictHttpException('An agreement reference or revision already exists. Reload and review the request.', $error);
         }
+    }
+
+    public function delete(AgreementKind $kind, AgreementContext $context, int $id): never
+    {
+        $this->authorization->assert($context, $kind, true);
+        throw new \LogicException('Agreement history must be preserved. Close the agreement instead of deleting.');
     }
 
     private function model(AgreementKind $kind): string

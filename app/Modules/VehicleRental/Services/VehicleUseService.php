@@ -243,6 +243,9 @@ final class VehicleUseService
         } elseif (isset($input['handover_odometer']) && is_numeric($input['handover_odometer'])) {
             $input['handover_odometer'] = (string) $input['handover_odometer'];
         }
+        if (array_key_exists('owner_agreement_id', $input) && ($input['owner_agreement_id'] === '' || $input['owner_agreement_id'] === null)) {
+            $input['owner_agreement_id'] = null;
+        }
         if (array_key_exists('ends_at', $input) && ($input['ends_at'] === '' || (is_string($input['ends_at']) && trim($input['ends_at']) === ''))) {
             $input['ends_at'] = null;
         }
@@ -254,6 +257,11 @@ final class VehicleUseService
             'return_odometer' => ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN],
             'handover_odometer' => ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN],
         ]))->validate();
+        $data['owner_agreement_id'] = empty($data['owner_agreement_id']) ? null : (int) $data['owner_agreement_id'];
+        $data['ends_at'] = empty($data['ends_at']) ? null : $data['ends_at'];
+        $data['notes'] = empty($data['notes']) ? null : $data['notes'];
+        $data['return_odometer'] = (isset($data['return_odometer']) && trim((string) $data['return_odometer']) !== '') ? (string) $data['return_odometer'] : null;
+        $data['handover_odometer'] = (isset($data['handover_odometer']) && trim((string) $data['handover_odometer']) !== '') ? (string) $data['handover_odometer'] : null;
         if (trim($data['reason']) === '') {
             throw ValidationException::withMessages(['reason' => ['Explain the vehicle replacement.']]);
         }
@@ -284,6 +292,12 @@ final class VehicleUseService
         if ($this->rentalBlocker->conflicts($context->tenantId, $vehicle, $start, $end, $exclude)) {
             throw new ConflictHttpException(VehicleUseAvailabilityBlocker::REASON);
         }
+    }
+
+    public function delete(AgreementContext $context, int $id): never
+    {
+        $this->authorization->assertUse($context, true);
+        throw new \LogicException('Preserve vehicle-use history. Cancel or return the vehicle.');
     }
 
     private function lockVehicle(AgreementContext $context, int $id): Vehicle
@@ -320,6 +334,9 @@ final class VehicleUseService
 
     private function validatePlanInput(array $input): array
     {
+        if (array_key_exists('owner_agreement_id', $input) && ($input['owner_agreement_id'] === '' || $input['owner_agreement_id'] === null)) {
+            $input['owner_agreement_id'] = null;
+        }
         if (array_key_exists('ends_at', $input) && ($input['ends_at'] === '' || (is_string($input['ends_at']) && trim($input['ends_at']) === ''))) {
             $input['ends_at'] = null;
         }
@@ -327,7 +344,12 @@ final class VehicleUseService
             $input['notes'] = null;
         }
 
-        return Validator::make($input, $this->planRules())->validate();
+        $validated = Validator::make($input, $this->planRules())->validate();
+        $validated['owner_agreement_id'] = empty($validated['owner_agreement_id']) ? null : (int) $validated['owner_agreement_id'];
+        $validated['ends_at'] = empty($validated['ends_at']) ? null : $validated['ends_at'];
+        $validated['notes'] = empty($validated['notes']) ? null : $validated['notes'];
+
+        return $validated;
     }
 
     private function planRules(): array

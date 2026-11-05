@@ -125,7 +125,7 @@ export default function VehicleAvailabilityPage() {
                         error={error?.fields.starts_at?.[0]}
                     />
                     <Input
-                        label="Expected end date & time"
+                        label="Expected end date & time (optional)"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
                         min={startsAt || undefined}

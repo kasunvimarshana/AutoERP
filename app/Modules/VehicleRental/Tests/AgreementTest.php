@@ -414,4 +414,54 @@ final class AgreementTest extends TestCase
             self::assertStringStartsWith('VRC-2026-', $successor->reference);
         });
     }
+
+    public function test_agreement_creation_accepts_omitted_and_empty_optional_fields(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $service = app(AgreementService::class);
+
+            // Omit terms, set empty strings for ends_on, executing_on, notes
+            $input = $customer;
+            unset($input['terms']);
+            $input['ends_on'] = '';
+            $input['executing_on'] = '';
+            $input['notes'] = '   ';
+
+            $agreement = $service->create(AgreementKind::Customer, $context, $input);
+            self::assertNull($agreement->ends_on);
+            self::assertNull($agreement->executing_on);
+            self::assertNull($agreement->notes);
+            foreach ($agreement->terms as $term => $val) {
+                self::assertNull($val, "Expected term {$term} to be null.");
+            }
+
+            // Explicit empty strings in terms preserve null rather than becoming 0.000000
+            $inputWithEmptyTerms = array_replace($customer, [
+                'reference' => 'TERMS-EMPTY-REF',
+                'terms' => [
+                    'base_rate' => '',
+                    'included_km' => '   ',
+                    'excess_km_rate' => '100',
+                ],
+            ]);
+            $customAgreement = $service->create(AgreementKind::Customer, $context, $inputWithEmptyTerms);
+            self::assertNull($customAgreement->terms['base_rate']);
+            self::assertNull($customAgreement->terms['included_km']);
+            self::assertSame('100.000000', $customAgreement->terms['excess_km_rate']);
+        });
+    }
+
+    public function test_agreement_service_delete_throws_logic_exception(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $service = app(AgreementService::class);
+            $agreement = $service->create(AgreementKind::Customer, $context, $customer);
+
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Agreement history must be preserved. Close the agreement instead of deleting.');
+            $service->delete(AgreementKind::Customer, $context, $agreement->id);
+        });
+    }
 }

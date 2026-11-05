@@ -25,7 +25,7 @@ final class AgreementRequest extends TenantScopedRequest
             'closed_at' => ['prohibited'],
         ];
 
-        if ($this->isMethod('get')) {
+        if ($this->isMethod('get') || $this->isMethod('delete')) {
             $rules['status'] = ['nullable', 'string', Rule::enum(AgreementStatus::class)];
         } else {
             $rules['status'] = ['prohibited'];

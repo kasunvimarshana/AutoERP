@@ -113,6 +113,6 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             </fieldset>
         </details>
         <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} error={fieldError('notes')} />
-        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !party || !currency || !agreedOn || !startsOn || !basis || !driver || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={(Boolean(record) && !reference.trim()) || !party || !currency || !agreedOn || !startsOn || !basis || !driver || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }

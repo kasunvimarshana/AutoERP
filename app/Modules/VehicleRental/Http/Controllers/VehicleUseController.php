@@ -18,10 +18,16 @@ use Modules\VehicleRental\Services\OwnerSourceService;
 use Modules\VehicleRental\Services\VehicleUseRegisterService;
 use Modules\VehicleRental\Services\VehicleUseService;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class VehicleUseController
 {
     public function __construct(private readonly VehicleUseService $uses) {}
+
+    public function destroy(AgreementRequest $request, int $use): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Vehicle custody uses cannot be deleted to preserve physical custody history. Cancel or return the vehicle instead.');
+    }
 
     public function register(VehicleUseRegisterRequest $request, VehicleUseRegisterService $register): AnonymousResourceCollection
     {

@@ -46,3 +46,28 @@ it('provides guidance that agreement reference can be left blank for automatic g
     expect(referenceInput).not.toHaveAttribute('required');
     expect(screen.getByText('Leave blank to automatically generate a unique contract reference')).toBeInTheDocument();
 });
+
+it('disables save when reference is cleared while editing an existing agreement', () => {
+    const existing = {
+        id: 1,
+        reference: 'AGR-INIT',
+        row_version: 1,
+        status: AgreementStatus.Draft,
+        basis: RentalBasis.Monthly,
+        driver_mode: DriverMode.SelfDrive,
+        supersedes_agreement: null,
+        party: { id: 90, name: 'Original Customer' },
+        currency: { id: 2, name: 'Rupee', code: 'LKR' },
+        agreed_on: '2026-09-01',
+        executing_on: null,
+        starts_on: '2026-10-01',
+        ends_on: null,
+        terms: {},
+        notes: null,
+    } as unknown as Agreement;
+
+    render(<AgreementEditor kind={AgreementKind.Customer} record={existing} onSaved={() => undefined} onCancel={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText('Agreement reference'), { target: { value: '' } });
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+});

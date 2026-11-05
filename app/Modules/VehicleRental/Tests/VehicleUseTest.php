@@ -335,4 +335,52 @@ final class VehicleUseTest extends TestCase
             ]);
         });
     }
+
+    public function test_vehicle_use_plan_accepts_empty_string_owner_agreement_id_for_company_vehicle(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $vehicle = DB::table('vehicles')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'vehicle_number' => 'COMPANY-CAR-99',
+                'registration_number' => 'COMPANY-CAR-99',
+                'status' => VehicleStatus::Active->value,
+            ]);
+            DB::table('vehicle_ownerships')->insert([
+                'tenant_id' => $context->tenantId,
+                'vehicle_id' => $vehicle,
+                'owner_type' => VehicleOwnerType::Company->value,
+                'owner_key' => 'company',
+                'owner_code_snapshot' => 'COMPANY',
+                'owner_name_snapshot' => 'Company',
+                'ownership_type' => VehicleOwnershipType::CompanyOwned->value,
+                'started_at' => '2026-09-01 00:00:00',
+            ]);
+
+            $use = $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $vehicle,
+                'owner_agreement_id' => '',
+                'starts_at' => '2026-09-07T09:00:00+00:00',
+                'ends_at' => '',
+                'notes' => '   ',
+            ]);
+
+            self::assertNull($use->owner_agreement_id);
+            self::assertNull($use->ends_at);
+            self::assertNull($use->notes);
+            self::assertSame(VehicleUseStatus::Planned, $use->status);
+        });
+    }
+
+    public function test_vehicle_use_service_delete_throws_logic_exception(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, $input);
+
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Preserve vehicle-use history. Cancel or return the vehicle.');
+            $service->delete($context, $use->id);
+        });
+    }
 }
