@@ -38,3 +38,11 @@ it('locks the counterparty lookup when editing a successor draft', () => {
     expect(screen.getByRole('combobox', { name: 'Customer' })).toBeDisabled();
     expect(screen.getByText('Successor agreements inherit the counterparty of the predecessor agreement.')).toBeInTheDocument();
 });
+
+it('provides guidance that agreement reference can be left blank for automatic generation', () => {
+    render(<AgreementEditor kind={AgreementKind.Customer} onSaved={() => undefined} onCancel={() => undefined} />);
+
+    const referenceInput = screen.getByLabelText('Agreement reference');
+    expect(referenceInput).not.toHaveAttribute('required');
+    expect(screen.getByText('Leave blank to automatically generate a unique contract reference')).toBeInTheDocument();
+});

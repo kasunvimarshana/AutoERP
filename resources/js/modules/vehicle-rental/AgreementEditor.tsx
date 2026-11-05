@@ -45,7 +45,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
         setSaving(true); setError(null);
         try {
             const submittedTerms = Object.fromEntries(termKeys.map(key => [key, terms[key] ?? null])) as Partial<Record<TermKey, string | null>>;
-            await saveAgreement(kind, { reference, party_id: party.id, currency_id: currency.id,
+            await saveAgreement(kind, { reference: reference.trim() || undefined, party_id: party.id, currency_id: currency.id,
                 ...(kind === AgreementKind.Owner ? { vehicle_id: vehicle!.id } : {}), agreed_on: agreedOn, executing_on: executingOn || null, starts_on: startsOn,
                 ends_on: endsOn || null, basis, driver_mode: driver, terms: submittedTerms, notes: notes || null, expected_version: record?.row_version }, record?.id);
             onSaved();
@@ -55,7 +55,14 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
         <h2 className="text-xl font-semibold">{record ? 'Edit draft agreement' : 'New agreement'}</h2>
         <ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
-            <Input label="Agreement reference" value={reference} onChange={e => setReference(e.target.value)} required error={fieldError('reference')} />
+            <Input
+                label="Agreement reference"
+                value={reference}
+                onChange={e => setReference(e.target.value)}
+                required={Boolean(record)}
+                hint={record ? undefined : "Leave blank to automatically generate a unique contract reference"}
+                error={fieldError('reference')}
+            />
             <div>
                 <LookupSelect
                     label={kind === AgreementKind.Customer ? 'Customer' : 'Owner / supplier'}

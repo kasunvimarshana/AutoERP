@@ -225,7 +225,6 @@ final class RentalReservationService
             }
 
             $payload = array_merge([
-                'reference' => 'CA-'.strtoupper(bin2hex(random_bytes(4))),
                 'party_id' => $reservation->customer_id,
                 'currency_id' => $reservation->currency_id,
                 'agreed_on' => now()->toDateString(),

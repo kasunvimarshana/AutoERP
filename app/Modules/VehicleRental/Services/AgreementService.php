@@ -35,6 +35,7 @@ final class AgreementService
         private readonly RentalAuthorization $authorization,
         private readonly AgreementValidation $validation,
         private readonly RentalCalendar $calendar,
+        private readonly AgreementNumberService $numbers,
     ) {}
 
     public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null, ?AgreementStatus $status = null): LengthAwarePaginator
@@ -56,6 +57,9 @@ final class AgreementService
     public function create(AgreementKind $kind, AgreementContext $context, array $input): Agreement
     {
         $this->authorization->assert($context, $kind, true);
+        if (empty(trim((string) ($input['reference'] ?? '')))) {
+            $input['reference'] = $this->numbers->next($kind, $context, $input['agreed_on'] ?? null);
+        }
 
         return $this->atomic(function () use ($kind, $context, $input): Agreement {
             $data = $this->validation->validate($input, $kind, $context);
@@ -73,6 +77,9 @@ final class AgreementService
     {
         $this->authorization->assert($context, $kind, true);
         $this->validation->assertContext($context);
+        if (empty(trim((string) ($input['reference'] ?? '')))) {
+            $input['reference'] = $this->numbers->next($kind, $context, $input['agreed_on'] ?? null);
+        }
         $data = Validator::make($input, [
             'reference' => ['required', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
             'agreed_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],

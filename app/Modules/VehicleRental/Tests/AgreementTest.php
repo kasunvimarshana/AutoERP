@@ -370,4 +370,48 @@ final class AgreementTest extends TestCase
             self::assertSame(AgreementStatus::Draft->value, $resource['successor_agreement']['status']);
         });
     }
+
+    public function test_agreement_reference_is_automatically_generated_when_omitted(): void
+    {
+        [$context, $customer, $owner] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer, $owner): void {
+            $service = app(AgreementService::class);
+
+            // Omit reference for customer agreement
+            $custInput = $customer;
+            unset($custInput['reference']);
+            $custAgreement = $service->create(AgreementKind::Customer, $context, $custInput);
+            self::assertNotEmpty($custAgreement->reference);
+            self::assertStringStartsWith('VRC-2026-', $custAgreement->reference);
+
+            // Empty reference string for owner agreement
+            $ownerInput = array_replace($owner, ['reference' => '   ']);
+            $ownerAgreement = $service->create(AgreementKind::Owner, $context, $ownerInput);
+            self::assertNotEmpty($ownerAgreement->reference);
+            self::assertStringStartsWith('VRO-2026-', $ownerAgreement->reference);
+
+            // Explicit reference is preserved
+            $custom = $service->create(AgreementKind::Customer, $context, array_replace($customer, ['reference' => 'CUSTOM-AGR-999']));
+            self::assertSame('CUSTOM-AGR-999', $custom->reference);
+        });
+    }
+
+    public function test_successor_reference_is_automatically_generated_when_omitted(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $service = app(AgreementService::class);
+            $predecessor = $service->create(AgreementKind::Customer, $context, $customer);
+            $predecessor = $service->change(AgreementKind::Customer, $context, $predecessor->id, $predecessor->row_version, AgreementAction::Activate);
+
+            $successor = $service->successor(AgreementKind::Customer, $context, $predecessor->id, $predecessor->row_version, [
+                'agreed_on' => '2026-09-20',
+                'starts_on' => '2026-10-01',
+                'reason' => 'Contract extension',
+            ]);
+
+            self::assertNotEmpty($successor->reference);
+            self::assertStringStartsWith('VRC-2026-', $successor->reference);
+        });
+    }
 }
