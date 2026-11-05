@@ -9,6 +9,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Services\UserAccessResolver;
@@ -16,6 +17,7 @@ use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
+use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\VehicleUseService;
@@ -202,6 +204,93 @@ final class RunningChartTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('data.id', $chart->id)
                 ->assertJsonPath('data.reference', $facts['reference']);
+        });
+    }
+
+    public function test_reference_is_automatically_generated_when_omitted(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $factsWithoutReference = $facts;
+            unset($factsWithoutReference['reference']);
+
+            $chart = $service->create($context, $use->id, $use->row_version, $factsWithoutReference);
+            self::assertMatchesRegularExpression('/^RC-2026-\d{5}$/', $chart->reference);
+            self::assertSame('RC-2026-00001', $chart->reference);
+
+            $second = $service->create($context, $use->id, $use->row_version, array_replace($factsWithoutReference, [
+                'reference' => '   ',
+                'starts_at' => '2026-09-07T17:00:30+05:30',
+                'ends_at' => '2026-09-07T20:00:00+05:30',
+            ]));
+            self::assertSame('RC-2026-00002', $second->reference);
+        });
+    }
+
+    public function test_numeric_odometer_and_distance_inputs_are_accepted(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $numericFacts = array_replace($facts, [
+                'reference' => 'NUMERIC-CHART',
+                'start_odometer' => 100,
+                'end_odometer' => 150.25,
+                'garage_km' => 0,
+                'commercial_km' => 45.5,
+            ]);
+
+            $chart = $service->create($context, $use->id, $use->row_version, $numericFacts);
+            self::assertSame('100.000000', $chart->start_odometer);
+            self::assertSame('150.250000', $chart->end_odometer);
+            self::assertSame('0.000000', $chart->garage_km);
+            self::assertSame('45.500000', $chart->commercial_km);
+            self::assertSame('50.250000', $chart->totalKm());
+        });
+    }
+
+    public function test_running_chart_delete_is_strictly_prohibited(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, $facts);
+
+            $this->expectException(LogicException::class);
+            $this->expectExceptionMessage('Preserve Running Chart evidence. Use reversal.');
+            $chart->delete();
+        });
+    }
+
+    public function test_corrected_by_chart_relation_and_resource_lineage(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $this->withoutMiddleware();
+            $this->app->resolving(AgreementRequest::class, function ($request) use ($context): void {
+                $request->attributes->set(config('core.current_tenant.id_attribute', 'current_tenant_id'), $context->tenantId);
+                $request->attributes->set(config('core.current_organization_unit.id_attribute', 'current_organization_unit_id'), $context->organizationUnitId);
+                $request->attributes->set(config('core.current_user.id_attribute', 'current_user_id'), $context->actorId);
+            });
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, $facts);
+            $chart = $service->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize);
+            $chart = $service->change($context, $chart->id, $chart->row_version, RunningChartAction::Reverse, reason: 'Correct readings');
+
+            $correction = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'CORRECTION-RC',
+                'end_odometer' => '152.0',
+            ]), $chart->id);
+
+            self::assertSame($correction->id, $chart->refresh()->correctedByChart?->id);
+            self::assertSame($chart->id, $correction->correctsChart?->id);
+
+            $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/running-charts/'.$chart->id)
+                ->assertOk()
+                ->assertJsonPath('data.corrected_by_chart.id', $correction->id)
+                ->assertJsonPath('data.corrected_by_chart.reference', 'CORRECTION-RC');
+
+            $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/running-charts/'.$correction->id)
+                ->assertOk()
+                ->assertJsonPath('data.corrects_chart.id', $chart->id)
+                ->assertJsonPath('data.corrects_chart.reference', $chart->reference);
         });
     }
 }

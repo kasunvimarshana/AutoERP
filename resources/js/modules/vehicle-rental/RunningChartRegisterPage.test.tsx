@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '@/shared/api/apiError';
 import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import RunningChartRegisterPage from './RunningChartRegisterPage';
@@ -14,21 +15,27 @@ const row: ChartRegisterRow = {
     normal_ot_minutes: null, double_ot_minutes: null, triple_ot_minutes: null, night_outs: null, ac_mode: null, notes: null, driver_observation: 'Signed chart received',
     driver_identity_source: DriverIdentitySource.Employee, driver_employee_id: 27, driver_name_snapshot: 'Nimal Perera', driver_reference_snapshot: 'DRV-027',
     driver: { source: DriverIdentitySource.Employee, employee_id: 27, name: 'Nimal Perera', reference: 'DRV-027' },
-    vehicle_use: { id: 12, vehicle_label: 'CAR-1234', version: 2 }, customer_agreement: { reference: 'CUSTOMER-A', party_name: 'Example Customer' }, owner_agreement: null,
-    corrects_chart: { id: 8, reference: 'CHART-ORIGINAL' }, replaces_vehicle: 'CAR-OLD',
+    vehicle_use: { id: 12, vehicle_label: 'CAR-1234', version: 2 }, customer_agreement: { reference: 'CUSTOMER-A', party_name: 'Example Customer' },
+    owner_agreement: { reference: 'OWNER-A', party_name: 'Example Owner' },
+    corrects_chart: { id: 8, reference: 'CHART-ORIGINAL' }, corrected_by_chart: { id: 10, reference: 'CHART-CORRECTION' }, replaces_vehicle: 'CAR-OLD',
 };
+const renderPage = () => render(<MemoryRouter><RunningChartRegisterPage /></MemoryRouter>);
 beforeEach(() => { configureBusinessTimeZone('Asia/Colombo'); vi.clearAllMocks(); vi.mocked(listChartRegister).mockResolvedValue({ data: [row] }); });
 afterEach(() => configureBusinessTimeZone(null));
 describe('Running Chart register', () => {
     it('shows readable context, driver identity, correction lineage and preserved unknown measurements', async () => {
-        render(<RunningChartRegisterPage />);
+        renderPage();
         expect(screen.queryByRole('main')).not.toBeInTheDocument();
         expect(await screen.findByText('CHART-A · CAR-1234')).toBeInTheDocument();
-        expect(screen.getByText('Customer: Example Customer · CUSTOMER-A')).toBeInTheDocument();
+        expect(screen.getByText(/Customer: Example Customer/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'CUSTOMER-A' })).toHaveAttribute('href', '/vehicle-rental/customer/agreements?search=CUSTOMER-A');
+        expect(screen.getByText(/Owner: Example Owner/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'OWNER-A' })).toHaveAttribute('href', '/vehicle-rental/owner/agreements?search=OWNER-A');
         expect(screen.getByText('Driver: Nimal Perera · DRV-027')).toBeInTheDocument();
         expect(screen.getByText('Total distance: Not recorded')).toBeInTheDocument();
         expect(screen.getByText(`${formatBusinessDateTime(row.starts_at)} — ${formatBusinessDateTime(row.ends_at)}`)).toBeInTheDocument();
         expect(screen.getByText('Corrects chart CHART-ORIGINAL')).toBeInTheDocument();
+        expect(screen.getByText('Corrected by chart CHART-CORRECTION')).toBeInTheDocument();
         expect(screen.getByText('Replaces vehicle CAR-OLD')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Review CHART-A' }));
         expect(screen.getByText('Garage distance (km)').parentElement).toHaveTextContent('0');
@@ -37,7 +44,7 @@ describe('Running Chart register', () => {
         expect(screen.queryByRole('button', { name: 'Finalize usage' })).not.toBeInTheDocument();
     });
     it('applies explicit filters and reports an empty result', async () => {
-        render(<RunningChartRegisterPage />); await screen.findByText('CHART-A · CAR-1234');
+        renderPage(); await screen.findByText('CHART-A · CAR-1234');
         vi.mocked(listChartRegister).mockResolvedValue({ data: [] });
         fireEvent.change(screen.getByLabelText('Chart, vehicle, driver, agreement or party'), { target: { value: ' SEARCH ' } });
         fireEvent.change(screen.getByLabelText('Chart status'), { target: { value: RunningChartStatus.Reversed } });
@@ -54,7 +61,7 @@ describe('Running Chart register', () => {
         await waitFor(() => expect(listChartRegister).toHaveBeenLastCalledWith({ search: 'SEARCH', chart_status: RunningChartStatus.Reversed, from: undefined, until: undefined }, 1, expect.any(AbortSignal)));
     });
     it('retries an unfiltered request when Clear filters follows an error', async () => {
-        render(<RunningChartRegisterPage />); await screen.findByText('CHART-A · CAR-1234');
+        renderPage(); await screen.findByText('CHART-A · CAR-1234');
         vi.mocked(listChartRegister).mockRejectedValueOnce(new ApiError('Running Charts could not be loaded.', 500));
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('Running Charts could not be loaded.')).toBeInTheDocument();
@@ -64,16 +71,14 @@ describe('Running Chart register', () => {
         expect(await screen.findByText('CHART-A · CAR-1234')).toBeInTheDocument();
     });
     it('does not display old results as matching after a failed filter request', async () => {
-        render(<RunningChartRegisterPage />); await screen.findByText('CHART-A · CAR-1234');
+        renderPage(); await screen.findByText('CHART-A · CAR-1234');
         vi.mocked(listChartRegister).mockRejectedValue(new ApiError('Period end must follow its start.', 422));
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('Period end must follow its start.')).toBeInTheDocument();
         expect(screen.queryByText('CHART-A · CAR-1234')).not.toBeInTheDocument();
     });
-});
-
     it('clears applied filters and reloads the unfiltered chart register', async () => {
-        render(<RunningChartRegisterPage />); await screen.findByText('CHART-A · CAR-1234');
+        renderPage(); await screen.findByText('CHART-A · CAR-1234');
         vi.mocked(listChartRegister).mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({ data: [row] });
         fireEvent.change(screen.getByLabelText('Chart status'), { target: { value: RunningChartStatus.Reversed } });
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
@@ -82,3 +87,4 @@ describe('Running Chart register', () => {
         expect(await screen.findByText('CHART-A · CAR-1234')).toBeInTheDocument();
         expect(listChartRegister).toHaveBeenLastCalledWith({}, 1, expect.any(AbortSignal));
     });
+});

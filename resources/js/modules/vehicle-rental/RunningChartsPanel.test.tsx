@@ -24,13 +24,25 @@ describe('Running Chart review', () => {
  it('round trips seconds without corrupting the offset timestamp', () => {
   const original = '2026-09-07T09:00:15+05:30'; expect(new Date(timestampWithOffset(localTimestampValue(original))).getTime()).toBe(new Date(original).getTime());
  });
-});
-
-it('removes stale charts when a reload fails', async () => {
-    render(<RunningChartsPanel use={use} />);
-    expect(await screen.findByText('CHART-A')).toBeInTheDocument();
-    vi.mocked(listCharts).mockRejectedValue(new ApiError('Charts could not be loaded.', 500));
-    fireEvent.click(screen.getByRole('button', { name: 'Reload charts' }));
-    expect(await screen.findByText('Charts could not be loaded.')).toBeInTheDocument();
-    expect(screen.queryByText('CHART-A')).not.toBeInTheDocument();
+ it('displays corrected by chart badge and hides create correction button when chart was already corrected', async () => {
+  session.permissions.push(CHART_PERMISSION.manage);
+  const reversedChart = {
+   ...chart,
+   id: 6,
+   status: RunningChartStatus.Reversed,
+   corrected_by_chart: { id: 7, reference: 'CHART-CORRECTION' },
+  };
+  vi.mocked(listCharts).mockResolvedValue({ data: [reversedChart] });
+  render(<RunningChartsPanel use={use} />);
+  expect(await screen.findByText('Corrected by chart CHART-CORRECTION')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Create correction' })).not.toBeInTheDocument();
+ });
+ it('removes stale charts when a reload fails', async () => {
+  render(<RunningChartsPanel use={use} />);
+  expect(await screen.findByText('CHART-A')).toBeInTheDocument();
+  vi.mocked(listCharts).mockRejectedValue(new ApiError('Charts could not be loaded.', 500));
+  fireEvent.click(screen.getByRole('button', { name: 'Reload charts' }));
+  expect(await screen.findByText('Charts could not be loaded.')).toBeInTheDocument();
+  expect(screen.queryByText('CHART-A')).not.toBeInTheDocument();
+ });
 });

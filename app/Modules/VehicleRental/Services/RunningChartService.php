@@ -26,27 +26,37 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class RunningChartService
 {
-    public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $contextValidation, private readonly RunningChartValidation $validation, private readonly OdometerContinuity $odometerContinuity) {}
+    public function __construct(
+        private readonly RentalAuthorization $authorization,
+        private readonly AgreementValidation $contextValidation,
+        private readonly RunningChartValidation $validation,
+        private readonly OdometerContinuity $odometerContinuity,
+        private readonly RunningChartNumberService $numbers,
+    ) {}
 
     public function list(AgreementContext $context, int $useId, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, false);
         VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($useId);
 
-        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->where('vehicle_use_id', $useId)->with(['vehicleUse', 'correctsChart'])->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
+        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->where('vehicle_use_id', $useId)->with(['vehicleUse', 'correctsChart', 'correctedByChart'])->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
     }
 
     public function find(AgreementContext $context, int $id): RunningChart
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, false);
 
-        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->with(['vehicleUse', 'correctsChart'])->findOrFail($id);
+        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->with(['vehicleUse', 'correctsChart', 'correctedByChart'])->findOrFail($id);
     }
 
     public function create(AgreementContext $context, int $useId, int $expectedUseVersion, array $input, ?int $corrects = null): RunningChart
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, true);
         $this->contextValidation->assertContext($context);
+
+        if (empty(trim((string) ($input['reference'] ?? '')))) {
+            $input['reference'] = $this->numbers->next($context, $input['starts_at'] ?? null);
+        }
 
         return $this->atomic(function () use ($context, $useId, $expectedUseVersion, $input, $corrects): RunningChart {
             $use = $this->lockedUse($context, $useId);
@@ -63,7 +73,7 @@ final class RunningChartService
             $chart->forceFill(array_merge($data, ['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId, 'vehicle_use_id' => $useId, 'vehicle_use_version' => $use->row_version, 'corrects_chart_id' => $corrects, 'status' => RunningChartStatus::Draft, 'row_version' => AgreementFields::INITIAL_VERSION]))->save();
             $this->record($chart, $context, RunningChartAction::Create);
 
-            return $chart->load(['vehicleUse', 'correctsChart']);
+            return $chart->load(['vehicleUse', 'correctsChart', 'correctedByChart']);
         });
     }
 
@@ -115,7 +125,7 @@ final class RunningChartService
             $chart->save();
             $this->record($chart, $context, $action, $reason);
 
-            return $chart->load(['vehicleUse', 'correctsChart']);
+            return $chart->load(['vehicleUse', 'correctsChart', 'correctedByChart']);
         });
     }
 

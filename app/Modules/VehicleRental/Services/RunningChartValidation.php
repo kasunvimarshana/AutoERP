@@ -35,11 +35,14 @@ final class RunningChartValidation
         ];
         foreach (RunningChartFields::DISTANCES as $field) {
             $rules[$field] = ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN];
+            if (isset($input[$field]) && (is_int($input[$field]) || is_float($input[$field]))) {
+                $input[$field] = (string) $input[$field];
+            }
         }
         foreach (RunningChartFields::COUNTS as $field) {
             $rules[$field] = ['nullable', 'integer', 'min:0', 'max:'.RunningChartFields::MAX_COUNT];
         }
-        $input['reference'] = is_string($input['reference'] ?? null) ? trim($input['reference']) : null;
+        $input['reference'] = is_string($input['reference'] ?? null) ? trim($input['reference']) : ($input['reference'] ?? null);
         $data = array_replace(array_fill_keys(RunningChartFields::MUTABLE, null), Validator::make($input, $rules)->validate());
         $this->driverIdentity($data, $context);
 

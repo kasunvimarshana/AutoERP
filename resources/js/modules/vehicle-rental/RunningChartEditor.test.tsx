@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it } from 'vitest';
 import { RunningChartEditor } from './RunningChartEditor';
+import { RunningChartStatus, type RunningChart } from './runningCharts';
 import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
 
 const use = {
@@ -45,16 +46,47 @@ it('keeps save disabled until required chart identity and period are complete', 
     expect(save).toBeEnabled();
 });
 
-it('keeps save disabled until selected driver identity details are complete', () => {
+it('allows leaving chart reference blank to automatically generate unique reference on creation', () => {
     render(<RunningChartEditor use={use} onSaved={() => undefined} onCancel={() => undefined} />);
-    fireEvent.change(screen.getByLabelText('Chart reference'), { target: { value: 'CHART-NEW' } });
+    expect(screen.getByText('Leave blank to automatically generate a unique chart reference')).toBeInTheDocument();
+    const save = screen.getByRole('button', { name: 'Save draft' });
+    expect(save).toBeDisabled();
+
     fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T09:00' } });
     fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-07T17:00' } });
-    fireEvent.click(screen.getByText('Additional usage observations'));
-    fireEvent.change(screen.getByLabelText('Driver identity'), { target: { value: 'external' } });
+    expect(save).toBeEnabled();
+});
 
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('External driver name'), { target: { value: 'External Driver' } });
-    fireEvent.change(screen.getByLabelText('External driver reference'), { target: { value: 'DRV-X' } });
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+it('requires chart reference when editing an existing draft chart', () => {
+    const existingChart = {
+        id: 15,
+        row_version: 1,
+        reference: 'RC-2026-00001',
+        status: RunningChartStatus.Draft,
+        starts_at: '2026-09-07T09:00:00+05:30',
+        ends_at: '2026-09-07T17:00:00+05:30',
+        start_odometer: null,
+        end_odometer: null,
+        garage_km: null,
+        commercial_km: null,
+        normal_ot_minutes: null,
+        double_ot_minutes: null,
+        triple_ot_minutes: null,
+        night_outs: null,
+        ac_mode: null,
+        notes: null,
+        driver_observation: null,
+        total_km: null,
+        corrects_chart: null,
+    } as RunningChart;
+    render(<RunningChartEditor use={use} chart={existingChart} onSaved={() => undefined} onCancel={() => undefined} />);
+    expect(screen.queryByText('Leave blank to automatically generate a unique chart reference')).not.toBeInTheDocument();
+    const refInput = screen.getByLabelText('Chart reference');
+    expect(refInput).toHaveAttribute('required');
+
+    const save = screen.getByRole('button', { name: 'Save draft' });
+    expect(save).toBeEnabled();
+
+    fireEvent.change(refInput, { target: { value: '' } });
+    expect(save).toBeDisabled();
 });

@@ -34,7 +34,7 @@ final class RunningChartRegisterService
         $search = trim($filters['search'] ?? '');
 
         return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.replacesUse', 'correctsChart'])
+            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.replacesUse', 'correctsChart', 'correctedByChart'])
             ->when($filters['chart_status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($from !== null, fn ($q) => $q->where('ends_at', '>', OperationalTime::database($from)))
             ->when($until !== null, fn ($q) => $q->where('starts_at', '<', OperationalTime::database($until)))
@@ -45,6 +45,7 @@ final class RunningChartRegisterService
                     ->orWhere('driver_reference_snapshot', 'like', $pattern)
                     ->orWhereHas('vehicleUse', function ($use) use ($pattern): void {
                         $use->where('vehicle_label_snapshot', 'like', $pattern)
+                            ->orWhereHas('vehicle', fn ($v) => $v->where('registration_number', 'like', $pattern)->orWhere('vehicle_number', 'like', $pattern))
                             ->orWhereHas('customerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern))
                             ->orWhereHas('ownerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));
                     });
