@@ -63,7 +63,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 type="datetime-local"
                 step={OPERATIONAL_TIME_STEP_SECONDS}
                 min={minStart}
-                max={maxEnd}
+                max={end || maxEnd}
                 value={start}
                 onChange={e => { setStart(e.target.value); setOwner(null); }}
                 required

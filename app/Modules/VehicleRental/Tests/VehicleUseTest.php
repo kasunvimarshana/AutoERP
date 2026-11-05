@@ -221,4 +221,72 @@ final class VehicleUseTest extends TestCase
             self::assertSame(2, $next->history()->count());
         });
     }
+
+    public function test_vehicle_use_delete_is_strictly_prohibited_to_preserve_custody_history(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Preserve vehicle-use history. Cancel or return the vehicle.');
+            $use->delete();
+        });
+    }
+
+    public function test_vehicle_use_identity_and_planned_evidence_are_immutable(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Vehicle-use identity and planned evidence are immutable.');
+            $use->vehicle_id = 999;
+            $use->save();
+        });
+    }
+
+    public function test_vehicle_use_plan_accepts_omitted_ends_at_for_open_ended_coverage(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            unset($input['ends_at']);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+            self::assertNull($use->ends_at);
+            self::assertSame(VehicleUseStatus::Planned, $use->status);
+        });
+    }
+
+    public function test_vehicle_use_transition_accepts_numeric_odometer(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+            $use = $s->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => $input['starts_at'],
+                'odometer' => 12500,
+                'reason' => 'Customer collected vehicle',
+            ]);
+            self::assertSame('12500.000000', $use->handover_odometer);
+        });
+    }
+
+    public function test_vehicle_use_replaced_by_use_relation(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $old = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $old = $service->transition($context, $old->id, $old->row_version, VehicleUseAction::Handover, ['occurred_at' => $input['starts_at'], 'reason' => 'Collected']);
+            $vehicle = DB::table('vehicles')->insertGetId(['tenant_id' => $context->tenantId, 'vehicle_number' => 'REPLACEMENT-2', 'registration_number' => 'REPLACEMENT-2', 'status' => VehicleStatus::Active->value]);
+            DB::table('vehicle_ownerships')->insert(['tenant_id' => $context->tenantId, 'vehicle_id' => $vehicle, 'owner_type' => VehicleOwnerType::Company->value, 'owner_key' => 'company', 'owner_code_snapshot' => 'COMPANY', 'owner_name_snapshot' => 'Company', 'ownership_type' => VehicleOwnershipType::CompanyOwned->value, 'started_at' => '2026-09-01 00:00:00']);
+
+            $replacement = array_replace($input, ['vehicle_id' => $vehicle, 'starts_at' => '2026-09-07T12:00:00+05:30', 'reason' => 'Vehicle exchange', 'owner_agreement_id' => null]);
+            $next = $service->replace($context, $old->id, $old->row_version, $replacement);
+
+            $oldReplaced = $old->fresh()->load('replacedByUse');
+            self::assertNotNull($oldReplaced->replacedByUse);
+            self::assertSame((int) $next->id, (int) $oldReplaced->replacedByUse->id);
+        });
+    }
 }

@@ -18,10 +18,19 @@ import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithO
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 
 export default function VehicleUseRegisterPage() {
-    const [search, setSearch] = useState('');
-    const [status, setStatus] = useState<VehicleUseStatus | ''>('');
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const initialSearch = searchParams.get('search') ?? '';
+    const initialStatusParam = searchParams.get('status') ?? searchParams.get('use_status') ?? '';
+    const initialStatus = Object.values(VehicleUseStatus).includes(initialStatusParam as VehicleUseStatus)
+        ? (initialStatusParam as VehicleUseStatus)
+        : '';
+    const [search, setSearch] = useState(initialSearch);
+    const [status, setStatus] = useState<VehicleUseStatus | ''>(initialStatus);
     const [from, setFrom] = useState(''); const [until, setUntil] = useState('');
-    const [filters, setFilters] = useState<VehicleUseRegisterFilters>({}); const [page, setPage] = useState(1);
+    const [filters, setFilters] = useState<VehicleUseRegisterFilters>({
+        ...(initialSearch ? { search: initialSearch } : {}),
+        ...(initialStatus ? { use_status: initialStatus } : {}),
+    }); const [page, setPage] = useState(1);
     const [rows, setRows] = useState<VehicleUse[]>([]); const [meta, setMeta] = useState<PaginationMeta>();
     const [loading, setLoading] = useState(true); const [error, setError] = useState<ApiError | null>(null);
     const [selected, setSelected] = useState<number | null>(null);
@@ -75,12 +84,28 @@ export default function VehicleUseRegisterPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
                     <p>Customer: {row.customer_agreement.party_name}</p>
-                    <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+                    <p>
+                        {row.owner_agreement ? (
+                            <>
+                                Owner: {row.owner_agreement.party_name} ·{' '}
+                                <Link
+                                    to={`/vehicle-rental/owner/agreements?search=${encodeURIComponent(row.owner_agreement.reference)}`}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    title="Review owner agreement"
+                                >
+                                    {row.owner_agreement.reference}
+                                </Link>
+                            </>
+                        ) : (
+                            'Company supply'
+                        )}
+                    </p>
                     <p>Planned: {formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>
                     <p>Handed over: {formatBusinessDateTime(row.handed_over_at, 'Not recorded')}</p>
                     <p>Returned: {formatBusinessDateTime(row.returned_at, 'Not recorded')}</p>
                 </div>
                 {row.replaces_use && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_use.vehicle_label}</p>}
+                {row.replaced_by_use && <p className="text-sm font-medium text-purple-700">Replaced by vehicle {row.replaced_by_use.vehicle_label}</p>}
                 <div><Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.vehicle.label}</Button></div>
                 {selected === row.id && <div className="space-y-3 border-t border-slate-200 pt-3">
                     <p>Handover odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>

@@ -16,6 +16,7 @@ interface AgreementReference { id: number; reference: string; party_name: string
 export interface VehicleUse {
     id: number; row_version: number; status: VehicleUseStatus;
     replaces_use?: { id: number; vehicle_label: string } | null;
+    replaced_by_use?: { id: number; vehicle_label: string } | null;
     customer_agreement: AgreementReference; owner_agreement: AgreementReference | null;
     vehicle: { id: number; label: string }; starts_at: string; ends_at: string | null;
     handed_over_at: string | null; returned_at: string | null; handover_odometer: string | null; return_odometer: string | null; notes: string | null;

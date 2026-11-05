@@ -80,3 +80,18 @@ describe('Vehicle Use register', () => {
         expect(await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ })).toBeInTheDocument();
         expect(listVehicleUseRegister).toHaveBeenLastCalledWith({}, 1, expect.any(AbortSignal));
     });
+
+    it('renders owner agreement link and replaced-by lineage when present', async () => {
+        const rowWithOwner: VehicleUse = {
+            ...row,
+            owner_agreement: { id: 8, reference: 'OWNER-AG-99', party_name: 'Fleet Supplier', version: 1 },
+            replaced_by_use: { id: 15, vehicle_label: 'CAR-NEW' },
+        };
+        vi.mocked(listVehicleUseRegister).mockResolvedValue({ data: [rowWithOwner] });
+        renderPage();
+        expect(await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ })).toBeInTheDocument();
+        const ownerLink = screen.getByRole('link', { name: 'OWNER-AG-99' });
+        expect(ownerLink).toBeInTheDocument();
+        expect(ownerLink).toHaveAttribute('href', '/vehicle-rental/owner/agreements?search=OWNER-AG-99');
+        expect(screen.getByText('Replaced by vehicle CAR-NEW')).toBeInTheDocument();
+    });

@@ -102,7 +102,7 @@ final class VehicleUseService
         $this->authorization->assertUse($context, true);
         $this->validation->assertContext($context);
         $data = $this->validatePlanInput($input);
-        [$start, $end] = OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at']);
+        [$start, $end] = OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at'] ?? null);
 
         return DB::transaction(function () use ($context, $customerAgreement, $expectedAgreementVersion, $data, $start, $end, $replaces): VehicleUse {
             $vehicle = $this->lockVehicle($context, (int) $data['vehicle_id']);
@@ -132,7 +132,7 @@ final class VehicleUseService
                 'owner_agreement_id' => $owner?->id, 'owner_agreement_version' => $owner?->row_version,
                 'vehicle_id' => $vehicle->id, 'replaces_use_id' => $replaces, 'vehicle_label_snapshot' => $vehicle->registration_number ?: $vehicle->vehicle_number,
                 'starts_at' => OperationalTime::database($start), 'ends_at' => ($end === null ? null : OperationalTime::database($end)),
-                'starts_at_input' => $data['starts_at'], 'ends_at_input' => $data['ends_at'], 'notes' => $data['notes'] ?? null,
+                'starts_at_input' => $data['starts_at'], 'ends_at_input' => $data['ends_at'] ?? null, 'notes' => $data['notes'] ?? null,
                 'row_version' => AgreementFields::INITIAL_VERSION, 'status' => VehicleUseStatus::Planned])->save();
             $this->record($record, $context, VehicleUseAction::Plan);
 
@@ -144,6 +144,9 @@ final class VehicleUseService
     {
         $this->authorization->assertUse($context, true);
         $this->validation->assertContext($context);
+        if (isset($input['odometer']) && is_numeric($input['odometer'])) {
+            $input['odometer'] = (string) $input['odometer'];
+        }
         $data = Validator::make($input, ['occurred_at' => ['nullable', 'string'], 'odometer' => ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN],
             'reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH]])->validate();
         if (trim($data['reason']) === '') {
@@ -214,6 +217,12 @@ final class VehicleUseService
     {
         $this->authorization->assertUse($context, true);
         $this->validation->assertContext($context);
+        if (isset($input['return_odometer']) && is_numeric($input['return_odometer'])) {
+            $input['return_odometer'] = (string) $input['return_odometer'];
+        }
+        if (isset($input['handover_odometer']) && is_numeric($input['handover_odometer'])) {
+            $input['handover_odometer'] = (string) $input['handover_odometer'];
+        }
         $data = Validator::make($input, array_merge($this->planRules(), [
             'reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
             'return_odometer' => ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN],
@@ -223,7 +232,7 @@ final class VehicleUseService
             throw ValidationException::withMessages(['reason' => ['Explain the vehicle replacement.']]);
         }
         // Validate the complete planned replacement period before mutating the existing custody record.
-        OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at']);
+        OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at'] ?? null);
 
         return DB::transaction(function () use ($context, $id, $expectedVersion, $data): VehicleUse {
             $previous = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
@@ -287,7 +296,7 @@ final class VehicleUseService
             'vehicle_id' => ['required', 'integer', 'min:1'],
             'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['required', 'string'],
-            'ends_at' => ['present', 'nullable', 'string'],
+            'ends_at' => ['sometimes', 'nullable', 'string'],
             'notes' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
         ];
     }

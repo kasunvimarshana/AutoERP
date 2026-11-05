@@ -58,6 +58,22 @@ it('displays guidance when agreement is in draft', async () => {
     await screen.findByText('CAR-1234');
 });
 
+it('provides handover odometer guidance and timestamp bounds when recording return', async () => {
+    vi.mocked(listVehicleUses).mockResolvedValue({
+        data: [{
+            ...row,
+            status: VehicleUseStatus.InCustody,
+            handed_over_at: '2026-09-07T09:00:00+05:30',
+            handover_odometer: '1500.00',
+        }],
+    });
+    render(<VehicleUsePanel agreement={agreement} canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Record return' }));
+    expect(screen.getByText(/Handover reading was 1500\.00\. Return reading cannot be lower\./)).toBeInTheDocument();
+    const eventTimeInput = screen.getByLabelText('Actual event time');
+    expect(eventTimeInput).toHaveAttribute('min', '2026-09-07T09:00');
+});
+
 it('removes stale rows when a vehicle-use reload fails', async () => {
     render(<VehicleUsePanel agreement={agreement} canManage={false} />);
     expect(await screen.findByText('CAR-1234')).toBeInTheDocument();
