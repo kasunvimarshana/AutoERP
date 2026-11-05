@@ -53,9 +53,9 @@ class VehicleServiceSalesSummaryExport
                 new ReportColumn('direct_cost', 'Direct / component cost', format: 'money'),
                 new ReportColumn('commission', 'Commission', format: 'money'),
                 new ReportColumn('profit', 'Profit / loss', format: 'money'),
-                new ReportColumn('collected', 'Collected', format: 'money'),
+                new ReportColumn('collected', 'Payments received', format: 'money'),
             ],
-            description: 'Sales follow invoice date; collections follow payment date. Item profit is before commission; job profit is after direct costs and commission. Sections overlap and must not be added together.',
+            description: 'Sales follow invoice date; payments received follow payment date, including older invoices. Item profit is before commission; job profit is after direct costs and commission. Sections overlap and must not be added together.',
             orientation: 'landscape',
         );
     }
@@ -94,7 +94,6 @@ class VehicleServiceSalesSummaryExport
                 'direct_cost' => $job['direct_cost'],
                 'commission' => $job['commission'],
                 'profit' => $job['profit'],
-                'collected' => $job['collected'],
             ];
             foreach (['stock_items' => 'Job stock', 'combos' => 'Job combo', 'other_items' => 'Job service / labour'] as $key => $lineSection) {
                 foreach ($job[$key] as $item) {
@@ -111,6 +110,14 @@ class VehicleServiceSalesSummaryExport
                     }
                 }
             }
+        }
+
+        foreach ($result['receipts'] as $receipt) {
+            $rows[] = [
+                'section' => 'Payment received',
+                'reference' => "{$receipt['date']} | {$receipt['payment_number']} | {$receipt['job_number']} | {$receipt['invoice_number']} | ".implode(' + ', $receipt['methods']),
+                'collected' => $receipt['amount'],
+            ];
         }
 
         return $this->checkRowLimit($rows);
