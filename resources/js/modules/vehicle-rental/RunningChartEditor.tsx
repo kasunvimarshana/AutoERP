@@ -65,17 +65,33 @@ export function RunningChartEditor({ use, chart, correction, initialDriver, onSa
         event.preventDefault(); setSaving(true); setError(null);
         try {
             const trimmedReference = reference.trim();
+            const parseDistance = (val?: string) => {
+                const t = val?.trim();
+                return t ? t : null;
+            };
+            const parseCount = (val?: string) => {
+                const t = val?.trim();
+                return t === undefined || t === '' ? null : Number(t);
+            };
             const facts: ChartFacts = {
                 ...(trimmedReference ? { reference: trimmedReference } : (isReferenceRequired ? { reference: '' } : {})),
-                starts_at: timestampWithOffset(start), ends_at: timestampWithOffset(end), start_odometer: values.start_odometer || null, end_odometer: values.end_odometer || null,
-                garage_km: values.garage_km || null, commercial_km: values.commercial_km || null,
-                normal_ot_minutes: values.normal_ot_minutes === '' ? null : Number(values.normal_ot_minutes), double_ot_minutes: values.double_ot_minutes === '' ? null : Number(values.double_ot_minutes),
-                triple_ot_minutes: values.triple_ot_minutes === '' ? null : Number(values.triple_ot_minutes), night_outs: values.night_outs === '' ? null : Number(values.night_outs), ac_mode: ac || null,
+                starts_at: timestampWithOffset(start),
+                ends_at: timestampWithOffset(end),
+                start_odometer: parseDistance(values.start_odometer),
+                end_odometer: parseDistance(values.end_odometer),
+                garage_km: parseDistance(values.garage_km),
+                commercial_km: parseDistance(values.commercial_km),
+                normal_ot_minutes: parseCount(values.normal_ot_minutes),
+                double_ot_minutes: parseCount(values.double_ot_minutes),
+                triple_ot_minutes: parseCount(values.triple_ot_minutes),
+                night_outs: parseCount(values.night_outs),
+                ac_mode: ac || null,
                 driver_identity_source: driverSource || null,
                 driver_employee_id: driverSource === DriverIdentitySource.Employee ? driverEmployee?.id ?? null : null,
-                driver_name_snapshot: driverSource === DriverIdentitySource.External ? externalDriverName || null : null,
-                driver_reference_snapshot: driverSource === DriverIdentitySource.External ? externalDriverReference || null : null,
-                driver_observation: driverObservation || null, notes: notes || null,
+                driver_name_snapshot: driverSource === DriverIdentitySource.External ? externalDriverName.trim() || null : null,
+                driver_reference_snapshot: driverSource === DriverIdentitySource.External ? externalDriverReference.trim() || null : null,
+                driver_observation: driverObservation.trim() || null,
+                notes: notes.trim() || null,
             };
             if (chart && !correction) await updateChart(chart, facts); else await createChart(use, facts, correction ? chart?.id : undefined);
             onSaved();

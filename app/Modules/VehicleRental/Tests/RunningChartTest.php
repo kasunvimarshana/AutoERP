@@ -13,6 +13,8 @@ use LogicException;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Services\UserAccessResolver;
+use Modules\VehicleRental\Enums\AirConditioningMode;
+use Modules\VehicleRental\Enums\DriverIdentitySource;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseAction;
@@ -291,6 +293,98 @@ final class RunningChartTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('data.corrects_chart.id', $chart->id)
                 ->assertJsonPath('data.corrects_chart.reference', $chart->reference);
+        });
+    }
+
+    public function test_optional_fields_can_be_omitted_or_passed_as_empty_strings(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $factsWithEmptyStrings = [
+                'reference' => 'BLANK-OPTIONAL-CHART',
+                'starts_at' => '2026-09-07T09:00:00+05:30',
+                'ends_at' => '2026-09-07T17:00:00+05:30',
+                'start_odometer' => '',
+                'end_odometer' => '',
+                'garage_km' => '',
+                'commercial_km' => '',
+                'normal_ot_minutes' => '',
+                'double_ot_minutes' => '',
+                'triple_ot_minutes' => '',
+                'night_outs' => '',
+                'ac_mode' => '',
+                'driver_identity_source' => '',
+                'driver_employee_id' => '',
+                'driver_name_snapshot' => '   ',
+                'driver_reference_snapshot' => '',
+                'driver_observation' => '   ',
+                'notes' => '',
+            ];
+
+            $chart = $service->create($context, $use->id, $use->row_version, $factsWithEmptyStrings);
+            self::assertNull($chart->start_odometer);
+            self::assertNull($chart->end_odometer);
+            self::assertNull($chart->garage_km);
+            self::assertNull($chart->commercial_km);
+            self::assertNull($chart->normal_ot_minutes);
+            self::assertNull($chart->double_ot_minutes);
+            self::assertNull($chart->triple_ot_minutes);
+            self::assertNull($chart->night_outs);
+            self::assertNull($chart->ac_mode);
+            self::assertNull($chart->driver_identity_source);
+            self::assertNull($chart->driver_employee_id);
+            self::assertNull($chart->driver_name_snapshot);
+            self::assertNull($chart->driver_reference_snapshot);
+            self::assertNull($chart->driver_observation);
+            self::assertNull($chart->notes);
+
+            $updated = $service->change($context, $chart->id, $chart->row_version, RunningChartAction::Update, [
+                'start_odometer' => '100.5',
+                'end_odometer' => '',
+                'garage_km' => '',
+                'commercial_km' => '',
+                'notes' => 'Updated notes',
+            ]);
+            self::assertSame('100.500000', $updated->start_odometer);
+            self::assertNull($updated->end_odometer);
+            self::assertSame('Updated notes', $updated->notes);
+        });
+    }
+
+    public function test_draft_update_without_reference_retains_existing_reference(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, $facts);
+            self::assertSame($facts['reference'], $chart->reference);
+
+            $updated = $service->change($context, $chart->id, $chart->row_version, RunningChartAction::Update, [
+                'start_odometer' => '105.000000',
+                'notes' => 'Omitted reference test',
+            ]);
+            self::assertSame($facts['reference'], $updated->reference);
+            self::assertSame('105.000000', $updated->start_odometer);
+            self::assertSame('Omitted reference test', $updated->notes);
+        });
+    }
+
+    public function test_running_chart_destroy_endpoint_returns_405_method_not_allowed(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $this->withoutMiddleware();
+            $this->app->resolving(AgreementRequest::class, function ($request) use ($context): void {
+                $request->attributes->set(config('core.current_tenant.id_attribute', 'current_tenant_id'), $context->tenantId);
+                $request->attributes->set(config('core.current_organization_unit.id_attribute', 'current_organization_unit_id'), $context->organizationUnitId);
+                $request->attributes->set(config('core.current_user.id_attribute', 'current_user_id'), $context->actorId);
+            });
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, $facts);
+
+            $this->tenantDeleteJson($context->tenantId, '/api/v1/vehicle-rental/running-charts/'.$chart->id)
+                ->assertStatus(405);
+
+            $this->tenantDeleteJson($context->tenantId, '/api/v1/vehicle-rental/vehicle-uses/'.$use->id.'/running-charts/'.$chart->id)
+                ->assertStatus(405);
         });
     }
 }

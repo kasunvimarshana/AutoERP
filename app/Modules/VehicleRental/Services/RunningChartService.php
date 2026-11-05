@@ -49,6 +49,12 @@ final class RunningChartService
         return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->with(['vehicleUse', 'correctsChart', 'correctedByChart'])->findOrFail($id);
     }
 
+    public function delete(AgreementContext $context, int $id): never
+    {
+        $this->authorization->assertChart($context, RunningChartAction::Create, true);
+        throw new \LogicException('Preserve Running Chart evidence. Use reversal.');
+    }
+
     public function create(AgreementContext $context, int $useId, int $expectedUseVersion, array $input, ?int $corrects = null): RunningChart
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, true);
@@ -91,7 +97,31 @@ final class RunningChartService
             $chart = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
             $this->version($chart->row_version, $expectedVersion);
             if ($action === RunningChartAction::Update && $chart->status === RunningChartStatus::Draft) {
-                $data = $this->validation->validate($input, $context);
+                $existing = [
+                    'reference' => $chart->reference,
+                    'starts_at' => $chart->starts_at->toIso8601String(),
+                    'ends_at' => $chart->ends_at->toIso8601String(),
+                    'start_odometer' => $chart->start_odometer,
+                    'end_odometer' => $chart->end_odometer,
+                    'garage_km' => $chart->garage_km,
+                    'commercial_km' => $chart->commercial_km,
+                    'ac_mode' => $chart->ac_mode?->value,
+                    'normal_ot_minutes' => $chart->normal_ot_minutes,
+                    'double_ot_minutes' => $chart->double_ot_minutes,
+                    'triple_ot_minutes' => $chart->triple_ot_minutes,
+                    'night_outs' => $chart->night_outs,
+                    'driver_identity_source' => $chart->driver_identity_source?->value,
+                    'driver_employee_id' => $chart->driver_employee_id,
+                    'driver_name_snapshot' => $chart->driver_name_snapshot,
+                    'driver_reference_snapshot' => $chart->driver_reference_snapshot,
+                    'driver_observation' => $chart->driver_observation,
+                    'notes' => $chart->notes,
+                ];
+                $mergedInput = array_merge($existing, $input);
+                if (empty(trim((string) ($mergedInput['reference'] ?? '')))) {
+                    $mergedInput['reference'] = $chart->reference;
+                }
+                $data = $this->validation->validate($mergedInput, $context);
                 $this->assertCoverage($use, $data['starts_at'], $data['ends_at']);
                 $chart->forceFill($data);
             } elseif ($action === RunningChartAction::Finalize && $chart->status === RunningChartStatus::Draft) {

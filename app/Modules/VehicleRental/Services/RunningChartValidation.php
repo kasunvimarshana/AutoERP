@@ -21,6 +21,17 @@ final class RunningChartValidation
 
     public function validate(array $input, AgreementContext $context): array
     {
+        foreach (RunningChartFields::MUTABLE as $field) {
+            if ($field === 'starts_at' || $field === 'ends_at') {
+                continue;
+            }
+            if (array_key_exists($field, $input)) {
+                if (is_string($input[$field]) && trim($input[$field]) === '') {
+                    $input[$field] = null;
+                }
+            }
+        }
+
         $rules = [
             'reference' => ['required', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
             'starts_at' => ['required', 'string'],
@@ -43,7 +54,17 @@ final class RunningChartValidation
             $rules[$field] = ['nullable', 'integer', 'min:0', 'max:'.RunningChartFields::MAX_COUNT];
         }
         $input['reference'] = is_string($input['reference'] ?? null) ? trim($input['reference']) : ($input['reference'] ?? null);
+        if ($input['reference'] === '') {
+            $input['reference'] = null;
+        }
+
         $data = array_replace(array_fill_keys(RunningChartFields::MUTABLE, null), Validator::make($input, $rules)->validate());
+        foreach (['driver_observation', 'notes', 'driver_name_snapshot', 'driver_reference_snapshot'] as $strField) {
+            if (isset($data[$strField]) && is_string($data[$strField])) {
+                $trimmed = trim($data[$strField]);
+                $data[$strField] = $trimmed === '' ? null : $trimmed;
+            }
+        }
         $this->driverIdentity($data, $context);
 
         $start = OperationalTime::parse($data['starts_at'], 'starts_at');
@@ -56,8 +77,10 @@ final class RunningChartValidation
         $data['starts_at'] = OperationalTime::database($start);
         $data['ends_at'] = OperationalTime::database($end);
         foreach (RunningChartFields::DISTANCES as $field) {
-            if ($data[$field] !== null) {
-                $data[$field] = bcadd($data[$field], AgreementFields::ZERO, AgreementFields::DECIMAL_SCALE);
+            if ($data[$field] !== null && $data[$field] !== '') {
+                $data[$field] = bcadd((string) $data[$field], AgreementFields::ZERO, AgreementFields::DECIMAL_SCALE);
+            } else {
+                $data[$field] = null;
             }
         }
         if ($data['start_odometer'] !== null && $data['end_odometer'] !== null) {

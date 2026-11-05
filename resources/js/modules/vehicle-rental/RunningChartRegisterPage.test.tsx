@@ -87,4 +87,21 @@ describe('Running Chart register', () => {
         expect(await screen.findByText('CHART-A · CAR-1234')).toBeInTheDocument();
         expect(listChartRegister).toHaveBeenLastCalledWith({}, 1, expect.any(AbortSignal));
     });
+    it('syncs url search params when filters are applied and cleared', async () => {
+        const replaceSpy = vi.spyOn(window.history, 'replaceState');
+        renderPage();
+        await screen.findByText('CHART-A · CAR-1234');
+
+        fireEvent.change(screen.getByLabelText('Chart, vehicle, driver, agreement or party'), { target: { value: 'RC-001' } });
+        fireEvent.change(screen.getByLabelText('Chart status'), { target: { value: RunningChartStatus.Draft } });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+
+        expect(replaceSpy).toHaveBeenCalledWith({}, '', expect.stringContaining('search=RC-001'));
+        expect(replaceSpy).toHaveBeenCalledWith({}, '', expect.stringContaining('status=draft'));
+
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Clear filters' })).toBeEnabled());
+        fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+        expect(replaceSpy).toHaveBeenLastCalledWith({}, '', expect.not.stringContaining('search=RC-001'));
+        replaceSpy.mockRestore();
+    });
 });

@@ -121,6 +121,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::get('running-charts', [RunningChartController::class, 'register']);
     Route::get('running-charts/{chart}', [RunningChartController::class, 'show'])->whereNumber('chart');
     Route::put('running-charts/{chart}', [RunningChartController::class, 'update'])->whereNumber('chart');
+    Route::delete('running-charts/{chart}', [RunningChartController::class, 'destroy'])->whereNumber('chart');
+    Route::delete('vehicle-uses/{use}/running-charts/{chart}', [RunningChartController::class, 'destroy'])->whereNumber(['use', 'chart']);
     Route::get('running-charts/{chart}/history', [RunningChartController::class, 'history'])->whereNumber('chart');
     Route::post('running-charts/{chart}/{action}', [RunningChartController::class, 'transition'])->whereNumber('chart')->whereIn('action', [RunningChartAction::Finalize->value, RunningChartAction::Reverse->value]);
 

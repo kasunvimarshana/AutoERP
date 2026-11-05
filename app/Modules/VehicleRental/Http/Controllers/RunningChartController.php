@@ -16,10 +16,16 @@ use Modules\VehicleRental\Http\Resources\RunningChartResource;
 use Modules\VehicleRental\Services\RunningChartRegisterService;
 use Modules\VehicleRental\Services\RunningChartService;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class RunningChartController
 {
     public function __construct(private readonly RunningChartService $charts) {}
+
+    public function destroy(AgreementRequest $request, ?int $first = null, ?int $second = null): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Running charts cannot be deleted to preserve physical usage evidence. Use chart reversal instead.');
+    }
 
     public function register(RunningChartRegisterRequest $request, RunningChartRegisterService $register): AnonymousResourceCollection
     {

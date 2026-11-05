@@ -1,8 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { expect, it, vi } from 'vitest';
 import { RunningChartEditor } from './RunningChartEditor';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
 import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
+import { createChart } from './runningChartApi';
+
+vi.mock('./runningChartApi', () => ({
+    createChart: vi.fn(),
+    updateChart: vi.fn(),
+}));
 
 const use = {
     id: 12,
@@ -89,4 +95,42 @@ it('requires chart reference when editing an existing draft chart', () => {
 
     fireEvent.change(refInput, { target: { value: '' } });
     expect(save).toBeDisabled();
+});
+
+it('submits null for blank optional fields when creating a chart', async () => {
+    vi.mocked(createChart).mockResolvedValueOnce({} as RunningChart);
+    const onSaved = vi.fn();
+    render(<RunningChartEditor use={use} onSaved={onSaved} onCancel={() => undefined} />);
+
+    fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T09:00' } });
+    fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-07T17:00' } });
+    fireEvent.change(screen.getByLabelText('Start odometer'), { target: { value: '   ' } });
+    fireEvent.change(screen.getByLabelText('End odometer'), { target: { value: ' ' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => {
+        expect(createChart).toHaveBeenCalledWith(
+            use,
+            expect.objectContaining({
+                start_odometer: null,
+                end_odometer: null,
+                garage_km: null,
+                commercial_km: null,
+                normal_ot_minutes: null,
+                double_ot_minutes: null,
+                triple_ot_minutes: null,
+                night_outs: null,
+                ac_mode: null,
+                driver_identity_source: null,
+                driver_employee_id: null,
+                driver_name_snapshot: null,
+                driver_reference_snapshot: null,
+                driver_observation: null,
+                notes: null,
+            }),
+            undefined
+        );
+        expect(onSaved).toHaveBeenCalled();
+    });
 });

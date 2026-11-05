@@ -69,16 +69,32 @@ export default function RunningChartRegisterPage() {
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [filters, page]);
+    function syncUrl(nextSearch: string, nextStatus: string, nextFrom: string, nextUntil: string) {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (nextSearch.trim()) url.searchParams.set('search', nextSearch.trim());
+        else url.searchParams.delete('search');
+        if (nextStatus) url.searchParams.set('status', nextStatus);
+        else url.searchParams.delete('status');
+        url.searchParams.delete('chart_status');
+        if (nextFrom) url.searchParams.set('from', nextFrom);
+        else url.searchParams.delete('from');
+        if (nextUntil) url.searchParams.set('until', nextUntil);
+        else url.searchParams.delete('until');
+        window.history.replaceState({}, '', url.toString());
+    }
     function apply(event: FormEvent) {
         event.preventDefault();
         try {
             const next = { search: search.trim() || undefined, chart_status: status || undefined, from: from ? timestampWithOffset(from) : undefined, until: until ? timestampWithOffset(until) : undefined };
+            syncUrl(search, status, from, until);
             setLoading(true); setError(null); setPage(1); setSelected(null); setHistory(null); setFilters(next);
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
         const needsReload = error !== null || page !== 1 || Object.values(filters).some(value => value !== undefined);
         setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setHistory(null); setError(null);
+        syncUrl('', '', '', '');
         if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
     const statusOptions = Object.values(RunningChartStatus).map(value => ({ value, label: CHART_LABELS[value] }));
