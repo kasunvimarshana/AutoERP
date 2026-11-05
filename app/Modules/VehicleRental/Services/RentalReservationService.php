@@ -72,19 +72,19 @@ final class RentalReservationService
                 'reservation_number' => $reservationNumber,
                 'customer_id' => $customer->id,
                 'customer_name_snapshot' => $customer->name,
-                'requested_vehicle_id' => $data['requested_vehicle_id'] ?? null,
-                'requested_vehicle_category_id' => $data['requested_vehicle_category_id'] ?? null,
+                'requested_vehicle_id' => ! empty($data['requested_vehicle_id']) ? (int) $data['requested_vehicle_id'] : null,
+                'requested_vehicle_category_id' => ! empty($data['requested_vehicle_category_id']) ? (int) $data['requested_vehicle_category_id'] : null,
                 'rental_mode' => $data['rental_mode'] instanceof DriverMode ? $data['rental_mode'] : DriverMode::from((string) $data['rental_mode']),
                 'billing_cycle' => $data['billing_cycle'] instanceof RentalBasis ? $data['billing_cycle'] : RentalBasis::from((string) $data['billing_cycle']),
                 'requested_start_at' => $start,
                 'requested_end_at' => $end,
                 'currency_id' => $currency->id,
                 'currency_code_snapshot' => $currency->code,
-                'estimated_amount' => $data['estimated_amount'] ?? '0.000000',
-                'estimated_deposit_amount' => $data['estimated_deposit_amount'] ?? '0.000000',
+                'estimated_amount' => (isset($data['estimated_amount']) && $data['estimated_amount'] !== '' && $data['estimated_amount'] !== null) ? (string) $data['estimated_amount'] : '0.000000',
+                'estimated_deposit_amount' => (isset($data['estimated_deposit_amount']) && $data['estimated_deposit_amount'] !== '' && $data['estimated_deposit_amount'] !== null) ? (string) $data['estimated_deposit_amount'] : '0.000000',
                 'status' => RentalReservationStatus::Draft,
-                'source' => $data['source'] ?? null,
-                'remarks' => $data['remarks'] ?? null,
+                'source' => (isset($data['source']) && trim((string) $data['source']) !== '') ? trim((string) $data['source']) : null,
+                'remarks' => (isset($data['remarks']) && trim((string) $data['remarks']) !== '') ? trim((string) $data['remarks']) : null,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
@@ -140,18 +140,30 @@ final class RentalReservationService
             $reservation->fill([
                 'customer_id' => $customerId,
                 'customer_name_snapshot' => $customerNameSnapshot,
-                'requested_vehicle_id' => array_key_exists('requested_vehicle_id', $data) ? $data['requested_vehicle_id'] : $reservation->requested_vehicle_id,
-                'requested_vehicle_category_id' => array_key_exists('requested_vehicle_category_id', $data) ? $data['requested_vehicle_category_id'] : $reservation->requested_vehicle_category_id,
+                'requested_vehicle_id' => array_key_exists('requested_vehicle_id', $data)
+                    ? (! empty($data['requested_vehicle_id']) ? (int) $data['requested_vehicle_id'] : null)
+                    : $reservation->requested_vehicle_id,
+                'requested_vehicle_category_id' => array_key_exists('requested_vehicle_category_id', $data)
+                    ? (! empty($data['requested_vehicle_category_id']) ? (int) $data['requested_vehicle_category_id'] : null)
+                    : $reservation->requested_vehicle_category_id,
                 'rental_mode' => isset($data['rental_mode']) ? ($data['rental_mode'] instanceof DriverMode ? $data['rental_mode'] : DriverMode::from((string) $data['rental_mode'])) : $reservation->rental_mode,
                 'billing_cycle' => isset($data['billing_cycle']) ? ($data['billing_cycle'] instanceof RentalBasis ? $data['billing_cycle'] : RentalBasis::from((string) $data['billing_cycle'])) : $reservation->billing_cycle,
                 'requested_start_at' => $start,
                 'requested_end_at' => $end,
                 'currency_id' => $currencyId,
                 'currency_code_snapshot' => $currencyCodeSnapshot,
-                'estimated_amount' => $data['estimated_amount'] ?? $reservation->estimated_amount,
-                'estimated_deposit_amount' => $data['estimated_deposit_amount'] ?? $reservation->estimated_deposit_amount,
-                'source' => $data['source'] ?? $reservation->source,
-                'remarks' => $data['remarks'] ?? $reservation->remarks,
+                'estimated_amount' => array_key_exists('estimated_amount', $data)
+                    ? ((isset($data['estimated_amount']) && $data['estimated_amount'] !== '' && $data['estimated_amount'] !== null) ? (string) $data['estimated_amount'] : '0.000000')
+                    : $reservation->estimated_amount,
+                'estimated_deposit_amount' => array_key_exists('estimated_deposit_amount', $data)
+                    ? ((isset($data['estimated_deposit_amount']) && $data['estimated_deposit_amount'] !== '' && $data['estimated_deposit_amount'] !== null) ? (string) $data['estimated_deposit_amount'] : '0.000000')
+                    : $reservation->estimated_deposit_amount,
+                'source' => array_key_exists('source', $data)
+                    ? ((isset($data['source']) && trim((string) $data['source']) !== '') ? trim((string) $data['source']) : null)
+                    : $reservation->source,
+                'remarks' => array_key_exists('remarks', $data)
+                    ? ((isset($data['remarks']) && trim((string) $data['remarks']) !== '') ? trim((string) $data['remarks']) : null)
+                    : $reservation->remarks,
                 'row_version' => $expectedVersion + 1,
                 'updated_by' => $userId,
             ]);
@@ -224,6 +236,19 @@ final class RentalReservationService
                 throw new InvalidArgumentException('Only confirmed reservations can be converted to an agreement.');
             }
 
+            $filteredPayload = array_filter($agreementPayload, fn ($v) => $v !== null && $v !== '');
+            $defaultTerms = [
+                'base_rate' => (string) $reservation->estimated_amount,
+                'deposit_requirement' => (string) $reservation->estimated_deposit_amount,
+                'included_km' => '0',
+                'excess_km_rate' => '0',
+                'normal_ot_rate' => '0',
+                'night_out_rate' => '0',
+            ];
+            $mergedTerms = isset($agreementPayload['terms']) && is_array($agreementPayload['terms'])
+                ? array_merge($defaultTerms, $agreementPayload['terms'])
+                : $defaultTerms;
+
             $payload = array_merge([
                 'party_id' => $reservation->customer_id,
                 'currency_id' => $reservation->currency_id,
@@ -232,16 +257,10 @@ final class RentalReservationService
                 'ends_on' => $reservation->requested_end_at->toDateString(),
                 'basis' => $reservation->billing_cycle->value,
                 'driver_mode' => $reservation->rental_mode->value,
-                'terms' => [
-                    'base_rate' => (string) $reservation->estimated_amount,
-                    'deposit_requirement' => (string) $reservation->estimated_deposit_amount,
-                    'included_km' => '0',
-                    'excess_km_rate' => '0',
-                    'normal_ot_rate' => '0',
-                    'night_out_rate' => '0',
-                ],
+                'terms' => $mergedTerms,
                 'notes' => 'Converted from reservation '.$reservation->reservation_number,
-            ], $agreementPayload);
+            ], $filteredPayload);
+            $payload['terms'] = $mergedTerms;
 
             $agreement = $this->agreements->create(AgreementKind::Customer, $context, $payload);
 

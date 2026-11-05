@@ -199,4 +199,44 @@ final class VehicleFinanceTest extends TestCase
             $this->assertSame($a2->id, $resultsBeta->items()[0]->id);
         });
     }
+
+    public function test_vehicle_finance_handles_empty_optional_fields_and_query_filters(): void
+    {
+        [$context, , $ownerData] = $this->loginFixture();
+
+        // 1. Create finance agreement with empty optional fields
+        $response = $this->postJson($this->rentalRoot . '/finance-agreements', [
+            'supplier_id' => $ownerData['party_id'],
+            'vehicle_id' => $ownerData['vehicle_id'],
+            'agreement_number' => '',
+            'agreement_date' => '2026-04-01',
+            'starts_at' => '2026-04-01T00:00:00+05:30',
+            'matures_at' => '2026-07-01T00:00:00+05:30',
+            'currency_id' => $ownerData['currency_id'],
+            'principal_amount' => '300000.000000',
+            'initial_deposit_amount' => '',
+            'residual_value' => '',
+            'interest_method' => '',
+            'payment_term_days' => '',
+            'tax_group_id' => '',
+            'remarks' => '',
+            'annual_interest_rate' => '10.000000',
+            'installment_frequency' => 'monthly',
+            'installment_count' => 3,
+        ])->assertCreated();
+
+        $this->assertNotEmpty($response->json('data.agreement_number'));
+        $this->assertSame('0.000000', (string) $response->json('data.initial_deposit_amount'));
+        $this->assertSame('0.000000', (string) $response->json('data.residual_value'));
+        $this->assertNull($response->json('data.remarks'));
+
+        // 2. Query agreements with empty query parameters
+        $this->getJson($this->rentalRoot . '/finance-agreements?search=&supplier_id=&vehicle_id=&status=&from=&until=')
+            ->assertOk();
+
+        // 3. Refresh due statuses with empty as_at
+        $this->patchJson($this->rentalRoot . '/finance-agreements/installments/refresh-due-statuses', [
+            'as_at' => '',
+        ])->assertOk();
+    }
 }

@@ -101,9 +101,10 @@ final class RentalIncidentService
     {
         $this->authorization->assertIncident($context, IncidentPermission::Record);
         $this->contextValidation->assertContext($context);
-        foreach (['evidence_reference', 'description'] as $field) {
-            if (is_string($input[$field] ?? null)) {
-                $input[$field] = trim($input[$field]);
+        foreach (['evidence_reference', 'description', 'running_chart_id'] as $field) {
+            if (array_key_exists($field, $input) && is_string($input[$field])) {
+                $trimmed = trim($input[$field]);
+                $input[$field] = $trimmed === '' ? null : $trimmed;
             }
         }
         $data = Validator::make($input, [
@@ -122,7 +123,7 @@ final class RentalIncidentService
             if ((int) $use->row_version !== (int) $data['expected_use_version']) {
                 throw new ConflictHttpException('The vehicle assignment changed. Reload and select its current revision.');
             }
-            $chartId = isset($data['running_chart_id']) ? (int) $data['running_chart_id'] : null;
+            $chartId = ! empty($data['running_chart_id']) ? (int) $data['running_chart_id'] : null;
             if ($chartId !== null && RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)
                 ->where('vehicle_use_id', $use->getKey())->whereKey($chartId)->first() === null) {
                 throw ValidationException::withMessages([

@@ -49,7 +49,8 @@ final class RentalExpenseService
             $this->validateReferences($data, $tenantId);
 
             $net = $this->math->normalize((string) $data['net_amount']);
-            $tax = $this->math->normalize((string) ($data['tax_amount'] ?? '0'));
+            $taxInput = isset($data['tax_amount']) && trim((string) $data['tax_amount']) !== '' ? (string) $data['tax_amount'] : '0.000000';
+            $tax = $this->math->normalize($taxInput);
             $gross = $this->math->add($net, $tax);
 
             $vehicle = Vehicle::query()->forTenant($tenantId)->findOrFail((int) $data['vehicle_id']);
@@ -69,30 +70,32 @@ final class RentalExpenseService
                 throw new InvalidArgumentException('A matching rental expense already exists for this vehicle, date and reference.');
             }
 
-            $expenseNumber = $data['expense_number'] ?? 'REX-'.strtoupper(bin2hex(random_bytes(4)));
+            $expenseNumber = (isset($data['expense_number']) && trim((string) $data['expense_number']) !== '')
+                ? trim((string) $data['expense_number'])
+                : 'REX-'.strtoupper(bin2hex(random_bytes(4)));
 
             $expense = RentalExpense::query()->create([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId ?? $vehicle->organization_unit_id,
                 'row_version' => 1,
                 'expense_number' => $expenseNumber,
-                'customer_agreement_id' => $data['customer_agreement_id'] ?? null,
-                'vehicle_use_id' => $data['vehicle_use_id'] ?? null,
-                'running_chart_id' => $data['running_chart_id'] ?? null,
+                'customer_agreement_id' => ! empty($data['customer_agreement_id']) ? (int) $data['customer_agreement_id'] : null,
+                'vehicle_use_id' => ! empty($data['vehicle_use_id']) ? (int) $data['vehicle_use_id'] : null,
+                'running_chart_id' => ! empty($data['running_chart_id']) ? (int) $data['running_chart_id'] : null,
                 'vehicle_id' => $vehicle->id,
                 'vehicle_label_snapshot' => $vehicle->registration_number ?? $vehicle->vehicle_number,
-                'supplier_id' => $data['supplier_id'] ?? null,
-                'employee_id' => $data['employee_id'] ?? null,
+                'supplier_id' => ! empty($data['supplier_id']) ? (int) $data['supplier_id'] : null,
+                'employee_id' => ! empty($data['employee_id']) ? (int) $data['employee_id'] : null,
                 'expense_type' => $data['expense_type'] instanceof RentalExpenseType ? $data['expense_type'] : RentalExpenseType::from((string) $data['expense_type']),
                 'expense_date' => $data['expense_date'],
                 'currency_id' => $currency->id,
                 'currency_code_snapshot' => $currency->code,
                 'net_amount' => $net,
-                'tax_group_id' => $data['tax_group_id'] ?? null,
+                'tax_group_id' => ! empty($data['tax_group_id']) ? (int) $data['tax_group_id'] : null,
                 'tax_amount' => $tax,
                 'gross_amount' => $gross,
-                'reference_number' => $data['reference_number'] ?? null,
-                'description' => $data['description'] ?? null,
+                'reference_number' => (isset($data['reference_number']) && trim((string) $data['reference_number']) !== '') ? trim((string) $data['reference_number']) : null,
+                'description' => (isset($data['description']) && trim((string) $data['description']) !== '') ? trim((string) $data['description']) : null,
                 'status' => RentalExpenseStatus::Draft,
                 'fingerprint' => $fingerprint,
                 'created_by' => $userId,
@@ -232,9 +235,9 @@ final class RentalExpenseService
             }
 
             $net = (string) $row['net_amount'];
-            $tax = (string) ($row['tax_amount'] ?? '0.000000');
-            $markup = (string) ($row['markup_amount'] ?? '0.000000');
-            $withholding = (string) ($row['withholding_amount'] ?? '0.000000');
+            $tax = (isset($row['tax_amount']) && trim((string) $row['tax_amount']) !== '') ? (string) $row['tax_amount'] : '0.000000';
+            $markup = (isset($row['markup_amount']) && trim((string) $row['markup_amount']) !== '') ? (string) $row['markup_amount'] : '0.000000';
+            $withholding = (isset($row['withholding_amount']) && trim((string) $row['withholding_amount']) !== '') ? (string) $row['withholding_amount'] : '0.000000';
             $total = $this->math->sub($this->math->add($this->math->add($net, $tax), $markup), $withholding);
 
             $expense->allocations()->create([
@@ -243,14 +246,14 @@ final class RentalExpenseService
                 'row_version' => 1,
                 'sequence' => $sequence++,
                 'allocation_type' => $row['allocation_type'] instanceof RentalExpenseAllocationType ? $row['allocation_type'] : RentalExpenseAllocationType::from((string) $row['allocation_type']),
-                'target_customer_agreement_id' => $row['target_customer_agreement_id'] ?? null,
-                'target_owner_agreement_id' => $row['target_owner_agreement_id'] ?? null,
-                'target_vehicle_use_id' => $row['target_vehicle_use_id'] ?? null,
+                'target_customer_agreement_id' => ! empty($row['target_customer_agreement_id']) ? (int) $row['target_customer_agreement_id'] : null,
+                'target_owner_agreement_id' => ! empty($row['target_owner_agreement_id']) ? (int) $row['target_owner_agreement_id'] : null,
+                'target_vehicle_use_id' => ! empty($row['target_vehicle_use_id']) ? (int) $row['target_vehicle_use_id'] : null,
                 'customer_id' => $customerId,
                 'supplier_id' => $supplierId,
-                'employee_id' => $row['employee_id'] ?? null,
+                'employee_id' => ! empty($row['employee_id']) ? (int) $row['employee_id'] : null,
                 'net_amount' => $net,
-                'tax_group_id' => $row['tax_group_id'] ?? null,
+                'tax_group_id' => ! empty($row['tax_group_id']) ? (int) $row['tax_group_id'] : null,
                 'tax_amount' => $tax,
                 'withholding_amount' => $withholding,
                 'markup_amount' => $markup,

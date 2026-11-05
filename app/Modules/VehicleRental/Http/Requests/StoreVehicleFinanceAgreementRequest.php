@@ -11,6 +11,47 @@ use Modules\VehicleRental\Data\AgreementContext;
 
 final class StoreVehicleFinanceAgreementRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach ([
+            'agreement_number',
+            'initial_deposit_amount',
+            'residual_value',
+            'interest_method',
+            'payment_term_days',
+            'tax_group_id',
+            'remarks',
+        ] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($this->has('schedule') && is_array($this->input('schedule'))) {
+            $normalizedSchedule = [];
+            foreach ($this->input('schedule') as $index => $row) {
+                if (is_array($row)) {
+                    foreach (['installment_number', 'fee_due', 'tax_due'] as $field) {
+                        if (array_key_exists($field, $row) && is_string($row[$field]) && trim($row[$field]) === '') {
+                            $row[$field] = null;
+                        }
+                    }
+                    $normalizedSchedule[$index] = $row;
+                } else {
+                    $normalizedSchedule[$index] = $row;
+                }
+            }
+            $merges['schedule'] = $normalizedSchedule;
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [

@@ -83,6 +83,17 @@ final class VehicleAvailabilityQueryTest extends TestCase
         self::assertContains($vehicle2Id, $outsideIds);
     }
 
+    public function test_available_vehicles_query_with_empty_ends_at_and_category_id(): void
+    {
+        [$context, , $ownerInput] = $this->loginFixture();
+
+        $response = $this->getJson(
+            self::ROOT.'/vehicles/available?starts_at='.urlencode('2026-09-07T09:00:00+05:30').'&ends_at=&category_id='
+        );
+        $response->assertOk()
+            ->assertJsonStructure(['data' => [['id', 'registration_number', 'display_label']]]);
+    }
+
     private function loginFixture(): array
     {
         [$context, $customer, $owner] = $this->fixture();

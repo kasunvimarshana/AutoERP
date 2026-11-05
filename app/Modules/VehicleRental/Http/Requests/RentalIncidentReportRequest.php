@@ -11,6 +11,22 @@ use Modules\VehicleRental\Data\AgreementContext;
 
 final class RentalIncidentReportRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach (['incident_type', 'status', 'vehicle_id'] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [

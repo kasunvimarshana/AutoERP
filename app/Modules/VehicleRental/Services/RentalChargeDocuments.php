@@ -68,6 +68,10 @@ final class RentalChargeDocuments
 
     public function documentInput(array $input): array
     {
+        if (array_key_exists('due_date', $input) && ($input['due_date'] === null || (is_string($input['due_date']) && trim($input['due_date']) === ''))) {
+            $input['due_date'] = null;
+        }
+
         return Validator::make($input, ['expected_version' => ['required', 'integer', 'min:'.AgreementFields::INITIAL_VERSION],
             'invoice_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
             'due_date' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:invoice_date'],

@@ -22,6 +22,11 @@ final class OwnerSourceService
     public function list(AgreementContext $context, int $vehicle, array $input, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertUse($context, false);
+        foreach (['ends_at', 'customer_agreement_id', 'search'] as $key) {
+            if (array_key_exists($key, $input) && is_string($input[$key]) && trim($input[$key]) === '') {
+                $input[$key] = null;
+            }
+        }
         $data = Validator::make($input, [
             'starts_at' => ['required', 'string'],
             'ends_at' => ['sometimes', 'nullable', 'string'],

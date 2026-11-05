@@ -285,4 +285,130 @@ final class RentalReservationTest extends TestCase
             ));
         });
     }
+
+    public function test_reservation_handles_empty_string_optional_fields_and_clearing(): void
+    {
+        [$context, $customerData] = $this->fixture();
+        $this->grantPermissions($context->tenantId, $context->actorId, [
+            RentalAuthorization::CUSTOMER_MANAGE,
+            RentalAuthorization::CUSTOMER_VIEW,
+            RentalAuthorization::RESERVATION_MANAGE,
+            RentalAuthorization::RESERVATION_VIEW,
+        ]);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData): void {
+            $service = app(RentalReservationService::class);
+
+            // Create with empty string optional fields
+            $reservation = $service->create([
+                'customer_id' => $customerData['party_id'],
+                'requested_vehicle_id' => '',
+                'requested_vehicle_category_id' => '',
+                'rental_mode' => DriverMode::SelfDrive->value,
+                'billing_cycle' => RentalBasis::Daily->value,
+                'requested_start_at' => '2026-11-20T10:00:00+05:30',
+                'requested_end_at' => '2026-11-25T18:00:00+05:30',
+                'currency_id' => $customerData['currency_id'],
+                'estimated_amount' => '',
+                'estimated_deposit_amount' => '',
+                'source' => '',
+                'remarks' => '',
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $this->assertNull($reservation->requested_vehicle_id);
+            $this->assertNull($reservation->requested_vehicle_category_id);
+            $this->assertSame('0.000000', (string) $reservation->estimated_amount);
+            $this->assertSame('0.000000', (string) $reservation->estimated_deposit_amount);
+            $this->assertNull($reservation->source);
+            $this->assertNull($reservation->remarks);
+
+            // Update with populated values
+            $populated = $service->update($reservation, [
+                'source' => 'walk-in',
+                'remarks' => 'Requires baby seat',
+                'estimated_amount' => '15000.000000',
+            ], $reservation->row_version, $context->actorId);
+
+            $this->assertSame('walk-in', $populated->source);
+            $this->assertSame('Requires baby seat', $populated->remarks);
+            $this->assertSame('15000.000000', (string) $populated->estimated_amount);
+
+            // Update with empty strings to clear
+            $cleared = $service->update($populated, [
+                'source' => '',
+                'remarks' => '',
+                'estimated_amount' => '',
+            ], $populated->row_version, $context->actorId);
+
+            $this->assertNull($cleared->source);
+            $this->assertNull($cleared->remarks);
+            $this->assertSame('0.000000', (string) $cleared->estimated_amount);
+        });
+    }
+
+    public function test_reservation_http_endpoints_accept_empty_optional_fields_and_query_filters(): void
+    {
+        [$context, $customerData] = $this->loginFixture();
+
+        // 1. POST reservation with empty optional strings
+        $response = $this->postJson($this->rentalRoot . '/reservations', [
+            'customer_id' => $customerData['party_id'],
+            'requested_vehicle_id' => '',
+            'requested_vehicle_category_id' => '',
+            'rental_mode' => DriverMode::SelfDrive->value,
+            'billing_cycle' => RentalBasis::Daily->value,
+            'requested_start_at' => '2026-11-20T10:00:00+05:30',
+            'requested_end_at' => '2026-11-25T18:00:00+05:30',
+            'currency_id' => $customerData['currency_id'],
+            'estimated_amount' => '',
+            'estimated_deposit_amount' => '',
+            'source' => '',
+            'remarks' => '',
+        ]);
+
+        $response->assertCreated();
+        $reservationId = $response->json('data.id');
+        $version = $response->json('data.row_version');
+        $this->assertNull($response->json('data.requested_vehicle_id'));
+        $this->assertNull($response->json('data.source'));
+
+        // 2. GET index with empty filter query params
+        $indexResponse = $this->getJson($this->rentalRoot . '/reservations?search=&customer_id=&requested_vehicle_id=&status=&from=&until=');
+        $indexResponse->assertOk();
+
+        // 3. PUT update reservation with empty strings
+        $updateResponse = $this->putJson($this->rentalRoot . '/reservations/' . $reservationId, [
+            'expected_version' => $version,
+            'customer_id' => $customerData['party_id'],
+            'rental_mode' => DriverMode::SelfDrive->value,
+            'billing_cycle' => RentalBasis::Daily->value,
+            'requested_start_at' => '2026-11-20T10:00:00+05:30',
+            'requested_end_at' => '2026-11-26T18:00:00+05:30',
+            'currency_id' => $customerData['currency_id'],
+            'requested_vehicle_id' => '',
+            'source' => '',
+            'remarks' => '',
+            'estimated_amount' => '',
+        ]);
+        $updateResponse->assertOk();
+        $newVersion = $updateResponse->json('data.row_version');
+
+        // 4. Transition to confirmed
+        $transResponse = $this->patchJson($this->rentalRoot . '/reservations/' . $reservationId . '/transition', [
+            'expected_version' => $newVersion,
+            'status' => RentalReservationStatus::Confirmed->value,
+            'reason' => 'Confirmed via phone',
+        ]);
+        $transResponse->assertOk();
+        $confirmedVersion = $transResponse->json('data.row_version');
+
+        // 5. Convert to agreement with empty optional reference and notes
+        $convertResponse = $this->postJson($this->rentalRoot . '/reservations/' . $reservationId . '/convert', [
+            'expected_version' => $confirmedVersion,
+            'reference' => '',
+            'notes' => '',
+        ]);
+        $convertResponse->assertCreated();
+        $this->assertNotEmpty($convertResponse->json('data.reference'));
+    }
 }

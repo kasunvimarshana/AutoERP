@@ -10,6 +10,15 @@ use Modules\VehicleRental\Data\AgreementContext;
 
 final class RefreshVehicleFinanceDueStatusesRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        if ($this->has('as_at') && is_string($this->input('as_at')) && trim($this->input('as_at')) === '') {
+            $this->merge(['as_at' => null]);
+        }
+    }
+
     public function rules(): array
     {
         return [

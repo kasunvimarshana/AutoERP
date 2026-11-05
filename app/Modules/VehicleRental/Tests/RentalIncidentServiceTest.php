@@ -177,4 +177,25 @@ final class RentalIncidentServiceTest extends TestCase
             ]);
         });
     }
+
+    public function test_incident_creation_with_empty_running_chart_and_empty_optional_strings(): void
+    {
+        $this->custodyFixture(function ($context, $use): void {
+            $service = app(RentalIncidentService::class);
+            $incident = $service->create($context, [
+                'vehicle_use_id' => $use->id,
+                'expected_use_version' => $use->row_version,
+                'running_chart_id' => '',
+                'incident_type' => 'accident_damage',
+                'occurred_on' => '2026-09-08',
+                'evidence_reference' => 'Police Report #552',
+                'description' => 'Minor dent on bumper during parking',
+            ]);
+
+            self::assertSame(IncidentStatus::Recorded, $incident->status);
+            self::assertNull($incident->running_chart_id);
+            self::assertSame('Police Report #552', $incident->evidence_reference);
+            self::assertSame('Minor dent on bumper during parking', $incident->description);
+        });
+    }
 }

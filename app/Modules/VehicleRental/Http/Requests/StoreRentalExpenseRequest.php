@@ -12,6 +12,33 @@ use Modules\VehicleRental\Enums\RentalExpenseType;
 
 final class StoreRentalExpenseRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach ([
+            'expense_number',
+            'customer_agreement_id',
+            'vehicle_use_id',
+            'running_chart_id',
+            'supplier_id',
+            'employee_id',
+            'tax_group_id',
+            'tax_amount',
+            'reference_number',
+            'description',
+        ] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [
