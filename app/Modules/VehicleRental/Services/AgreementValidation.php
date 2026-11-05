@@ -40,6 +40,13 @@ final class AgreementValidation
             $rules['terms.'.$field] = ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN];
         }
         $input['reference'] = is_string($input['reference'] ?? null) ? trim($input['reference']) : $input['reference'] ?? null;
+        if (isset($input['terms']) && is_array($input['terms'])) {
+            foreach ($input['terms'] as $key => $val) {
+                if (is_int($val) || is_float($val)) {
+                    $input['terms'][$key] = (string) $val;
+                }
+            }
+        }
         $data = Validator::make($input, $rules)->validate();
         if ($kind === AgreementKind::Owner && ($data['terms'][AgreementFields::DEPOSIT_REQUIREMENT] ?? null) !== null) {
             throw ValidationException::withMessages([

@@ -279,4 +279,95 @@ final class AgreementTest extends TestCase
             }
         });
     }
+
+    public function test_agreements_can_be_filtered_by_status(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $service = app(AgreementService::class);
+            $draft = $service->create(AgreementKind::Customer, $context, $customer);
+            $activeInput = array_replace($customer, ['reference' => $customer['reference'].'-ACT']);
+            $active = $service->create(AgreementKind::Customer, $context, $activeInput);
+            $active = $service->change(AgreementKind::Customer, $context, $active->id, $active->row_version, AgreementAction::Activate);
+            $closedInput = array_replace($customer, ['reference' => $customer['reference'].'-CLS']);
+            $closed = $service->create(AgreementKind::Customer, $context, $closedInput);
+            $closed = $service->change(AgreementKind::Customer, $context, $closed->id, $closed->row_version, AgreementAction::Close, reason: 'Terminal draft');
+
+            $all = $service->list(AgreementKind::Customer, $context, 25);
+            self::assertGreaterThanOrEqual(3, $all->total());
+
+            $drafts = $service->list(AgreementKind::Customer, $context, 25, status: AgreementStatus::Draft);
+            self::assertTrue($drafts->getCollection()->contains('id', $draft->id));
+            self::assertFalse($drafts->getCollection()->contains('id', $active->id));
+            self::assertFalse($drafts->getCollection()->contains('id', $closed->id));
+
+            $actives = $service->list(AgreementKind::Customer, $context, 25, status: AgreementStatus::Active);
+            self::assertTrue($actives->getCollection()->contains('id', $active->id));
+            self::assertFalse($actives->getCollection()->contains('id', $draft->id));
+
+            $closeds = $service->list(AgreementKind::Customer, $context, 25, status: AgreementStatus::Closed);
+            self::assertTrue($closeds->getCollection()->contains('id', $closed->id));
+            self::assertFalse($closeds->getCollection()->contains('id', $draft->id));
+        });
+    }
+
+    public function test_agreement_delete_is_strictly_prohibited_to_preserve_legal_history(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $draft = app(AgreementService::class)->create(AgreementKind::Customer, $context, $customer);
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Agreement history must be preserved.');
+            $draft->delete();
+        });
+    }
+
+    public function test_terms_accept_numeric_int_and_float_values(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $input = array_replace($customer, [
+                'reference' => $customer['reference'].'-NUM',
+                'terms' => [
+                    'base_rate' => 1500,
+                    'excess_km_rate' => 75.5,
+                ],
+            ]);
+            $agreement = app(AgreementService::class)->create(AgreementKind::Customer, $context, $input);
+            self::assertSame('1500.000000', $agreement->terms['base_rate']);
+            self::assertSame('75.500000', $agreement->terms['excess_km_rate']);
+        });
+    }
+
+    public function test_owner_agreement_exposes_vehicle_uses_relation(): void
+    {
+        [$context, , $owner] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $owner): void {
+            $agreement = app(AgreementService::class)->create(AgreementKind::Owner, $context, $owner);
+            self::assertInstanceOf(\Illuminate\Database\Eloquent\Relations\HasMany::class, $agreement->vehicleUses());
+            self::assertSame(0, $agreement->vehicleUses()->count());
+        });
+    }
+
+    public function test_agreement_resource_exposes_successor_agreement_lineage(): void
+    {
+        [$context, $customer] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer): void {
+            $service = app(AgreementService::class);
+            $predecessor = $service->create(AgreementKind::Customer, $context, $customer);
+            $predecessor = $service->change(AgreementKind::Customer, $context, $predecessor->id, $predecessor->row_version, AgreementAction::Activate);
+            $successor = $service->successor(AgreementKind::Customer, $context, $predecessor->id, $predecessor->row_version, [
+                'reference' => $predecessor->reference.'-R2',
+                'agreed_on' => '2026-09-20',
+                'starts_on' => '2026-10-01',
+                'reason' => 'Contract extension',
+            ]);
+
+            $resource = (new AgreementResource($predecessor->refresh()))->toArray(new Request);
+            self::assertNotNull($resource['successor_agreement']);
+            self::assertSame($successor->id, $resource['successor_agreement']['id']);
+            self::assertSame($successor->reference, $resource['successor_agreement']['reference']);
+            self::assertSame(AgreementStatus::Draft->value, $resource['successor_agreement']['status']);
+        });
+    }
 }

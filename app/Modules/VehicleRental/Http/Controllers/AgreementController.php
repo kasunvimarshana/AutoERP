@@ -9,6 +9,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\AgreementHistoryResource;
 use Modules\VehicleRental\Http\Resources\AgreementResource;
@@ -22,7 +23,9 @@ final class AgreementController
 
     public function index(AgreementRequest $request, string $kind): AnonymousResourceCollection
     {
-        return AgreementResource::collection($this->agreements->list(AgreementKind::from($kind), $request->context(), $request->perPage(), $request->validated('search')));
+        $status = $request->validated('status') !== null ? AgreementStatus::tryFrom((string) $request->validated('status')) : null;
+
+        return AgreementResource::collection($this->agreements->list(AgreementKind::from($kind), $request->context(), $request->perPage(), $request->validated('search'), $status));
     }
 
     public function store(AgreementRequest $request, string $kind): JsonResponse

@@ -37,11 +37,12 @@ final class AgreementService
         private readonly RentalCalendar $calendar,
     ) {}
 
-    public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null): LengthAwarePaginator
+    public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null, ?AgreementStatus $status = null): LengthAwarePaginator
     {
         $this->authorization->assert($context, $kind, false);
 
         return $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)->with($this->relations($kind))
+            ->when($status !== null, fn ($q) => $q->where('status', $status->value))
             ->when($search !== null && $search !== '', fn ($q) => $q->where(fn ($query) => $query->where('reference', 'like', '%'.$search.'%')->orWhereHas('party', fn ($p) => $p->where('name', 'like', '%'.$search.'%'))))->orderByDesc('id')->paginate($perPage);
     }
 
@@ -91,6 +92,16 @@ final class AgreementService
             }
             if ($predecessor->status !== AgreementStatus::Active) {
                 throw ValidationException::withMessages(['status' => ['Only an active agreement can have a successor draft.']]);
+            }
+            $existingSuccessor = $this->model($kind)::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->where('supersedes_agreement_id', $predecessor->id)
+                ->first();
+            if ($existingSuccessor !== null) {
+                if ($existingSuccessor->status === AgreementStatus::Draft) {
+                    throw new ConflictHttpException("A successor draft ({$existingSuccessor->reference}) already exists for this agreement. Review or complete that draft.");
+                }
+                throw new ConflictHttpException("This agreement has already been superseded by {$existingSuccessor->reference}.");
             }
             $this->assertSuccessorStartsAfter($predecessor, $data['starts_on']);
 
@@ -314,6 +325,8 @@ final class AgreementService
 
     private function relations(AgreementKind $kind): array
     {
-        return $kind === AgreementKind::Owner ? ['party', 'currency', 'vehicle', 'supersedesAgreement'] : ['party', 'currency', 'supersedesAgreement'];
+        return $kind === AgreementKind::Owner
+            ? ['party', 'currency', 'vehicle', 'supersedesAgreement', 'successorAgreement']
+            : ['party', 'currency', 'supersedesAgreement', 'successorAgreement'];
     }
 }

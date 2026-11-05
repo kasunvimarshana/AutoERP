@@ -4,19 +4,34 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Requests;
 
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\AgreementStatus;
 
 final class AgreementRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
-        return ['expected_version' => ['sometimes', 'required', 'integer', 'min:1'],
+        $rules = [
+            'expected_version' => ['sometimes', 'required', 'integer', 'min:1'],
             'reason' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
             'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
-            'status' => ['prohibited'], 'row_version' => ['prohibited'], 'actor_id' => ['prohibited'], 'activated_at' => ['prohibited'], 'closed_at' => ['prohibited']];
+            'row_version' => ['prohibited'],
+            'actor_id' => ['prohibited'],
+            'activated_at' => ['prohibited'],
+            'closed_at' => ['prohibited'],
+        ];
+
+        if ($this->isMethod('get')) {
+            $rules['status'] = ['nullable', 'string', Rule::enum(AgreementStatus::class)];
+        } else {
+            $rules['status'] = ['prohibited'];
+        }
+
+        return $rules;
     }
 
     public function context(): AgreementContext

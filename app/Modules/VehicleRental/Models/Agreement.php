@@ -57,6 +57,11 @@ abstract class Agreement extends TenantOwnedModel
         return $this->belongsTo(static::class, 'supersedes_agreement_id');
     }
 
+    public function successorAgreement(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(static::class, 'supersedes_agreement_id');
+    }
+
     protected static function booted(): void
     {
         static::deleting(static fn () => throw new LogicException('Agreement history must be preserved.'));

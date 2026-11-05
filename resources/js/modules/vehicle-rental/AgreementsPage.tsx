@@ -21,6 +21,7 @@ import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { Input } from '@/shared/components/Input';
+import { Select } from '@/shared/components/Select';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementEditor } from './AgreementEditor';
 import { AgreementTermsGrid } from './AgreementTermsGrid';
@@ -45,8 +46,19 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [saving, setSaving] = useState(false);
     const [activeReviewTab, setActiveReviewTab] = useState<'billing' | 'vehicles' | 'deposits' | 'history'>('billing');
     const [showSuccessor, setShowSuccessor] = useState(false);
-    const [search, setSearch] = useState('');
-    const [query, setQuery] = useState('');
+    const [search, setSearch] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return new URLSearchParams(window.location.search).get('search') ?? '';
+    });
+    const [query, setQuery] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return new URLSearchParams(window.location.search).get('search') ?? '';
+    });
+    const [statusFilter, setStatusFilter] = useState<AgreementStatus | ''>(() => {
+        if (typeof window === 'undefined') return '';
+        const param = new URLSearchParams(window.location.search).get('status');
+        return Object.values(AgreementStatus).includes(param as AgreementStatus) ? (param as AgreementStatus) : '';
+    });
     const [vehicleIdParam, setVehicleIdParam] = useState<string | null>(() => {
         if (typeof window === 'undefined') return null;
         return new URLSearchParams(window.location.search).get('vehicle_id');
@@ -62,12 +74,12 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     }
     useEffect(() => {
         const controller = new AbortController();
-        listAgreements(kind, page, controller.signal, query).then(result => {
+        listAgreements(kind, page, controller.signal, query, statusFilter).then(result => {
             if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
         }).catch(failure => { if (!controller.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(failure)); } })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
-    }, [kind, page, revision, query]);
+    }, [kind, page, revision, query, statusFilter]);
     function reload() { setSelected(null); setAction(null); setEditing(null); setShowSuccessor(false); setLoading(true); setRevision(value => value + 1); }
     async function confirm() {
         if (!selected || !action) return;
@@ -103,16 +115,33 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                     onChange={event => setSearch(event.target.value)}
                 />
             </div>
+            <div className="w-40">
+                <Select
+                    name="status"
+                    options={[
+                        { value: AgreementStatus.Draft, label: 'Draft' },
+                        { value: AgreementStatus.Active, label: 'Active' },
+                        { value: AgreementStatus.Closed, label: 'Closed' },
+                    ]}
+                    placeholder="All statuses"
+                    value={statusFilter}
+                    onChange={event => {
+                        setStatusFilter(event.target.value as AgreementStatus | '');
+                        setPage(1);
+                    }}
+                />
+            </div>
             <Button type="submit" variant="secondary" disabled={loading}>
                 Search
             </Button>
-            {query && (
+            {(query || statusFilter) && (
                 <Button
                     type="button"
                     variant="ghost"
                     onClick={() => {
                         setSearch('');
                         setQuery('');
+                        setStatusFilter('');
                         setPage(1);
                     }}
                 >
@@ -144,7 +173,13 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                             )}
                             {selected.status === AgreementStatus.Active && (
                                 <>
-                                    <Button variant="secondary" onClick={() => setShowSuccessor(true)}>Create successor</Button>
+                                    {selected.successor_agreement ? (
+                                        <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
+                                            Successor in progress ({selected.successor_agreement.status}): {selected.successor_agreement.reference}
+                                        </span>
+                                    ) : (
+                                        <Button variant="secondary" onClick={() => setShowSuccessor(true)}>Create successor</Button>
+                                    )}
                                     <Button variant="danger" onClick={() => setAction(AgreementAction.Close)}>Close agreement</Button>
                                 </>
                             )}
@@ -171,6 +206,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <p className="text-sm text-slate-600">{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
             <p className="text-xs text-slate-500">Agreement date: {formatBusinessDate(selected.agreed_on)} · Executing date: {formatBusinessDate(selected.executing_on, 'Not recorded')}</p>
             {selected.supersedes_agreement && <p className="text-xs text-blue-600 font-medium">Successor of {selected.supersedes_agreement.reference}</p>}
+            {selected.successor_agreement && <p className="text-xs text-amber-700 font-medium">Successor ({selected.successor_agreement.status}): {selected.successor_agreement.reference}</p>}
             <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
             {selected.notes && <p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">Notes:</span> {selected.notes}</p>}
 

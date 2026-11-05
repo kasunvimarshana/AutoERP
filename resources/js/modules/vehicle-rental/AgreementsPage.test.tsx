@@ -93,6 +93,26 @@ describe('Rental agreement review', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Confirm closure' }));
         await waitFor(() => expect(transitionAgreement).toHaveBeenCalledWith(AgreementKind.Customer, record, 'close', 'Customer withdrew proposal'));
     });
+    it('filters agreements by status when selected', async () => {
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' });
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: AgreementStatus.Draft } });
+        await waitFor(() => expect(listAgreements).toHaveBeenCalledWith(AgreementKind.Customer, 1, expect.any(AbortSignal), '', AgreementStatus.Draft));
+    });
+    it('displays successor in progress and hides create successor button when successor exists', async () => {
+        session.permissions.push('vehicle-rental.customer-agreements.manage');
+        const activeWithSuccessor: Agreement = {
+            ...record,
+            status: AgreementStatus.Active,
+            successor_agreement: { id: 105, reference: 'LESSEE-R2', status: AgreementStatus.Draft },
+        };
+        vi.mocked(listAgreements).mockResolvedValue({ data: [activeWithSuccessor] });
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
+        expect(screen.getByText('Successor in progress (draft): LESSEE-R2')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Create successor' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Close agreement' })).toBeInTheDocument();
+    });
 });
 
 it('formats financial terms and included distance for operator review', async () => {

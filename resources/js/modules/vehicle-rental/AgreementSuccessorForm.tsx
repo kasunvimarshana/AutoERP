@@ -50,6 +50,7 @@ export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: {
                 label="Effective start date"
                 type="date"
                 min={minStartDate}
+                max={endsOn || undefined}
                 value={startsOn}
                 onChange={event => setStartsOn(event.target.value)}
                 required

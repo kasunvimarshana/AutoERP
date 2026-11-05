@@ -23,6 +23,11 @@ final class AgreementResource extends JsonResource
                 'id' => $this->supersedesAgreement->getKey(),
                 'reference' => $this->supersedesAgreement->reference,
             ],
+            'successor_agreement' => $this->successorAgreement === null ? null : [
+                'id' => $this->successorAgreement->getKey(),
+                'reference' => $this->successorAgreement->reference,
+                'status' => $this->successorAgreement->status->value,
+            ],
             'party' => ['id' => $this->party->getKey(), 'name' => $this->party_name_snapshot, 'code' => $this->party_code_snapshot],
             'currency' => ['id' => $this->currency->getKey(), 'code' => $this->currency_code_snapshot, 'name' => $this->currency->name],
             'vehicle' => $this->when($this->resource instanceof OwnerAgreement, fn () => ['id' => $this->vehicle->getKey(), 'registration_number' => $this->vehicle_registration_snapshot, 'vehicle_number' => $this->vehicle_number_snapshot]),
