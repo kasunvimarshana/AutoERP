@@ -24,7 +24,7 @@ final class VehicleUseController
 {
     public function __construct(private readonly VehicleUseService $uses) {}
 
-    public function destroy(AgreementRequest $request, int $use): JsonResponse
+    public function destroy(AgreementRequest $request, ?int $first = null, ?int $second = null): JsonResponse
     {
         throw new MethodNotAllowedHttpException([], 'Vehicle custody uses cannot be deleted to preserve physical custody history. Cancel or return the vehicle instead.');
     }

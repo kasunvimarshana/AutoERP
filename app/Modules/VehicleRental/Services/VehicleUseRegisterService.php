@@ -46,6 +46,7 @@ final class VehicleUseRegisterService
             ->when($search !== '', fn ($q) => $q->where(function ($match) use ($search): void {
                 $pattern = '%'.$search.'%';
                 $match->where('vehicle_label_snapshot', 'like', $pattern)
+                    ->orWhere('notes', 'like', $pattern)
                     ->orWhereHas('vehicle', fn ($v) => $v->where('registration_number', 'like', $pattern)->orWhere('vehicle_number', 'like', $pattern))
                     ->orWhereHas('customerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern))
                     ->orWhereHas('ownerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));

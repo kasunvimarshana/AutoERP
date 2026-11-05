@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '@/shared/api/apiError';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { formatQuantity } from '@/shared/utils/formatQuantity';
@@ -135,4 +136,19 @@ it('removes stale agreements when a reload fails', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect(await screen.findByText('Agreements could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review LESSEE-AGREEMENT' })).not.toBeInTheDocument();
+});
+
+it('renders vehicle uses register link for owner agreements', async () => {
+    session.permissions = ['vehicle-rental.owner-agreements.view', 'vehicle-rental.vehicle-use.view'];
+    vi.mocked(listAgreements).mockResolvedValue({
+        data: [{ ...record, reference: 'OWNER-AG-01' }],
+    });
+    render(
+        <MemoryRouter>
+            <AgreementsPage kind={AgreementKind.Owner} />
+        </MemoryRouter>
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Review OWNER-AG-01' }));
+    const usesLink = screen.getByRole('link', { name: /Vehicle Uses/ });
+    expect(usesLink).toHaveAttribute('href', '/vehicle-rental/vehicle-uses?search=OWNER-AG-01');
 });

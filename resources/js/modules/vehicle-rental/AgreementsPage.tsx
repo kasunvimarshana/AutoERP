@@ -9,6 +9,7 @@ import { AgreementHistoryPanel } from './AgreementHistoryPanel';
 import { AgreementSuccessorForm } from './AgreementSuccessorForm';
 import { listAgreements, transitionAgreement } from './agreementApi';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -234,6 +235,16 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                     >
                         Assigned Vehicles & Handover
                     </button>
+                )}
+                {kind === AgreementKind.Owner && canViewUse && (
+                    <Link
+                        to={`/vehicle-rental/vehicle-uses?search=${encodeURIComponent(selected.reference)}`}
+                        className="px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center gap-1"
+                        title="View vehicle uses utilizing this owner's vehicle in the vehicle-use register"
+                    >
+                        <span>Vehicle Uses</span>
+                        <span aria-hidden="true">&rarr;</span>
+                    </Link>
                 )}
                 {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && (
                     <button

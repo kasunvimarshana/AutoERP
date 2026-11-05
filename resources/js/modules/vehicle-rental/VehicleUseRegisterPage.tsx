@@ -24,12 +24,25 @@ export default function VehicleUseRegisterPage() {
     const initialStatus = Object.values(VehicleUseStatus).includes(initialStatusParam as VehicleUseStatus)
         ? (initialStatusParam as VehicleUseStatus)
         : '';
+    const initialFrom = searchParams.get('from') ?? '';
+    const initialUntil = searchParams.get('until') ?? '';
+    let initialFromOffset: string | undefined;
+    let initialUntilOffset: string | undefined;
+    if (initialFrom) {
+        try { initialFromOffset = timestampWithOffset(initialFrom); } catch {}
+    }
+    if (initialUntil) {
+        try { initialUntilOffset = timestampWithOffset(initialUntil); } catch {}
+    }
     const [search, setSearch] = useState(initialSearch);
     const [status, setStatus] = useState<VehicleUseStatus | ''>(initialStatus);
-    const [from, setFrom] = useState(''); const [until, setUntil] = useState('');
+    const [from, setFrom] = useState(initialFrom);
+    const [until, setUntil] = useState(initialUntil);
     const [filters, setFilters] = useState<VehicleUseRegisterFilters>({
         ...(initialSearch ? { search: initialSearch } : {}),
         ...(initialStatus ? { use_status: initialStatus } : {}),
+        ...(initialFromOffset ? { from: initialFromOffset } : {}),
+        ...(initialUntilOffset ? { until: initialUntilOffset } : {}),
     }); const [page, setPage] = useState(1);
     const [rows, setRows] = useState<VehicleUse[]>([]); const [meta, setMeta] = useState<PaginationMeta>();
     const [loading, setLoading] = useState(true); const [error, setError] = useState<ApiError | null>(null);
@@ -42,16 +55,32 @@ export default function VehicleUseRegisterPage() {
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [filters, page]);
+    function syncUrl(nextSearch: string, nextStatus: string, nextFrom: string, nextUntil: string) {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (nextSearch.trim()) url.searchParams.set('search', nextSearch.trim());
+        else url.searchParams.delete('search');
+        if (nextStatus) url.searchParams.set('status', nextStatus);
+        else url.searchParams.delete('status');
+        url.searchParams.delete('use_status');
+        if (nextFrom) url.searchParams.set('from', nextFrom);
+        else url.searchParams.delete('from');
+        if (nextUntil) url.searchParams.set('until', nextUntil);
+        else url.searchParams.delete('until');
+        window.history.replaceState({}, '', url.toString());
+    }
     function apply(event: FormEvent) {
         event.preventDefault();
         try {
             const next = { search: search.trim() || undefined, use_status: status || undefined, from: from ? timestampWithOffset(from) : undefined, until: until ? timestampWithOffset(until) : undefined };
+            syncUrl(search, status, from, until);
             setLoading(true); setError(null); setPage(1); setSelected(null); setFilters(next);
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
         const needsReload = error !== null || page !== 1 || Object.values(filters).some(value => value !== undefined);
         setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setError(null);
+        syncUrl('', '', '', '');
         if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
     const statusOptions = Object.values(VehicleUseStatus).map(value => ({ value, label: USE_LABELS[value] }));

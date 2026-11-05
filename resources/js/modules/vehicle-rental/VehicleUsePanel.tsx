@@ -41,7 +41,7 @@ export function VehicleUsePanel({
     function choose(row: VehicleUse, type: VehicleUseAction) { setAction({ row, type }); setAt(''); setOdometer(''); setReason(''); setError(null); }
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!action) return; setSaving(true); setError(null);
-        try { await transitionVehicleUse(action.row, action.type, { reason, ...(action.type === VehicleUseAction.Cancel ? {} : { occurred_at: timestampWithOffset(at), odometer: odometer || null }) }); reload(); }
+        try { await transitionVehicleUse(action.row, action.type, { reason: reason.trim(), ...(action.type === VehicleUseAction.Cancel ? {} : { occurred_at: timestampWithOffset(at), odometer: odometer.trim() || null }) }); reload(); }
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
     return <section aria-label="Assigned vehicles" className="space-y-4 border-t pt-4">
@@ -128,6 +128,7 @@ export function VehicleUsePanel({
                             value={odometer}
                             onChange={e => setOdometer(e.target.value)}
                             inputMode="decimal"
+                            min={action.type === VehicleUseAction.Return && action.row.handover_odometer ? action.row.handover_odometer : undefined}
                             hint={action.type === VehicleUseAction.Return && action.row.handover_odometer
                                 ? `Handover reading was ${action.row.handover_odometer}. Return reading cannot be lower.`
                                 : undefined

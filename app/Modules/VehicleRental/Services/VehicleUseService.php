@@ -74,6 +74,11 @@ final class VehicleUseService
             if ($this->rentalBlocker->conflicts($context->tenantId, (int) $vehicle->id, $startDb, $endDb)) {
                 continue;
             }
+            try {
+                $this->availability->assertUnblocked($context->tenantId, $context->organizationUnitId, (int) $vehicle->id, $startDb, $endDb, $this->rentalBlocker);
+            } catch (InvalidArgumentException) {
+                continue;
+            }
             $available[] = [
                 'id' => (int) $vehicle->id,
                 'vehicle_number' => $vehicle->vehicle_number,
@@ -274,11 +279,47 @@ final class VehicleUseService
                 throw ValidationException::withMessages(['vehicle_id' => ['Select a different physical vehicle.']]);
             }
             Vehicle::query()->where('tenant_id', $context->tenantId)->whereIn('id', [(int) $previous->vehicle_id, (int) $data['vehicle_id']])->orderBy('id')->lockForUpdate()->get();
-            $previous = $this->transition($context, $id, $expectedVersion, VehicleUseAction::ReturnVehicle, ['occurred_at' => $data['starts_at'], 'odometer' => $data['return_odometer'] ?? null, 'reason' => $data['reason']]);
+
+            try {
+                $previous = $this->transition($context, $id, $expectedVersion, VehicleUseAction::ReturnVehicle, [
+                    'occurred_at' => $data['starts_at'],
+                    'odometer' => $data['return_odometer'] ?? null,
+                    'reason' => $data['reason'],
+                ]);
+            } catch (ValidationException $e) {
+                $messages = $e->errors();
+                if (isset($messages['odometer'])) {
+                    $messages['return_odometer'] = $messages['odometer'];
+                    unset($messages['odometer']);
+                }
+                if (isset($messages['occurred_at'])) {
+                    $messages['starts_at'] = $messages['occurred_at'];
+                    unset($messages['occurred_at']);
+                }
+                throw ValidationException::withMessages($messages);
+            }
+
             $customer = CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($previous->customer_agreement_id);
             $next = $this->plan($context, (int) $customer->id, $customer->row_version, $data, (int) $previous->id);
 
-            return $this->transition($context, (int) $next->id, $next->row_version, VehicleUseAction::Handover, ['occurred_at' => $data['starts_at'], 'odometer' => $data['handover_odometer'] ?? null, 'reason' => $data['reason']]);
+            try {
+                return $this->transition($context, (int) $next->id, $next->row_version, VehicleUseAction::Handover, [
+                    'occurred_at' => $data['starts_at'],
+                    'odometer' => $data['handover_odometer'] ?? null,
+                    'reason' => $data['reason'],
+                ]);
+            } catch (ValidationException $e) {
+                $messages = $e->errors();
+                if (isset($messages['odometer'])) {
+                    $messages['handover_odometer'] = $messages['odometer'];
+                    unset($messages['odometer']);
+                }
+                if (isset($messages['occurred_at'])) {
+                    $messages['starts_at'] = $messages['occurred_at'];
+                    unset($messages['occurred_at']);
+                }
+                throw ValidationException::withMessages($messages);
+            }
         });
     }
 

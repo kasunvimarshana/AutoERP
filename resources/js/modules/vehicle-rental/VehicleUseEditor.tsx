@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { apiClient } from '@/shared/api/apiClient';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -7,6 +8,7 @@ import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { AGREEMENT_API, type Agreement } from './agreements';
@@ -21,7 +23,9 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [start, setStart] = useState(''); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
     const isSameReplacementVehicle = Boolean(replacement && vehicle && vehicle.id === replacement.vehicle.id);
-    const minStart = agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined;
+    const minStart = replacement?.handed_over_at
+        ? replacement.handed_over_at.slice(0, 16)
+        : (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined);
     const maxEnd = agreement.ends_on ? `${agreement.ends_on}T23:59` : undefined;
 
     useEffect(() => {
@@ -32,6 +36,16 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                     const found = result.data.find(v => v.id === initialVehicleId);
                     if (found) {
                         setVehicle(found);
+                    } else {
+                        apiClient.get<{ data: { id: number; registration_number?: string; vehicle_number: string } }>(
+                            `${endpoints.vehicles}/${initialVehicleId}`,
+                            { signal: controller.signal },
+                        ).then(res => {
+                            if (res.data?.data) {
+                                const d = res.data.data;
+                                setVehicle({ id: Number(d.id), name: String(d.registration_number || d.vehicle_number) });
+                            }
+                        }).catch(() => {});
                     }
                 })
                 .catch(() => {});
@@ -42,7 +56,26 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!vehicle || !start || (!company && !owner)) return;
         setSaving(true); setError(null);
-        try { const input = { vehicle_id: vehicle.id, owner_agreement_id: company ? null : owner!.id, starts_at: timestampWithOffset(start), ends_at: end ? timestampWithOffset(end) : null, notes: notes || null }; if (replacement) await replaceVehicleUse(replacement, { ...input, reason: notes, return_odometer: oldOdometer || null, handover_odometer: newOdometer || null }); else await planVehicleUse(agreement, input); onSaved(); }
+        try {
+            const input = {
+                vehicle_id: vehicle.id,
+                owner_agreement_id: company ? null : owner!.id,
+                starts_at: timestampWithOffset(start),
+                ends_at: end ? timestampWithOffset(end) : null,
+                notes: notes.trim() || null,
+            };
+            if (replacement) {
+                await replaceVehicleUse(replacement, {
+                    ...input,
+                    reason: notes.trim(),
+                    return_odometer: oldOdometer.trim() || null,
+                    handover_odometer: newOdometer.trim() || null,
+                });
+            } else {
+                await planVehicleUse(agreement, input);
+            }
+            onSaved();
+        }
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
     return <form onSubmit={submit} className="space-y-4 rounded-lg border p-4" aria-label={replacement ? "Replace vehicle" : "Assign vehicle"}>
@@ -67,7 +100,10 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 value={start}
                 onChange={e => { setStart(e.target.value); setOwner(null); }}
                 required
-                hint={minStart ? `Agreement starts: ${agreement.starts_on}` : undefined}
+                hint={replacement?.handed_over_at
+                    ? `Previous vehicle handed over: ${formatBusinessDateTime(replacement.handed_over_at)}`
+                    : (minStart ? `Agreement starts: ${agreement.starts_on}` : undefined)
+                }
                 error={error?.fields.starts_at?.[0]}
             />
             <Input
@@ -86,7 +122,27 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
             {!company && vehicle && !start && <p className="text-sm text-slate-600 sm:col-span-2">Enter planned handover to find owner agreements covering it.</p>}
             {!company && vehicle && start && <LookupSelect key={`${vehicle.id}:${start}:${end}`} label="Owner agreement" value={owner} onChange={setOwner} search={sources} required error={error?.fields.owner_agreement_id?.[0]} />}
             {!end && <p className="text-xs text-slate-500 sm:col-span-2">{agreement.ends_on ? `Planned return is optional. When left blank, assignment covers up to agreement end (${agreement.ends_on}).` : 'Planned return is optional. When left blank, usage remains open-ended until returned.'}</p>}
-            {replacement && <><Input label="Old vehicle return odometer (optional)" value={oldOdometer} onChange={e => setOldOdometer(e.target.value)} inputMode="decimal" error={error?.fields.return_odometer?.[0]} /><Input label="Replacement handover odometer (optional)" value={newOdometer} onChange={e => setNewOdometer(e.target.value)} inputMode="decimal" error={error?.fields.handover_odometer?.[0]} /><p className="text-sm text-slate-600 sm:col-span-2">Return and handover are saved together. If either fails, neither is recorded. No replacement charges are calculated.</p></>}
+            {replacement && (
+                <>
+                    <Input
+                        label="Old vehicle return odometer (optional)"
+                        value={oldOdometer}
+                        onChange={e => setOldOdometer(e.target.value)}
+                        inputMode="decimal"
+                        min={replacement.handover_odometer ?? undefined}
+                        hint={replacement.handover_odometer ? `Handover reading was ${replacement.handover_odometer}. Return reading cannot be lower.` : undefined}
+                        error={error?.fields.return_odometer?.[0]}
+                    />
+                    <Input
+                        label="Replacement handover odometer (optional)"
+                        value={newOdometer}
+                        onChange={e => setNewOdometer(e.target.value)}
+                        inputMode="decimal"
+                        error={error?.fields.handover_odometer?.[0]}
+                    />
+                    <p className="text-sm text-slate-600 sm:col-span-2">Return and handover are saved together. If either fails, neither is recorded. No replacement charges are calculated.</p>
+                </>
+            )}
             <div className="sm:col-span-2"><Textarea label={replacement ? "Replacement reason" : "Assignment notes"} required={!!replacement} value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.reason?.[0] ?? error?.fields.notes?.[0]} /></div>
         </fieldset>
         <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!vehicle || !start || (!company && !owner) || (!!replacement && !notes.trim()) || isSameReplacementVehicle}>{replacement ? "Confirm replacement" : "Save assignment"}</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>

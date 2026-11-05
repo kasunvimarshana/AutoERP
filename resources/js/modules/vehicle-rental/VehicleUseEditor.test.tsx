@@ -134,3 +134,27 @@ it('prevents selecting the same vehicle during replacement', async () => {
     expect(screen.getByText('Select a different physical vehicle.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Confirm replacement' })).toBeDisabled();
 });
+
+it('provides return odometer guidance and min bound during replacement when old vehicle had handover odometer', async () => {
+    const replacement = {
+        id: 73,
+        row_version: 3,
+        status: VehicleUseStatus.InCustody,
+        customer_agreement: { id: 3, reference: 'CUSTOMER-A', party_name: 'Customer', version: 2 },
+        owner_agreement: null,
+        vehicle: { id: 6, label: 'CAR-OLD' },
+        starts_at: '2026-09-07T09:00:00+05:30',
+        ends_at: null,
+        handed_over_at: '2026-09-07T09:00:00+05:30',
+        returned_at: null,
+        handover_odometer: '1250.00',
+        return_odometer: null,
+        notes: null,
+    } as VehicleUse;
+    render(<VehicleUseEditor agreement={agreement} replacement={replacement} onSaved={vi.fn()} onCancel={vi.fn()} />);
+    const timeInput = screen.getByLabelText('Replacement time');
+    expect(timeInput).toHaveAttribute('min', '2026-09-07T09:00');
+    expect(screen.getByText(/Handover reading was 1250\.00\. Return reading cannot be lower\./)).toBeInTheDocument();
+    const oldOdoInput = screen.getByLabelText('Old vehicle return odometer (optional)');
+    expect(oldOdoInput).toHaveAttribute('min', '1250.00');
+});

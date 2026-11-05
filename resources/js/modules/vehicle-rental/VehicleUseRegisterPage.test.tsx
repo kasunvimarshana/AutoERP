@@ -95,3 +95,18 @@ describe('Vehicle Use register', () => {
         expect(ownerLink).toHaveAttribute('href', '/vehicle-rental/owner/agreements?search=OWNER-AG-99');
         expect(screen.getByText('Replaced by vehicle CAR-NEW')).toBeInTheDocument();
     });
+
+    it('initializes filters from search parameters including from and until', async () => {
+        window.history.replaceState({}, '', '/vehicle-rental/vehicle-uses?search=CAR&from=2026-09-07T08:00&until=2026-09-08T18:00');
+        renderPage();
+        await screen.findByRole('heading', { name: /CAR-1234 · CUSTOMER-A/ });
+        expect(screen.getByLabelText('Vehicle, agreement or party')).toHaveValue('CAR');
+        expect(screen.getByLabelText('Planned period start (optional)')).toHaveValue('2026-09-07T08:00');
+        expect(screen.getByLabelText('Planned period end (optional)')).toHaveValue('2026-09-08T18:00');
+        expect(listVehicleUseRegister).toHaveBeenCalledWith(expect.objectContaining({
+            search: 'CAR',
+            from: timestampWithOffset('2026-09-07T08:00'),
+            until: timestampWithOffset('2026-09-08T18:00'),
+        }), 1, expect.any(AbortSignal));
+        window.history.replaceState({}, '', '/vehicle-rental/vehicle-uses');
+    });
