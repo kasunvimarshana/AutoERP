@@ -84,7 +84,7 @@ final class SalesSettlementBreakdownService
             ],
             'other_paid' => $breakdown[self::OTHER_PAID],
             'credits_applied' => $creditsApplied,
-            'source_note' => 'Cash and card show active receipt allocations to these sales. Split-method receipts are apportioned using their persisted payment-line amounts. On credit is the current invoice balance.',
+            'source_note' => 'These invoices are selected by invoice date. Cash and card include all active receipts against them, even when received later. Outstanding is the current unpaid balance.',
         ];
     }
 

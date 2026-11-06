@@ -57,7 +57,6 @@ export interface VehicleServiceSalesSummaryJob {
     customer: { name: string };
     vehicle: { name: string };
     revenue: string;
-    collected: string;
     direct_cost: string;
     stock_cost: string;
     used_stock_cost: string;
@@ -69,8 +68,18 @@ export interface VehicleServiceSalesSummaryJob {
     other_items: VehicleServiceSalesSummaryCostLine[];
 }
 
+export interface VehicleServiceSalesSummaryReceipt {
+    date: string;
+    payment_number: string;
+    invoice_number: string;
+    job_number: string;
+    methods: string[];
+    amount: string;
+}
+
 export interface VehicleServiceSalesSummaryResult {
     jobs: VehicleServiceSalesSummaryJob[];
+    receipts: VehicleServiceSalesSummaryReceipt[];
     summary: {
         job_count: number;
         revenue: string;

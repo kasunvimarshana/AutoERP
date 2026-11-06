@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Reporting\Services\PaymentMethodWiseSummaryReportService;
+use Modules\Reporting\Services\VehicleServiceSalesSummaryReportService;
 use Tests\TestCase;
 
 final class PaymentMethodWiseSummaryReportTest extends TestCase
@@ -83,6 +84,16 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
         self::assertSame('30.000000', $all['days'][1]['methods']['CARD']);
         self::assertSame('60.000000', $reports->run($tenantId, null, '2026-10-05', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_SELLING)['totals'][0]['receipts']);
         self::assertSame('40.000000', $reports->run($tenantId, null, '2026-10-05', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_SERVICE)['totals'][0]['receipts']);
+        $serviceSales = app(VehicleServiceSalesSummaryReportService::class)->run([
+            'tenant_id' => $tenantId,
+            'date_from' => '2026-10-05',
+            'date_to' => '2026-10-05',
+        ]);
+        self::assertSame('0', $serviceSales['summary']['revenue']);
+        self::assertSame('40.000000', $serviceSales['summary']['collected']);
+        self::assertSame('JOB-PMW', $serviceSales['receipts'][0]['job_number']);
+        self::assertSame('INV-SERVICE-PMW', $serviceSales['receipts'][0]['invoice_number']);
+        self::assertSame(['CASH', 'CARD'], $serviceSales['receipts'][0]['methods']);
         self::assertSame('180.000000', $reports->exportRows($all)[2]['credit_sales']);
         self::assertArrayNotHasKey('documents', $all['days'][0]);
 
