@@ -50,6 +50,30 @@ it('requires the actual event time before a handover can be confirmed', async ()
     expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeEnabled();
 });
 
+it('displays guidance when agreement is in draft', async () => {
+    const draftAgreement = { ...agreement, status: AgreementStatus.Draft };
+    render(<VehicleUsePanel agreement={draftAgreement} canManage />);
+    expect(screen.getByText('This agreement is currently in Draft. Activate the agreement to assign and dispatch vehicles.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Assign vehicle' })).not.toBeInTheDocument();
+    await screen.findByText('CAR-1234');
+});
+
+it('provides handover odometer guidance and timestamp bounds when recording return', async () => {
+    vi.mocked(listVehicleUses).mockResolvedValue({
+        data: [{
+            ...row,
+            status: VehicleUseStatus.InCustody,
+            handed_over_at: '2026-09-07T09:00:00+05:30',
+            handover_odometer: '1500.00',
+        }],
+    });
+    render(<VehicleUsePanel agreement={agreement} canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Record return' }));
+    expect(screen.getByText(/Handover reading was 1500\.00\. Return reading cannot be lower\./)).toBeInTheDocument();
+    const eventTimeInput = screen.getByLabelText('Actual event time');
+    expect(eventTimeInput).toHaveAttribute('min', '2026-09-07T09:00');
+});
+
 it('removes stale rows when a vehicle-use reload fails', async () => {
     render(<VehicleUsePanel agreement={agreement} canManage={false} />);
     expect(await screen.findByText('CAR-1234')).toBeInTheDocument();

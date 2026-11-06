@@ -39,6 +39,7 @@ export const termLabel = (kind: AgreementKind, key: TermKey): string =>
 export interface Agreement {
     id: number; reference: string; row_version: number; status: AgreementStatus; basis: RentalBasis; driver_mode: DriverMode;
     supersedes_agreement?: { id: number; reference: string } | null;
+    successor_agreement?: { id: number; reference: string; status: AgreementStatus } | null;
     party: NamedResource; currency: NamedResource & { code: string }; vehicle?: { id: number; vehicle_number: string; registration_number: string | null };
     agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; terms: Record<TermKey, string | null>; notes: string | null;
     activated_at?: string | null; closed_at?: string | null; closed_on?: string | null;
@@ -49,10 +50,10 @@ export interface AgreementHistory {
     starts_on: string; ends_on: string | null; basis: RentalBasis; driver_mode: DriverMode; terms: Record<TermKey, string | null>; notes: string | null;
 }
 export interface AgreementPayload {
-    reference: string; party_id: number; currency_id: number; vehicle_id?: number; agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null;
+    reference?: string; party_id: number; currency_id: number; vehicle_id?: number; agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null;
     basis: RentalBasis | ''; driver_mode: DriverMode | ''; terms: Partial<Record<TermKey, string | null>>; notes: string | null; expected_version?: number;
 }
 export interface AgreementSuccessorPayload {
-    reference: string; agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; reason: string;
+    reference?: string; agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; reason: string;
 }
 export const agreementPath = (kind: AgreementKind) => `/vehicle-rental/${kind}/agreements`;

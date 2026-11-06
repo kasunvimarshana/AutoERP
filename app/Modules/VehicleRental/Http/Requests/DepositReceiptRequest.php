@@ -35,7 +35,13 @@ final class DepositReceiptRequest extends TenantScopedRequest
     protected function prepareForValidation(): void
     {
         parent::prepareForValidation();
-        $this->merge([PaymentIdempotency::REQUEST_ATTRIBUTE => trim((string) $this->header(PaymentIdempotency::REQUEST_HEADER))]);
+        $merges = [PaymentIdempotency::REQUEST_ATTRIBUTE => trim((string) $this->header(PaymentIdempotency::REQUEST_HEADER))];
+        foreach (['reference_number', 'notes'] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+        $this->merge($merges);
     }
 
     public function context(): AgreementContext

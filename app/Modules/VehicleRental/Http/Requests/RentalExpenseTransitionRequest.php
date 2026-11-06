@@ -12,6 +12,39 @@ use Modules\VehicleRental\Enums\RentalExpenseStatus;
 
 final class RentalExpenseTransitionRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        if ($this->has('allocations') && is_array($this->input('allocations'))) {
+            $normalized = [];
+            foreach ($this->input('allocations') as $index => $row) {
+                if (is_array($row)) {
+                    foreach ([
+                        'tax_amount',
+                        'markup_amount',
+                        'withholding_amount',
+                        'target_customer_agreement_id',
+                        'target_owner_agreement_id',
+                        'target_vehicle_use_id',
+                        'customer_id',
+                        'supplier_id',
+                        'employee_id',
+                        'tax_group_id',
+                    ] as $field) {
+                        if (array_key_exists($field, $row) && is_string($row[$field]) && trim($row[$field]) === '') {
+                            $row[$field] = null;
+                        }
+                    }
+                    $normalized[$index] = $row;
+                } else {
+                    $normalized[$index] = $row;
+                }
+            }
+            $this->merge(['allocations' => $normalized]);
+        }
+    }
+
     public function rules(): array
     {
         return [

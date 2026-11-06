@@ -21,20 +21,25 @@ final class RunningChartRegisterService
     public function list(AgreementContext $context, array $filters, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, false);
+        foreach (['from', 'until', 'chart_status', 'search'] as $key) {
+            if (isset($filters[$key]) && is_string($filters[$key]) && trim($filters[$key]) === '') {
+                $filters[$key] = null;
+            }
+        }
         $filters = Validator::make($filters, [
             'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
             'chart_status' => ['nullable', Rule::enum(RunningChartStatus::class)],
             'from' => ['nullable', 'string'], 'until' => ['nullable', 'string'],
         ])->validate();
-        $from = ($filters['from'] ?? null) === null ? null : OperationalTime::parse($filters['from'], 'from');
-        $until = ($filters['until'] ?? null) === null ? null : OperationalTime::parse($filters['until'], 'until');
+        $from = empty($filters['from']) ? null : OperationalTime::parse($filters['from'], 'from');
+        $until = empty($filters['until']) ? null : OperationalTime::parse($filters['until'], 'until');
         if ($from !== null && $until !== null && $until <= $from) {
             throw ValidationException::withMessages(['until' => ['Period end must follow its start.']]);
         }
         $search = trim($filters['search'] ?? '');
 
         return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.replacesUse', 'correctsChart'])
+            ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.replacesUse', 'correctsChart', 'correctedByChart'])
             ->when($filters['chart_status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($from !== null, fn ($q) => $q->where('ends_at', '>', OperationalTime::database($from)))
             ->when($until !== null, fn ($q) => $q->where('starts_at', '<', OperationalTime::database($until)))
@@ -43,8 +48,11 @@ final class RunningChartRegisterService
                 $match->where('reference', 'like', $pattern)
                     ->orWhere('driver_name_snapshot', 'like', $pattern)
                     ->orWhere('driver_reference_snapshot', 'like', $pattern)
+                    ->orWhere('notes', 'like', $pattern)
+                    ->orWhere('driver_observation', 'like', $pattern)
                     ->orWhereHas('vehicleUse', function ($use) use ($pattern): void {
                         $use->where('vehicle_label_snapshot', 'like', $pattern)
+                            ->orWhereHas('vehicle', fn ($v) => $v->where('registration_number', 'like', $pattern)->orWhere('vehicle_number', 'like', $pattern))
                             ->orWhereHas('customerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern))
                             ->orWhereHas('ownerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));
                     });

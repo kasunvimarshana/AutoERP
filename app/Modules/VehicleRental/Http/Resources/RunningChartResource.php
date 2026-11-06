@@ -30,6 +30,7 @@ final class RunningChartResource extends JsonResource
             ],
             'vehicle_use' => ['id' => $this->vehicleUse->id, 'vehicle_label' => $this->vehicleUse->vehicle_label_snapshot, 'version' => $this->vehicle_use_version],
             'corrects_chart' => $this->correctsChart === null ? null : ['id' => $this->correctsChart->id, 'reference' => $this->correctsChart->reference],
+            'corrected_by_chart' => $this->relationLoaded('correctedByChart') && $this->correctedByChart !== null ? ['id' => $this->correctedByChart->id, 'reference' => $this->correctedByChart->reference] : null,
             'finalized_at' => $this->finalized_at?->toIso8601String(),
             'reversed_at' => $this->reversed_at?->toIso8601String(),
         ]);

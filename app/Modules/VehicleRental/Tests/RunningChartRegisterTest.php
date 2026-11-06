@@ -69,6 +69,39 @@ final class RunningChartRegisterTest extends TestCase
         });
     }
 
+    public function test_register_filters_accept_empty_strings_without_validation_error(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $charts = app(RunningChartService::class);
+            $charts->create($context, $use->id, $use->row_version, $facts);
+            $register = app(RunningChartRegisterService::class);
+
+            $result = $register->list($context, [
+                'from' => '',
+                'until' => '',
+                'chart_status' => '',
+                'search' => '   ',
+            ], 10);
+            self::assertSame(1, $result->total());
+        });
+    }
+
+    public function test_register_searches_notes_and_driver_observation(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $charts = app(RunningChartService::class);
+            $charts->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'CHART-NOTES-TEST',
+                'driver_observation' => 'Special observation note',
+                'notes' => 'Distinctive remarks in chart',
+            ]));
+            $register = app(RunningChartRegisterService::class);
+
+            self::assertSame(1, $register->list($context, ['search' => 'Special observation'], 10)->total());
+            self::assertSame(1, $register->list($context, ['search' => 'Distinctive remarks'], 10)->total());
+        });
+    }
+
     public function test_invalid_filters_fail_and_read_requires_chart_view_permission(): void
     {
         [$context] = $this->fixture();

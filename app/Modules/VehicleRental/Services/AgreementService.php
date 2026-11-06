@@ -35,13 +35,15 @@ final class AgreementService
         private readonly RentalAuthorization $authorization,
         private readonly AgreementValidation $validation,
         private readonly RentalCalendar $calendar,
+        private readonly AgreementNumberService $numbers,
     ) {}
 
-    public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null): LengthAwarePaginator
+    public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null, ?AgreementStatus $status = null): LengthAwarePaginator
     {
         $this->authorization->assert($context, $kind, false);
 
         return $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)->with($this->relations($kind))
+            ->when($status !== null, fn ($q) => $q->where('status', $status->value))
             ->when($search !== null && $search !== '', fn ($q) => $q->where(fn ($query) => $query->where('reference', 'like', '%'.$search.'%')->orWhereHas('party', fn ($p) => $p->where('name', 'like', '%'.$search.'%'))))->orderByDesc('id')->paginate($perPage);
     }
 
@@ -55,6 +57,9 @@ final class AgreementService
     public function create(AgreementKind $kind, AgreementContext $context, array $input): Agreement
     {
         $this->authorization->assert($context, $kind, true);
+        if (empty(trim((string) ($input['reference'] ?? '')))) {
+            $input['reference'] = $this->numbers->next($kind, $context, $input['agreed_on'] ?? null);
+        }
 
         return $this->atomic(function () use ($kind, $context, $input): Agreement {
             $data = $this->validation->validate($input, $kind, $context);
@@ -72,6 +77,14 @@ final class AgreementService
     {
         $this->authorization->assert($context, $kind, true);
         $this->validation->assertContext($context);
+        if (empty(trim((string) ($input['reference'] ?? '')))) {
+            $input['reference'] = $this->numbers->next($kind, $context, $input['agreed_on'] ?? null);
+        }
+        foreach (['executing_on', 'ends_on'] as $opt) {
+            if (isset($input[$opt]) && is_string($input[$opt]) && trim($input[$opt]) === '') {
+                $input[$opt] = null;
+            }
+        }
         $data = Validator::make($input, [
             'reference' => ['required', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
             'agreed_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
@@ -92,6 +105,16 @@ final class AgreementService
             if ($predecessor->status !== AgreementStatus::Active) {
                 throw ValidationException::withMessages(['status' => ['Only an active agreement can have a successor draft.']]);
             }
+            $existingSuccessor = $this->model($kind)::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->where('supersedes_agreement_id', $predecessor->id)
+                ->first();
+            if ($existingSuccessor !== null) {
+                if ($existingSuccessor->status === AgreementStatus::Draft) {
+                    throw new ConflictHttpException("A successor draft ({$existingSuccessor->reference}) already exists for this agreement. Review or complete that draft.");
+                }
+                throw new ConflictHttpException("This agreement has already been superseded by {$existingSuccessor->reference}.");
+            }
             $this->assertSuccessorStartsAfter($predecessor, $data['starts_on']);
 
             $successorTerms = $predecessor->terms;
@@ -104,9 +127,9 @@ final class AgreementService
                 'party_id' => $kind === AgreementKind::Customer ? $predecessor->customer_id : $predecessor->supplier_id,
                 'currency_id' => $predecessor->currency_id,
                 'agreed_on' => $data['agreed_on'],
-                'executing_on' => $data['executing_on'] ?? null,
+                'executing_on' => empty($data['executing_on']) ? null : $data['executing_on'],
                 'starts_on' => $data['starts_on'],
-                'ends_on' => $data['ends_on'] ?? null,
+                'ends_on' => empty($data['ends_on']) ? null : $data['ends_on'],
                 'basis' => $predecessor->basis->value,
                 'driver_mode' => $predecessor->driver_mode->value,
                 'terms' => $successorTerms,
@@ -157,6 +180,9 @@ final class AgreementService
             }
 
             if ($action === AgreementAction::Update && $record->status === AgreementStatus::Draft) {
+                if (empty(trim((string) ($input['reference'] ?? '')))) {
+                    $input['reference'] = $record->reference;
+                }
                 $validated = $this->validation->validate($input, $kind, $context);
                 if ($record->supersedes_agreement_id !== null) {
                     $this->assertSuccessorIdentity($kind, $context, $record, $validated);
@@ -171,7 +197,7 @@ final class AgreementService
                 }
                 $record->status = AgreementStatus::Active;
                 $record->activated_at = now();
-            } elseif ($action === AgreementAction::Close && $record->status === AgreementStatus::Active) {
+            } elseif ($action === AgreementAction::Close && ($record->status === AgreementStatus::Active || $record->status === AgreementStatus::Draft)) {
                 if (trim($reason ?? '') === '' || mb_strlen($reason) > AgreementFields::NOTES_LENGTH) {
                     throw ValidationException::withMessages(['reason' => ['Provide a closure reason within the notes length limit.']]);
                 }
@@ -307,6 +333,12 @@ final class AgreementService
         }
     }
 
+    public function delete(AgreementKind $kind, AgreementContext $context, int $id): never
+    {
+        $this->authorization->assert($context, $kind, true);
+        throw new \LogicException('Agreement history must be preserved. Close the agreement instead of deleting.');
+    }
+
     private function model(AgreementKind $kind): string
     {
         return $kind === AgreementKind::Customer ? CustomerAgreement::class : OwnerAgreement::class;
@@ -314,6 +346,8 @@ final class AgreementService
 
     private function relations(AgreementKind $kind): array
     {
-        return $kind === AgreementKind::Owner ? ['party', 'currency', 'vehicle', 'supersedesAgreement'] : ['party', 'currency', 'supersedesAgreement'];
+        return $kind === AgreementKind::Owner
+            ? ['party', 'currency', 'vehicle', 'supersedesAgreement', 'successorAgreement']
+            : ['party', 'currency', 'supersedesAgreement', 'successorAgreement'];
     }
 }

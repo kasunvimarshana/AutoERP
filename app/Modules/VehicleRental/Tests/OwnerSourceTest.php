@@ -78,4 +78,38 @@ final class OwnerSourceTest extends TestCase
             }
         }
     }
+
+    public function test_sources_lookup_accepts_omitted_ends_at_when_customer_agreement_is_provided(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
+            $agreements = app(AgreementService::class);
+            $customer = $agreements->create(AgreementKind::Customer, $context, array_replace($customerInput, ['ends_on' => '2026-09-10']));
+            $customer = $agreements->change(AgreementKind::Customer, $context, $customer->id, $customer->row_version, AgreementAction::Activate);
+
+            $owner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['ends_on' => '2026-09-15']));
+            $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
+
+            $lookup = app(OwnerSourceService::class);
+            // When ends_at is empty/null, but customer_agreement_id is provided, owner agreement covering customer agreement is returned
+            $result = $lookup->list($context, $ownerInput['vehicle_id'], [
+                'starts_at' => '2026-09-07T00:00:00+00:00',
+                'ends_at' => '',
+                'customer_agreement_id' => $customer->id,
+            ], 10);
+            self::assertSame(1, $result->total());
+
+            // If owner agreement ends before the customer agreement, it is excluded
+            $shorterOwner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['reference' => 'OWNER-SHORT', 'ends_on' => '2026-09-09']));
+            $agreements->change(AgreementKind::Owner, $context, $shorterOwner->id, $shorterOwner->row_version, AgreementAction::Activate);
+            $result = $lookup->list($context, $ownerInput['vehicle_id'], [
+                'starts_at' => '2026-09-07T00:00:00+00:00',
+                'ends_at' => null,
+                'customer_agreement_id' => $customer->id,
+            ], 10);
+            // Only the owner agreement ending on 2026-09-15 is returned, not the one ending on 2026-09-09
+            self::assertSame(1, $result->total());
+            self::assertSame($owner->reference, $result->items()[0]->reference);
+        });
+    }
 }

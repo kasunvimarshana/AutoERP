@@ -16,10 +16,16 @@ use Modules\VehicleRental\Http\Resources\RunningChartResource;
 use Modules\VehicleRental\Services\RunningChartRegisterService;
 use Modules\VehicleRental\Services\RunningChartService;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class RunningChartController
 {
     public function __construct(private readonly RunningChartService $charts) {}
+
+    public function destroy(AgreementRequest $request, ?int $first = null, ?int $second = null): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Running charts cannot be deleted to preserve physical usage evidence. Use chart reversal instead.');
+    }
 
     public function register(RunningChartRegisterRequest $request, RunningChartRegisterService $register): AnonymousResourceCollection
     {
@@ -36,6 +42,11 @@ final class RunningChartController
         $data = $request->validate(['corrects_chart_id' => ['nullable', 'integer', 'min:1']]);
 
         return (new RunningChartResource($this->charts->create($request->context(), $use, $request->expectedVersion(), $request->only(RunningChartFields::MUTABLE), isset($data['corrects_chart_id']) ? (int) $data['corrects_chart_id'] : null)))->response()->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    public function show(AgreementRequest $request, int $chart): RunningChartResource
+    {
+        return new RunningChartResource($this->charts->find($request->context(), $chart));
     }
 
     public function update(AgreementRequest $request, int $chart): RunningChartResource

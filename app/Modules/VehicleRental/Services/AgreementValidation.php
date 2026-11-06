@@ -33,13 +33,29 @@ final class AgreementValidation
             'executing_on' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT],
             'ends_on' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:starts_on'],
             'basis' => ['required', Rule::enum(RentalBasis::class)], 'driver_mode' => ['required', Rule::enum(DriverMode::class)],
-            'terms' => ['present', 'array:'.implode(',', AgreementFields::AMOUNTS)],
+            'terms' => ['sometimes', 'nullable', 'array:'.implode(',', AgreementFields::AMOUNTS)],
             'notes' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
         ];
         foreach (AgreementFields::AMOUNTS as $field) {
             $rules['terms.'.$field] = ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN];
         }
         $input['reference'] = is_string($input['reference'] ?? null) ? trim($input['reference']) : $input['reference'] ?? null;
+        foreach (['executing_on', 'ends_on', 'notes'] as $opt) {
+            if (array_key_exists($opt, $input) && ($input[$opt] === '' || (is_string($input[$opt]) && trim($input[$opt]) === ''))) {
+                $input[$opt] = null;
+            }
+        }
+        if (! isset($input['terms']) || ! is_array($input['terms'])) {
+            $input['terms'] = [];
+        } else {
+            foreach ($input['terms'] as $key => $val) {
+                if ($val === '' || (is_string($val) && trim($val) === '')) {
+                    $input['terms'][$key] = null;
+                } elseif (is_int($val) || is_float($val)) {
+                    $input['terms'][$key] = (string) $val;
+                }
+            }
+        }
         $data = Validator::make($input, $rules)->validate();
         if ($kind === AgreementKind::Owner && ($data['terms'][AgreementFields::DEPOSIT_REQUIREMENT] ?? null) !== null) {
             throw ValidationException::withMessages([
@@ -68,17 +84,19 @@ final class AgreementValidation
         $data['party_name_snapshot'] = $party->name;
         $data['party_code_snapshot'] = $party->code;
         $data['currency_code_snapshot'] = $currency->code;
-        $data['terms'] = array_replace(array_fill_keys(AgreementFields::AMOUNTS, null), $data['terms']);
+        $data['terms'] = array_replace(array_fill_keys(AgreementFields::AMOUNTS, null), $data['terms'] ?? []);
         foreach ($data['terms'] as $field => $amount) {
-            if ($amount !== null) {
-                $data['terms'][$field] = bcadd($amount, AgreementFields::ZERO, AgreementFields::DECIMAL_SCALE);
+            if ($amount !== null && trim((string) $amount) !== '') {
+                $data['terms'][$field] = bcadd((string) $amount, AgreementFields::ZERO, AgreementFields::DECIMAL_SCALE);
+            } else {
+                $data['terms'][$field] = null;
             }
         }
         $data[$kind === AgreementKind::Customer ? 'customer_id' : 'supplier_id'] = (int) $data['party_id'];
         unset($data['party_id']);
-        $data['executing_on'] = $data['executing_on'] ?? null;
-        $data['ends_on'] = $data['ends_on'] ?? null;
-        $data['notes'] = $data['notes'] ?? null;
+        $data['executing_on'] = empty($data['executing_on']) ? null : $data['executing_on'];
+        $data['ends_on'] = empty($data['ends_on']) ? null : $data['ends_on'];
+        $data['notes'] = empty($data['notes']) ? null : $data['notes'];
 
         return $data;
     }

@@ -26,27 +26,43 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class RunningChartService
 {
-    public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $contextValidation, private readonly RunningChartValidation $validation, private readonly OdometerContinuity $odometerContinuity) {}
+    public function __construct(
+        private readonly RentalAuthorization $authorization,
+        private readonly AgreementValidation $contextValidation,
+        private readonly RunningChartValidation $validation,
+        private readonly OdometerContinuity $odometerContinuity,
+        private readonly RunningChartNumberService $numbers,
+    ) {}
 
     public function list(AgreementContext $context, int $useId, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, false);
         VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($useId);
 
-        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->where('vehicle_use_id', $useId)->with(['vehicleUse', 'correctsChart'])->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
+        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->where('vehicle_use_id', $useId)->with(['vehicleUse', 'correctsChart', 'correctedByChart'])->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
     }
 
     public function find(AgreementContext $context, int $id): RunningChart
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, false);
 
-        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->with(['vehicleUse', 'correctsChart'])->findOrFail($id);
+        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->with(['vehicleUse', 'correctsChart', 'correctedByChart'])->findOrFail($id);
+    }
+
+    public function delete(AgreementContext $context, int $id): never
+    {
+        $this->authorization->assertChart($context, RunningChartAction::Create, true);
+        throw new \LogicException('Preserve Running Chart evidence. Use reversal.');
     }
 
     public function create(AgreementContext $context, int $useId, int $expectedUseVersion, array $input, ?int $corrects = null): RunningChart
     {
         $this->authorization->assertChart($context, RunningChartAction::Create, true);
         $this->contextValidation->assertContext($context);
+
+        if (empty(trim((string) ($input['reference'] ?? '')))) {
+            $input['reference'] = $this->numbers->next($context, $input['starts_at'] ?? null);
+        }
 
         return $this->atomic(function () use ($context, $useId, $expectedUseVersion, $input, $corrects): RunningChart {
             $use = $this->lockedUse($context, $useId);
@@ -63,7 +79,7 @@ final class RunningChartService
             $chart->forceFill(array_merge($data, ['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId, 'vehicle_use_id' => $useId, 'vehicle_use_version' => $use->row_version, 'corrects_chart_id' => $corrects, 'status' => RunningChartStatus::Draft, 'row_version' => AgreementFields::INITIAL_VERSION]))->save();
             $this->record($chart, $context, RunningChartAction::Create);
 
-            return $chart->load(['vehicleUse', 'correctsChart']);
+            return $chart->load(['vehicleUse', 'correctsChart', 'correctedByChart']);
         });
     }
 
@@ -81,7 +97,31 @@ final class RunningChartService
             $chart = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
             $this->version($chart->row_version, $expectedVersion);
             if ($action === RunningChartAction::Update && $chart->status === RunningChartStatus::Draft) {
-                $data = $this->validation->validate($input, $context);
+                $existing = [
+                    'reference' => $chart->reference,
+                    'starts_at' => $chart->starts_at->toIso8601String(),
+                    'ends_at' => $chart->ends_at->toIso8601String(),
+                    'start_odometer' => $chart->start_odometer,
+                    'end_odometer' => $chart->end_odometer,
+                    'garage_km' => $chart->garage_km,
+                    'commercial_km' => $chart->commercial_km,
+                    'ac_mode' => $chart->ac_mode?->value,
+                    'normal_ot_minutes' => $chart->normal_ot_minutes,
+                    'double_ot_minutes' => $chart->double_ot_minutes,
+                    'triple_ot_minutes' => $chart->triple_ot_minutes,
+                    'night_outs' => $chart->night_outs,
+                    'driver_identity_source' => $chart->driver_identity_source?->value,
+                    'driver_employee_id' => $chart->driver_employee_id,
+                    'driver_name_snapshot' => $chart->driver_name_snapshot,
+                    'driver_reference_snapshot' => $chart->driver_reference_snapshot,
+                    'driver_observation' => $chart->driver_observation,
+                    'notes' => $chart->notes,
+                ];
+                $mergedInput = array_merge($existing, $input);
+                if (empty(trim((string) ($mergedInput['reference'] ?? '')))) {
+                    $mergedInput['reference'] = $chart->reference;
+                }
+                $data = $this->validation->validate($mergedInput, $context);
                 $this->assertCoverage($use, $data['starts_at'], $data['ends_at']);
                 $chart->forceFill($data);
             } elseif ($action === RunningChartAction::Finalize && $chart->status === RunningChartStatus::Draft) {
@@ -115,7 +155,7 @@ final class RunningChartService
             $chart->save();
             $this->record($chart, $context, $action, $reason);
 
-            return $chart->load(['vehicleUse', 'correctsChart']);
+            return $chart->load(['vehicleUse', 'correctsChart', 'correctedByChart']);
         });
     }
 

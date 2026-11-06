@@ -198,4 +198,78 @@ final class RentalExpenseTest extends TestCase
         $this->assertSame('allocated', $allocatedResponse->json('data.status'));
         $this->assertCount(1, $allocatedResponse->json('data.allocations'));
     }
+
+    public function test_expense_handles_empty_optional_fields_and_query_filters(): void
+    {
+        [$context, , $ownerData] = $this->loginFixture();
+
+        // 1. Create expense with empty string optional fields
+        $createResponse = $this->postJson($this->rentalRoot . '/expenses', [
+            'vehicle_id' => $ownerData['vehicle_id'],
+            'expense_type' => RentalExpenseType::Fuel->value,
+            'expense_date' => '2026-09-15',
+            'currency_id' => $ownerData['currency_id'],
+            'net_amount' => '5000.000000',
+            'expense_number' => '',
+            'customer_agreement_id' => '',
+            'vehicle_use_id' => '',
+            'running_chart_id' => '',
+            'supplier_id' => '',
+            'employee_id' => '',
+            'tax_group_id' => '',
+            'tax_amount' => '',
+            'reference_number' => '',
+            'description' => '',
+        ])->assertCreated();
+
+        $expenseId = $createResponse->json('data.id');
+        $version = $createResponse->json('data.row_version');
+
+        $this->assertNotEmpty($createResponse->json('data.expense_number'));
+        $this->assertSame('0.000000', (string) $createResponse->json('data.tax_amount'));
+        $this->assertSame('5000.000000', (string) $createResponse->json('data.gross_amount'));
+        $this->assertNull($createResponse->json('data.reference_number'));
+        $this->assertNull($createResponse->json('data.description'));
+
+        // 2. Query index with empty filter parameters
+        $this->getJson($this->rentalRoot . '/expenses?search=&expense_type=&vehicle_id=&status=&from=&until=')
+            ->assertOk();
+
+        // 3. Transition to submitted then approved
+        $submitted = $this->patchJson($this->rentalRoot . '/expenses/' . $expenseId . '/transition', [
+            'expected_version' => $version,
+            'status' => RentalExpenseStatus::Submitted->value,
+        ])->assertOk();
+
+        $approved = $this->patchJson($this->rentalRoot . '/expenses/' . $expenseId . '/transition', [
+            'expected_version' => $submitted->json('data.row_version'),
+            'status' => RentalExpenseStatus::Approved->value,
+        ])->assertOk();
+
+        // 4. Transition to allocated with empty optional allocation fields
+        $allocated = $this->patchJson($this->rentalRoot . '/expenses/' . $expenseId . '/transition', [
+            'expected_version' => $approved->json('data.row_version'),
+            'status' => RentalExpenseStatus::Allocated->value,
+            'allocations' => [
+                [
+                    'allocation_type' => RentalExpenseAllocationType::CompanyCost->value,
+                    'net_amount' => '5000.000000',
+                    'tax_amount' => '',
+                    'markup_amount' => '',
+                    'withholding_amount' => '',
+                    'target_customer_agreement_id' => '',
+                    'customer_id' => '',
+                    'supplier_id' => '',
+                    'employee_id' => '',
+                    'notes' => '',
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertSame('allocated', $allocated->json('data.status'));
+        $this->assertCount(1, $allocated->json('data.allocations'));
+        $alloc = $allocated->json('data.allocations.0');
+        $this->assertSame('0.000000', (string) $alloc['tax_amount']);
+        $this->assertSame('5000.000000', (string) $alloc['total_amount']);
+    }
 }

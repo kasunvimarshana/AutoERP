@@ -10,6 +10,22 @@ use Modules\VehicleRental\Data\AgreementContext;
 
 final class RentalExpenseQueryRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach (['expense_type', 'status', 'vehicle_id', 'customer_agreement_id', 'search', 'per_page', 'page'] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [

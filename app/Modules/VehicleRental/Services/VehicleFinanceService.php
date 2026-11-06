@@ -52,7 +52,12 @@ final class VehicleFinanceService
                 throw new InvalidArgumentException('Vehicle finance requires at least one installment.');
             }
 
-            if ($this->math->compare((string) ($data['initial_deposit_amount'] ?? '0'), (string) $data['principal_amount']) > 0) {
+            $depositInput = isset($data['initial_deposit_amount']) && trim((string) $data['initial_deposit_amount']) !== '' ? (string) $data['initial_deposit_amount'] : '0.000000';
+            $deposit = $this->math->normalize($depositInput);
+            $residualInput = isset($data['residual_value']) && trim((string) $data['residual_value']) !== '' ? (string) $data['residual_value'] : '0.000000';
+            $residual = $this->math->normalize($residualInput);
+
+            if ($this->math->compare($deposit, (string) $data['principal_amount']) > 0) {
                 throw new InvalidArgumentException('Initial finance deposit cannot exceed the principal amount.');
             }
 
@@ -63,7 +68,9 @@ final class VehicleFinanceService
                 TaxGroup::query()->forTenant($tenantId)->findOrFail((int) $data['tax_group_id']);
             }
 
-            $agreementNumber = $data['agreement_number'] ?? 'VFA-'.strtoupper(bin2hex(random_bytes(4)));
+            $agreementNumber = (isset($data['agreement_number']) && trim((string) $data['agreement_number']) !== '')
+                ? trim((string) $data['agreement_number'])
+                : 'VFA-'.strtoupper(bin2hex(random_bytes(4)));
 
             $agreement = VehicleFinanceAgreement::query()->create([
                 'tenant_id' => $tenantId,
@@ -80,16 +87,16 @@ final class VehicleFinanceService
                 'currency_id' => $currency->id,
                 'currency_code_snapshot' => $currency->code,
                 'principal_amount' => $data['principal_amount'],
-                'initial_deposit_amount' => $data['initial_deposit_amount'] ?? '0.000000',
-                'residual_value' => $data['residual_value'] ?? '0.000000',
-                'interest_method' => $data['interest_method'] ?? 'flat',
-                'annual_interest_rate' => $data['annual_interest_rate'] ?? '0.000000',
-                'installment_frequency' => $data['installment_frequency'] ?? 'monthly',
+                'initial_deposit_amount' => $deposit,
+                'residual_value' => $residual,
+                'interest_method' => ! empty($data['interest_method']) ? $data['interest_method'] : 'flat',
+                'annual_interest_rate' => (isset($data['annual_interest_rate']) && trim((string) $data['annual_interest_rate']) !== '') ? (string) $data['annual_interest_rate'] : '0.000000',
+                'installment_frequency' => ! empty($data['installment_frequency']) ? $data['installment_frequency'] : 'monthly',
                 'installment_count' => $count,
-                'payment_term_days' => $data['payment_term_days'] ?? 0,
-                'tax_group_id' => $data['tax_group_id'] ?? null,
+                'payment_term_days' => ! empty($data['payment_term_days']) ? (int) $data['payment_term_days'] : 0,
+                'tax_group_id' => ! empty($data['tax_group_id']) ? (int) $data['tax_group_id'] : null,
                 'status' => VehicleFinanceAgreementStatus::Draft,
-                'remarks' => $data['remarks'] ?? null,
+                'remarks' => (isset($data['remarks']) && trim((string) $data['remarks']) !== '') ? trim((string) $data['remarks']) : null,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
@@ -317,10 +324,10 @@ final class VehicleFinanceService
     {
         if (! empty($customSchedule)) {
             foreach ($customSchedule as $index => $row) {
-                $principal = (string) ($row['principal_due'] ?? '0.000000');
-                $interest = (string) ($row['interest_due'] ?? '0.000000');
-                $fee = (string) ($row['fee_due'] ?? '0.000000');
-                $tax = (string) ($row['tax_due'] ?? '0.000000');
+                $principal = (isset($row['principal_due']) && trim((string) $row['principal_due']) !== '') ? (string) $row['principal_due'] : '0.000000';
+                $interest = (isset($row['interest_due']) && trim((string) $row['interest_due']) !== '') ? (string) $row['interest_due'] : '0.000000';
+                $fee = (isset($row['fee_due']) && trim((string) $row['fee_due']) !== '') ? (string) $row['fee_due'] : '0.000000';
+                $tax = (isset($row['tax_due']) && trim((string) $row['tax_due']) !== '') ? (string) $row['tax_due'] : '0.000000';
                 $total = $this->math->sum([$principal, $interest, $fee, $tax]);
 
                 $agreement->installments()->create([

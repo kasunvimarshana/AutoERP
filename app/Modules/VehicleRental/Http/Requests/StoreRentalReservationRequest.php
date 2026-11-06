@@ -13,6 +13,22 @@ use Modules\VehicleRental\Enums\RentalBasis;
 
 final class StoreRentalReservationRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach (['requested_vehicle_id', 'requested_vehicle_category_id', 'estimated_amount', 'estimated_deposit_amount', 'source', 'remarks'] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [

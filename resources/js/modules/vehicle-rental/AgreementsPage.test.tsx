@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '@/shared/api/apiError';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { formatQuantity } from '@/shared/utils/formatQuantity';
@@ -81,6 +82,38 @@ describe('Rental agreement review', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create successor draft' }));
         await waitFor(() => expect(createAgreementSuccessor).toHaveBeenCalledWith(AgreementKind.Customer, expect.objectContaining({ id: record.id }), expect.objectContaining({ reference: 'LESSEE-R2', starts_on: '2026-10-01', reason: 'Future rate revision' })));
     });
+    it('allows closing a draft agreement with a reason', async () => {
+        session.permissions.push('vehicle-rental.customer-agreements.manage');
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Close draft' }));
+        expect(screen.getByText('Close this draft agreement without activating it while preserving its history.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Confirm closure' })).toBeDisabled();
+        fireEvent.change(screen.getByLabelText('Closure reason'), { target: { value: 'Customer withdrew proposal' } });
+        expect(screen.getByRole('button', { name: 'Confirm closure' })).toBeEnabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm closure' }));
+        await waitFor(() => expect(transitionAgreement).toHaveBeenCalledWith(AgreementKind.Customer, record, 'close', 'Customer withdrew proposal'));
+    });
+    it('filters agreements by status when selected', async () => {
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' });
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: AgreementStatus.Draft } });
+        await waitFor(() => expect(listAgreements).toHaveBeenCalledWith(AgreementKind.Customer, 1, expect.any(AbortSignal), '', AgreementStatus.Draft));
+    });
+    it('displays successor in progress and hides create successor button when successor exists', async () => {
+        session.permissions.push('vehicle-rental.customer-agreements.manage');
+        const activeWithSuccessor: Agreement = {
+            ...record,
+            status: AgreementStatus.Active,
+            successor_agreement: { id: 105, reference: 'LESSEE-R2', status: AgreementStatus.Draft },
+        };
+        vi.mocked(listAgreements).mockResolvedValue({ data: [activeWithSuccessor] });
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
+        expect(screen.getByText('Successor in progress (draft): LESSEE-R2')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Create successor' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Close agreement' })).toBeInTheDocument();
+    });
 });
 
 it('formats financial terms and included distance for operator review', async () => {
@@ -103,4 +136,19 @@ it('removes stale agreements when a reload fails', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect(await screen.findByText('Agreements could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review LESSEE-AGREEMENT' })).not.toBeInTheDocument();
+});
+
+it('renders vehicle uses register link for owner agreements', async () => {
+    session.permissions = ['vehicle-rental.owner-agreements.view', 'vehicle-rental.vehicle-use.view'];
+    vi.mocked(listAgreements).mockResolvedValue({
+        data: [{ ...record, reference: 'OWNER-AG-01' }],
+    });
+    render(
+        <MemoryRouter>
+            <AgreementsPage kind={AgreementKind.Owner} />
+        </MemoryRouter>
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Review OWNER-AG-01' }));
+    const usesLink = screen.getByRole('link', { name: /Vehicle Uses/ });
+    expect(usesLink).toHaveAttribute('href', '/vehicle-rental/vehicle-uses?search=OWNER-AG-01');
 });

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -19,9 +20,44 @@ import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartHistoryPanel } from './RunningChartHistoryPanel';
 
 export default function RunningChartRegisterPage() {
-    const [search, setSearch] = useState(''); const [status, setStatus] = useState<RunningChartStatus | ''>('');
-    const [from, setFrom] = useState(''); const [until, setUntil] = useState('');
-    const [filters, setFilters] = useState<ChartRegisterFilters>({}); const [page, setPage] = useState(1);
+    const [search, setSearch] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return new URLSearchParams(window.location.search).get('search') ?? '';
+    });
+    const [status, setStatus] = useState<RunningChartStatus | ''>(() => {
+        if (typeof window === 'undefined') return '';
+        const s = new URLSearchParams(window.location.search).get('status') ?? new URLSearchParams(window.location.search).get('chart_status');
+        return Object.values(RunningChartStatus).includes(s as RunningChartStatus) ? (s as RunningChartStatus) : '';
+    });
+    const [from, setFrom] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return new URLSearchParams(window.location.search).get('from') ?? '';
+    });
+    const [until, setUntil] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return new URLSearchParams(window.location.search).get('until') ?? '';
+    });
+    const [filters, setFilters] = useState<ChartRegisterFilters>(() => {
+        if (typeof window === 'undefined') return {};
+        const params = new URLSearchParams(window.location.search);
+        const searchParam = params.get('search')?.trim();
+        const statusParam = params.get('status') ?? params.get('chart_status');
+        const fromParam = params.get('from');
+        const untilParam = params.get('until');
+        const initial: ChartRegisterFilters = {};
+        if (searchParam) initial.search = searchParam;
+        if (statusParam && Object.values(RunningChartStatus).includes(statusParam as RunningChartStatus)) {
+            initial.chart_status = statusParam as RunningChartStatus;
+        }
+        if (fromParam) {
+            try { initial.from = timestampWithOffset(fromParam); } catch {}
+        }
+        if (untilParam) {
+            try { initial.until = timestampWithOffset(untilParam); } catch {}
+        }
+        return initial;
+    });
+    const [page, setPage] = useState(1);
     const [rows, setRows] = useState<ChartRegisterRow[]>([]); const [meta, setMeta] = useState<PaginationMeta>();
     const [loading, setLoading] = useState(true); const [error, setError] = useState<ApiError | null>(null); const [selected, setSelected] = useState<number | null>(null);
     const [history, setHistory] = useState<number | null>(null);
@@ -33,16 +69,32 @@ export default function RunningChartRegisterPage() {
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [filters, page]);
+    function syncUrl(nextSearch: string, nextStatus: string, nextFrom: string, nextUntil: string) {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (nextSearch.trim()) url.searchParams.set('search', nextSearch.trim());
+        else url.searchParams.delete('search');
+        if (nextStatus) url.searchParams.set('status', nextStatus);
+        else url.searchParams.delete('status');
+        url.searchParams.delete('chart_status');
+        if (nextFrom) url.searchParams.set('from', nextFrom);
+        else url.searchParams.delete('from');
+        if (nextUntil) url.searchParams.set('until', nextUntil);
+        else url.searchParams.delete('until');
+        window.history.replaceState({}, '', url.toString());
+    }
     function apply(event: FormEvent) {
         event.preventDefault();
         try {
             const next = { search: search.trim() || undefined, chart_status: status || undefined, from: from ? timestampWithOffset(from) : undefined, until: until ? timestampWithOffset(until) : undefined };
+            syncUrl(search, status, from, until);
             setLoading(true); setError(null); setPage(1); setSelected(null); setHistory(null); setFilters(next);
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
         const needsReload = error !== null || page !== 1 || Object.values(filters).some(value => value !== undefined);
         setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setHistory(null); setError(null);
+        syncUrl('', '', '', '');
         if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
     const statusOptions = Object.values(RunningChartStatus).map(value => ({ value, label: CHART_LABELS[value] }));
@@ -62,13 +114,37 @@ export default function RunningChartRegisterPage() {
             {rows.map(row => <article key={row.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3"><h2 className="text-base font-semibold text-slate-900">{row.reference} · {row.vehicle_use.vehicle_label}</h2><StatusBadge status={row.status} /></div>
                 <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
-                    <p>Customer: {row.customer_agreement.party_name} · {row.customer_agreement.reference}</p>
-                    <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+                    <p>
+                        Customer: {row.customer_agreement.party_name} ·{' '}
+                        <Link
+                            to={`/vehicle-rental/customer/agreements?search=${encodeURIComponent(row.customer_agreement.reference)}`}
+                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            title="Review customer agreement"
+                        >
+                            {row.customer_agreement.reference}
+                        </Link>
+                    </p>
+                    <p>
+                        {row.owner_agreement ? (
+                            <>
+                                Owner: {row.owner_agreement.party_name} ·{' '}
+                                <Link
+                                    to={`/vehicle-rental/owner/agreements?search=${encodeURIComponent(row.owner_agreement.reference)}`}
+                                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                    title="Review owner agreement"
+                                >
+                                    {row.owner_agreement.reference}
+                                </Link>
+                            </>
+                        ) : (
+                            'Company supply'
+                        )}
+                    </p>
                     <p>Driver: {row.driver ? `${row.driver.name} · ${row.driver.reference}` : 'Not recorded'}</p>
                     <p>{formatBusinessDateTime(row.starts_at)} — {formatBusinessDateTime(row.ends_at)}</p>
                     <p className="sm:col-span-2">Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
                 </div>
-                {row.replaces_vehicle && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p className="text-sm font-medium text-blue-600">Corrects chart {row.corrects_chart.reference}</p>}
+                {row.replaces_vehicle && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p className="text-sm font-medium text-blue-600">Corrects chart {row.corrects_chart.reference}</p>}{row.corrected_by_chart && <p className="text-sm font-medium text-amber-700">Corrected by chart {row.corrected_by_chart.reference}</p>}
                 <div className="flex flex-wrap gap-2">
                     <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button>
                     {row.customer_agreement.id && (

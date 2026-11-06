@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Models\HrEmployee;
@@ -59,6 +60,11 @@ final class RunningChart extends TenantOwnedModel
     public function correctsChart(): BelongsTo
     {
         return $this->belongsTo(self::class, 'corrects_chart_id');
+    }
+
+    public function correctedByChart(): HasOne
+    {
+        return $this->hasOne(self::class, 'corrects_chart_id');
     }
 
     public function history(): HasMany

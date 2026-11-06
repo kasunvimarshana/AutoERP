@@ -17,6 +17,6 @@ final class RunningChartHistoryResource extends JsonResource
         $facts['starts_at'] = $this->snapshot['starts_at_input'];
         $facts['ends_at'] = $this->snapshot['ends_at_input'];
 
-        return ['version' => $this->row_version, 'action' => $this->action, 'reason' => $this->reason, 'recorded_at' => $this->recorded_at->toIso8601String(), 'actor' => ['name' => trim($this->actor->first_name.' '.$this->actor->last_name)], 'facts' => $facts];
+        return ['version' => $this->row_version, 'action' => $this->action, 'reason' => $this->reason, 'recorded_at' => $this->recorded_at->toIso8601String(), 'actor' => ['name' => $this->actor ? trim(($this->actor->first_name ?? '').' '.($this->actor->last_name ?? '')) : 'System'], 'facts' => $facts];
     }
 }

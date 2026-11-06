@@ -18,10 +18,16 @@ use Modules\VehicleRental\Services\OwnerSourceService;
 use Modules\VehicleRental\Services\VehicleUseRegisterService;
 use Modules\VehicleRental\Services\VehicleUseService;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class VehicleUseController
 {
     public function __construct(private readonly VehicleUseService $uses) {}
+
+    public function destroy(AgreementRequest $request, ?int $first = null, ?int $second = null): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Vehicle custody uses cannot be deleted to preserve physical custody history. Cancel or return the vehicle instead.');
+    }
 
     public function register(VehicleUseRegisterRequest $request, VehicleUseRegisterService $register): AnonymousResourceCollection
     {
@@ -51,6 +57,11 @@ final class VehicleUseController
         return (new VehicleUseResource($this->uses->plan($request->context(), $agreement, $request->expectedVersion(), $request->only(OperationalFields::MUTABLE_USE))))->response()->setStatusCode(Response::HTTP_CREATED);
     }
 
+    public function show(AgreementRequest $request, int $use): VehicleUseResource
+    {
+        return new VehicleUseResource($this->uses->find($request->context(), $use));
+    }
+
     public function transition(AgreementRequest $request, int $use, string $action): VehicleUseResource
     {
         return new VehicleUseResource($this->uses->transition($request->context(), $use, $request->expectedVersion(), VehicleUseAction::from($action), $request->only(['occurred_at', 'odometer', 'reason'])));
@@ -68,6 +79,6 @@ final class VehicleUseController
 
     public function sources(AgreementRequest $request, int $vehicle, OwnerSourceService $sources): AnonymousResourceCollection
     {
-        return OwnerSourceResource::collection($sources->list($request->context(), $vehicle, $request->only(['search', 'starts_at', 'ends_at']), $request->perPage()));
+        return OwnerSourceResource::collection($sources->list($request->context(), $vehicle, $request->only(['search', 'starts_at', 'ends_at', 'customer_agreement_id']), $request->perPage()));
     }
 }

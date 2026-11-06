@@ -9,20 +9,29 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\AgreementHistoryResource;
 use Modules\VehicleRental\Http\Resources\AgreementResource;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\BaseRentPreview;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class AgreementController
 {
     public function __construct(private readonly AgreementService $agreements) {}
 
+    public function destroy(AgreementRequest $request, string $kind, int $agreement): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Rental agreements cannot be deleted to preserve legal and financial audit history. Close the agreement instead.');
+    }
+
     public function index(AgreementRequest $request, string $kind): AnonymousResourceCollection
     {
-        return AgreementResource::collection($this->agreements->list(AgreementKind::from($kind), $request->context(), $request->perPage(), $request->validated('search')));
+        $status = $request->validated('status') !== null ? AgreementStatus::tryFrom((string) $request->validated('status')) : null;
+
+        return AgreementResource::collection($this->agreements->list(AgreementKind::from($kind), $request->context(), $request->perPage(), $request->validated('search'), $status));
     }
 
     public function store(AgreementRequest $request, string $kind): JsonResponse

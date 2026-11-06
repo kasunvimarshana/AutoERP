@@ -74,9 +74,9 @@ export function ReservationEditor({
             requested_start_at: startAt,
             requested_end_at: endAt,
             currency_id: currency.id,
-            estimated_amount: estimatedAmount,
-            estimated_deposit_amount: estimatedDeposit,
-            source,
+            estimated_amount: estimatedAmount.trim() || '0.00',
+            estimated_deposit_amount: estimatedDeposit.trim() || '0.00',
+            source: source.trim() || null,
             remarks: remarks.trim() || null,
         };
 

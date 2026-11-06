@@ -168,6 +168,7 @@ final class VehicleUseTest extends TestCase
             $response = $this->tenantPostJson($context->tenantId, $path, array_merge($input, ['expected_version' => $customer->row_version]));
             $response->assertCreated()->assertJsonPath('data.customer_agreement.reference', $customer->reference);
             $id = $response->json('data.id');
+            $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/vehicle-uses/'.$id)->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.customer_agreement.reference', $customer->reference);
             $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/vehicle-uses/'.$id.'/history')->assertOk()->assertJsonPath('data.0.action', 'plan')->assertJsonPath('data.0.actor.name', 'Test User');
         });
     }
@@ -218,6 +219,257 @@ final class VehicleUseTest extends TestCase
             self::assertSame($old->returned_at->toIso8601String(), $next->handed_over_at->toIso8601String());
             self::assertSame(3, $old->history()->count());
             self::assertSame(2, $next->history()->count());
+        });
+    }
+
+    public function test_vehicle_use_delete_is_strictly_prohibited_to_preserve_custody_history(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Preserve vehicle-use history. Cancel or return the vehicle.');
+            $use->delete();
+        });
+    }
+
+    public function test_vehicle_use_identity_and_planned_evidence_are_immutable(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Vehicle-use identity and planned evidence are immutable.');
+            $use->vehicle_id = 999;
+            $use->save();
+        });
+    }
+
+    public function test_vehicle_use_plan_accepts_omitted_ends_at_for_open_ended_coverage(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            unset($input['ends_at']);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+            self::assertNull($use->ends_at);
+            self::assertSame(VehicleUseStatus::Planned, $use->status);
+        });
+    }
+
+    public function test_vehicle_use_transition_accepts_numeric_odometer(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $s = app(VehicleUseService::class);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+            $use = $s->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => $input['starts_at'],
+                'odometer' => 12500,
+                'reason' => 'Customer collected vehicle',
+            ]);
+            self::assertSame('12500.000000', $use->handover_odometer);
+        });
+    }
+
+    public function test_vehicle_use_replaced_by_use_relation(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $old = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $old = $service->transition($context, $old->id, $old->row_version, VehicleUseAction::Handover, ['occurred_at' => $input['starts_at'], 'reason' => 'Collected']);
+            $vehicle = DB::table('vehicles')->insertGetId(['tenant_id' => $context->tenantId, 'vehicle_number' => 'REPLACEMENT-2', 'registration_number' => 'REPLACEMENT-2', 'status' => VehicleStatus::Active->value]);
+            DB::table('vehicle_ownerships')->insert(['tenant_id' => $context->tenantId, 'vehicle_id' => $vehicle, 'owner_type' => VehicleOwnerType::Company->value, 'owner_key' => 'company', 'owner_code_snapshot' => 'COMPANY', 'owner_name_snapshot' => 'Company', 'ownership_type' => VehicleOwnershipType::CompanyOwned->value, 'started_at' => '2026-09-01 00:00:00']);
+
+            $replacement = array_replace($input, ['vehicle_id' => $vehicle, 'starts_at' => '2026-09-07T12:00:00+05:30', 'reason' => 'Vehicle exchange', 'owner_agreement_id' => null]);
+            $next = $service->replace($context, $old->id, $old->row_version, $replacement);
+
+            $oldReplaced = $old->fresh()->load('replacedByUse');
+            self::assertNotNull($oldReplaced->replacedByUse);
+            self::assertSame((int) $next->id, (int) $oldReplaced->replacedByUse->id);
+        });
+    }
+
+    public function test_vehicle_use_plan_with_owner_agreement_succeeds_when_planned_return_is_blank_and_owner_covers_customer(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
+            $agreements = app(AgreementService::class);
+            $customer = $agreements->create(AgreementKind::Customer, $context, array_replace($customerInput, ['ends_on' => '2026-09-10']));
+            $customer = $agreements->change(AgreementKind::Customer, $context, $customer->id, $customer->row_version, AgreementAction::Activate);
+
+            $owner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['ends_on' => '2026-09-15']));
+            $owner = $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
+
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $ownerInput['vehicle_id'],
+                'owner_agreement_id' => $owner->id,
+                'starts_at' => '2026-09-07T09:00:00+00:00',
+                'ends_at' => '',
+            ]);
+            self::assertNull($use->ends_at);
+            self::assertSame(VehicleUseStatus::Planned, $use->status);
+            self::assertSame($owner->id, (int) $use->owner_agreement_id);
+        });
+    }
+
+    public function test_vehicle_use_plan_with_owner_agreement_rejects_insufficient_coverage_when_planned_return_is_blank(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
+            $agreements = app(AgreementService::class);
+            $customer = $agreements->create(AgreementKind::Customer, $context, array_replace($customerInput, ['ends_on' => '2026-09-20']));
+            $customer = $agreements->change(AgreementKind::Customer, $context, $customer->id, $customer->row_version, AgreementAction::Activate);
+
+            $owner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['ends_on' => '2026-09-15']));
+            $owner = $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
+
+            $service = app(VehicleUseService::class);
+            $this->expectException(ValidationException::class);
+            $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $ownerInput['vehicle_id'],
+                'owner_agreement_id' => $owner->id,
+                'starts_at' => '2026-09-07T09:00:00+00:00',
+                'ends_at' => null,
+            ]);
+        });
+    }
+
+    public function test_vehicle_use_plan_accepts_empty_string_owner_agreement_id_for_company_vehicle(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $vehicle = DB::table('vehicles')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'vehicle_number' => 'COMPANY-CAR-99',
+                'registration_number' => 'COMPANY-CAR-99',
+                'status' => VehicleStatus::Active->value,
+            ]);
+            DB::table('vehicle_ownerships')->insert([
+                'tenant_id' => $context->tenantId,
+                'vehicle_id' => $vehicle,
+                'owner_type' => VehicleOwnerType::Company->value,
+                'owner_key' => 'company',
+                'owner_code_snapshot' => 'COMPANY',
+                'owner_name_snapshot' => 'Company',
+                'ownership_type' => VehicleOwnershipType::CompanyOwned->value,
+                'started_at' => '2026-09-01 00:00:00',
+            ]);
+
+            $use = $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $vehicle,
+                'owner_agreement_id' => '',
+                'starts_at' => '2026-09-07T09:00:00+00:00',
+                'ends_at' => '',
+                'notes' => '   ',
+            ]);
+
+            self::assertNull($use->owner_agreement_id);
+            self::assertNull($use->ends_at);
+            self::assertNull($use->notes);
+            self::assertSame(VehicleUseStatus::Planned, $use->status);
+        });
+    }
+
+    public function test_vehicle_use_service_delete_throws_logic_exception(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, $input);
+
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Preserve vehicle-use history. Cancel or return the vehicle.');
+            $service->delete($context, $use->id);
+        });
+    }
+
+    public function test_available_vehicles_excludes_workshop_service_blocked_vehicle(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $available = $service->availableVehicles($context, '2026-09-07T09:00:00+00:00', '2026-09-08T09:00:00+00:00');
+            $ids = array_column($available, 'id');
+            self::assertContains($input['vehicle_id'], $ids);
+
+            $job = new VehicleServiceJob;
+            $job->forceFill([
+                'tenant_id' => $context->tenantId,
+                'organization_unit_id' => $context->organizationUnitId,
+                'job_number' => 'WORKSHOP-BLOCK',
+                'job_date' => '2026-09-07',
+                'expected_delivery_date' => '2026-09-08',
+                'vehicle_id' => $input['vehicle_id'],
+                'customer_id' => $customer->customer_id,
+                'bill_to_customer_id' => $customer->customer_id,
+                'status' => VehicleServiceJobStatus::InProgress,
+                'type' => VehicleServiceJobType::FullService,
+                'row_version' => 1,
+            ])->save();
+
+            $availableAfter = $service->availableVehicles($context, '2026-09-07T09:00:00+00:00', '2026-09-08T09:00:00+00:00');
+            $idsAfter = array_column($availableAfter, 'id');
+            self::assertNotContains($input['vehicle_id'], $idsAfter);
+        });
+    }
+
+    public function test_replacement_maps_validation_error_to_return_odometer(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $old = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $old = $service->transition($context, $old->id, $old->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => $input['starts_at'],
+                'odometer' => '1000',
+                'reason' => 'Collected',
+            ]);
+
+            $vehicle = DB::table('vehicles')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'vehicle_number' => 'REPLACEMENT-ODO',
+                'registration_number' => 'REPLACEMENT-ODO',
+                'status' => VehicleStatus::Active->value,
+            ]);
+            DB::table('vehicle_ownerships')->insert([
+                'tenant_id' => $context->tenantId,
+                'vehicle_id' => $vehicle,
+                'owner_type' => VehicleOwnerType::Company->value,
+                'owner_key' => 'company',
+                'owner_code_snapshot' => 'COMPANY',
+                'owner_name_snapshot' => 'Company',
+                'ownership_type' => VehicleOwnershipType::CompanyOwned->value,
+                'started_at' => '2026-09-01 00:00:00',
+            ]);
+
+            try {
+                $service->replace($context, $old->id, $old->row_version, [
+                    'vehicle_id' => $vehicle,
+                    'owner_agreement_id' => null,
+                    'starts_at' => '2026-09-07T12:00:00+05:30',
+                    'reason' => 'Vehicle exchange',
+                    'return_odometer' => '900', // Lower than handover of 1000!
+                ]);
+                self::fail('Lower return odometer was accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('return_odometer', $e->errors());
+                self::assertStringContainsString('lower than handover', $e->errors()['return_odometer'][0]);
+            }
+        });
+    }
+
+    public function test_vehicle_use_register_searches_notes(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $input['notes'] = 'VIP client high priority';
+            $service->plan($context, $customer->id, $customer->row_version, $input);
+
+            $register = app(\Modules\VehicleRental\Services\VehicleUseRegisterService::class);
+            $results = $register->list($context, ['search' => 'VIP client'], 10);
+            self::assertSame(1, $results->total());
+
+            $empty = $register->list($context, ['search' => 'NonExistentNotes123'], 10);
+            self::assertSame(0, $empty->total());
         });
     }
 }

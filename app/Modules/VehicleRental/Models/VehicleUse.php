@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Vehicle\Models\Vehicle;
@@ -47,6 +48,11 @@ final class VehicleUse extends TenantOwnedModel
     public function replacesUse(): BelongsTo
     {
         return $this->belongsTo(self::class, 'replaces_use_id');
+    }
+
+    public function replacedByUse(): HasOne
+    {
+        return $this->hasOne(self::class, 'replaces_use_id');
     }
 
     public function history(): HasMany

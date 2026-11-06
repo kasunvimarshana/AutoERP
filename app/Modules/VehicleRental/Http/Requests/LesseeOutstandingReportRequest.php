@@ -14,6 +14,22 @@ final class LesseeOutstandingReportRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach (['as_of_date', 'customer_id', 'agreement_id', 'aging_bucket'] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     /** @return array<string, array<int, string>> */
     public function rules(): array
     {

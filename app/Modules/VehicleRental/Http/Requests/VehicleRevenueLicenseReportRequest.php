@@ -14,6 +14,22 @@ final class VehicleRevenueLicenseReportRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach (['start_date', 'end_date', 'status', 'vehicle_id'] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     /** @return array<string, array<int, string>> */
     public function rules(): array
     {

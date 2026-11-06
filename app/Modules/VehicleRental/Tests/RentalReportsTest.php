@@ -291,4 +291,44 @@ final class RentalReportsTest extends TestCase
             ->get(self::ROOT.'/reports/owner-disbursements/export/print?start_date=2026-09-01&end_date=2026-09-30&report_type=wht_ledger&wht_rate=10');
         $ownerWhtPrint->assertOk()->assertSee('3305-000 WHT', false);
     }
+
+    public function test_reports_accept_empty_optional_query_filters(): void
+    {
+        [$context] = $this->loginFixture();
+
+        // 1. Fleet Utilization with empty optional filters
+        $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/fleet-utilization?start_date=2026-09-01&end_date=2026-09-30&ownership_type=&custody_status=&vehicle_id=')
+            ->assertOk();
+
+        // 2. Revenue Licenses with empty optional filters
+        $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/revenue-licenses?status=&vehicle_id=&start_date=&end_date=')
+            ->assertOk();
+
+        // 3. Rental Revenue with empty optional filters
+        $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/rental-revenue?start_date=2026-09-01&end_date=2026-09-30&customer_id=&agreement_id=')
+            ->assertOk();
+
+        // 4. Lessee Outstanding with empty optional filters
+        $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/lessee-outstanding?as_of_date=2026-09-30&customer_id=&agreement_id=&aging_bucket=')
+            ->assertOk();
+
+        // 5. Owner Disbursement with empty optional filters
+        $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/owner-disbursements?start_date=2026-09-01&end_date=2026-09-30&supplier_id=&owner_agreement_id=&wht_rate=')
+            ->assertOk();
+
+        // 6. Vehicle Profitability with empty optional filters
+        $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/vehicle-profitability?start_date=2026-09-01&end_date=2026-09-30&ownership_type=&vehicle_id=')
+            ->assertOk();
+
+        // 7. Incident Report with empty optional filters
+        $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->getJson(self::ROOT.'/reports/incidents-summary?start_date=2026-09-01&end_date=2026-09-30&incident_type=&status=&vehicle_id=')
+            ->assertOk();
+    }
 }

@@ -17,14 +17,15 @@ import { AgreementKind, DriverMode, RentalBasis, termLabel, visibleTermKeys, typ
 
 const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params)
-    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number ?? row.vehicle_number), code: String(row.vehicle_number) })) }));
+    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number || row.vehicle_number), code: String(row.vehicle_number) })) }));
 const basisOptions = [{ value: RentalBasis.Daily, label: 'Daily' }, { value: RentalBasis.Monthly, label: 'Monthly' }];
 const driverOptions = [{ value: DriverMode.SelfDrive, label: 'Self-drive' }, { value: DriverMode.WithDriver, label: 'With driver' }];
 
 export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: AgreementKind; record?: Agreement; onSaved: () => void; onCancel: () => void }) {
+    const isSuccessor = Boolean(record?.supersedes_agreement);
     const [party, setParty] = useState<NamedResource | null>(record?.party ?? null);
     const [currency, setCurrency] = useState<NamedResource | null>(record?.currency ?? null);
-    const [vehicle, setVehicle] = useState<NamedResource | null>(record?.vehicle ? { id: record.vehicle.id, name: record.vehicle.registration_number ?? record.vehicle.vehicle_number } : null);
+    const [vehicle, setVehicle] = useState<NamedResource | null>(record?.vehicle ? { id: record.vehicle.id, name: record.vehicle.registration_number || record.vehicle.vehicle_number } : null);
     const [reference, setReference] = useState(record?.reference ?? '');
     const [agreedOn, setAgreedOn] = useState(record?.agreed_on ?? businessDateInputValue());
     const [executingOn, setExecutingOn] = useState(record?.executing_on ?? '');
@@ -44,7 +45,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
         setSaving(true); setError(null);
         try {
             const submittedTerms = Object.fromEntries(termKeys.map(key => [key, terms[key] ?? null])) as Partial<Record<TermKey, string | null>>;
-            await saveAgreement(kind, { reference, party_id: party.id, currency_id: currency.id,
+            await saveAgreement(kind, { reference: reference.trim() || undefined, party_id: party.id, currency_id: currency.id,
                 ...(kind === AgreementKind.Owner ? { vehicle_id: vehicle!.id } : {}), agreed_on: agreedOn, executing_on: executingOn || null, starts_on: startsOn,
                 ends_on: endsOn || null, basis, driver_mode: driver, terms: submittedTerms, notes: notes || null, expected_version: record?.row_version }, record?.id);
             onSaved();
@@ -54,13 +55,52 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
         <h2 className="text-xl font-semibold">{record ? 'Edit draft agreement' : 'New agreement'}</h2>
         <ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
-            <Input label="Agreement reference" value={reference} onChange={e => setReference(e.target.value)} required error={fieldError('reference')} />
-            <LookupSelect label={kind === AgreementKind.Customer ? 'Customer' : 'Owner / supplier'} value={party} onChange={setParty} search={kind === AgreementKind.Customer ? lookupApi.customers : lookupApi.suppliers} required error={fieldError('party_id')} />
-            {kind === AgreementKind.Owner && <LookupSelect label="Vehicle" value={vehicle} onChange={setVehicle} search={vehicles} required error={fieldError('vehicle_id')} />}
+            <Input
+                label="Agreement reference"
+                value={reference}
+                onChange={e => setReference(e.target.value)}
+                required={Boolean(record)}
+                hint={record ? undefined : "Leave blank to automatically generate a unique contract reference"}
+                error={fieldError('reference')}
+            />
+            <div>
+                <LookupSelect
+                    label={kind === AgreementKind.Customer ? 'Customer' : 'Owner / supplier'}
+                    value={party}
+                    onChange={setParty}
+                    search={kind === AgreementKind.Customer ? lookupApi.customers : lookupApi.suppliers}
+                    required
+                    disabled={isSuccessor}
+                    error={fieldError('party_id')}
+                />
+                {isSuccessor && (
+                    <p className="mt-1 text-xs text-slate-500">
+                        Successor agreements inherit the counterparty of the predecessor agreement.
+                    </p>
+                )}
+            </div>
+            {kind === AgreementKind.Owner && (
+                <div>
+                    <LookupSelect
+                        label="Vehicle"
+                        value={vehicle}
+                        onChange={setVehicle}
+                        search={vehicles}
+                        required
+                        disabled={isSuccessor}
+                        error={fieldError('vehicle_id')}
+                    />
+                    {isSuccessor && (
+                        <p className="mt-1 text-xs text-slate-500">
+                            Owner successor agreements inherit the supplied vehicle.
+                        </p>
+                    )}
+                </div>
+            )}
             <LookupSelect label="Currency" value={currency} onChange={setCurrency} search={currencies} required error={fieldError('currency_id')} />
             <Input label="Agreement date" type="date" value={agreedOn} onChange={e => setAgreedOn(e.target.value)} required error={fieldError('agreed_on')} />
             <Input label="Agreement executing date" type="date" value={executingOn} onChange={e => setExecutingOn(e.target.value)} error={fieldError('executing_on')} hint="Record the date stated in the agreement; leave blank if unknown." />
-            <Input label="Start date" type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />
+            <Input label="Start date" type="date" max={endsOn || undefined} value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />
             <Input label="End date" type="date" min={startsOn || undefined} value={endsOn} onChange={e => setEndsOn(e.target.value)} error={fieldError('ends_on')} hint="Leave blank if no end date has been agreed." />
             <Select label="Rental basis" options={basisOptions} value={basis} onChange={e => setBasis(e.target.value as RentalBasis)} required error={fieldError('basis')} />
             <Select label="Driver arrangement" options={driverOptions} value={driver} onChange={e => setDriver(e.target.value as DriverMode)} required error={fieldError('driver_mode')} />
@@ -73,6 +113,6 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             </fieldset>
         </details>
         <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} error={fieldError('notes')} />
-        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !party || !currency || !agreedOn || !startsOn || !basis || !driver || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={(Boolean(record) && !reference.trim()) || !party || !currency || !agreedOn || !startsOn || !basis || !driver || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }

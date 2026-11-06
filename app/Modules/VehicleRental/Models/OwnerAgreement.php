@@ -27,4 +27,9 @@ final class OwnerAgreement extends Agreement
     {
         return $this->belongsTo(Vehicle::class, 'vehicle_id')->withTrashed();
     }
+
+    public function vehicleUses(): HasMany
+    {
+        return $this->hasMany(VehicleUse::class, 'owner_agreement_id');
+    }
 }

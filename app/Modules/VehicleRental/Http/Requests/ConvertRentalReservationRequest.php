@@ -10,6 +10,25 @@ use Modules\VehicleRental\Data\AgreementContext;
 
 final class ConvertRentalReservationRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach (['reference', 'notes'] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+        if ($this->has('terms') && ! is_array($this->input('terms'))) {
+            $merges['terms'] = null;
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [

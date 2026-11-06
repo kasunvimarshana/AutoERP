@@ -59,19 +59,39 @@ export function RunningChartEditor({ use, chart, correction, initialDriver, onSa
     );
     const [driverObservation, setDriverObservation] = useState(chart?.driver_observation ?? ''); const [notes, setNotes] = useState(chart?.notes ?? '');
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
+    const isReferenceRequired = Boolean(chart && !correction);
+    const isReferenceValid = isReferenceRequired ? Boolean(reference.trim()) : true;
     async function submit(event: FormEvent) {
         event.preventDefault(); setSaving(true); setError(null);
         try {
+            const trimmedReference = reference.trim();
+            const parseDistance = (val?: string) => {
+                const t = val?.trim();
+                return t ? t : null;
+            };
+            const parseCount = (val?: string) => {
+                const t = val?.trim();
+                return t === undefined || t === '' ? null : Number(t);
+            };
             const facts: ChartFacts = {
-                reference, starts_at: timestampWithOffset(start), ends_at: timestampWithOffset(end), start_odometer: values.start_odometer || null, end_odometer: values.end_odometer || null,
-                garage_km: values.garage_km || null, commercial_km: values.commercial_km || null,
-                normal_ot_minutes: values.normal_ot_minutes === '' ? null : Number(values.normal_ot_minutes), double_ot_minutes: values.double_ot_minutes === '' ? null : Number(values.double_ot_minutes),
-                triple_ot_minutes: values.triple_ot_minutes === '' ? null : Number(values.triple_ot_minutes), night_outs: values.night_outs === '' ? null : Number(values.night_outs), ac_mode: ac || null,
+                ...(trimmedReference ? { reference: trimmedReference } : (isReferenceRequired ? { reference: '' } : {})),
+                starts_at: timestampWithOffset(start),
+                ends_at: timestampWithOffset(end),
+                start_odometer: parseDistance(values.start_odometer),
+                end_odometer: parseDistance(values.end_odometer),
+                garage_km: parseDistance(values.garage_km),
+                commercial_km: parseDistance(values.commercial_km),
+                normal_ot_minutes: parseCount(values.normal_ot_minutes),
+                double_ot_minutes: parseCount(values.double_ot_minutes),
+                triple_ot_minutes: parseCount(values.triple_ot_minutes),
+                night_outs: parseCount(values.night_outs),
+                ac_mode: ac || null,
                 driver_identity_source: driverSource || null,
                 driver_employee_id: driverSource === DriverIdentitySource.Employee ? driverEmployee?.id ?? null : null,
-                driver_name_snapshot: driverSource === DriverIdentitySource.External ? externalDriverName || null : null,
-                driver_reference_snapshot: driverSource === DriverIdentitySource.External ? externalDriverReference || null : null,
-                driver_observation: driverObservation || null, notes: notes || null,
+                driver_name_snapshot: driverSource === DriverIdentitySource.External ? externalDriverName.trim() || null : null,
+                driver_reference_snapshot: driverSource === DriverIdentitySource.External ? externalDriverReference.trim() || null : null,
+                driver_observation: driverObservation.trim() || null,
+                notes: notes.trim() || null,
             };
             if (chart && !correction) await updateChart(chart, facts); else await createChart(use, facts, correction ? chart?.id : undefined);
             onSaved();
@@ -83,7 +103,7 @@ export function RunningChartEditor({ use, chart, correction, initialDriver, onSa
         <h4 className="font-semibold">{correction ? `Correct ${chart?.reference}` : chart ? 'Edit draft Running Chart' : 'Record Running Chart'}</h4>
         <p>Record actual usage in {operationalTimeZoneLabel()}. Leave unknown observations blank; enter zero only when verified.</p><ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="space-y-4">
-            <Input label="Chart reference" required value={reference} onChange={e => setReference(e.target.value)} error={error?.fields.reference?.[0]} />
+            <Input label="Chart reference" required={isReferenceRequired} value={reference} onChange={e => setReference(e.target.value)} error={error?.fields.reference?.[0]} hint={!isReferenceRequired ? 'Leave blank to automatically generate a unique chart reference' : undefined} />
             <div className="grid gap-3 sm:grid-cols-2">
                 <Input label="Usage start" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={start} onChange={e => setStart(e.target.value)} error={error?.fields.starts_at?.[0]} />
                 <Input label="Usage end" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={start || undefined} required value={end} onChange={e => setEnd(e.target.value)} error={error?.fields.ends_at?.[0]} />
@@ -110,6 +130,6 @@ export function RunningChartEditor({ use, chart, correction, initialDriver, onSa
                 <p className="text-xs text-slate-500">This is operational evidence only; employee pay remains owned by HR.</p>
                 <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
             </div></details>
-        </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !start || !end || (driverSource === DriverIdentitySource.Employee && !driverEmployee) || (driverSource === DriverIdentitySource.External && (!externalDriverName.trim() || !externalDriverReference.trim()))}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!isReferenceValid || !start || !end || (driverSource === DriverIdentitySource.Employee && !driverEmployee) || (driverSource === DriverIdentitySource.External && (!externalDriverName.trim() || !externalDriverReference.trim()))}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }
