@@ -8,7 +8,7 @@ export interface PaymentMethodWiseParams {
 
 export interface PaymentMethodWiseAmountRow {
     currency: string;
-    credit_sales: string;
+    unpaid_sales: string;
     receipts: string;
     methods: Record<string, string>;
 }
@@ -19,7 +19,7 @@ export interface PaymentMethodWiseDay extends PaymentMethodWiseAmountRow {
 }
 
 export interface PaymentMethodWiseDocument {
-    type: 'credit_sale' | 'receipt';
+    type: 'unpaid_sale' | 'receipt';
     invoice: { id: number; number: string };
     payment: { id: number; number: string } | null;
     amount: string;

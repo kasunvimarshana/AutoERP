@@ -5,6 +5,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatMoney } from '@/shared/utils/formatMoney';
+import { compareDecimalStrings, sumDecimals } from '@/shared/utils/decimal';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { runSummaryReport } from '../reportingApi';
 import type {
@@ -166,6 +167,19 @@ export default function SummaryReportPage() {
                         />
                     </section>
 
+                    <section>
+                        <SectionHeading
+                            title="Payments received during selected dates"
+                            description="Grouped by the date money was received, including payments for earlier invoices. These amounts are separate from the current settlement of selected sales above."
+                        />
+                        <PaymentCard
+                            title="Payments received"
+                            tone="emerald"
+                            metrics={result.payments.received}
+                            currency={currency}
+                        />
+                    </section>
+
                     <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
                         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                             <SectionHeading
@@ -222,23 +236,15 @@ export default function SummaryReportPage() {
 
                     <section>
                         <SectionHeading
-                            title="Cash movement"
-                            description="Posted payments are grouped using the payment-method snapshot stored on each transaction."
+                            title="Payments sent during selected dates"
+                            description="Posted outgoing payments grouped by their payment method."
                         />
-                        <div className="grid gap-5 lg:grid-cols-2">
-                            <PaymentCard
-                                title="Payments received"
-                                tone="emerald"
-                                metrics={result.payments.received}
-                                currency={currency}
-                            />
-                            <PaymentCard
-                                title="Payments sent"
-                                tone="blue"
-                                metrics={result.payments.sent}
-                                currency={currency}
-                            />
-                        </div>
+                        <PaymentCard
+                            title="Payments sent"
+                            tone="blue"
+                            metrics={result.payments.sent}
+                            currency={currency}
+                        />
                     </section>
                 </div>
             ) : null}
@@ -478,6 +484,10 @@ function PaymentCard({
     metrics: SummaryPaymentMetrics;
     currency: string;
 }) {
+    const cashTotal = sumDecimals(metrics.methods
+        .filter((method) => method.type === 'cash')
+        .map((method) => method.amount));
+
     return (
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -504,8 +514,27 @@ function PaymentCard({
                     <p className="py-7 text-center text-sm text-slate-500">No posted payments in this period.</p>
                 )}
             </div>
+            {metrics.cash_sources && compareDecimalStrings(cashTotal, '0') > 0 ? (
+                <details className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+                    <summary className="flex cursor-pointer items-center justify-between gap-4 font-semibold text-slate-900">
+                        <span>Cash received breakdown</span>
+                        <span className="tabular-nums">{money(cashTotal, currency)}</span>
+                    </summary>
+                    <p className="mt-2 text-xs text-slate-600">Cash received on selected dates, grouped by its current invoice allocation.</p>
+                    <dl className="mt-3 space-y-2 border-t border-emerald-100 pt-3 text-sm">
+                        <CashSourceRow label="Invoices dated in selected period" amount={metrics.cash_sources.selected_invoices} currency={currency} />
+                        <CashSourceRow label="Earlier invoices" amount={metrics.cash_sources.earlier_invoices} currency={currency} />
+                        <CashSourceRow label="Other invoices" amount={metrics.cash_sources.other_invoices} currency={currency} />
+                        <CashSourceRow label="Not allocated to an invoice" amount={metrics.cash_sources.unapplied} currency={currency} />
+                    </dl>
+                </details>
+            ) : null}
         </article>
     );
+}
+
+function CashSourceRow({ label, amount, currency }: { label: string; amount: string; currency: string }) {
+    return <div className="flex items-center justify-between gap-4"><dt className="text-slate-600">{label}</dt><dd className="font-medium tabular-nums text-slate-900">{money(amount, currency)}</dd></div>;
 }
 
 function BridgeRow({ label, value, currency, width, tone }: {

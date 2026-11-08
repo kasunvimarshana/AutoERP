@@ -64,7 +64,7 @@ export default function PaymentMethodWiseSummaryReportPage() {
         <>
             <ContentHeader
                 title="Payment Method Wise Summary"
-                description="Receipts follow payment date. Credit sales include only invoices explicitly kept on credit."
+                description="Receipts follow payment date. New unpaid sales show what remained unpaid at the end of each invoice date."
                 actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} />
@@ -82,12 +82,12 @@ export default function PaymentMethodWiseSummaryReportPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <p className="font-semibold text-slate-900">{result.organization_unit}</p>
-                        <p className="text-sm text-slate-500">Receipts follow payment date. New credit sales follow invoice date.</p>
+                        <p className="text-sm text-slate-500">Receipts follow payment date. New unpaid sales follow invoice date.</p>
                     </div>
                     <ExportActions reportKey="payment-method-wise-summary" params={filters} />
                 </div>
                 <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
-                    New credit sales are original sales recorded on credit. Later collections appear on their payment date and reduce invoice outstanding; the two totals are shown separately to avoid double counting.
+                    New unpaid sales include unpaid portions of invoices issued that day, including partial payments. Later collections appear on their payment date. These totals describe different events and should not be added together.
                 </div>
                 <Panel title="Daily summary">
                     <div className="max-h-[75vh] overflow-auto print:max-h-none print:overflow-visible">
@@ -97,7 +97,7 @@ export default function PaymentMethodWiseSummaryReportPage() {
                                     <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3">Date</th>
                                     {result.methods.map((method) => <th key={method.key} className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right">{method.name}</th>)}
                                     <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right">Receipts total</th>
-                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right">New credit sales</th>
+                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-right">New unpaid sales</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -115,34 +115,42 @@ export default function PaymentMethodWiseSummaryReportPage() {
                                     </td>
                                     {result.methods.map((method) => <td key={method.key} className="px-4 py-3 text-right tabular-nums">{formatMoney(day.methods[method.key], day.currency)}</td>)}
                                     <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(day.receipts, day.currency)}</td>
-                                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(day.credit_sales, day.currency)}</td>
+                                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(day.unpaid_sales, day.currency)}</td>
                                     </tr>
                                     {expanded ? <tr><td colSpan={result.methods.length + 3} className="bg-slate-50 px-4 py-4">
                                         {details?.key !== key ? <p className="text-sm text-slate-500">Loading documents...</p> : null}
                                         {details?.key === key && details.error ? <ErrorAlert error={details.error} /> : null}
                                         {documents ? <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                                            <p className="px-4 py-3 text-sm text-slate-600">Unpaid sale rows belong to New unpaid sales. Receipt rows belong to Receipts total and the payment method columns.</p>
                                             <table className="min-w-full text-sm">
-                                                <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Type</th><th className="px-4 py-3">Document</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Method</th><th className="px-4 py-3 text-right">Amount</th></tr></thead>
-                                                <tbody className="divide-y divide-slate-100">{documents.map((document, index) => <tr key={`${document.type}-${document.payment?.id ?? 'credit'}-${document.invoice.id}-${index}`} className="transition-colors hover:bg-blue-50/40">
-                                                    <td className="px-4 py-3">{document.type === 'receipt' ? 'Receipt' : 'Credit sale'}</td>
-                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/payments/${document.payment.id}`} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">{document.payment.number}</Link> : <Link to={`/invoices/${document.invoice.id}`} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">{document.invoice.number}</Link>}</td>
-                                                    <td className="px-4 py-3">{document.payment ? <Link to={`/invoices/${document.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">{document.invoice.number}</Link> : '—'}</td>
-                                                    <td className="px-4 py-3">{Object.entries(document.methods).map(([method, amount]) => `${result.methods.find((entry) => entry.key === method)?.name ?? method}: ${formatMoney(amount, day.currency)}`).join(', ') || '—'}</td>
-                                                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(document.amount, day.currency)}</td>
-                                                </tr>)}</tbody>
+                                                <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-3">Type</th><th className="px-4 py-3">Document</th><th className="px-4 py-3">Invoice</th><th className="px-4 py-3">Method</th><th className="px-4 py-3 text-right">Row amount</th></tr></thead>
+                                                <tbody className="divide-y divide-slate-100">{(['unpaid_sale', 'receipt'] as const).map((type) => {
+                                                    const rows = documents.filter((document) => document.type === type);
+                                                    if (rows.length === 0) return null;
+                                                    return <Fragment key={type}>
+                                                        <tr className="bg-slate-100"><th colSpan={5} className="px-4 py-2 text-left text-sm font-semibold text-slate-800">{type === 'unpaid_sale' ? 'New unpaid sales · invoice date' : 'Receipts · payment date'}</th></tr>
+                                                        {rows.map((document, index) => <tr key={`${document.type}-${document.payment?.id ?? 'unpaid'}-${document.invoice.id}-${index}`} className="transition-colors hover:bg-blue-50/40">
+                                                            <td className="px-4 py-3">{document.type === 'receipt' ? 'Receipt' : 'Unpaid sale'}</td>
+                                                            <td className="px-4 py-3">{document.payment ? <Link to={`/payments/${document.payment.id}`} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">{document.payment.number}</Link> : <Link to={`/invoices/${document.invoice.id}`} className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">{document.invoice.number}</Link>}</td>
+                                                            <td className="px-4 py-3">{document.payment ? <Link to={`/invoices/${document.invoice.id}`} className="font-medium text-blue-600 hover:text-blue-800 hover:underline">{document.invoice.number}</Link> : '—'}</td>
+                                                            <td className="px-4 py-3">{Object.entries(document.methods).map(([method, amount]) => `${result.methods.find((entry) => entry.key === method)?.name ?? method}: ${formatMoney(amount, day.currency)}`).join(', ') || '—'}</td>
+                                                            <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatMoney(document.amount, day.currency)}</td>
+                                                        </tr>)}
+                                                    </Fragment>;
+                                                })}</tbody>
                                             </table>
                                         </div> : null}
                                     </td></tr> : null}
                                     </Fragment>;
                                 })}
-                                {result.days.length === 0 ? <tr><td colSpan={result.methods.length + 3} className="px-3 py-10 text-center text-slate-500">No posted invoice receipts or new credit sales in this period.</td></tr> : null}
+                                {result.days.length === 0 ? <tr><td colSpan={result.methods.length + 3} className="px-3 py-10 text-center text-slate-500">No posted invoice receipts or new unpaid sales in this period.</td></tr> : null}
                             </tbody>
                             <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
                                 {result.totals.map((total) => <tr key={total.currency}>
                                     <td className="px-3 py-3">Total ({total.currency})</td>
                                     {result.methods.map((method) => <td key={method.key} className="px-3 py-3 text-right tabular-nums">{formatMoney(total.methods[method.key], total.currency)}</td>)}
                                     <td className="px-3 py-3 text-right tabular-nums">{formatMoney(total.receipts, total.currency)}</td>
-                                    <td className="px-3 py-3 text-right tabular-nums">{formatMoney(total.credit_sales, total.currency)}</td>
+                                    <td className="px-3 py-3 text-right tabular-nums">{formatMoney(total.unpaid_sales, total.currency)}</td>
                                 </tr>)}
                             </tfoot>
                         </table>

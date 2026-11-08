@@ -31,6 +31,7 @@ final class SummaryReportService
         private readonly FinanceStatementService $statements,
         private readonly ReportBrandingResolver $branding,
         private readonly SalesSettlementBreakdownService $salesSettlements,
+        private readonly ReceivedCashSourceBreakdown $receivedCashSources,
         private readonly ExpenseReportService $expenses,
     ) {}
 
@@ -254,7 +255,7 @@ final class SummaryReportService
     }
 
     /**
-     * @return array{amount: string, transaction_count: int, methods: list<array<string, int|string>>}
+     * @return array<string, mixed>
      */
     private function paymentSummary(
         int $tenantId,
@@ -279,6 +280,7 @@ final class SummaryReportService
         $rows = $query->get([
             'payments.id as payment_id',
             'payments.exchange_rate',
+            'payments.total_amount as payment_total',
             'lines.amount',
             'lines.payment_method_type_snapshot as type',
             'lines.payment_method_name_snapshot as name',
@@ -311,11 +313,23 @@ final class SummaryReportService
         ], $methodTotals));
         usort($methods, fn (array $left, array $right): int => $this->math->compare($right['amount'], $left['amount']));
 
-        return [
+        $summary = [
             'amount' => $amount,
             'transaction_count' => count($paymentIds),
             'methods' => $methods,
         ];
+
+        if ($direction === PaymentDirection::Inbound) {
+            $summary['cash_sources'] = $this->receivedCashSources->run(
+                $rows,
+                $tenantId,
+                $organizationUnitId,
+                $dateFrom,
+                $dateTo,
+            );
+        }
+
+        return $summary;
     }
 
     /**

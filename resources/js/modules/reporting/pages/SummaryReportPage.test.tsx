@@ -49,7 +49,19 @@ describe('SummaryReportPage', () => {
                             transaction_count: 40,
                             amount: '376270',
                         },
+                        {
+                            type: 'card',
+                            name: 'Card',
+                            transaction_count: 41,
+                            amount: '349125.71',
+                        },
                     ],
+                    cash_sources: {
+                        selected_invoices: '100000',
+                        earlier_invoices: '200000',
+                        other_invoices: '0',
+                        unapplied: '76270',
+                    },
                 },
                 sent: {
                     amount: '0',
@@ -114,8 +126,13 @@ describe('SummaryReportPage', () => {
         expect(screen.getByRole('heading', { name: 'Cash' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Card' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Outstanding now' })).toBeInTheDocument();
-        expect(screen.getAllByText(/376,270\.00/)).toHaveLength(2);
+        expect(screen.getByText('Payments received during selected dates')).toBeInTheDocument();
+        expect(screen.getAllByText(/376,270\.00/)).toHaveLength(3);
         expect(screen.getByRole('heading', { name: 'Payments received' })).toBeInTheDocument();
+        await user.click(screen.getByText('Cash received breakdown'));
+        expect(screen.getByText('Invoices dated in selected period')).toBeInTheDocument();
+        expect(screen.getByText('Earlier invoices')).toBeInTheDocument();
+        expect(screen.getByText('Not allocated to an invoice')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Total expenses' })).toBeInTheDocument();
         expect(screen.getByText(/Rent was the largest paid expense type at 100%/)).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Not connected yet' })).toBeInTheDocument();

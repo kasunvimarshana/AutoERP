@@ -20,6 +20,7 @@ final class PaymentPermissionTest extends TestCase
             'payments.submit',
             'payments.approve',
             'payments.post',
+            'payments.backdate-cash',
             'payments.void',
             'payments.reverse',
             'payments.allocate',

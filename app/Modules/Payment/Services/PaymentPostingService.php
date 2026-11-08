@@ -35,6 +35,7 @@ final class PaymentPostingService
         private readonly PaymentPostingPolicyService $postingPolicy,
         private readonly PaymentRefundFinanceService $refundFinance,
         private readonly PaymentBalanceSynchronizer $balances,
+        private readonly PaymentCashReceiptDatePolicy $cashReceiptDates,
     ) {}
 
     public function post(Payment $payment, int $expectedVersion, ?int $postedBy = null): Payment
@@ -59,6 +60,7 @@ final class PaymentPostingService
             if ($locked->lines->isEmpty()) {
                 throw new InvalidArgumentException('Payment posting requires at least one payment line.');
             }
+            $this->cashReceiptDates->assertCanPost($locked, $postedBy);
             $this->validator->assertPositive((string) $locked->total_amount, 'Payment total');
             foreach ($locked->lines as $line) {
                 if (! $line instanceof PaymentLine) {

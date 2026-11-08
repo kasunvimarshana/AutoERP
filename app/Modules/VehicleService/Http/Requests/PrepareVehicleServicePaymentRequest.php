@@ -23,6 +23,7 @@ final class PrepareVehicleServicePaymentRequest extends TenantScopedRequest
             'expected_version' => $this->expectedVersionRules(),
             'invoice_id' => ['required', 'integer', 'min:1'],
             'payment_date' => ['required', 'date'],
+            'backdate_reason' => ['nullable', 'string', 'max:1000'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.amount' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.payment_method_id' => ['required', 'integer', 'min:1'],
@@ -61,6 +62,7 @@ final class PrepareVehicleServicePaymentRequest extends TenantScopedRequest
             currencyId: $this->filled('currency_id') ? (int) $this->input('currency_id') : null,
             exchangeRate: (string) $this->input('exchange_rate', '1.000000'),
             createdBy: $this->currentUserId(),
+            backdateReason: $this->filled('backdate_reason') ? trim((string) $this->input('backdate_reason')) : null,
         );
     }
 

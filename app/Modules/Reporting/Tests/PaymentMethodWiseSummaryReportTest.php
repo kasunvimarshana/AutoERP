@@ -15,7 +15,7 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_credit_sales_stay_on_invoice_date_and_split_receipts_follow_payment_date(): void
+    public function test_unpaid_sales_stay_on_invoice_date_and_split_receipts_follow_payment_date(): void
     {
         $now = now();
         $tenantId = (int) DB::table('tenants')->insertGetId([
@@ -57,12 +57,21 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
         DB::table('vehicle_service_invoice_links')->insert([
             'tenant_id' => $tenantId, 'vehicle_service_job_id' => $jobId,
             'invoice_id' => $serviceInvoiceId, 'source_line_total' => '80.000000',
-            'invoice_total' => '80.000000', 'settlement_mode' => 'credit', 'status' => 'active',
+            'invoice_total' => '80.000000', 'settlement_mode' => 'direct', 'status' => 'active',
             'created_at' => $now, 'updated_at' => $now,
         ]);
 
         $cashId = $this->method($tenantId, 'CASH', 'cash');
         $cardId = $this->method($tenantId, 'CARD', 'card');
+        $sameDayPaymentId = (int) DB::table('payments')->insertGetId([
+            'tenant_id' => $tenantId, 'payment_number' => 'PAY-PMW-INITIAL',
+            'payment_type' => 'customer_receipt', 'direction' => 'inbound',
+            'document_status' => 'approved', 'posting_status' => 'posted',
+            'payment_date' => '2026-10-01', 'total_amount' => '20.000000',
+            'allocated_amount' => '20.000000', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        $this->line($tenantId, $sameDayPaymentId, $cashId, 1, 'CASH', 'cash', '20.000000');
+        $this->allocation($tenantId, $sameDayPaymentId, $serviceInvoiceId, '20.000000', '2026-10-01');
         $paymentId = (int) DB::table('payments')->insertGetId([
             'tenant_id' => $tenantId, 'payment_number' => 'PAY-PMW',
             'payment_type' => 'customer_receipt', 'direction' => 'inbound',
@@ -77,8 +86,8 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
 
         $reports = app(PaymentMethodWiseSummaryReportService::class);
         $all = $reports->run($tenantId, null, '2026-10-01', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_ALL);
-        self::assertSame('180.000000', $all['days'][0]['credit_sales']);
-        self::assertSame('0.000000', $all['days'][0]['receipts']);
+        self::assertSame('160.000000', $all['days'][0]['unpaid_sales']);
+        self::assertSame('20.000000', $all['days'][0]['receipts']);
         self::assertSame('100.000000', $all['days'][1]['receipts']);
         self::assertSame('70.000000', $all['days'][1]['methods']['CASH']);
         self::assertSame('30.000000', $all['days'][1]['methods']['CARD']);
@@ -94,12 +103,13 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
         self::assertSame('JOB-PMW', $serviceSales['receipts'][0]['job_number']);
         self::assertSame('INV-SERVICE-PMW', $serviceSales['receipts'][0]['invoice_number']);
         self::assertSame(['CASH', 'CARD'], $serviceSales['receipts'][0]['methods']);
-        self::assertSame('180.000000', $reports->exportRows($all)[2]['credit_sales']);
+        self::assertSame('160.000000', $reports->exportRows($all)[2]['unpaid_sales']);
         self::assertArrayNotHasKey('documents', $all['days'][0]);
 
-        $creditDocuments = $reports->run($tenantId, null, '2026-10-01', '2026-10-01', PaymentMethodWiseSummaryReportService::SOURCE_ALL, true)['days'][0]['documents'];
-        self::assertSame(['INV-SELL-PMW', 'INV-SERVICE-PMW'], array_column(array_column($creditDocuments, 'invoice'), 'number'));
-        self::assertSame(['credit_sale', 'credit_sale'], array_column($creditDocuments, 'type'));
+        $initialDocuments = $reports->run($tenantId, null, '2026-10-01', '2026-10-01', PaymentMethodWiseSummaryReportService::SOURCE_ALL, true)['days'][0]['documents'];
+        self::assertSame(['INV-SELL-PMW', 'INV-SERVICE-PMW', 'INV-SERVICE-PMW'], array_column(array_column($initialDocuments, 'invoice'), 'number'));
+        self::assertSame(['unpaid_sale', 'unpaid_sale', 'receipt'], array_column($initialDocuments, 'type'));
+        self::assertSame('60.000000', $initialDocuments[1]['amount']);
 
         $receiptDocuments = $reports->run($tenantId, null, '2026-10-05', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_ALL, true)['days'][0]['documents'];
         self::assertCount(2, $receiptDocuments);
@@ -112,12 +122,12 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
         self::assertSame('40.000000', $receiptDocuments[1]['amount']);
 
         DB::table('invoices')->whereIn('id', [$sellingInvoiceId, $serviceInvoiceId])->update(['status' => 'paid', 'balance_due' => '0.000000']);
-        self::assertSame('180.000000', $reports->run($tenantId, null, '2026-10-01', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_ALL)['totals'][0]['credit_sales']);
+        self::assertSame('160.000000', $reports->run($tenantId, null, '2026-10-01', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_ALL)['totals'][0]['unpaid_sales']);
     }
 
     private function invoice(int $tenantId, int $customerId, string $number, string $type, string $amount): int
     {
-        return (int) DB::table('invoices')->insertGetId([
+        $invoiceId = (int) DB::table('invoices')->insertGetId([
             'tenant_id' => $tenantId, 'invoice_number' => $number, 'invoice_type' => $type,
             'direction' => 'outbound', 'party_type' => 'customer', 'party_id' => $customerId,
             'invoice_date' => '2026-10-01', 'due_date' => '2026-10-31',
@@ -125,6 +135,16 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
             'balance_due' => '40.000000',
             'created_at' => now(), 'updated_at' => now(),
         ]);
+        DB::table('invoice_balances')->insert([
+            'tenant_id' => $tenantId,
+            'invoice_id' => $invoiceId,
+            'invoice_total' => $amount,
+            'remaining_amount' => $amount,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $invoiceId;
     }
 
     private function method(int $tenantId, string $code, string $type): int
@@ -149,7 +169,7 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
         ]);
     }
 
-    private function allocation(int $tenantId, int $paymentId, int $invoiceId, string $amount): void
+    private function allocation(int $tenantId, int $paymentId, int $invoiceId, string $amount, string $date = '2026-10-05'): void
     {
         DB::table('payment_allocations')->insert([
             'tenant_id' => $tenantId, 'payment_id' => $paymentId, 'invoice_id' => $invoiceId,
@@ -157,7 +177,7 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
             'invoice_number_snapshot' => 'Invoice '.$invoiceId,
             'invoice_total' => '100.000000', 'invoice_balance_before' => '100.000000',
             'allocated_amount' => $amount, 'invoice_balance_after' => '40.000000',
-            'allocation_date' => '2026-10-05', 'status' => 'active',
+            'allocation_date' => $date, 'status' => 'active',
             'created_at' => now(), 'updated_at' => now(),
         ]);
     }

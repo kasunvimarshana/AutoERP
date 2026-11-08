@@ -159,6 +159,7 @@ final class VehicleServicePaymentIntegrationService
                 'vehicle_service_job_id' => (int) $job->getKey(),
                 'vehicle_service_job_number' => (string) $job->job_number,
                 'invoice_id' => $data->invoiceId,
+                'backdate_reason' => $data->backdateReason,
             ],
         );
     }

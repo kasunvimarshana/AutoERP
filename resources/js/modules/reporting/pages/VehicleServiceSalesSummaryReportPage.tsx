@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -181,10 +182,11 @@ function StockItemsPanel({ result, params }: { result: VehicleServiceSalesSummar
                 <h2 className="font-semibold text-slate-900">Stock item performance</h2>
                 <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...params, export_section: 'stock' }} formats={sectionExportFormats} compact />
             </div>
-            <p className="mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is sales less stock cost, before commission.</p>
-            <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+            <p className="mb-3 text-sm text-slate-500">Ranked by invoiced quantity. Sales are after discounts and may include tax and charges. Profit is before commission.</p>
+            <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-slate-800">
                 <span>{formatQuantity(stock.item_count)} item types</span>
-                <span>{formatQuantity(stock.quantity)} units sold</span>
+                <span>{formatQuantity(stock.quantity)} units invoiced</span>
+                <span>Discount {formatMoney(stock.discount_amount)}</span>
                 <span>Revenue {formatMoney(stock.revenue)}</span>
                 <span>Profit {formatMoney(stock.profit)}</span>
             </div>
@@ -201,11 +203,12 @@ function ComboItemsPanel({ result, params }: { result: VehicleServiceSalesSummar
                 <h2 className="font-semibold text-slate-900">Combo item performance</h2>
                 <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...params, export_section: 'combo' }} formats={sectionExportFormats} compact />
             </div>
-            <p className="mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is combo sales less all component costs, before commission.</p>
-            <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+            <p className="mb-3 text-sm text-slate-500">Ranked by invoiced quantity. Sales are after discounts and may include tax and charges. Profit is before commission.</p>
+            <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-slate-800">
                 <span>{formatQuantity(combo.item_count)} combo types</span>
-                <span>{formatQuantity(combo.quantity)} combos sold</span>
+                <span>{formatQuantity(combo.quantity)} combos invoiced</span>
                 <span>{formatQuantity(combo.component_stock_quantity)} component stock units</span>
+                <span>Discount {formatMoney(combo.discount_amount)}</span>
                 <span>Revenue {formatMoney(combo.revenue)}</span>
                 <span>Profit {formatMoney(combo.profit)}</span>
             </div>
@@ -223,16 +226,17 @@ function RankedItemsTable({ items, kind }: { items: VehicleServiceSalesSummaryRa
                     <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <th scope="col" className="py-2 pl-3 pr-2">#</th>
                         <th scope="col" className="px-2 py-2">Item</th>
-                        <th scope="col" className="px-2 py-2 text-right">Qty sold</th>
+                        <th scope="col" className="px-2 py-2 text-right">Qty invoiced</th>
                         <th scope="col" className="px-2 py-2 text-right">Jobs</th>
-                        <th scope="col" className="px-2 py-2 text-right">Sales</th>
+                        <th scope="col" className="px-2 py-2 text-right">Discount</th>
+                        <th scope="col" className="px-2 py-2 text-right">Invoice sales</th>
                         <th scope="col" className="px-2 py-2 text-right">{costLabel}</th>
                         <th scope="col" className="py-2 pl-2 pr-3 text-right">Profit</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                     {items.map((item, index) => <RankedItemRow key={`${item.item.id ?? item.item.code}-${index}`} item={item} rank={index + 1} kind={kind} />)}
-                    {items.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-500">No {kind === 'combo' ? 'combo' : 'stock'} item sales in this period.</td></tr>}
+                    {items.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-500">No {kind === 'combo' ? 'combo' : 'stock'} item sales in this period.</td></tr>}
                 </tbody>
             </table>
         </div>
@@ -241,21 +245,20 @@ function RankedItemsTable({ items, kind }: { items: VehicleServiceSalesSummaryRa
 
 function RankedItemRow({ item, rank, kind }: { item: VehicleServiceSalesSummaryRankedItem; rank: number; kind: 'stock' | 'combo' }) {
     const [expanded, setExpanded] = useState(false);
-    const hasComponents = kind === 'combo' && (item.components?.length ?? 0) > 0;
     const loss = item.profit.startsWith('-');
     return (
         <>
             <tr className="align-middle">
                 <td className="py-2 pl-3 pr-2 tabular-nums text-slate-400">{rank}</td>
                 <td className="min-w-40 px-2 py-2">
-                    <div className="flex items-center gap-1">
-                        {hasComponents && <button type="button" className="rounded px-1 text-blue-600 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" aria-label={`${expanded ? 'Hide' : 'Show'} components for ${item.item.name}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? '−' : '+'}</button>}
-                        <span className="font-medium text-slate-900">{item.item.name}</span>
-                    </div>
-                    <div className={hasComponents ? 'pl-6 text-xs text-slate-500' : 'text-xs text-slate-500'}>{item.item.code}</div>
+                    <button type="button" className="flex items-center gap-1 text-left font-semibold text-blue-700 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={`${expanded ? 'Hide' : 'Show'} jobs for ${item.item.name}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+                        <span aria-hidden="true" className="w-4">{expanded ? '−' : '+'}</span>{item.item.name}
+                    </button>
+                    <div className="pl-5 text-xs text-slate-500">{item.item.code}</div>
                 </td>
                 <td className="px-2 py-2 text-right font-semibold tabular-nums text-slate-800">{formatQuantity(item.quantity)}</td>
                 <td className="px-2 py-2 text-right tabular-nums text-slate-600">{formatQuantity(item.job_count)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-amber-800">{formatMoney(item.discount_amount)}</td>
                 <td className="px-2 py-2 text-right tabular-nums text-slate-700">{formatMoney(item.sales_amount)}</td>
                 <td className="px-2 py-2 text-right tabular-nums text-slate-700">
                     {formatMoney(item.cost)}
@@ -265,8 +268,27 @@ function RankedItemRow({ item, rank, kind }: { item: VehicleServiceSalesSummaryR
                     {formatMoney(item.profit)}<div className="text-xs font-normal text-slate-500">{formatQuantity(item.margin)}%</div>
                 </td>
             </tr>
-            {expanded && hasComponents && <tr><td colSpan={7} className="bg-blue-50/30 px-4 py-3 sm:px-8"><ComboItemComponents components={item.components ?? []} /></td></tr>}
+            {expanded && <tr><td colSpan={8} className="bg-blue-50/30 px-4 py-3 sm:px-8"><div className="space-y-4"><RankedItemJobs item={item} />{kind === 'combo' && <ComboItemComponents components={item.components ?? []} />}</div></td></tr>}
         </>
+    );
+}
+
+function RankedItemJobs({ item }: { item: VehicleServiceSalesSummaryRankedItem }) {
+    return (
+        <section>
+            <h3 className="mb-2 text-sm font-semibold text-slate-800">Used in {item.job_count} jobs</h3>
+            <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-500"><tr><th className="px-3 py-2">Job</th><th className="px-3 py-2 text-right">Qty invoiced</th><th className="px-3 py-2 text-right">Discount</th><th className="px-3 py-2 text-right">Invoice sales</th></tr></thead>
+                    <tbody className="divide-y divide-slate-100">{item.jobs.map((job) => <tr key={job.id}>
+                        <td className="px-3 py-2"><Link to={`/vehicle-service/jobs/${job.id}`} className="font-semibold text-blue-700 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">{job.number}</Link></td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatQuantity(job.quantity)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(job.discount_amount)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(job.sales_amount)}</td>
+                    </tr>)}</tbody>
+                </table>
+            </div>
+        </section>
     );
 }
 

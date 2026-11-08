@@ -17,13 +17,13 @@ describe('PaymentMethodWiseSummaryReportPage', () => {
         apiMocks.runPaymentMethodWiseSummaryReport.mockResolvedValue({
             organization_unit: 'Main',
             methods: [{ key: 'CASH', name: 'Cash' }],
-            days: [{ date: '2026-10-05', currency: 'LKR', methods: { CASH: '40.000000' }, receipts: '40.000000', credit_sales: '100.000000' }],
-            totals: [{ currency: 'LKR', methods: { CASH: '40.000000' }, receipts: '40.000000', credit_sales: '100.000000' }],
+            days: [{ date: '2026-10-05', currency: 'LKR', methods: { CASH: '40.000000' }, receipts: '40.000000', unpaid_sales: '100.000000' }],
+            totals: [{ currency: 'LKR', methods: { CASH: '40.000000' }, receipts: '40.000000', unpaid_sales: '100.000000' }],
         });
         apiMocks.loadPaymentMethodWiseDocuments.mockResolvedValue([{
-            date: '2026-10-05', currency: 'LKR', methods: { CASH: '40.000000' }, receipts: '40.000000', credit_sales: '100.000000',
+            date: '2026-10-05', currency: 'LKR', methods: { CASH: '40.000000' }, receipts: '40.000000', unpaid_sales: '100.000000',
             documents: [
-                { type: 'credit_sale', invoice: { id: 11, number: 'SALES-0011' }, payment: null, amount: '100.000000', methods: {} },
+                { type: 'unpaid_sale', invoice: { id: 11, number: 'SALES-0011' }, payment: null, amount: '100.000000', methods: {} },
                 { type: 'receipt', invoice: { id: 11, number: 'SALES-0011' }, payment: { id: 22, number: 'PAY-0022' }, amount: '40.000000', methods: { CASH: '40.000000' } },
             ],
         }]);
@@ -36,6 +36,9 @@ describe('PaymentMethodWiseSummaryReportPage', () => {
 
         const payment = await screen.findByRole('link', { name: 'PAY-0022' });
         expect(payment).toHaveAttribute('href', '/payments/22');
+        expect(screen.getByText('New unpaid sales · invoice date')).toBeInTheDocument();
+        expect(screen.getByText('Receipts · payment date')).toBeInTheDocument();
+        expect(screen.getByText('Unpaid sale rows belong to New unpaid sales. Receipt rows belong to Receipts total and the payment method columns.')).toBeInTheDocument();
         expect(screen.getAllByRole('link', { name: 'SALES-0011' })).toHaveLength(2);
         expect(within(payment.closest('tr')!).getByText(/Cash:/)).toBeInTheDocument();
         expect(apiMocks.loadPaymentMethodWiseDocuments).toHaveBeenCalledWith(

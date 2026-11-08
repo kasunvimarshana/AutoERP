@@ -20,11 +20,11 @@ class VehicleServiceSalesSummaryExportTest extends TestCase
     {
         $stock = [
             'item' => ['code' => 'FILTER', 'name' => 'Oil filter'], 'quantity' => '2', 'job_count' => 1,
-            'sales_amount' => '200.555', 'cost' => '100.125', 'profit' => '100.43',
+            'sales_amount' => '200.555', 'discount_amount' => '20', 'cost' => '100.125', 'profit' => '100.43',
         ];
         $combo = [
             'item' => ['code' => 'SVC', 'name' => 'Oil service'], 'quantity' => '1', 'job_count' => 1,
-            'sales_amount' => '300', 'cost' => '150', 'stock_cost' => '100', 'profit' => '150',
+            'sales_amount' => '300', 'discount_amount' => '30', 'cost' => '150', 'stock_cost' => '100', 'profit' => '150',
             'components' => [['item' => ['code' => 'OIL', 'name' => 'Engine oil'], 'quantity' => '2.5', 'kind' => 'stock', 'cost' => '100']],
         ];
         $result = ['summary' => ['stock' => ['items' => [$stock]], 'combo' => ['items' => [$combo]]]];
@@ -34,6 +34,7 @@ class VehicleServiceSalesSummaryExportTest extends TestCase
         self::assertCount(1, $stockRows);
         self::assertSame('FILTER — Oil filter', $stockRows[0]['reference']);
         self::assertSame('200.555', $stockRows[0]['revenue']);
+        self::assertSame('20', $stockRows[0]['discount_amount']);
         self::assertSame('100.125', $stockRows[0]['direct_cost']);
         self::assertCount(2, $comboRows);
         self::assertSame('SVC — Oil service', $comboRows[0]['reference']);
@@ -79,11 +80,11 @@ class VehicleServiceSalesSummaryExportTest extends TestCase
         $component = ['item' => ['id' => 88, 'code' => 'OIL', 'name' => 'Engine oil'], 'kind' => 'stock', 'quantity' => '2.5', 'cost' => '30.125'];
         $combo = [
             'item' => ['id' => 77, 'code' => 'SVC', 'name' => 'Oil service'],
-            'quantity' => '1', 'job_count' => 1, 'sales_amount' => '100.555',
+            'quantity' => '1', 'job_count' => 1, 'sales_amount' => '100.555', 'discount_amount' => '10',
             'cost' => '40.125', 'component_cost' => '40.125', 'stock_cost' => '30.125',
             'profit' => '60.43', 'components' => [$component],
         ];
-        $totals = ['job_count' => 1, 'revenue' => '100.555', 'stock_cost' => '30.125', 'direct_cost' => '40.125', 'commission' => '5', 'profit' => '55.43', 'collected' => '70', 'margin' => '55.12'];
+        $totals = ['job_count' => 1, 'revenue' => '100.555', 'discount_amount' => '10', 'stock_cost' => '30.125', 'direct_cost' => '40.125', 'commission' => '5', 'profit' => '55.43', 'collected' => '70', 'margin' => '55.12'];
         $result = [
             'summary' => [...$totals, 'stock' => ['items' => []], 'combo' => ['items' => [$combo]]],
             'jobs' => [[
@@ -102,6 +103,7 @@ class VehicleServiceSalesSummaryExportTest extends TestCase
 
         self::assertCount(7, $rows);
         self::assertSame('100.555', $rows[0]['revenue']);
+        self::assertSame('10', $rows[0]['discount_amount']);
         self::assertSame('55.43', $rows[0]['profit']);
         self::assertSame('SVC — Oil service', $rows[1]['reference']);
         self::assertArrayNotHasKey('revenue', $rows[2]);

@@ -18,6 +18,8 @@ final class PaymentPermission
 
     public const PAYMENTS_POST = 'payments.post';
 
+    public const PAYMENTS_BACKDATE_CASH = 'payments.backdate-cash';
+
     public const PAYMENTS_VOID = 'payments.void';
 
     public const PAYMENTS_REVERSE = 'payments.reverse';
@@ -57,6 +59,7 @@ final class PaymentPermission
             self::PAYMENTS_SUBMIT => 'Submit payments for approval.',
             self::PAYMENTS_APPROVE => 'Approve submitted payments.',
             self::PAYMENTS_POST => 'Post approved payments to Finance journals.',
+            self::PAYMENTS_BACKDATE_CASH => 'Post a cash receipt with a date before the current business day.',
             self::PAYMENTS_VOID => 'Void eligible unposted payments.',
             self::PAYMENTS_REVERSE => 'Reverse posted payments and linked effects.',
             self::PAYMENTS_ALLOCATE => 'Allocate posted payments to invoices.',

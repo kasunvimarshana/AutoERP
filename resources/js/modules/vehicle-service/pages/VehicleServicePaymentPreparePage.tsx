@@ -197,6 +197,7 @@ export default function VehicleServicePaymentPreparePage() {
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
     const [date, setDate] = useState(businessDateInputValue());
+    const [backdateReason, setBackdateReason] = useState('');
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('direct');
     const [rows, setRows] = useState<PaymentRow[]>(DIRECT_PAYMENT_KINDS.map(({ kind }) => ({
         kind,
@@ -305,6 +306,7 @@ export default function VehicleServicePaymentPreparePage() {
         expected_version: options.data?.job_version ?? 0,
         invoice_id: Number(invoiceId),
         payment_date: date,
+        ...(date < businessDateInputValue() && backdateReason.trim() ? { backdate_reason: backdateReason.trim() } : {}),
         lines: rows.flatMap((row, index) => {
             if (compareDecimalStrings(appliedAmounts[index] ?? ZERO_AMOUNT, ZERO_AMOUNT) <= 0) return [];
             const method = selectedMethodForRow(row, paymentMethods);
@@ -436,6 +438,13 @@ export default function VehicleServicePaymentPreparePage() {
                                 disabled={submissionLocked}
                                 onChange={(event) => { setDate(event.target.value); }}
                             />
+                            {date < businessDateInputValue() && <Input
+                                label="Reason for earlier payment date"
+                                value={backdateReason}
+                                error={fieldError(error, 'backdate_reason')}
+                                disabled={submissionLocked}
+                                onChange={(event) => setBackdateReason(event.target.value)}
+                            />}
                             <fieldset>
                                 <legend className="mb-1.5 text-sm font-medium text-slate-700">Payment type</legend>
                                 <div className="flex flex-wrap gap-2">

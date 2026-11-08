@@ -391,6 +391,7 @@ export interface VehicleServicePaymentPayload {
     expected_version: number;
     invoice_id: number;
     payment_date: string;
+    backdate_reason?: string;
     lines: Array<{
         amount: string;
         payment_method_id: number;

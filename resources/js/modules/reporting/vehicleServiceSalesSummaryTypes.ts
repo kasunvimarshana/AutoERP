@@ -16,6 +16,7 @@ export interface VehicleServiceSalesSummaryCostLine {
     item: VehicleServiceSalesSummaryItem;
     quantity: string;
     sales_amount: string;
+    discount_amount: string;
     cost: string;
 }
 
@@ -31,10 +32,12 @@ export interface VehicleServiceSalesSummaryRankedItem {
     quantity: string;
     job_count: number;
     sales_amount: string;
+    discount_amount: string;
     cost: string;
     stock_cost?: string;
     profit: string;
     margin: string;
+    jobs: { id: number; number: string; quantity: string; discount_amount: string; sales_amount: string }[];
     components?: VehicleServiceSalesSummaryComboComponent[];
 }
 
@@ -43,6 +46,7 @@ export interface VehicleServiceSalesSummaryCombo {
     item: VehicleServiceSalesSummaryItem;
     quantity: string;
     sales_amount: string;
+    discount_amount: string;
     component_cost: string;
     stock_cost: string;
     stock_quantity: string;
@@ -57,6 +61,7 @@ export interface VehicleServiceSalesSummaryJob {
     customer: { name: string };
     vehicle: { name: string };
     revenue: string;
+    discount_amount: string;
     direct_cost: string;
     stock_cost: string;
     used_stock_cost: string;
@@ -83,6 +88,7 @@ export interface VehicleServiceSalesSummaryResult {
     summary: {
         job_count: number;
         revenue: string;
+        discount_amount: string;
         collected: string;
         direct_cost: string;
         stock_cost: string;
@@ -92,6 +98,7 @@ export interface VehicleServiceSalesSummaryResult {
         stock: {
             item_count: number;
             quantity: string;
+            discount_amount: string;
             revenue: string;
             cost: string;
             profit: string;
@@ -101,6 +108,7 @@ export interface VehicleServiceSalesSummaryResult {
             combo_count: number;
             item_count: number;
             quantity: string;
+            discount_amount: string;
             component_stock_quantity: string;
             revenue: string;
             stock_cost: string;

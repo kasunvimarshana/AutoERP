@@ -17,7 +17,6 @@ use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
-use Modules\VehicleService\Enums\VehicleServiceInvoiceSettlementMode;
 
 final class PaymentMethodWiseSummaryReportService
 {
@@ -42,6 +41,7 @@ final class PaymentMethodWiseSummaryReportService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly ReportBrandingResolver $branding,
+        private readonly CustomerOutstandingAsOfBalances $historicalBalances,
     ) {}
 
     /** @return array<string, mixed> */
@@ -51,6 +51,7 @@ final class PaymentMethodWiseSummaryReportService
         $defaultCurrency = (string) ($brand['currency_code'] ?? '');
         $days = [];
         $methods = [];
+        $invoiceRows = collect();
 
         if ($source !== self::SOURCE_SERVICE) {
             $sales = DB::table('sales')
@@ -58,7 +59,6 @@ final class PaymentMethodWiseSummaryReportService
                 ->where('sales.tenant_id', $tenantId)
                 ->where('invoices.tenant_id', $tenantId)
                 ->where('sales.status', self::POSTED_SALE_STATUS)
-                ->whereNotNull('sales.due_date')
                 ->where('invoices.invoice_type', InvoiceType::Sales->value)
                 ->where('invoices.direction', InvoiceDirection::Outbound->value)
                 ->whereIn('invoices.status', self::FINAL_INVOICE_STATUSES)
@@ -67,12 +67,7 @@ final class PaymentMethodWiseSummaryReportService
             $this->scope($sales, 'sales.organization_unit_id', $organizationUnitId);
             $this->scope($sales, 'invoices.organization_unit_id', $organizationUnitId);
 
-            foreach ($sales->get(['invoices.id', 'invoices.invoice_number', 'invoices.invoice_date', 'invoices.currency_code_snapshot', 'invoices.grand_total']) as $sale) {
-                $this->addCredit($days, (string) $sale->invoice_date, (string) ($sale->currency_code_snapshot ?: $defaultCurrency), (string) $sale->grand_total, $includeDocuments ? [
-                    'type' => 'credit_sale', 'invoice' => ['id' => (int) $sale->id, 'number' => (string) $sale->invoice_number],
-                    'payment' => null, 'amount' => (string) $sale->grand_total, 'methods' => [],
-                ] : null);
-            }
+            $invoiceRows = $invoiceRows->concat($sales->get(['invoices.id', 'invoices.invoice_number', 'invoices.invoice_date', 'invoices.currency_code_snapshot', 'invoices.grand_total']));
         }
 
         if ($source !== self::SOURCE_SELLING) {
@@ -81,7 +76,6 @@ final class PaymentMethodWiseSummaryReportService
                 ->where('links.tenant_id', $tenantId)
                 ->where('invoices.tenant_id', $tenantId)
                 ->where('links.status', self::ACTIVE_SERVICE_LINK_STATUS)
-                ->where('links.settlement_mode', VehicleServiceInvoiceSettlementMode::Credit->value)
                 ->where('invoices.invoice_type', InvoiceType::Service->value)
                 ->where('invoices.direction', InvoiceDirection::Outbound->value)
                 ->whereIn('invoices.status', self::FINAL_INVOICE_STATUSES)
@@ -90,10 +84,29 @@ final class PaymentMethodWiseSummaryReportService
             $this->scope($service, 'links.organization_unit_id', $organizationUnitId);
             $this->scope($service, 'invoices.organization_unit_id', $organizationUnitId);
 
-            foreach ($service->get(['invoices.id', 'invoices.invoice_number', 'invoices.invoice_date', 'invoices.currency_code_snapshot', 'links.invoice_total']) as $invoice) {
-                $this->addCredit($days, (string) $invoice->invoice_date, (string) ($invoice->currency_code_snapshot ?: $defaultCurrency), (string) $invoice->invoice_total, $includeDocuments ? [
-                    'type' => 'credit_sale', 'invoice' => ['id' => (int) $invoice->id, 'number' => (string) $invoice->invoice_number],
-                    'payment' => null, 'amount' => (string) $invoice->invoice_total, 'methods' => [],
+            $invoiceRows = $invoiceRows->concat($service->get(['invoices.id', 'invoices.invoice_number', 'invoices.invoice_date', 'invoices.currency_code_snapshot', 'invoices.grand_total', 'links.invoice_total']));
+        }
+
+        foreach ($invoiceRows->groupBy('invoice_date') as $invoiceDate => $datedInvoices) {
+            $balances = $this->historicalBalances->balances($tenantId, (string) $invoiceDate)
+                ->whereIn('current_balances.invoice_id', $datedInvoices->pluck('id')->all())
+                ->get()
+                ->keyBy('invoice_id');
+            foreach ($datedInvoices as $invoice) {
+                $balance = $balances->get($invoice->id);
+                if ($balance === null) {
+                    throw new \LogicException('Posted invoice is missing its balance record.');
+                }
+                $amount = (string) $balance->remaining_amount;
+                if (isset($invoice->invoice_total) && $this->math->compare((string) $invoice->grand_total, self::ZERO) > 0) {
+                    $amount = $this->math->mul($amount, $this->math->div((string) $invoice->invoice_total, (string) $invoice->grand_total, 12));
+                }
+                if ($this->math->compare($amount, self::ZERO) <= 0) {
+                    continue;
+                }
+                $this->addUnpaidSale($days, (string) $invoiceDate, (string) ($invoice->currency_code_snapshot ?: $defaultCurrency), $amount, $includeDocuments ? [
+                    'type' => 'unpaid_sale', 'invoice' => ['id' => (int) $invoice->id, 'number' => (string) $invoice->invoice_number],
+                    'payment' => null, 'amount' => $amount, 'methods' => [],
                 ] : null);
             }
         }
@@ -179,8 +192,8 @@ final class PaymentMethodWiseSummaryReportService
         foreach ($days as &$day) {
             $day['methods'] = array_replace(array_fill_keys(array_keys($methods), self::ZERO), $day['methods']);
             $currency = $day['currency'];
-            $totals[$currency] ??= ['currency' => $currency, 'credit_sales' => self::ZERO, 'receipts' => self::ZERO, 'methods' => array_fill_keys(array_keys($methods), self::ZERO)];
-            $totals[$currency]['credit_sales'] = $this->math->add($totals[$currency]['credit_sales'], $day['credit_sales']);
+            $totals[$currency] ??= ['currency' => $currency, 'unpaid_sales' => self::ZERO, 'receipts' => self::ZERO, 'methods' => array_fill_keys(array_keys($methods), self::ZERO)];
+            $totals[$currency]['unpaid_sales'] = $this->math->add($totals[$currency]['unpaid_sales'], $day['unpaid_sales']);
             $totals[$currency]['receipts'] = $this->math->add($totals[$currency]['receipts'], $day['receipts']);
             foreach ($day['methods'] as $key => $amount) {
                 $totals[$currency]['methods'][$key] = $this->math->add($totals[$currency]['methods'][$key], $amount);
@@ -206,7 +219,7 @@ final class PaymentMethodWiseSummaryReportService
             $columns[] = new ReportColumn('method_'.$index, $method['name'], format: 'money');
         }
         $columns[] = new ReportColumn('receipts', 'Receipts total', format: 'money');
-        $columns[] = new ReportColumn('credit_sales', 'New credit sales', format: 'money');
+        $columns[] = new ReportColumn('unpaid_sales', 'New unpaid sales', format: 'money');
 
         return new ReportDefinition(
             key: 'payment-method-wise-summary',
@@ -214,7 +227,7 @@ final class PaymentMethodWiseSummaryReportService
             group: 'Invoice & Payment',
             model: Payment::class,
             columns: $columns,
-            description: 'Daily allocated receipts and new credit sales for Selling and Vehicle Service.',
+            description: 'Daily allocated receipts and invoice-date balances remaining after payments recorded that day.',
             orientation: 'landscape',
         );
     }
@@ -223,7 +236,7 @@ final class PaymentMethodWiseSummaryReportService
     public function exportRows(array $result): array
     {
         $exportRow = static function (array $day) use ($result): array {
-            $row = ['date' => $day['date'] ?? 'Total', 'currency' => $day['currency'], 'receipts' => $day['receipts'], 'credit_sales' => $day['credit_sales']];
+            $row = ['date' => $day['date'] ?? 'Total', 'currency' => $day['currency'], 'receipts' => $day['receipts'], 'unpaid_sales' => $day['unpaid_sales']];
             foreach ($result['methods'] as $index => $method) {
                 $row['method_'.$index] = $day['methods'][$method['key']];
             }
@@ -235,10 +248,10 @@ final class PaymentMethodWiseSummaryReportService
     }
 
     /** @param array<string, array<string, mixed>> $days */
-    private function addCredit(array &$days, string $date, string $currency, string $amount, ?array $document): void
+    private function addUnpaidSale(array &$days, string $date, string $currency, string $amount, ?array $document): void
     {
         $day = &$this->day($days, $date, $currency);
-        $day['credit_sales'] = $this->math->add($day['credit_sales'], $amount);
+        $day['unpaid_sales'] = $this->math->add($day['unpaid_sales'], $amount);
         if ($document !== null) {
             $document['amount'] = $this->math->normalize($amount);
             $day['documents'][] = $document;
@@ -289,7 +302,7 @@ final class PaymentMethodWiseSummaryReportService
     private function &day(array &$days, string $date, string $currency): array
     {
         $key = $date.'|'.$currency;
-        $days[$key] ??= ['date' => $date, 'currency' => $currency, 'credit_sales' => self::ZERO, 'receipts' => self::ZERO, 'methods' => []];
+        $days[$key] ??= ['date' => $date, 'currency' => $currency, 'unpaid_sales' => self::ZERO, 'receipts' => self::ZERO, 'methods' => []];
 
         return $days[$key];
     }

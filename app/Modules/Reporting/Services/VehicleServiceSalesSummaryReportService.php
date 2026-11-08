@@ -63,6 +63,10 @@ final class VehicleServiceSalesSummaryReportService
                     ->on('invoice_links.vehicle_service_job_id', '=', 'jobs.id')
                     ->on('invoice_links.tenant_id', '=', 'source_lines.tenant_id');
             })
+            ->leftJoin('invoice_lines', function ($join): void {
+                $join->on('invoice_lines.id', '=', 'source_lines.invoice_line_id')
+                    ->on('invoice_lines.tenant_id', '=', 'source_lines.tenant_id');
+            })
             ->leftJoin('items', function ($join): void {
                 $join->on('items.id', '=', 'job_lines.item_id')
                     ->on('items.tenant_id', '=', 'job_lines.tenant_id');
@@ -104,16 +108,17 @@ final class VehicleServiceSalesSummaryReportService
                 }),
             )
             ->selectRaw(
-                'invoices.id as invoice_id, invoices.invoice_date, invoice_links.invoice_total, invoice_links.source_line_total, '
+                'invoices.id as invoice_id, invoices.invoice_date, invoice_links.invoice_total, invoice_links.source_line_total, invoice_links.allocated_adjustment_total, '
                 .'jobs.id as job_id, jobs.job_number, jobs.job_date, jobs.grand_total, jobs.supervisor_commission_amount, '
                 .'COALESCE(customers.display_name, customers.name) as customer_name, '
                 .'COALESCE(vehicles.registration_number, vehicles.vehicle_number) as vehicle_name, '
                 .'job_lines.id as job_line_id, job_lines.parent_line_id, job_lines.line_source_type, job_lines.quantity as line_quantity, '
                 .'job_lines.item_id, job_lines.description, items.code as item_code, items.name as item_name, items.is_stockable, '
-                .'SUM(source_lines.invoiced_quantity) as quantity, SUM(source_lines.invoiced_line_total) as sales_amount',
+                .'SUM(source_lines.invoiced_quantity) as quantity, SUM(source_lines.invoiced_line_total) as sales_amount, '
+                .'SUM(COALESCE(invoice_lines.discount_amount, 0)) as line_discount_amount',
             )
             ->groupBy(
-                'invoices.id', 'invoices.invoice_date', 'invoice_links.invoice_total', 'invoice_links.source_line_total',
+                'invoices.id', 'invoices.invoice_date', 'invoice_links.invoice_total', 'invoice_links.source_line_total', 'invoice_links.allocated_adjustment_total',
                 'jobs.id', 'jobs.job_number', 'jobs.job_date', 'jobs.grand_total', 'jobs.supervisor_commission_amount',
                 'customers.display_name', 'customers.name', 'vehicles.registration_number', 'vehicles.vehicle_number',
                 'job_lines.id', 'job_lines.parent_line_id', 'job_lines.line_source_type', 'job_lines.quantity',
@@ -127,6 +132,7 @@ final class VehicleServiceSalesSummaryReportService
 
         foreach ($sales as $row) {
             $invoiceSales = $this->allocatedInvoiceSales($row);
+            $invoiceDiscount = $this->allocatedInvoiceDiscount($row);
             $inSalesPeriod = (empty($params['date_from']) || $row->invoice_date >= $params['date_from'])
                 && (empty($params['date_to']) || $row->invoice_date <= $params['date_to']);
 
@@ -139,7 +145,7 @@ final class VehicleServiceSalesSummaryReportService
                 $jobs[$jobId]['revenue'] = $this->math->add($jobs[$jobId]['revenue'], $invoiceSales);
                 $lineQuantities[$lineId] = $this->math->add($lineQuantities[$lineId] ?? self::ZERO, (string) $row->quantity);
                 $lineBaseQuantities[$lineId] = (string) $row->line_quantity;
-                $this->addSalesLine($jobs[$jobId], $row, $invoiceSales, (string) $row->quantity);
+                $this->addSalesLine($jobs[$jobId], $row, $invoiceSales, $invoiceDiscount, (string) $row->quantity);
             }
         }
 
@@ -212,7 +218,7 @@ final class VehicleServiceSalesSummaryReportService
             if ($category === 'stock') {
                 $bucket['stock_cost'] = $this->math->add($bucket['stock_cost'], $cost);
                 $bucket['stock_quantity'] = $this->math->add($bucket['stock_quantity'], $quantity);
-                $this->addCostToItem($bucket['stock_items'], $line, $quantity, $cost);
+                $this->addCostToItem($bucket['stock_items'], $line, $cost);
             } elseif ($category === 'combo') {
                 $bucket['combo_component_cost'] = $this->math->add($bucket['combo_component_cost'], $cost);
                 if ((bool) $line->is_stockable) {
@@ -222,7 +228,7 @@ final class VehicleServiceSalesSummaryReportService
                 $this->addComboComponent($bucket['combos'], $parentId, $line, $quantity, $cost);
             } else {
                 $bucket['other_cost'] = $this->math->add($bucket['other_cost'], $cost);
-                $this->addCostToItem($bucket['other_items'], $line, $quantity, $cost);
+                $this->addCostToItem($bucket['other_items'], $line, $cost);
             }
 
             unset($bucket);
@@ -349,6 +355,19 @@ final class VehicleServiceSalesSummaryReportService
             : $sourceAmount;
     }
 
+    private function allocatedInvoiceDiscount(object $row): string
+    {
+        $sourceLineTotal = (string) $row->source_line_total;
+        $jobDiscount = $this->math->compare($sourceLineTotal, self::ZERO) > 0
+            ? $this->math->mul(
+                (string) $row->sales_amount,
+                $this->math->div((string) $row->allocated_adjustment_total, $sourceLineTotal, self::ALLOCATION_SCALE),
+            )
+            : self::ZERO;
+
+        return $this->math->add((string) $row->line_discount_amount, $jobDiscount);
+    }
+
     /** @return array<string, mixed> */
     private function emptyJob(object $row): array
     {
@@ -359,6 +378,7 @@ final class VehicleServiceSalesSummaryReportService
             'customer' => ['name' => (string) ($row->customer_name ?? 'Walk-in customer')],
             'vehicle' => ['name' => (string) ($row->vehicle_name ?? '—')],
             'revenue' => self::ZERO,
+            'discount_amount' => self::ZERO,
             'direct_cost' => self::ZERO,
             'stock_cost' => self::ZERO,
             'used_stock_cost' => self::ZERO,
@@ -384,13 +404,14 @@ final class VehicleServiceSalesSummaryReportService
     }
 
     /** @param array<string, mixed> $job */
-    private function addSalesLine(array &$job, object $row, string $amount, string $quantity): void
+    private function addSalesLine(array &$job, object $row, string $amount, string $discount, string $quantity): void
     {
         $sourceType = (string) $row->line_source_type;
         $category = $sourceType === VehicleServiceLineSourceType::ComboParent->value
             ? 'combo'
             : ((bool) $row->is_stockable ? 'stock' : 'other');
         $job['categories'][$category]['revenue'] = $this->math->add($job['categories'][$category]['revenue'], $amount);
+        $job['discount_amount'] = $this->math->add($job['discount_amount'], $discount);
         $item = [
             'id' => $row->item_id === null ? null : (int) $row->item_id,
             'code' => (string) $row->item_code,
@@ -405,6 +426,7 @@ final class VehicleServiceSalesSummaryReportService
                     'item' => $item,
                     'quantity' => self::ZERO,
                     'sales_amount' => self::ZERO,
+                    'discount_amount' => self::ZERO,
                     'component_cost' => self::ZERO,
                     'stock_cost' => self::ZERO,
                     'stock_quantity' => self::ZERO,
@@ -413,6 +435,7 @@ final class VehicleServiceSalesSummaryReportService
             }
             $job['combos'][$key]['quantity'] = $this->math->add($job['combos'][$key]['quantity'], $quantity);
             $job['combos'][$key]['sales_amount'] = $this->math->add($job['combos'][$key]['sales_amount'], $amount);
+            $job['combos'][$key]['discount_amount'] = $this->math->add($job['combos'][$key]['discount_amount'], $discount);
 
             return;
         }
@@ -420,10 +443,11 @@ final class VehicleServiceSalesSummaryReportService
         $rows = $category === 'stock' ? 'stock_items' : 'other_items';
         $key = (string) $row->job_line_id;
         if (! isset($job[$rows][$key])) {
-            $job[$rows][$key] = ['line_id' => (int) $row->job_line_id, 'item' => $item, 'quantity' => self::ZERO, 'sales_amount' => self::ZERO, 'cost' => self::ZERO];
+            $job[$rows][$key] = ['line_id' => (int) $row->job_line_id, 'item' => $item, 'quantity' => self::ZERO, 'sales_amount' => self::ZERO, 'discount_amount' => self::ZERO, 'cost' => self::ZERO];
         }
         $job[$rows][$key]['quantity'] = $this->math->add($job[$rows][$key]['quantity'], $quantity);
         $job[$rows][$key]['sales_amount'] = $this->math->add($job[$rows][$key]['sales_amount'], $amount);
+        $job[$rows][$key]['discount_amount'] = $this->math->add($job[$rows][$key]['discount_amount'], $discount);
     }
 
     private function invoicedFraction(object $line, ?int $parentId, array $lineQuantities, array $lineBaseQuantities): string
@@ -453,7 +477,7 @@ final class VehicleServiceSalesSummaryReportService
     }
 
     /** @param array<string, mixed> $rows */
-    private function addCostToItem(array &$rows, object $line, string $quantity, string $cost): void
+    private function addCostToItem(array &$rows, object $line, string $cost): void
     {
         $key = (string) $line->id;
         if (! isset($rows[$key])) {
@@ -462,10 +486,10 @@ final class VehicleServiceSalesSummaryReportService
                 'item' => ['id' => $line->item_id === null ? null : (int) $line->item_id, 'code' => (string) ($line->item_code ?? ''), 'name' => (string) ($line->item_name ?? $line->description)],
                 'quantity' => self::ZERO,
                 'sales_amount' => self::ZERO,
+                'discount_amount' => self::ZERO,
                 'cost' => self::ZERO,
             ];
         }
-        $rows[$key]['quantity'] = $this->math->add($rows[$key]['quantity'], $quantity);
         $rows[$key]['cost'] = $this->math->add($rows[$key]['cost'], $cost);
     }
 
@@ -502,14 +526,15 @@ final class VehicleServiceSalesSummaryReportService
         $summary = [
             'job_count' => count($jobs),
             'revenue' => self::ZERO,
+            'discount_amount' => self::ZERO,
             'collected' => self::ZERO,
             'direct_cost' => self::ZERO,
             'stock_cost' => self::ZERO,
             'commission' => self::ZERO,
             'profit' => self::ZERO,
             'margin' => self::ZERO,
-            'stock' => ['item_count' => 0, 'quantity' => self::ZERO, 'revenue' => self::ZERO, 'cost' => self::ZERO, 'profit' => self::ZERO, 'items' => []],
-            'combo' => ['combo_count' => 0, 'item_count' => 0, 'quantity' => self::ZERO, 'component_stock_quantity' => self::ZERO, 'revenue' => self::ZERO, 'stock_cost' => self::ZERO, 'component_cost' => self::ZERO, 'profit' => self::ZERO, 'items' => []],
+            'stock' => ['item_count' => 0, 'quantity' => self::ZERO, 'discount_amount' => self::ZERO, 'revenue' => self::ZERO, 'cost' => self::ZERO, 'profit' => self::ZERO, 'items' => []],
+            'combo' => ['combo_count' => 0, 'item_count' => 0, 'quantity' => self::ZERO, 'discount_amount' => self::ZERO, 'component_stock_quantity' => self::ZERO, 'revenue' => self::ZERO, 'stock_cost' => self::ZERO, 'component_cost' => self::ZERO, 'profit' => self::ZERO, 'items' => []],
             'other_service_revenue' => self::ZERO,
         ];
         $stockItems = [];
@@ -524,6 +549,7 @@ final class VehicleServiceSalesSummaryReportService
                 $combo['profit'] = $this->math->sub($combo['sales_amount'], $combo['component_cost']);
                 $summary['combo']['combo_count']++;
                 $summary['combo']['quantity'] = $this->math->add($summary['combo']['quantity'], $combo['quantity']);
+                $summary['combo']['discount_amount'] = $this->math->add($summary['combo']['discount_amount'], $combo['discount_amount']);
                 $summary['combo']['revenue'] = $this->math->add($summary['combo']['revenue'], $combo['sales_amount']);
                 $summary['combo']['stock_cost'] = $this->math->add($summary['combo']['stock_cost'], $combo['stock_cost']);
                 $summary['combo']['component_stock_quantity'] = $this->math->add($summary['combo']['component_stock_quantity'], $combo['stock_quantity']);
@@ -534,8 +560,10 @@ final class VehicleServiceSalesSummaryReportService
                     $combo['item'],
                     $combo['quantity'],
                     $combo['sales_amount'],
+                    $combo['discount_amount'],
                     $combo['component_cost'],
                     (int) $job['id'],
+                    (string) $job['job_number'],
                     $combo['stock_cost'],
                 );
                 foreach ($combo['components'] as $component) {
@@ -545,6 +573,7 @@ final class VehicleServiceSalesSummaryReportService
             unset($combo);
             foreach ($job['stock_items'] as $item) {
                 $summary['stock']['quantity'] = $this->math->add($summary['stock']['quantity'], $item['quantity']);
+                $summary['stock']['discount_amount'] = $this->math->add($summary['stock']['discount_amount'], $item['discount_amount']);
                 $summary['stock']['revenue'] = $this->math->add($summary['stock']['revenue'], $item['sales_amount']);
                 $summary['stock']['cost'] = $this->math->add($summary['stock']['cost'], $item['cost']);
                 $this->accumulateRankedItem(
@@ -552,13 +581,16 @@ final class VehicleServiceSalesSummaryReportService
                     $item['item'],
                     $item['quantity'],
                     $item['sales_amount'],
+                    $item['discount_amount'],
                     $item['cost'],
                     (int) $job['id'],
+                    (string) $job['job_number'],
                 );
             }
             $summary['stock']['profit'] = $this->math->sub($summary['stock']['revenue'], $summary['stock']['cost']);
             $summary['stock']['item_count'] = count($stockItems);
             $summary['revenue'] = $this->math->add($summary['revenue'], $job['revenue']);
+            $summary['discount_amount'] = $this->math->add($summary['discount_amount'], $job['discount_amount']);
             $summary['direct_cost'] = $this->math->add($summary['direct_cost'], $job['direct_cost']);
             $summary['stock_cost'] = $this->math->add($summary['stock_cost'], $job['used_stock_cost']);
             $summary['commission'] = $this->math->add($summary['commission'], $job['commission']);
@@ -596,8 +628,10 @@ final class VehicleServiceSalesSummaryReportService
         array $item,
         string $quantity,
         string $sales,
+        string $discount,
         string $cost,
         int $jobId,
+        string $jobNumber,
         ?string $stockCost = null,
     ): void {
         $key = $this->itemKey($item);
@@ -606,17 +640,28 @@ final class VehicleServiceSalesSummaryReportService
                 'item' => $item,
                 'quantity' => self::ZERO,
                 'sales_amount' => self::ZERO,
+                'discount_amount' => self::ZERO,
                 'cost' => self::ZERO,
                 'stock_cost' => self::ZERO,
-                'job_ids' => [],
+                'jobs' => [],
                 'components' => [],
             ];
         }
         $items[$key]['quantity'] = $this->math->add($items[$key]['quantity'], $quantity);
         $items[$key]['sales_amount'] = $this->math->add($items[$key]['sales_amount'], $sales);
+        $items[$key]['discount_amount'] = $this->math->add($items[$key]['discount_amount'], $discount);
         $items[$key]['cost'] = $this->math->add($items[$key]['cost'], $cost);
         $items[$key]['stock_cost'] = $this->math->add($items[$key]['stock_cost'], $stockCost ?? self::ZERO);
-        $items[$key]['job_ids'][$jobId] = true;
+        $items[$key]['jobs'][$jobId] ??= [
+            'id' => $jobId,
+            'number' => $jobNumber,
+            'quantity' => self::ZERO,
+            'discount_amount' => self::ZERO,
+            'sales_amount' => self::ZERO,
+        ];
+        $items[$key]['jobs'][$jobId]['quantity'] = $this->math->add($items[$key]['jobs'][$jobId]['quantity'], $quantity);
+        $items[$key]['jobs'][$jobId]['discount_amount'] = $this->math->add($items[$key]['jobs'][$jobId]['discount_amount'], $discount);
+        $items[$key]['jobs'][$jobId]['sales_amount'] = $this->math->add($items[$key]['jobs'][$jobId]['sales_amount'], $sales);
     }
 
     /** @param array<string, mixed> $items @param array{id: int|null, code: string, name: string} $comboItem @param array<string, mixed> $component */
@@ -656,7 +701,8 @@ final class VehicleServiceSalesSummaryReportService
     private function finalizeRankedItems(array $items, bool $includeComponents = false): array
     {
         foreach ($items as &$item) {
-            $item['job_count'] = count($item['job_ids']);
+            $item['job_count'] = count($item['jobs']);
+            $item['jobs'] = array_values($item['jobs']);
             $item['profit'] = $this->math->sub($item['sales_amount'], $item['cost']);
             $item['margin'] = $this->math->compare($item['sales_amount'], self::ZERO) > 0
                 ? $this->math->mul($this->math->div($item['profit'], $item['sales_amount']), '100')
@@ -666,7 +712,6 @@ final class VehicleServiceSalesSummaryReportService
             } else {
                 unset($item['stock_cost'], $item['components']);
             }
-            unset($item['job_ids']);
         }
         unset($item);
 

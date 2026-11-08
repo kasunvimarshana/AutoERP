@@ -22,6 +22,12 @@ export interface SummaryPaymentMetrics {
     amount: string;
     transaction_count: number;
     methods: SummaryPaymentMethod[];
+    cash_sources?: {
+        selected_invoices: string;
+        earlier_invoices: string;
+        other_invoices: string;
+        unapplied: string;
+    };
 }
 
 export interface SalesSettlementMetric {

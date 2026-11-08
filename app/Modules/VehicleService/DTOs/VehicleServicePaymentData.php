@@ -14,5 +14,6 @@ final readonly class VehicleServicePaymentData
         public ?int $currencyId = null,
         public string $exchangeRate = '1.000000',
         public ?int $createdBy = null,
+        public ?string $backdateReason = null,
     ) {}
 }
