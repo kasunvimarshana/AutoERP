@@ -36,6 +36,30 @@ export function VehicleUsePanel({
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true);
     const [adding, setAdding] = useState(Boolean(initialVehicleId));
     const [action, setAction] = useState<{ row: VehicleUse; type: VehicleUseAction } | null>(null); const [at, setAt] = useState(''); const [odometer, setOdometer] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [history, setHistory] = useState<number | null>(null);
+    const actionHandoverLocal = (() => {
+        if (!action?.row?.handed_over_at) return undefined;
+        try {
+            return localTimestampValue(action.row.handed_over_at);
+        } catch {
+            return action.row.handed_over_at.slice(0, 19);
+        }
+    })();
+    const actionPlannedStartLocal = (() => {
+        if (!action?.row?.starts_at) return undefined;
+        try {
+            return localTimestampValue(action.row.starts_at);
+        } catch {
+            return action.row.starts_at.slice(0, 19);
+        }
+    })();
+    const actionPlannedEndLocal = (() => {
+        if (!action?.row?.ends_at) return undefined;
+        try {
+            return localTimestampValue(action.row.ends_at);
+        } catch {
+            return action.row.ends_at.slice(0, 19);
+        }
+    })();
     useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
     function reload() { setReplacement(null); setLoading(true); setAdding(false); setAction(null); setHistory(null); setRevision(v => v + 1); }
     function choose(row: VehicleUse, type: VehicleUseAction) {
@@ -120,10 +144,10 @@ export function VehicleUsePanel({
                             step={OPERATIONAL_TIME_STEP_SECONDS}
                             min={action.type === VehicleUseAction.Handover
                                 ? (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined)
-                                : (action.row.handed_over_at ? action.row.handed_over_at.slice(0, 16) : undefined)
+                                : (actionHandoverLocal ? actionHandoverLocal.slice(0, 16) : undefined)
                             }
-                            max={action.type === VehicleUseAction.Handover && action.row.ends_at
-                                ? action.row.ends_at.slice(0, 16)
+                            max={action.type === VehicleUseAction.Handover && actionPlannedEndLocal
+                                ? actionPlannedEndLocal
                                 : `${businessDateInputValue()}T23:59:59`
                             }
                             value={at}
@@ -140,7 +164,7 @@ export function VehicleUsePanel({
                                 <Button
                                     type="button"
                                     variant="secondary"
-                                    onClick={() => setAt(action.row.starts_at ? action.row.starts_at.slice(0, 16) : '')}
+                                    onClick={() => setAt(actionPlannedStartLocal ?? '')}
                                 >
                                     Use planned handover time
                                 </Button>
@@ -151,7 +175,7 @@ export function VehicleUsePanel({
                                         try {
                                             setAt(localTimestampValue(new Date().toISOString()));
                                         } catch {
-                                            setAt(action.row.starts_at ? action.row.starts_at.slice(0, 16) : '');
+                                            setAt(actionPlannedStartLocal ?? '');
                                         }
                                     }}
                                 >

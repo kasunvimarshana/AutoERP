@@ -21,11 +21,19 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [company, setCompany] = useState(false);
     const [sourceCount, setSourceCount] = useState<number | null>(null);
     const [oldOdometer, setOldOdometer] = useState(''); const [newOdometer, setNewOdometer] = useState('');
-    const [start, setStart] = useState(() => replacement?.handed_over_at ? replacement.handed_over_at.slice(0, 16) : (agreement.starts_on ? `${agreement.starts_on}T00:00` : '')); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
+    const replacementHandoverLocal = (() => {
+        if (!replacement?.handed_over_at) return undefined;
+        try {
+            return localTimestampValue(replacement.handed_over_at);
+        } catch {
+            return replacement.handed_over_at.slice(0, 19);
+        }
+    })();
+    const [start, setStart] = useState(() => replacementHandoverLocal ?? (agreement.starts_on ? `${agreement.starts_on}T00:00` : '')); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
     const isSameReplacementVehicle = Boolean(replacement && vehicle && vehicle.id === replacement.vehicle.id);
-    const minStart = replacement?.handed_over_at
-        ? replacement.handed_over_at.slice(0, 16)
+    const minStart = replacementHandoverLocal
+        ? replacementHandoverLocal.slice(0, 16)
         : (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined);
     const maxEnd = agreement.ends_on ? `${agreement.ends_on}T23:59` : undefined;
 
