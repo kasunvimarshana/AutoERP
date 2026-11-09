@@ -347,7 +347,15 @@
                 <td class="text-center font-bold">{{ $row['ot_type'] }}</td>
                 <td class="text-center">{{ $row['night_out'] }}</td>
                 <td class="text-right">{{ $row['pass'] }}</td>
-                <td class="text-left">{{ $row['remarks'] }}</td>
+                <td class="text-left">
+                    @if (!empty($row['driver_name']) && !empty($row['remarks']))
+                        <span style="font-weight: 600;">{{ $row['driver_name'] }}</span>: {{ $row['remarks'] }}
+                    @elseif (!empty($row['driver_name']))
+                        <span style="font-weight: 600;">{{ $row['driver_name'] }}</span>
+                    @else
+                        {{ $row['remarks'] }}
+                    @endif
+                </td>
             </tr>
             @endforeach
         </tbody>

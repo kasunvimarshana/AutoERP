@@ -268,7 +268,7 @@ final class RunningChartReportService
                     $remarks = $dayCharts->pluck('driver_observation')->filter()->implode(', ');
                 }
 
-                $driverName = $firstChart->driver_name_snapshot ?? '';
+                $driverName = $dayCharts->pluck('driver_name_snapshot')->filter()->unique()->implode(', ');
 
                 $dayLessee = $firstChart->vehicleUse?->customerAgreement?->customer?->name
                     ?? $firstChart->vehicleUse?->customerAgreement?->party_name_snapshot

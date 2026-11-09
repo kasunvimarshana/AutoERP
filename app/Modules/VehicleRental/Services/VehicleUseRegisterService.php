@@ -27,7 +27,7 @@ final class VehicleUseRegisterService
             }
         }
         $filters = Validator::make($filters, [
-            'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
+            'search' => ['nullable', 'string', 'max:255'],
             'use_status' => ['nullable', Rule::enum(VehicleUseStatus::class)],
             'from' => ['nullable', 'string'], 'until' => ['nullable', 'string'],
         ])->validate();

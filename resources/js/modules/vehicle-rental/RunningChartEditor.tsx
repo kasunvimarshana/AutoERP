@@ -7,6 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
@@ -32,10 +33,41 @@ export interface InitialDriverState {
     externalReference?: string;
 }
 
-export function RunningChartEditor({ use, chart, correction, initialDriver, onSaved, onCancel }: { use: VehicleUse; chart?: RunningChart; correction?: boolean; initialDriver?: InitialDriverState; onSaved: () => void; onCancel: () => void }) {
+export function RunningChartEditor({
+    use,
+    chart,
+    correction,
+    initialDriver,
+    initialOdometer,
+    onSaved,
+    onCancel,
+}: {
+    use: VehicleUse;
+    chart?: RunningChart;
+    correction?: boolean;
+    initialDriver?: InitialDriverState;
+    initialOdometer?: string;
+    onSaved: () => void;
+    onCancel: () => void;
+}) {
+    const custodyStart = use.handed_over_at ? localTimestampValue(use.handed_over_at).slice(0, 16) : undefined;
+    const custodyEnd = use.returned_at ? localTimestampValue(use.returned_at).slice(0, 16) : undefined;
+
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
-    const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : ''); const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
-    const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries([...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [key, String(chart?.[key as keyof ChartFacts] ?? '')])));
+    const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : '');
+    const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
+    const [values, setValues] = useState<Record<string, string>>(() => {
+        const initial = Object.fromEntries(
+            [...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [
+                key,
+                String(chart?.[key as keyof ChartFacts] ?? ''),
+            ])
+        );
+        if (!chart && initialOdometer && !initial.start_odometer) {
+            initial.start_odometer = initialOdometer;
+        }
+        return initial;
+    });
     const [ac, setAc] = useState<AirConditioningMode | ''>(chart?.ac_mode ?? '');
     const [driverSource, setDriverSource] = useState<DriverIdentitySource | ''>(chart?.driver_identity_source ?? (!chart && initialDriver?.source ? initialDriver.source : ''));
     const [driverEmployee, setDriverEmployee] = useState<NamedResource | null>(() => {
@@ -57,10 +89,37 @@ export function RunningChartEditor({ use, chart, correction, initialDriver, onSa
             ? chart.driver.reference
             : (!chart && initialDriver?.source === DriverIdentitySource.External ? initialDriver.externalReference ?? '' : '')
     );
-    const [driverObservation, setDriverObservation] = useState(chart?.driver_observation ?? ''); const [notes, setNotes] = useState(chart?.notes ?? '');
-    const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
+    const [driverObservation, setDriverObservation] = useState(chart?.driver_observation ?? '');
+    const [notes, setNotes] = useState(chart?.notes ?? '');
+    const [error, setError] = useState<ApiError | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    const hasErrorInDetails = Boolean(error && Object.keys(error.fields).some(k => [
+        'garage_km', 'commercial_km', 'normal_ot_minutes', 'double_ot_minutes',
+        'triple_ot_minutes', 'night_outs', 'ac_mode', 'driver_identity_source',
+        'driver_employee_id', 'driver_name_snapshot', 'driver_reference_snapshot',
+        'driver_observation', 'notes',
+    ].includes(k)));
+
+    const hasDetailsContent = Boolean(
+        driverSource ||
+        ac ||
+        initialDriver?.source ||
+        values.garage_km ||
+        values.commercial_km ||
+        values.normal_ot_minutes ||
+        values.double_ot_minutes ||
+        values.triple_ot_minutes ||
+        values.night_outs ||
+        driverObservation ||
+        notes
+    );
+    const [userToggledOpen, setUserToggledOpen] = useState<boolean | null>(null);
+    const detailsOpen = userToggledOpen !== null ? userToggledOpen : (hasDetailsContent || hasErrorInDetails);
+
     const isReferenceRequired = Boolean(chart && !correction);
     const isReferenceValid = isReferenceRequired ? Boolean(reference.trim()) : true;
+
     async function submit(event: FormEvent) {
         event.preventDefault(); setSaving(true); setError(null);
         try {
@@ -97,39 +156,160 @@ export function RunningChartEditor({ use, chart, correction, initialDriver, onSa
             onSaved();
         } catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
-    const decimal = (key: string, label: string) => <Input key={key} label={label} value={values[key]} inputMode="decimal" onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))} error={error?.fields[key]?.[0]} />;
-    const count = (key: string, label: string) => <Input key={key} label={label} type="number" min={0} step={1} inputMode="numeric" value={values[key]} onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))} error={error?.fields[key]?.[0]} />;
+
+    const decimal = (key: string, label: string) => (
+        <Input
+            key={key}
+            label={label}
+            value={values[key]}
+            inputMode="decimal"
+            onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))}
+            error={error?.fields[key]?.[0]}
+        />
+    );
+    const count = (key: string, label: string) => (
+        <Input
+            key={key}
+            label={label}
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={values[key]}
+            onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))}
+            error={error?.fields[key]?.[0]}
+        />
+    );
+
     return <form aria-label="Running Chart" onSubmit={submit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h4 className="font-semibold">{correction ? `Correct ${chart?.reference}` : chart ? 'Edit draft Running Chart' : 'Record Running Chart'}</h4>
         <p>Record actual usage in {operationalTimeZoneLabel()}. Leave unknown observations blank; enter zero only when verified.</p><ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="space-y-4">
             <Input label="Chart reference" required={isReferenceRequired} value={reference} onChange={e => setReference(e.target.value)} error={error?.fields.reference?.[0]} hint={!isReferenceRequired ? 'Leave blank to automatically generate a unique chart reference' : undefined} />
             <div className="grid gap-3 sm:grid-cols-2">
-                <Input label="Usage start" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={start} onChange={e => setStart(e.target.value)} error={error?.fields.starts_at?.[0]} />
-                <Input label="Usage end" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={start || undefined} required value={end} onChange={e => setEnd(e.target.value)} error={error?.fields.ends_at?.[0]} />
+                <div className="space-y-1">
+                    <Input
+                        label="Usage start"
+                        type="datetime-local"
+                        step={OPERATIONAL_TIME_STEP_SECONDS}
+                        min={custodyStart}
+                        max={end || custodyEnd}
+                        required
+                        value={start}
+                        onChange={e => setStart(e.target.value)}
+                        error={error?.fields.starts_at?.[0]}
+                        hint={use.handed_over_at ? `Vehicle in custody since: ${formatBusinessDateTime(use.handed_over_at)}` : undefined}
+                    />
+                    {custodyStart && (
+                        <div className="flex flex-wrap gap-2 text-xs">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setStart(custodyStart)}
+                            >
+                                Use custody start time
+                            </Button>
+                        </div>
+                    )}
+                </div>
+                <div className="space-y-1">
+                    <Input
+                        label="Usage end"
+                        type="datetime-local"
+                        step={OPERATIONAL_TIME_STEP_SECONDS}
+                        min={start || custodyStart || undefined}
+                        max={custodyEnd}
+                        required
+                        value={end}
+                        onChange={e => setEnd(e.target.value)}
+                        error={error?.fields.ends_at?.[0]}
+                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTime(use.returned_at)}` : undefined}
+                    />
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                                try {
+                                    setEnd(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                } catch {
+                                    setEnd(new Date().toISOString().slice(0, 16));
+                                }
+                            }}
+                        >
+                            Use current time
+                        </Button>
+                    </div>
+                </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
                 {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}
                 {decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
             </div>
-            <details><summary className="cursor-pointer font-medium">Additional usage observations</summary><div className="space-y-3 pt-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                    {decimal('garage_km', DISTANCE_LABELS.garage_km)}
-                    {decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
+            <details
+                open={detailsOpen}
+                onToggle={e => setUserToggledOpen(e.currentTarget.open)}
+            >
+                <summary className="cursor-pointer font-medium">Additional usage observations</summary>
+                <div className="space-y-3 pt-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {decimal('garage_km', DISTANCE_LABELS.garage_km)}
+                        {decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {Object.entries(COUNT_LABELS).map(([key, label]) => count(key, label))}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} error={error?.fields.ac_mode?.[0]} />
+                        <Select
+                            label="Driver identity"
+                            placeholder="Not recorded"
+                            options={driverSourceOptions}
+                            value={driverSource}
+                            onChange={e => {
+                                const source = e.target.value as DriverIdentitySource | '';
+                                setDriverSource(source);
+                                if (source !== DriverIdentitySource.Employee) setDriverEmployee(null);
+                                setUserToggledOpen(true);
+                            }}
+                            error={error?.fields.driver_identity_source?.[0]}
+                        />
+                    </div>
+                    {driverSource === DriverIdentitySource.Employee && (
+                        <LookupSelect
+                            label="Employee driver"
+                            value={driverEmployee}
+                            onChange={setDriverEmployee}
+                            search={employees}
+                            required
+                            loadOnOpen
+                            minSearchLength={0}
+                            error={error?.fields.driver_employee_id?.[0]}
+                        />
+                    )}
+                    {driverSource === DriverIdentitySource.External && (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <Input label="External driver name" value={externalDriverName} onChange={e => setExternalDriverName(e.target.value)} required error={error?.fields.driver_name_snapshot?.[0]} />
+                            <Input label="External driver reference" value={externalDriverReference} onChange={e => setExternalDriverReference(e.target.value)} required error={error?.fields.driver_reference_snapshot?.[0]} hint="Use a stable business reference, not a temporary note." />
+                        </div>
+                    )}
+                    <Textarea label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} />
+                    <p className="text-xs text-slate-500">This is operational evidence only; employee pay remains owned by HR.</p>
+                    <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                    {Object.entries(COUNT_LABELS).map(([key, label]) => count(key, label))}
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} error={error?.fields.ac_mode?.[0]} />
-                    <Select label="Driver identity" placeholder="Not recorded" options={driverSourceOptions} value={driverSource} onChange={e => { const source = e.target.value as DriverIdentitySource | ''; setDriverSource(source); if (source !== DriverIdentitySource.Employee) setDriverEmployee(null); }} error={error?.fields.driver_identity_source?.[0]} />
-                </div>
-                {driverSource === DriverIdentitySource.Employee && <LookupSelect label="Employee driver" value={driverEmployee} onChange={setDriverEmployee} search={employees} required loadOnOpen minSearchLength={0} error={error?.fields.driver_employee_id?.[0]} />}
-                {driverSource === DriverIdentitySource.External && <div className="grid gap-3 sm:grid-cols-2"><Input label="External driver name" value={externalDriverName} onChange={e => setExternalDriverName(e.target.value)} required error={error?.fields.driver_name_snapshot?.[0]} /><Input label="External driver reference" value={externalDriverReference} onChange={e => setExternalDriverReference(e.target.value)} required error={error?.fields.driver_reference_snapshot?.[0]} hint="Use a stable business reference, not a temporary note." /></div>}
-                <Textarea label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} />
-                <p className="text-xs text-slate-500">This is operational evidence only; employee pay remains owned by HR.</p>
-                <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
-            </div></details>
-        </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!isReferenceValid || !start || !end || (driverSource === DriverIdentitySource.Employee && !driverEmployee) || (driverSource === DriverIdentitySource.External && (!externalDriverName.trim() || !externalDriverReference.trim()))}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+            </details>
+        </fieldset>
+        <div className="flex flex-wrap gap-2">
+            <Button
+                type="submit"
+                loading={saving}
+                disabled={!isReferenceValid || !start || !end || (driverSource === DriverIdentitySource.Employee && !driverEmployee) || (driverSource === DriverIdentitySource.External && (!externalDriverName.trim() || !externalDriverReference.trim()))}
+            >
+                Save draft
+            </Button>
+            <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>
+                Cancel
+            </Button>
+        </div>
     </form>;
 }

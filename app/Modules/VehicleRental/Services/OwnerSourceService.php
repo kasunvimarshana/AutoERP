@@ -31,7 +31,7 @@ final class OwnerSourceService
             'starts_at' => ['required', 'string'],
             'ends_at' => ['sometimes', 'nullable', 'string'],
             'customer_agreement_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
+            'search' => ['nullable', 'string', 'max:255'],
         ])->validate();
         $endsAt = $data['ends_at'] ?? null;
         if (is_string($endsAt) && trim($endsAt) === '') {

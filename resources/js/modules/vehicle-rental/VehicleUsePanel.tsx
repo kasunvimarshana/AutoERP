@@ -159,6 +159,23 @@ export function VehicleUsePanel({
                                 </Button>
                             </div>
                         )}
+                        {action.type === VehicleUseAction.Return && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        try {
+                                            setAt(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                        } catch {
+                                            setAt(new Date().toISOString().slice(0, 16));
+                                        }
+                                    }}
+                                >
+                                    Use current time
+                                </Button>
+                            </div>
+                        )}
                         <Input
                             label="Odometer (optional)"
                             value={odometer}

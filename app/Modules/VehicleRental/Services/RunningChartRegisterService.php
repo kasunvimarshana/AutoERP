@@ -27,7 +27,7 @@ final class RunningChartRegisterService
             }
         }
         $filters = Validator::make($filters, [
-            'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
+            'search' => ['nullable', 'string', 'max:255'],
             'chart_status' => ['nullable', Rule::enum(RunningChartStatus::class)],
             'from' => ['nullable', 'string'], 'until' => ['nullable', 'string'],
         ])->validate();

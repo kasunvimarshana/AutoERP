@@ -13,7 +13,7 @@ import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { AGREEMENT_API, type Agreement } from './agreements';
 import { planVehicleUse, replaceVehicleUse } from './vehicleUseApi';
-import { operationalTimeZoneLabel, timestampWithOffset, OPERATIONAL_TIME_STEP_SECONDS, type VehicleUse } from './vehicleUse';
+import { operationalTimeZoneLabel, localTimestampValue, timestampWithOffset, OPERATIONAL_TIME_STEP_SECONDS, type VehicleUse } from './vehicleUse';
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params).then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number || row.vehicle_number) })) }));
 export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onSaved, onCancel }: { agreement: Agreement; replacement?: VehicleUse; initialVehicleId?: number; onSaved: () => void; onCancel: () => void }) {
     const [vehicle, setVehicle] = useState<NamedResource | null>(null);
@@ -134,24 +134,46 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 value={vehicle}
                 onChange={value => { setVehicle(value); setOwner(null); }}
                 search={vehicles}
+                loadOnOpen
+                minSearchLength={0}
                 required
                 error={isSameReplacementVehicle ? 'Select a different physical vehicle.' : error?.fields.vehicle_id?.[0]}
             />
-            <Input
-                label={replacement ? "Replacement time" : "Planned handover"}
-                type="datetime-local"
-                step={OPERATIONAL_TIME_STEP_SECONDS}
-                min={minStart}
-                max={end || maxEnd}
-                value={start}
-                onChange={e => { setStart(e.target.value); setOwner(null); }}
-                required
-                hint={replacement?.handed_over_at
-                    ? `Previous vehicle handed over: ${formatBusinessDateTime(replacement.handed_over_at)}`
-                    : (minStart ? `Agreement starts: ${agreement.starts_on}` : undefined)
-                }
-                error={error?.fields.starts_at?.[0]}
-            />
+            <div className="space-y-1">
+                <Input
+                    label={replacement ? "Replacement time" : "Planned handover"}
+                    type="datetime-local"
+                    step={OPERATIONAL_TIME_STEP_SECONDS}
+                    min={minStart}
+                    max={end || maxEnd}
+                    value={start}
+                    onChange={e => { setStart(e.target.value); setOwner(null); }}
+                    required
+                    hint={replacement?.handed_over_at
+                        ? `Previous vehicle handed over: ${formatBusinessDateTime(replacement.handed_over_at)}`
+                        : (minStart ? `Agreement starts: ${agreement.starts_on}` : undefined)
+                    }
+                    error={error?.fields.starts_at?.[0]}
+                />
+                {replacement && (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                                try {
+                                    setStart(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                } catch {
+                                    setStart(new Date().toISOString().slice(0, 16));
+                                }
+                                setOwner(null);
+                            }}
+                        >
+                            Use current time
+                        </Button>
+                    </div>
+                )}
+            </div>
             <Input
                 label="Planned return (optional)"
                 type="datetime-local"
