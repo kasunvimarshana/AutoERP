@@ -10,6 +10,7 @@ import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { businessTimeZoneLabel } from '@/shared/utils/businessDate';
 import {
     createReferenceRecord,
     listReferenceRecords,
@@ -168,7 +169,7 @@ function ReferenceForm({ catalog, record, submitting, error, onCancel, onSubmit 
                 value={code}
                 disabled={record !== null}
                 required
-                hint={catalog === 'timezones' ? 'Example: Asia/Colombo' : 'Codes become permanent after creation.'}
+                hint={catalog === 'timezones' ? `Example: ${businessTimeZoneLabel()}` : 'Codes become permanent after creation.'}
                 onChange={(event) => setCode(event.target.value)}
             />
             <Input label={catalog === 'timezones' ? 'Display name' : 'Name'} value={name} required onChange={(event) => setName(event.target.value)} />
