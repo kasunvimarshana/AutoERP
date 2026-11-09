@@ -166,9 +166,9 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                             variant="secondary"
                             onClick={() => {
                                 try {
-                                    setStart(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                    setStart(localTimestampValue(new Date().toISOString()));
                                 } catch {
-                                    setStart(new Date().toISOString().slice(0, 16));
+                                    setStart(new Date().toISOString().slice(0, 19));
                                 }
                                 setOwner(null);
                                 setSourceCount(null);

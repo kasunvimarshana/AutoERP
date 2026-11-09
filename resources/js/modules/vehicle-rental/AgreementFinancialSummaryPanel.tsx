@@ -8,7 +8,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
+import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     AgreementKind,
     AgreementStatus,
@@ -36,11 +36,10 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
     const [feedback, setFeedback] = useState<string | null>(null);
 
     // Adjustment Form state
-    const today = new Date().toISOString().split('T')[0];
     const [adjustmentType, setAdjustmentType] = useState<'credit_note' | 'debit_note'>('credit_note');
     const [amount, setAmount] = useState('');
     const [reason, setReason] = useState('');
-    const [invoiceDate, setInvoiceDate] = useState(today);
+    const [invoiceDate, setInvoiceDate] = useState(businessDateInputValue);
     const [dueDate, setDueDate] = useState('');
     const [exchangeRate, setExchangeRate] = useState('1.000000');
 

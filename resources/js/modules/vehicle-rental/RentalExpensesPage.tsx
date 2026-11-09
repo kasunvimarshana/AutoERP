@@ -12,7 +12,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Select } from '@/shared/components/Select';
 import { LookupSelect } from '@/shared/components/LookupSelect';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
+import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import {
@@ -52,7 +52,7 @@ export default function RentalExpensesPage() {
     const [query, setQuery] = useState('');
 
     const [billingAllocation, setBillingAllocation] = useState<ExpenseAllocation | null>(null);
-    const [billingDate, setBillingDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [billingDate, setBillingDate] = useState(businessDateInputValue);
     const [billingDueDate, setBillingDueDate] = useState('');
     const [billingRate, setBillingRate] = useState('1.000000');
     const [isDebitNote, setIsDebitNote] = useState(true);
