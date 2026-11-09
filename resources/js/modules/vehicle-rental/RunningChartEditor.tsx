@@ -7,7 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, ApiError } from '@/shared/api/apiError';
-import { formatBusinessDateTimeWithSeconds } from '@/shared/utils/businessDate';
+import { formatBusinessDateTimeWithSeconds, businessDateInputValue } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
@@ -33,6 +33,14 @@ export interface InitialDriverState {
     externalReference?: string;
 }
 
+function freshLocalNow(): string {
+    return localTimestampValue(new Date().toISOString());
+}
+
+function freshToleranceNow(): string {
+    return localTimestampValue(new Date(Date.now() + 60_000).toISOString());
+}
+
 export function RunningChartEditor({
     use,
     chart,
@@ -52,14 +60,14 @@ export function RunningChartEditor({
 }) {
     const custodyStart = use.handed_over_at ? localTimestampValue(use.handed_over_at) : undefined;
     const custodyEnd = use.returned_at ? localTimestampValue(use.returned_at) : undefined;
-    const currentNow = localTimestampValue(new Date().toISOString());
+    const todayEnd = `${businessDateInputValue()}T23:59:59`;
 
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
     const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : '');
     const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
 
     const minStart = custodyStart ? custodyStart.slice(0, 16) + ':00' : undefined;
-    const maxEnd = custodyEnd && custodyEnd < currentNow ? custodyEnd : currentNow;
+    const maxEnd = custodyEnd ?? todayEnd;
     const maxStart = end && end < maxEnd ? end : maxEnd;
     const minEnd = start || minStart;
     const [values, setValues] = useState<Record<string, string>>(() => {
@@ -140,24 +148,28 @@ export function RunningChartEditor({
                 setSaving(false);
                 return;
             }
-            if (end && end > maxEnd) {
-                setError(new ApiError(
-                    'Record completed usage ending after its start, not in the future.',
-                    422,
-                    'VALIDATION_FAILED',
-                    'validation_error',
-                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
-                ));
-                setSaving(false);
-                return;
-            }
-            if (start && start > maxStart) {
+            const toleranceNow = freshToleranceNow();
+            const maxAllowedEnd = custodyEnd && custodyEnd < toleranceNow ? custodyEnd : toleranceNow;
+            const maxAllowedStart = end && end < maxAllowedEnd ? end : maxAllowedEnd;
+
+            if (start && start > maxAllowedStart) {
                 setError(new ApiError(
                     'Record completed usage starting before or at the current time, not in the future.',
                     422,
                     'VALIDATION_FAILED',
                     'validation_error',
                     { starts_at: ['Record completed usage starting before or at the current time, not in the future.'] },
+                ));
+                setSaving(false);
+                return;
+            }
+            if (end && end > maxAllowedEnd) {
+                setError(new ApiError(
+                    'Record completed usage ending after its start, not in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation_error',
+                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
                 ));
                 setSaving(false);
                 return;
@@ -279,9 +291,11 @@ export function RunningChartEditor({
                             variant="secondary"
                             onClick={() => {
                                 try {
-                                    setEnd(maxEnd);
+                                    const now = freshLocalNow();
+                                    const target = custodyEnd && custodyEnd < now ? custodyEnd : now;
+                                    setEnd(target);
                                 } catch {
-                                    setEnd(new Date().toISOString().slice(0, 16));
+                                    setEnd(new Date().toISOString().slice(0, 19));
                                 }
                             }}
                         >

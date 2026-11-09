@@ -26,6 +26,7 @@ final class RunningChartReportService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly RentalAuthorization $authorization,
+        private readonly RentalCalendar $calendar,
     ) {}
 
     /**
@@ -46,8 +47,9 @@ final class RunningChartReportService
         $startDate = (string) $params['start_date'];
         $endDate = (string) $params['end_date'];
 
-        $start = CarbonImmutable::parse($startDate)->startOfDay();
-        $end = CarbonImmutable::parse($endDate)->endOfDay();
+        $tz = $this->calendar->timezone($context);
+        $start = CarbonImmutable::parse($startDate, $tz)->startOfDay();
+        $end = CarbonImmutable::parse($endDate, $tz)->endOfDay();
 
         if ($end->lessThan($start)) {
             throw ValidationException::withMessages(['end_date' => ['End date must be on or after start date.']]);
@@ -153,17 +155,20 @@ final class RunningChartReportService
             ?? 'VARIOUS LESSEES';
 
         // Load all running chart logs in period
+        $startUtc = $start->setTimezone(OperationalFields::UTC);
+        $endUtc = $end->setTimezone(OperationalFields::UTC);
+
         $charts = RunningChart::query()
             ->forTenant($context->tenantId)
             ->whereIn('vehicle_use_id', $useIds)
-            ->where('starts_at', '>=', $start->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))
-            ->where('starts_at', '<=', $end->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))
+            ->where('starts_at', '>=', $startUtc->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))
+            ->where('starts_at', '<=', $endUtc->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))
             ->whereIn('status', [RunningChartStatus::Draft->value, RunningChartStatus::Finalized->value])
             ->with(['vehicleUse.vehicle', 'vehicleUse.customerAgreement.customer'])
             ->orderBy('starts_at')
             ->get();
 
-        $chartsByDate = $charts->groupBy(fn (RunningChart $chart): string => CarbonImmutable::parse($chart->starts_at)->toDateString());
+        $chartsByDate = $charts->groupBy(fn (RunningChart $chart): string => CarbonImmutable::parse($chart->starts_at)->setTimezone($tz)->toDateString());
 
         // Toll / Pass outlays
         $chartIds = $charts->pluck('id')->all();
@@ -187,7 +192,7 @@ final class RunningChartReportService
             ->groupBy(fn (RentalExpense $e): string => CarbonImmutable::parse($e->expense_date)->toDateString());
 
         $current = $start->copy();
-        $endDay = CarbonImmutable::parse($endDate)->startOfDay();
+        $endDay = $end->startOfDay();
 
         $rows = [];
         $cumulativeMileage = 0.0;
@@ -223,15 +228,14 @@ final class RunningChartReportService
                 $cumulativeMileage += $dayMileage;
                 $totalComparativeMileage += $dayMileage;
 
-                $onTime = $firstChart->starts_at ? CarbonImmutable::parse($firstChart->starts_at)->format('h:i A') : '';
-                $offTime = $lastChart->ends_at ? CarbonImmutable::parse($lastChart->ends_at)->format('h:i A') : '';
+                $firstStart = $firstChart->starts_at ? CarbonImmutable::parse($firstChart->starts_at)->setTimezone($tz) : null;
+                $lastEnd = $lastChart->ends_at ? CarbonImmutable::parse($lastChart->ends_at)->setTimezone($tz) : null;
 
-                if ($firstChart->starts_at && $lastChart->ends_at) {
-                    $startDt = CarbonImmutable::parse($firstChart->starts_at);
-                    $endDt = CarbonImmutable::parse($lastChart->ends_at);
-                    if ($endDt->toDateString() !== $startDt->toDateString()) {
-                        $offTime .= ' (+1)';
-                    }
+                $onTime = $firstStart ? $firstStart->format('h:i A') : '';
+                $offTime = $lastEnd ? $lastEnd->format('h:i A') : '';
+
+                if ($firstStart && $lastEnd && $lastEnd->toDateString() !== $firstStart->toDateString()) {
+                    $offTime .= ' (+1)';
                 }
 
                 $normMin = (int) $dayCharts->sum('normal_ot_minutes');

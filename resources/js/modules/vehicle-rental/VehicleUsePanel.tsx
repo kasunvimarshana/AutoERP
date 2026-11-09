@@ -10,7 +10,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';
 import { Pagination } from '@/shared/components/Pagination';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateInputValue } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
@@ -124,7 +124,7 @@ export function VehicleUsePanel({
                             }
                             max={action.type === VehicleUseAction.Handover && action.row.ends_at
                                 ? action.row.ends_at.slice(0, 16)
-                                : undefined
+                                : `${businessDateInputValue()}T23:59:59`
                             }
                             value={at}
                             onChange={e => setAt(e.target.value)}
@@ -149,7 +149,7 @@ export function VehicleUsePanel({
                                     variant="secondary"
                                     onClick={() => {
                                         try {
-                                            setAt(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                            setAt(localTimestampValue(new Date().toISOString()));
                                         } catch {
                                             setAt(action.row.starts_at ? action.row.starts_at.slice(0, 16) : '');
                                         }
@@ -166,9 +166,9 @@ export function VehicleUsePanel({
                                     variant="secondary"
                                     onClick={() => {
                                         try {
-                                            setAt(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                            setAt(localTimestampValue(new Date().toISOString()));
                                         } catch {
-                                            setAt(new Date().toISOString().slice(0, 16));
+                                            setAt(new Date().toISOString().slice(0, 19));
                                         }
                                     }}
                                 >

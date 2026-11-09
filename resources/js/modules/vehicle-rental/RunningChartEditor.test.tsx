@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { RunningChartEditor } from './RunningChartEditor';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
-import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
+import { localTimestampValue, VehicleUseStatus, type VehicleUse } from './vehicleUse';
 import { createChart } from './runningChartApi';
 
 vi.mock('./runningChartApi', () => ({
@@ -175,4 +175,22 @@ it('sets end time via Use current time button and respects custody return button
     const startInput = screen.getByLabelText('Usage start') as HTMLInputElement;
     fireEvent.click(screen.getByRole('button', { name: 'Use custody start time' }));
     expect(startInput.value).toContain('2026-09-07T08:00:38');
+});
+
+it('allows current timestamp with clock skew tolerance and rejects distant future start/end', async () => {
+    render(<RunningChartEditor use={use} onSaved={() => undefined} onCancel={() => undefined} />);
+
+    const startInput = screen.getByLabelText('Usage start');
+    const endInput = screen.getByLabelText('Usage end');
+
+    // Future start beyond tolerance (> 1 min ahead)
+    const futureStart = localTimestampValue(new Date(Date.now() + 10 * 60_000).toISOString()).slice(0, 16);
+    const futureEnd = localTimestampValue(new Date(Date.now() + 20 * 60_000).toISOString()).slice(0, 16);
+    fireEvent.change(startInput, { target: { value: futureStart } });
+    fireEvent.change(endInput, { target: { value: futureEnd } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
+
+    const errors = await screen.findAllByText(/Record completed usage (starting before or at the current time|ending after its start), not in the future\./);
+    expect(errors.length).toBeGreaterThanOrEqual(1);
+    expect(createChart).not.toHaveBeenCalled();
 });
