@@ -387,4 +387,58 @@ final class RunningChartTest extends TestCase
                 ->assertStatus(405);
         });
     }
+
+    public function test_usage_period_validation_enforces_order_rejects_future_and_tolerates_clock_skew_in_workspace_timezone(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+
+            // Rejects end earlier than or equal to start
+            try {
+                $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                    'reference' => 'INVALID-ORDER',
+                    'starts_at' => '2026-09-07T12:00:00+05:30',
+                    'ends_at' => '2026-09-07T11:00:00+05:30',
+                ]));
+                self::fail('Usage end before start was accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('ends_at', $e->errors());
+                self::assertSame('Record completed usage ending after its start, not in the future.', $e->errors()['ends_at'][0]);
+            }
+
+            // Current travel time is 2026-09-10T12:00:00+00:00 (17:30 in Asia/Colombo).
+            // Rejects end later than current time + tolerance
+            try {
+                $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                    'reference' => 'FUTURE-USAGE',
+                    'starts_at' => '2026-09-07T09:00:00+05:30',
+                    'ends_at' => '2026-09-10T17:35:00+05:30',
+                ]));
+                self::fail('Future usage was accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('ends_at', $e->errors());
+                self::assertSame('Record completed usage ending after its start, not in the future.', $e->errors()['ends_at'][0]);
+            }
+
+            // Rejects start later than current time
+            try {
+                $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                    'reference' => 'FUTURE-START',
+                    'starts_at' => '2026-09-10T17:35:00+05:30',
+                    'ends_at' => '2026-09-10T17:40:00+05:30',
+                ]));
+                self::fail('Future start was accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('starts_at', $e->errors());
+            }
+
+            // Accepts usage ending at current time with 30-second clock skew
+            $skewChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'SKEW-CHART',
+                'starts_at' => '2026-09-07T09:00:00+05:30',
+                'ends_at' => '2026-09-10T17:30:30+05:30',
+            ]));
+            self::assertSame('SKEW-CHART', $skewChart->reference);
+        });
+    }
 }

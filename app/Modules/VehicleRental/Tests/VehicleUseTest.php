@@ -536,4 +536,49 @@ final class VehicleUseTest extends TestCase
             ]);
         });
     }
+
+    public function test_return_enforces_order_rejects_future_and_tolerates_clock_skew_in_workspace_timezone(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $handedOver = $service->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => $input['starts_at'],
+                'odometer' => '100',
+                'reason' => 'Collected',
+            ]);
+
+            // Return before handover is rejected
+            try {
+                $service->transition($context, $handedOver->id, $handedOver->row_version, VehicleUseAction::ReturnVehicle, [
+                    'occurred_at' => '2026-09-07T08:00:00+05:30',
+                    'odometer' => '150',
+                    'reason' => 'Too early',
+                ]);
+                self::fail('Return before handover accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('occurred_at', $e->errors());
+            }
+
+            // Return in the future (relative to travel time 2026-09-10 17:30:00+05:30) is rejected
+            try {
+                $service->transition($context, $handedOver->id, $handedOver->row_version, VehicleUseAction::ReturnVehicle, [
+                    'occurred_at' => '2026-09-10T17:35:00+05:30',
+                    'odometer' => '150',
+                    'reason' => 'Future return',
+                ]);
+                self::fail('Future return accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('occurred_at', $e->errors());
+            }
+
+            // Return at current time with 30-second skew tolerance is accepted
+            $returned = $service->transition($context, $handedOver->id, $handedOver->row_version, VehicleUseAction::ReturnVehicle, [
+                'occurred_at' => '2026-09-10T17:30:30+05:30',
+                'odometer' => '150',
+                'reason' => 'Returned on time',
+            ]);
+            self::assertSame(VehicleUseStatus::Returned, $returned->status);
+        });
+    }
 }

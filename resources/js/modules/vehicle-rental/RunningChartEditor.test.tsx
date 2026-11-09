@@ -134,3 +134,41 @@ it('submits null for blank optional fields when creating a chart', async () => {
         expect(onSaved).toHaveBeenCalled();
     });
 });
+
+it('restricts usage end input to current time or return time and rejects client-side future usage', async () => {
+    render(<RunningChartEditor use={use} onSaved={() => undefined} onCancel={() => undefined} />);
+
+    const startInput = screen.getByLabelText('Usage start');
+    const endInput = screen.getByLabelText('Usage end');
+
+    expect(endInput).toHaveAttribute('max');
+    const maxEnd = endInput.getAttribute('max')!;
+    expect(maxEnd.length).toBeGreaterThanOrEqual(16);
+
+    // End cannot precede start
+    fireEvent.change(startInput, { target: { value: '2026-09-07T12:00' } });
+    fireEvent.change(endInput, { target: { value: '2026-09-07T11:00' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
+
+    const matchingErrors = await screen.findAllByText('Record completed usage ending after its start, not in the future.');
+    expect(matchingErrors.length).toBeGreaterThanOrEqual(1);
+    expect(createChart).not.toHaveBeenCalled();
+});
+
+it('sets end time via Use current time button and respects custody return button when present', () => {
+    const returnedUse = {
+        ...use,
+        status: VehicleUseStatus.Returned,
+        handed_over_at: '2026-09-07T08:00:00+05:30',
+        returned_at: '2026-09-07T18:00:00+05:30',
+    } as VehicleUse;
+
+    render(<RunningChartEditor use={returnedUse} onSaved={() => undefined} onCancel={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: 'Use custody start time' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use custody return time' })).toBeInTheDocument();
+
+    const endInput = screen.getByLabelText('Usage end');
+    fireEvent.click(screen.getByRole('button', { name: 'Use custody return time' }));
+    expect(endInput).toHaveValue('2026-09-07T18:00');
+});

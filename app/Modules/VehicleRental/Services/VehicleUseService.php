@@ -179,8 +179,10 @@ final class VehicleUseService
             if ($action === VehicleUseAction::Cancel && $record->status === VehicleUseStatus::Planned) {
                 $record->status = VehicleUseStatus::Cancelled;
             } elseif ($action === VehicleUseAction::Handover && $record->status === VehicleUseStatus::Planned) {
-                $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at');
-                if ($at->greaterThan(now()->addMinute()) || ($record->ends_at !== null && $at >= $record->ends_at)) {
+                $tz = $this->calendar->timezone($context);
+                $now = CarbonImmutable::now($tz)->addMinute();
+                $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at')->setTimezone($tz);
+                if ($at->greaterThan($now) || ($record->ends_at !== null && $at >= $record->ends_at)) {
                     throw ValidationException::withMessages(['occurred_at' => ['Record an actual handover before the planned return, not a future event.']]);
                 }
                 $this->coverageInstant($customer, $context, $at);
@@ -200,8 +202,10 @@ final class VehicleUseService
                 $record->handed_over_at = OperationalTime::database($at);
                 $record->handover_odometer = $data['odometer'] ?? null;
             } elseif ($action === VehicleUseAction::ReturnVehicle && $record->status === VehicleUseStatus::InCustody) {
-                $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at');
-                if ($at->isFuture() || $at <= $record->handed_over_at) {
+                $tz = $this->calendar->timezone($context);
+                $now = CarbonImmutable::now($tz)->addMinute();
+                $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at')->setTimezone($tz);
+                if ($at->greaterThan($now) || $at <= $record->handed_over_at) {
                     throw ValidationException::withMessages(['occurred_at' => ['Return must follow handover and cannot be in the future.']]);
                 }
                 if (($data['odometer'] ?? null) !== null && $record->handover_odometer !== null && bccomp($data['odometer'], $record->handover_odometer, AgreementFields::DECIMAL_SCALE) < 0) {

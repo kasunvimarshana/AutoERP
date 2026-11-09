@@ -6,7 +6,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
@@ -52,10 +52,14 @@ export function RunningChartEditor({
 }) {
     const custodyStart = use.handed_over_at ? localTimestampValue(use.handed_over_at).slice(0, 16) : undefined;
     const custodyEnd = use.returned_at ? localTimestampValue(use.returned_at).slice(0, 16) : undefined;
+    const currentNow = localTimestampValue(new Date().toISOString()).slice(0, 16);
 
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
     const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : '');
     const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
+
+    const maxEnd = custodyEnd && custodyEnd < currentNow ? custodyEnd : currentNow;
+    const maxStart = end && end < maxEnd ? end : maxEnd;
     const [values, setValues] = useState<Record<string, string>>(() => {
         const initial = Object.fromEntries(
             [...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [
@@ -123,6 +127,39 @@ export function RunningChartEditor({
     async function submit(event: FormEvent) {
         event.preventDefault(); setSaving(true); setError(null);
         try {
+            if (start && end && end <= start) {
+                setError(new ApiError(
+                    'Record completed usage ending after its start, not in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation_error',
+                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
+                ));
+                setSaving(false);
+                return;
+            }
+            if (end && end > maxEnd) {
+                setError(new ApiError(
+                    'Record completed usage ending after its start, not in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation_error',
+                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
+                ));
+                setSaving(false);
+                return;
+            }
+            if (start && start > maxStart) {
+                setError(new ApiError(
+                    'Record completed usage starting before or at the current time, not in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation_error',
+                    { starts_at: ['Record completed usage starting before or at the current time, not in the future.'] },
+                ));
+                setSaving(false);
+                return;
+            }
             const trimmedReference = reference.trim();
             const parseDistance = (val?: string) => {
                 const t = val?.trim();
@@ -193,7 +230,7 @@ export function RunningChartEditor({
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
                         min={custodyStart}
-                        max={end || custodyEnd}
+                        max={maxStart}
                         required
                         value={start}
                         onChange={e => setStart(e.target.value)}
@@ -218,7 +255,7 @@ export function RunningChartEditor({
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
                         min={start || custodyStart || undefined}
-                        max={custodyEnd}
+                        max={maxEnd}
                         required
                         value={end}
                         onChange={e => setEnd(e.target.value)}
@@ -226,12 +263,21 @@ export function RunningChartEditor({
                         hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTime(use.returned_at)}` : undefined}
                     />
                     <div className="flex flex-wrap gap-2 text-xs">
+                        {custodyEnd && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setEnd(custodyEnd)}
+                            >
+                                Use custody return time
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             variant="secondary"
                             onClick={() => {
                                 try {
-                                    setEnd(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                    setEnd(maxEnd);
                                 } catch {
                                     setEnd(new Date().toISOString().slice(0, 16));
                                 }

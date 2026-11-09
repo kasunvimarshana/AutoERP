@@ -31,6 +31,11 @@ final class RentalCalendar
         return CarbonImmutable::today($this->timezone($context));
     }
 
+    public function now(AgreementContext $context): CarbonImmutable
+    {
+        return CarbonImmutable::now($this->timezone($context));
+    }
+
     public function civilDate(AgreementContext $context, DateTimeInterface $instant): string
     {
         return CarbonImmutable::instance($instant)
