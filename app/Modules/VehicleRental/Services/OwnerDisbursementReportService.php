@@ -11,12 +11,15 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\UsageChargeComponent;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
 use Modules\VehicleRental\Models\OwnerUsageCharge;
 use Modules\VehicleRental\Models\RentalExpense;
+use Modules\VehicleRental\Models\RentalExpenseAllocation;
 
 final class OwnerDisbursementReportService
 {
@@ -101,13 +104,28 @@ final class OwnerDisbursementReportService
             $grossPayable = $basePayable + $mileagePayable + $overtimePayable;
 
             // Expenses charged to owner (fuel, fines, or maintenance chargebacks)
-            $deductions = (float) RentalExpense::query()
+            $allocatedDeductions = (float) RentalExpenseAllocation::query()
+                ->where('target_owner_agreement_id', $agreement->id)
+                ->where('allocation_type', RentalExpenseAllocationType::OwnerDeduction->value)
+                ->where('status', RentalExpenseAllocationStatus::Confirmed->value)
+                ->whereHas('expense', fn (Builder $q) => $q
+                    ->where('expense_date', '>=', $startDate)
+                    ->where('expense_date', '<=', $endDate)
+                    ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
+                )
+                ->sum('total_amount');
+
+            $directDeductions = (float) RentalExpense::query()
                 ->forTenant($context->tenantId)
                 ->where('supplier_id', $agreement->supplier_id)
                 ->where('expense_date', '>=', $startDate)
                 ->where('expense_date', '<=', $endDate)
                 ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
+                ->whereDoesntHave('allocations')
+                ->when($agreement->vehicle_id !== null, fn (Builder $q) => $q->where('vehicle_id', $agreement->vehicle_id))
                 ->sum('gross_amount');
+
+            $deductions = $allocatedDeductions + $directDeductions;
 
             $whtAmount = $whtRate > 0 ? round(($grossPayable * $whtRate) / 100.0, 2) : 0.0;
             $netPayable = max(0.0, ($grossPayable - $deductions) - $whtAmount);

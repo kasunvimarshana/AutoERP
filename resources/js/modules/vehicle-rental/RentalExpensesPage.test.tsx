@@ -4,6 +4,7 @@ import RentalExpensesPage from './RentalExpensesPage';
 import {
     ExpenseStatus,
     ExpenseType,
+    AllocationType,
     type RentalExpense,
 } from './rentalExpenseApi';
 import * as rentalExpenseApi from './rentalExpenseApi';
@@ -17,11 +18,14 @@ vi.mock('./rentalExpenseApi', async (importOriginal) => {
         ...actual,
         listRentalExpenses: vi.fn(),
         transitionRentalExpense: vi.fn(),
+        billRentalExpenseAllocation: vi.fn(),
+        unlinkRentalExpenseAllocationInvoice: vi.fn(),
     };
 });
 vi.mock('./agreementApi', () => ({
     searchCustomerAgreements: vi.fn(),
     searchOwnerAgreements: vi.fn(),
+    getAgreement: vi.fn(),
 }));
 
 const mockExpense: RentalExpense = {
@@ -156,6 +160,66 @@ describe('RentalExpensesPage', () => {
                     net_amount: '15000.00',
                     target_customer_agreement_id: 44,
                 }],
+            );
+        });
+    });
+
+    it('allows manager to bill unbilled customer recovery allocation', async () => {
+        session.permissions = ['vehicle-rental.expenses.view', 'vehicle-rental.expenses.manage'];
+        const allocatedExpense: RentalExpense = {
+            ...mockExpense,
+            status: ExpenseStatus.Allocated,
+            allocations: [
+                {
+                    id: 77,
+                    sequence: 1,
+                    row_version: 1,
+                    allocation_type: AllocationType.CustomerRecovery,
+                    allocation_type_label: 'Customer Recovery',
+                    net_amount: '15000.00',
+                    tax_amount: '0.00',
+                    total_amount: '15000.00',
+                    target_customer_agreement: { id: 44, reference: 'CA-2026-0044' },
+                    customer: { id: 8, name: 'Metro Logistics' },
+                    invoice: null,
+                },
+            ],
+        };
+
+        vi.mocked(rentalExpenseApi.listRentalExpenses).mockResolvedValue({
+            data: [allocatedExpense],
+            meta: { current_page: 1, last_page: 1, per_page: 15, total: 1, from: 1, to: 1 },
+        });
+        vi.mocked(agreementApi.getAgreement).mockResolvedValue({
+            id: 44,
+            row_version: 2,
+        } as never);
+        vi.mocked(rentalExpenseApi.billRentalExpenseAllocation).mockResolvedValue({
+            id: 101,
+            invoice_number: 'INV-101',
+            status: 'issued',
+            grand_total: '15000.00',
+        });
+
+        render(<RentalExpensesPage />);
+        const reviewBtn = await screen.findByRole('button', { name: 'Review' });
+        fireEvent.click(reviewBtn);
+
+        const billBtn = await screen.findByRole('button', { name: 'Bill Customer' });
+        fireEvent.click(billBtn);
+
+        expect(screen.getByText(/Bill Customer Recovery:/)).toBeInTheDocument();
+        const generateBtn = screen.getByRole('button', { name: 'Generate & Issue Invoice' });
+        fireEvent.click(generateBtn);
+
+        await waitFor(() => {
+            expect(rentalExpenseApi.billRentalExpenseAllocation).toHaveBeenCalledWith(
+                77,
+                expect.objectContaining({
+                    expected_allocation_version: 1,
+                    expected_agreement_version: 2,
+                    is_debit_note: true,
+                }),
             );
         });
     });

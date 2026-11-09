@@ -32,12 +32,20 @@ export enum AllocationType {
 
 export interface ExpenseAllocation {
     id: number;
+    row_version?: number;
     sequence: number;
     allocation_type: AllocationType;
     allocation_type_label: string;
     net_amount: string;
     tax_amount: string;
     total_amount: string;
+    status?: string;
+    invoice_id?: number | null;
+    invoice?: {
+        id: number;
+        invoice_number: string;
+        status: string;
+    } | null;
     customer?: { id: number; name: string } | null;
     supplier?: { id: number; name: string } | null;
     target_customer_agreement?: { id: number; reference: string } | null;
@@ -147,5 +155,34 @@ export async function transitionRentalExpense(
         status,
         allocations,
     });
+    return response.data.data;
+}
+
+export interface BillAllocationPayload {
+    expected_allocation_version: number;
+    expected_agreement_version: number;
+    invoice_date: string;
+    due_date?: string | null;
+    exchange_rate?: string;
+    is_debit_note?: boolean;
+}
+
+export async function billRentalExpenseAllocation(
+    allocationId: number,
+    payload: BillAllocationPayload,
+): Promise<{ id: number; invoice_number: string; status: string; grand_total: string }> {
+    const response = await apiClient.post<{ data: { id: number; invoice_number: string; status: string; grand_total: string } }>(
+        `/api/v1/vehicle-rental/expenses/allocations/${allocationId}/bill`,
+        payload,
+    );
+    return response.data.data;
+}
+
+export async function unlinkRentalExpenseAllocationInvoice(
+    allocationId: number,
+): Promise<ExpenseAllocation> {
+    const response = await apiClient.post<{ data: ExpenseAllocation }>(
+        `/api/v1/vehicle-rental/expenses/allocations/${allocationId}/unlink-invoice`,
+    );
     return response.data.data;
 }

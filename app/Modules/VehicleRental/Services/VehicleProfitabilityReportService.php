@@ -13,6 +13,8 @@ use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\RunningChartStatus;
@@ -92,6 +94,7 @@ final class VehicleProfitabilityReportService
             ->where('expense_date', '>=', $startDate)
             ->where('expense_date', '<=', $endDate)
             ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
+            ->with('allocations')
             ->get()
             ->groupBy('vehicle_id');
 
@@ -131,7 +134,23 @@ final class VehicleProfitabilityReportService
                 ->where('period_until', '>=', $startDate)
                 ->sum('amount');
 
-            $vehicleRevenue = $vehicleCustomerBase + $vehicleCustomerUsage;
+            $vehicleExpenses = $expenses->get($vehicle->id) ?? collect();
+            $customerRecoveries = 0.0;
+            $ownerDeductions = 0.0;
+            foreach ($vehicleExpenses as $exp) {
+                foreach ($exp->allocations as $alloc) {
+                    if ($alloc->status === RentalExpenseAllocationStatus::Confirmed) {
+                        if ($alloc->allocation_type === RentalExpenseAllocationType::CustomerRecovery) {
+                            $customerRecoveries += (float) $alloc->total_amount;
+                        } elseif ($alloc->allocation_type === RentalExpenseAllocationType::OwnerDeduction) {
+                            $ownerDeductions += (float) $alloc->total_amount;
+                        }
+                    }
+                }
+            }
+
+            // Customer Revenue includes base, usage, and recovered charges
+            $vehicleRevenue = $vehicleCustomerBase + $vehicleCustomerUsage + $customerRecoveries;
 
             // Direct Costs
             $ownerAgreementIds = $ownerAgreements->get($vehicle->id)?->pluck('id')->all() ?? [];
@@ -153,10 +172,10 @@ final class VehicleProfitabilityReportService
                     ->where('period_until', '>=', $startDate)
                     ->sum('amount');
 
-                $ownerLeaseCost = $ownerBase + $ownerUsage;
+                // Net of owner deductions (maintenance, tyre, fuel chargebacks)
+                $ownerLeaseCost = max(0.0, ($ownerBase + $ownerUsage) - $ownerDeductions);
             }
 
-            $vehicleExpenses = $expenses->get($vehicle->id) ?? collect();
             $fuelCost = (float) $vehicleExpenses->where('expense_type', RentalExpenseType::Fuel)->sum('gross_amount');
             $maintenanceCost = (float) $vehicleExpenses->where('expense_type', RentalExpenseType::Maintenance)->sum('gross_amount');
             $tollCost = (float) $vehicleExpenses->where('expense_type', RentalExpenseType::Toll)->sum('gross_amount');

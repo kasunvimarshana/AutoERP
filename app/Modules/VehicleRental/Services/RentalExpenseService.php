@@ -11,11 +11,29 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Hr\Models\HrEmployee;
+use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\DTOs\InvoiceSourceData;
+use Modules\Invoice\DTOs\InvoiceSourceLineData;
+use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceLineType;
+use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
+use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\TaxGroup;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Constants\AgreementFields;
+use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
@@ -26,6 +44,7 @@ use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RentalExpenseAllocation;
 use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Models\VehicleUse;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class RentalExpenseService
 {
@@ -41,6 +60,8 @@ final class RentalExpenseService
 
     public function __construct(
         private readonly DecimalMath $math,
+        private readonly TaxedSourceInvoiceFactory $factory,
+        private readonly InvoiceCreationService $invoices,
     ) {}
 
     public function create(array $data, int $tenantId, ?int $organizationUnitId, ?int $userId): RentalExpense
@@ -197,7 +218,163 @@ final class RentalExpenseService
             'allocations.supplier',
             'allocations.targetCustomerAgreement',
             'allocations.targetOwnerAgreement',
+            'allocations.invoice',
         ];
+    }
+
+    public function billAllocation(
+        RentalExpenseAllocation $allocation,
+        AgreementContext $context,
+        array $input,
+    ): Invoice {
+        return DB::transaction(function () use ($allocation, $context, $input): Invoice {
+            $lockedAlloc = RentalExpenseAllocation::query()
+                ->forTenant($context->tenantId)
+                ->lockForUpdate()
+                ->findOrFail($allocation->getKey());
+
+            $expectedAllocVersion = (int) ($input['expected_allocation_version'] ?? $lockedAlloc->row_version);
+            if ($lockedAlloc->row_version !== $expectedAllocVersion) {
+                throw new ConflictHttpException('This expense allocation changed. Reload before billing.');
+            }
+
+            if ($lockedAlloc->allocation_type !== RentalExpenseAllocationType::CustomerRecovery) {
+                throw ValidationException::withMessages([
+                    'allocation' => ['Only customer recovery allocations can be billed to a customer agreement.'],
+                ]);
+            }
+
+            if ($lockedAlloc->invoice_id !== null) {
+                throw new ConflictHttpException('This allocation has already been invoiced.');
+            }
+
+            if ($lockedAlloc->target_customer_agreement_id === null) {
+                throw ValidationException::withMessages([
+                    'allocation' => ['This allocation does not target a customer agreement.'],
+                ]);
+            }
+
+            $agreement = CustomerAgreement::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->lockForUpdate()
+                ->findOrFail($lockedAlloc->target_customer_agreement_id);
+
+            if (isset($input['expected_agreement_version']) && $agreement->row_version !== (int) $input['expected_agreement_version']) {
+                throw new ConflictHttpException('This agreement changed. Reload before billing.');
+            }
+
+            if ($agreement->status === AgreementStatus::Draft) {
+                throw ValidationException::withMessages([
+                    'agreement' => ['Activate the agreement before billing.'],
+                ]);
+            }
+
+            $expense = RentalExpense::query()
+                ->forTenant($context->tenantId)
+                ->findOrFail($lockedAlloc->expense_id);
+
+            $isDebitNote = ! empty($input['is_debit_note']);
+            $invoiceType = $isDebitNote ? InvoiceType::Debit : InvoiceType::Sales;
+            $sourceType = 'vehicle_rental_customer_recovery';
+            $description = 'Customer recovery · '.$expense->expense_type->label().' · '.$expense->expense_number.' ('.$agreement->reference.')';
+
+            $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
+            $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+            $exchangeRate = (string) ($input['exchange_rate'] ?? '1.000000');
+
+            $source = new CreateInvoiceData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                invoiceType: $invoiceType,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: $invoiceDate,
+                dueDate: $dueDate,
+                currencyId: $agreement->currency_id,
+                exchangeRate: $exchangeRate,
+                partyType: InvoicePartyType::Customer->value,
+                partyId: (int) $agreement->customer_id,
+                createdBy: $context->actorId,
+                supplyPeriodStart: $expense->expense_date->toDateString(),
+                supplyPeriodEnd: $expense->expense_date->toDateString(),
+                lines: [
+                    new InvoiceLineData(
+                        lineNumber: 1,
+                        description: $description,
+                        quantity: '1.000000',
+                        unitPrice: (string) $lockedAlloc->net_amount,
+                        lineType: InvoiceLineType::Charge,
+                        sourceLineType: $sourceType,
+                        sourceLineId: $lockedAlloc->id,
+                    ),
+                ],
+                sources: [
+                    new InvoiceSourceData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: $sourceType,
+                        sourceId: $lockedAlloc->id,
+                        sourceDocumentNumber: $agreement->reference,
+                        sourceDocumentDate: $expense->expense_date->toDateString(),
+                        sourceSubtotal: (string) $lockedAlloc->net_amount,
+                        sourceGrandTotal: (string) $lockedAlloc->total_amount,
+                    ),
+                ],
+                sourceLines: [
+                    new InvoiceSourceLineData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: $sourceType,
+                        sourceId: $lockedAlloc->id,
+                        sourceLineType: $sourceType,
+                        sourceLineId: $lockedAlloc->id,
+                        sourceQuantity: '1.000000',
+                        invoicedQuantity: '1.000000',
+                        sourceUnitPrice: (string) $lockedAlloc->net_amount,
+                        sourceLineTotal: (string) $lockedAlloc->total_amount,
+                        invoicedLineTotal: (string) $lockedAlloc->total_amount,
+                    ),
+                ],
+            );
+
+            $prepared = $this->factory->prepare(
+                $source,
+                FinancePostingProfileCode::CustomerRentalInvoice,
+                FinanceAccountRoleCode::RentalRevenue,
+            );
+
+            $invoice = $this->invoices->create($prepared);
+
+            $lockedAlloc->invoice_id = $invoice->id;
+            $lockedAlloc->row_version = $lockedAlloc->row_version + 1;
+            $lockedAlloc->save();
+
+            return $invoice;
+        });
+    }
+
+    public function unlinkCancelledInvoice(RentalExpenseAllocation $allocation, AgreementContext $context): RentalExpenseAllocation
+    {
+        return DB::transaction(function () use ($allocation, $context): RentalExpenseAllocation {
+            $lockedAlloc = RentalExpenseAllocation::query()
+                ->forTenant($context->tenantId)
+                ->lockForUpdate()
+                ->findOrFail($allocation->getKey());
+
+            if ($lockedAlloc->invoice_id === null) {
+                return $lockedAlloc;
+            }
+
+            $invoice = Invoice::query()->forTenant($context->tenantId)->findOrFail($lockedAlloc->invoice_id);
+            if (! in_array($invoice->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true)) {
+                throw new ConflictHttpException('Cancel or reverse the invoice before unlinking it from the expense allocation.');
+            }
+
+            $lockedAlloc->invoice_id = null;
+            $lockedAlloc->row_version = $lockedAlloc->row_version + 1;
+            $lockedAlloc->save();
+
+            return $lockedAlloc;
+        });
     }
 
     private function createAllocations(RentalExpense $expense, array $allocations, ?int $userId): void

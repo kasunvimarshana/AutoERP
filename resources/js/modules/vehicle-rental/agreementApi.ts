@@ -40,3 +40,100 @@ export const transitionAgreement = (kind: AgreementKind, record: Agreement, acti
     apiClient.post<ApiResource<Agreement>>(`${url(kind)}/${record.id}/${action}`, { expected_version: record.row_version, reason }).then(r => r.data.data);
 export const agreementHistory = (kind: AgreementKind, id: number, page: number, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<AgreementHistory>>(`${url(kind)}/${id}/history`, { params: { page, per_page: PAGE_SIZE }, signal }).then(r => r.data);
+
+export interface AgreementFinancialSummary {
+    agreement: {
+        id: number;
+        reference: string;
+        kind: string;
+        status: string;
+        currency: { id: number; code: string };
+        party: { id: number; name: string; code: string };
+    };
+    summary: {
+        total_base_charges: string;
+        total_usage_charges: string;
+        total_allocations: string;
+        total_invoiced: string;
+        total_credit_notes: string;
+        total_debit_notes: string;
+        total_paid: string;
+        total_credit_allocated: string;
+        total_remaining_balance: string;
+        total_unallocated_credit: string;
+    };
+    base_charges: Array<{
+        id: number;
+        from: string;
+        until: string;
+        amount: string;
+        voided_at?: string | null;
+        invoices: Array<{ id: number; invoice_number: string; status: string }>;
+    }>;
+    usage_charges: Array<{
+        id: number;
+        component: string;
+        from: string;
+        until: string;
+        amount: string;
+        voided_at?: string | null;
+        invoices: Array<{ id: number; invoice_number: string; status: string }>;
+    }>;
+    allocations: Array<{
+        id: number;
+        row_version: number;
+        sequence: number;
+        allocation_type: string;
+        allocation_type_label: string;
+        net_amount: string;
+        total_amount: string;
+        status: string;
+        expense: {
+            id: number;
+            expense_number: string;
+            expense_type: string;
+            expense_date: string;
+        };
+        invoice?: {
+            id: number;
+            invoice_number: string;
+            status: string;
+        } | null;
+    }>;
+    documents: Array<{
+        id: number;
+        invoice_number: string;
+        invoice_date: string;
+        due_date?: string | null;
+        invoice_type: string;
+        document_kind: string;
+        status: string;
+        grand_total: string;
+        paid_total: string;
+        credit_total: string;
+        balance_due: string;
+        notes?: string | null;
+    }>;
+    deposit?: {
+        requirement: string | null;
+        net_receipts: string;
+        remaining: string | null;
+        receipts_count: number;
+    } | null;
+}
+
+export interface FinancialAdjustmentPayload {
+    expected_version: number;
+    adjustment_type: 'credit_note' | 'debit_note';
+    amount: string;
+    reason: string;
+    invoice_date: string;
+    due_date?: string | null;
+    exchange_rate: string;
+}
+
+export const getAgreementFinancialSummary = (kind: AgreementKind, id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<AgreementFinancialSummary>>(`${url(kind)}/${id}/financial-summary`, { signal }).then(r => r.data.data);
+
+export const createAgreementFinancialAdjustment = (kind: AgreementKind, id: number, payload: FinancialAdjustmentPayload) =>
+    apiClient.post<ApiResource<{ id: number; invoice_number: string }>>(`${url(kind)}/${id}/financial-adjustments`, payload).then(r => r.data.data);

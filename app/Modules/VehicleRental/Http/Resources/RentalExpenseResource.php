@@ -62,12 +62,20 @@ final class RentalExpenseResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
             'allocations' => $this->whenLoaded('allocations', fn () => $this->allocations->map(fn ($a) => [
                 'id' => $a->id,
+                'row_version' => $a->row_version,
                 'sequence' => $a->sequence,
                 'allocation_type' => $a->allocation_type->value,
                 'allocation_type_label' => $a->allocation_type->label(),
                 'net_amount' => (string) $a->net_amount,
                 'tax_amount' => (string) $a->tax_amount,
                 'total_amount' => (string) $a->total_amount,
+                'status' => $a->status->value,
+                'invoice_id' => $a->invoice_id,
+                'invoice' => $a->invoice ? [
+                    'id' => $a->invoice->id,
+                    'invoice_number' => $a->invoice->invoice_number,
+                    'status' => (string) $a->invoice->status,
+                ] : null,
                 'customer' => $a->customer ? ['id' => $a->customer->id, 'name' => $a->customer->name] : null,
                 'supplier' => $a->supplier ? ['id' => $a->supplier->id, 'name' => $a->supplier->name] : null,
                 'target_customer_agreement' => $a->targetCustomerAgreement ? [

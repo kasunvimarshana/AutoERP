@@ -295,4 +295,104 @@ final class RentalExpenseTest extends TestCase
             \Modules\VehicleRental\Models\RentalExpense::query()->findOrFail($expenseId)->delete();
         });
     }
+
+    public function test_customer_recovery_allocation_can_be_billed_as_invoice_and_double_billing_is_rejected(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(\Modules\VehicleRental\Services\RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $agreements = app(\Modules\VehicleRental\Services\AgreementService::class);
+            $customerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerData);
+            $agreements->change(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, \Modules\VehicleRental\Enums\AgreementAction::Activate);
+            $customerAg->refresh();
+
+            $service = app(RentalExpenseService::class);
+            $expense = $service->create([
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'expense_type' => RentalExpenseType::Fuel->value,
+                'expense_date' => '2026-09-15',
+                'currency_id' => $ownerData['currency_id'],
+                'net_amount' => '4500.000000',
+                'reference_number' => 'FUEL-RECOVER-01',
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $submitted = $service->transition($expense, RentalExpenseStatus::Submitted, $expense->row_version, $context->actorId);
+            $approved = $service->transition($submitted, RentalExpenseStatus::Approved, $submitted->row_version, $context->actorId);
+
+            $allocated = $service->transition($approved, RentalExpenseStatus::Allocated, $approved->row_version, $context->actorId, [
+                [
+                    'allocation_type' => RentalExpenseAllocationType::CustomerRecovery->value,
+                    'target_customer_agreement_id' => $customerAg->id,
+                    'net_amount' => '4500.000000',
+                ],
+            ]);
+
+            $allocation = $allocated->allocations->first();
+            $this->assertNull($allocation->invoice_id);
+
+            // Bill allocation as invoice
+            $invoice = $service->billAllocation($allocation, $context, [
+                'expected_allocation_version' => $allocation->row_version,
+                'expected_agreement_version' => $customerAg->row_version,
+                'invoice_date' => '2026-09-16',
+                'exchange_rate' => '1.000000',
+            ]);
+
+            $this->assertNotNull($invoice->id);
+            $allocation->refresh();
+            $this->assertSame($invoice->id, $allocation->invoice_id);
+
+            // Double billing is rejected
+            $this->expectException(\Symfony\Component\HttpKernel\Exception\ConflictHttpException::class);
+            $service->billAllocation($allocation, $context, [
+                'expected_allocation_version' => $allocation->row_version,
+                'expected_agreement_version' => $customerAg->row_version,
+                'invoice_date' => '2026-09-16',
+                'exchange_rate' => '1.000000',
+            ]);
+        });
+    }
+
+    public function test_bill_allocation_api_endpoint(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture();
+
+        [$allocId, $agreementVersion] = $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): array {
+            $agreements = app(\Modules\VehicleRental\Services\AgreementService::class);
+            $customerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerData);
+            $activated = $agreements->change(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, \Modules\VehicleRental\Enums\AgreementAction::Activate);
+
+            $service = app(RentalExpenseService::class);
+            $expense = $service->create([
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'expense_type' => RentalExpenseType::Toll->value,
+                'expense_date' => '2026-09-18',
+                'currency_id' => $ownerData['currency_id'],
+                'net_amount' => '1200.000000',
+            ], $context->tenantId, $context->organizationUnitId, $context->actorId);
+
+            $submitted = $service->transition($expense, RentalExpenseStatus::Submitted, $expense->row_version, $context->actorId);
+            $approved = $service->transition($submitted, RentalExpenseStatus::Approved, $submitted->row_version, $context->actorId);
+            $allocated = $service->transition($approved, RentalExpenseStatus::Allocated, $approved->row_version, $context->actorId, [
+                [
+                    'allocation_type' => RentalExpenseAllocationType::CustomerRecovery->value,
+                    'target_customer_agreement_id' => $customerAg->id,
+                    'net_amount' => '1200.000000',
+                ],
+            ]);
+
+            return [$allocated->allocations->first()->id, $activated->row_version];
+        });
+
+        $resp = $this->postJson($this->rentalRoot . '/expenses/allocations/' . $allocId . '/bill', [
+            'expected_allocation_version' => 1,
+            'expected_agreement_version' => $agreementVersion,
+            'invoice_date' => '2026-09-19',
+            'exchange_rate' => '1.000000',
+            'is_debit_note' => true,
+        ])->assertCreated();
+
+        $this->assertSame('1200.000000', $resp->json('data.grand_total'));
+    }
 }

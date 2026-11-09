@@ -11,6 +11,8 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\BaseChargeSource;
+use Modules\VehicleRental\Enums\UsageChargeSource;
 use Modules\VehicleRental\Models\CustomerAgreement;
 
 final class LesseeOutstandingReportService
@@ -79,7 +81,18 @@ final class LesseeOutstandingReportService
                     ->select('source_document_number')
                     ->whereColumn('invoice_sources.invoice_id', 'invoices.id')
                     ->whereColumn('invoice_sources.tenant_id', 'invoices.tenant_id')
-                    ->whereIn('invoice_sources.source_type', ['base_rent', 'excess_mileage', 'overtime', 'extra_hours', 'night_out'])
+                    ->where(function (Builder $sq): void {
+                        $sq->whereIn('invoice_sources.source_type', [
+                            BaseChargeSource::Customer->value,
+                            UsageChargeSource::Customer->value,
+                            'vehicle_rental_customer_recovery',
+                            'base_rent',
+                            'excess_mileage',
+                            'overtime',
+                            'extra_hours',
+                            'night_out',
+                        ])->orWhere('invoice_sources.source_type', 'like', 'vehicle_rental_%');
+                    })
                     ->limit(1),
                 'rental_agreement_number',
             )

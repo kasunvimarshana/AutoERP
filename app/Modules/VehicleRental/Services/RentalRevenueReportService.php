@@ -11,6 +11,8 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\UsageChargeComponent;
@@ -18,6 +20,7 @@ use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\CustomerBaseCharge;
 use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\RentalExpense;
+use Modules\VehicleRental\Models\RentalExpenseAllocation;
 
 final class RentalRevenueReportService
 {
@@ -95,15 +98,28 @@ final class RentalRevenueReportService
             $nightOut = (float) $usageCharges->where('component', UsageChargeComponent::NightOut->value)->sum('amount');
             $totalOvertime = $normalOt + $doubleOt + $tripleOt;
 
-            $tollExpenses = RentalExpense::query()
+            $allocatedCustomerRecoveries = (float) RentalExpenseAllocation::query()
+                ->where('target_customer_agreement_id', $agreement->id)
+                ->where('allocation_type', RentalExpenseAllocationType::CustomerRecovery->value)
+                ->where('status', RentalExpenseAllocationStatus::Confirmed->value)
+                ->whereHas('expense', fn (Builder $q) => $q
+                    ->where('expense_date', '>=', $startDate)
+                    ->where('expense_date', '<=', $endDate)
+                    ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
+                )
+                ->sum('total_amount');
+
+            $directTollPass = (float) RentalExpense::query()
                 ->forTenant($context->tenantId)
                 ->where('customer_agreement_id', $agreement->id)
                 ->where('expense_type', RentalExpenseType::Toll)
                 ->where('expense_date', '>=', $startDate)
                 ->where('expense_date', '<=', $endDate)
                 ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
-                ->get();
-            $tollPass = (float) $tollExpenses->sum('gross_amount');
+                ->whereDoesntHave('allocations')
+                ->sum('gross_amount');
+
+            $tollPass = $allocatedCustomerRecoveries + $directTollPass;
 
             $totalAgreementRevenue = $baseRent + $excessMileage + $totalOvertime + $nightOut + $tollPass;
 

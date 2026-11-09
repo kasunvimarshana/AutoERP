@@ -66,6 +66,104 @@ final class RentalChargeDocuments
             $customer ? FinanceAccountRoleCode::RentalRevenue : FinanceAccountRoleCode::RentalExpense));
     }
 
+    public function issueAdjustment(
+        AgreementKind $kind,
+        AgreementContext $context,
+        Agreement $agreement,
+        string $adjustmentType,
+        string $amount,
+        string $reason,
+        array $data,
+    ): Invoice {
+        $customer = $kind === AgreementKind::Customer;
+        $isCredit = $adjustmentType === 'credit_note';
+        $invoiceType = $isCredit ? InvoiceType::Credit : InvoiceType::Debit;
+        $direction = $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound;
+        $partyType = $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value;
+        $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
+        $sourceType = 'vehicle_rental_agreement_adjustment';
+        $adjustmentSourceId = (int) (now()->timestamp * 100000 + random_int(1000, 99999));
+        $description = ($isCredit ? 'Credit Note' : 'Debit Note').' · '.$agreement->reference.' · '.trim($reason);
+
+        $source = new CreateInvoiceData(
+            tenantId: $context->tenantId,
+            organizationUnitId: $context->organizationUnitId,
+            invoiceType: $invoiceType,
+            direction: $direction,
+            invoiceDate: $data['invoice_date'],
+            dueDate: $data['due_date'] ?? null,
+            currencyId: $agreement->currency_id,
+            exchangeRate: $data['exchange_rate'],
+            partyType: $partyType,
+            partyId: $partyId,
+            createdBy: $context->actorId,
+            notes: trim($reason),
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: self::FIRST_LINE,
+                    description: $description,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $amount,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $adjustmentSourceId,
+                ),
+            ],
+            sources: [
+                new InvoiceSourceData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $adjustmentSourceId,
+                    sourceDocumentNumber: $agreement->reference,
+                    sourceDocumentDate: $data['invoice_date'],
+                    sourceSubtotal: $amount,
+                    sourceGrandTotal: $amount,
+                ),
+            ],
+            sourceLines: [
+                new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $adjustmentSourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $adjustmentSourceId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $amount,
+                    sourceLineTotal: $amount,
+                    invoicedLineTotal: $amount,
+                ),
+            ],
+        );
+
+        return $this->invoices->create(
+            $this->factory->prepare(
+                $source,
+                $customer ? FinancePostingProfileCode::CustomerRentalInvoice : FinancePostingProfileCode::SupplierRentalInvoice,
+                $customer ? FinanceAccountRoleCode::RentalRevenue : FinanceAccountRoleCode::RentalExpense,
+            ),
+        );
+    }
+
+    public function adjustmentInput(array $input): array
+    {
+        if (array_key_exists('due_date', $input) && ($input['due_date'] === null || (is_string($input['due_date']) && trim($input['due_date']) === ''))) {
+            $input['due_date'] = null;
+        }
+
+        return Validator::make($input, [
+            'expected_version' => ['required', 'integer', 'min:'.AgreementFields::INITIAL_VERSION],
+            'adjustment_type' => ['required', 'string', 'in:credit_note,debit_note'],
+            'amount' => ['required', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'numeric', 'gt:0'],
+            'reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
+            'invoice_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'due_date' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:invoice_date'],
+            'exchange_rate' => ['required', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'numeric', 'gt:0'],
+        ])->validate();
+    }
+
     public function documentInput(array $input): array
     {
         if (array_key_exists('due_date', $input) && ($input['due_date'] === null || (is_string($input['due_date']) && trim($input['due_date']) === ''))) {

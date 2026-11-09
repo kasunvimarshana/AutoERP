@@ -18,11 +18,15 @@ import type { PaginationMeta } from '@/shared/types/pagination';
 import {
     listRentalExpenses,
     transitionRentalExpense,
+    billRentalExpenseAllocation,
+    unlinkRentalExpenseAllocationInvoice,
     ExpenseStatus,
     EXPENSE_PERMISSION,
     type RentalExpense,
+    type ExpenseAllocation,
 } from './rentalExpenseApi';
-import { searchCustomerAgreements, searchOwnerAgreements } from './agreementApi';
+import { searchCustomerAgreements, searchOwnerAgreements, getAgreement } from './agreementApi';
+import { AgreementKind } from './agreements';
 import { RentalExpenseEditor } from './RentalExpenseEditor';
 
 export default function RentalExpensesPage() {
@@ -46,6 +50,13 @@ export default function RentalExpensesPage() {
     const [allocOwnerAgreement, setAllocOwnerAgreement] = useState<NamedResource | null>(null);
     const [search, setSearch] = useState('');
     const [query, setQuery] = useState('');
+
+    const [billingAllocation, setBillingAllocation] = useState<ExpenseAllocation | null>(null);
+    const [billingDate, setBillingDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [billingDueDate, setBillingDueDate] = useState('');
+    const [billingRate, setBillingRate] = useState('1.000000');
+    const [isDebitNote, setIsDebitNote] = useState(true);
+    const [billingLoading, setBillingLoading] = useState(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -91,6 +102,44 @@ export default function RentalExpensesPage() {
         setError(null);
         try {
             await transitionRentalExpense(expense.id, expense.row_version, next, allocations);
+            reload();
+        } catch (failure) {
+            setError(toApiError(failure));
+        } finally {
+            setActionLoading(false);
+        }
+    }
+
+    async function handleConfirmBilling(e: React.FormEvent) {
+        e.preventDefault();
+        if (!billingAllocation || !billingAllocation.target_customer_agreement) return;
+
+        setBillingLoading(true);
+        setError(null);
+        try {
+            const customerAg = await getAgreement(AgreementKind.Customer, billingAllocation.target_customer_agreement.id);
+            await billRentalExpenseAllocation(billingAllocation.id, {
+                expected_allocation_version: billingAllocation.row_version ?? 1,
+                expected_agreement_version: customerAg.row_version,
+                invoice_date: billingDate,
+                due_date: billingDueDate || null,
+                exchange_rate: billingRate || '1.000000',
+                is_debit_note: isDebitNote,
+            });
+            setBillingAllocation(null);
+            reload();
+        } catch (failure) {
+            setError(toApiError(failure));
+        } finally {
+            setBillingLoading(false);
+        }
+    }
+
+    async function handleUnlinkInvoice(allocation: ExpenseAllocation) {
+        setActionLoading(true);
+        setError(null);
+        try {
+            await unlinkRentalExpenseAllocationInvoice(allocation.id);
             reload();
         } catch (failure) {
             setError(toApiError(failure));
@@ -231,7 +280,7 @@ export default function RentalExpensesPage() {
                                 <table className="w-full text-left text-xs">
                                     <thead>
                                         <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
-                                            {['#', 'Type', 'Party', 'Amount'].map(l => <th className="px-3 py-2" key={l}>{l}</th>)}
+                                            {['#', 'Type', 'Party', 'Amount', 'Billing Status', 'Actions'].map(l => <th className="px-3 py-2" key={l}>{l}</th>)}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -247,12 +296,106 @@ export default function RentalExpensesPage() {
                                                             : (a.customer?.name ?? a.supplier?.name ?? 'Company Overhead')}
                                                 </td>
                                                 <td className="px-3 py-2 font-semibold text-slate-900"><MoneyDisplay value={a.total_amount} currency={selected.currency.code} /></td>
+                                                <td className="px-3 py-2">
+                                                    {a.invoice ? (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-semibold text-blue-700">{a.invoice.invoice_number}</span>
+                                                            <StatusBadge status={a.invoice.status} />
+                                                        </div>
+                                                    ) : a.allocation_type === 'customer_recovery' ? (
+                                                        <span className="text-amber-700 font-medium">Unbilled recovery</span>
+                                                    ) : a.allocation_type === 'owner_deduction' ? (
+                                                        <span className="text-slate-600">Settlement deduction</span>
+                                                    ) : (
+                                                        <span className="text-slate-400">Overhead</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    {canManage && a.allocation_type === 'customer_recovery' && !a.invoice && (
+                                                        <Button
+                                                            className="min-h-8 px-2.5 py-1 text-xs"
+                                                            variant="primary"
+                                                            onClick={() => setBillingAllocation(a)}
+                                                            disabled={actionLoading || billingLoading}
+                                                        >
+                                                            Bill Customer
+                                                        </Button>
+                                                    )}
+                                                    {canManage && a.invoice && ['cancelled', 'void', 'reversed'].includes(a.invoice.status.toLowerCase()) && (
+                                                        <Button
+                                                            className="min-h-8 px-2.5 py-1 text-xs"
+                                                            variant="secondary"
+                                                            onClick={() => handleUnlinkInvoice(a)}
+                                                            disabled={actionLoading}
+                                                        >
+                                                            Unlink
+                                                        </Button>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+                    )}
+
+                    {billingAllocation && (
+                        <form onSubmit={handleConfirmBilling} className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
+                            <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                                <h4 className="text-sm font-semibold text-slate-900">
+                                    Bill Customer Recovery: <MoneyDisplay value={billingAllocation.total_amount} currency={selected.currency.code} />
+                                </h4>
+                                <Button type="button" variant="ghost" onClick={() => setBillingAllocation(null)}>
+                                    Cancel
+                                </Button>
+                            </div>
+                            <p className="text-xs text-slate-600">
+                                Create an outbound billing document against agreement {billingAllocation.target_customer_agreement?.reference} for this fleet recovery.
+                            </p>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <Input
+                                    label="Invoice Date"
+                                    type="date"
+                                    value={billingDate}
+                                    onChange={e => setBillingDate(e.target.value)}
+                                    required
+                                />
+                                <Input
+                                    label="Due Date (Optional)"
+                                    type="date"
+                                    value={billingDueDate}
+                                    onChange={e => setBillingDueDate(e.target.value)}
+                                />
+                                <Input
+                                    label="Exchange Rate"
+                                    type="text"
+                                    value={billingRate}
+                                    onChange={e => setBillingRate(e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="isDebitNote"
+                                    checked={isDebitNote}
+                                    onChange={e => setIsDebitNote(e.target.checked)}
+                                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <label htmlFor="isDebitNote" className="text-xs font-medium text-slate-700">
+                                    Issue as Debit Note adjustment (unchecked issues standard Sales Invoice)
+                                </label>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button type="button" variant="secondary" onClick={() => setBillingAllocation(null)} disabled={billingLoading}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" variant="primary" loading={billingLoading}>
+                                    Generate & Issue Invoice
+                                </Button>
+                            </div>
+                        </form>
                     )}
 
                     {canManage && (

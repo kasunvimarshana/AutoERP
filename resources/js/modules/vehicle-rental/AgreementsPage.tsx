@@ -7,6 +7,7 @@ import { BaseRentPreviewPanel } from './BaseRentPreviewPanel';
 import { USE_PERMISSION } from './vehicleUse';
 import { AgreementHistoryPanel } from './AgreementHistoryPanel';
 import { AgreementSuccessorForm } from './AgreementSuccessorForm';
+import { AgreementFinancialSummaryPanel } from './AgreementFinancialSummaryPanel';
 import { listAgreements, transitionAgreement } from './agreementApi';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -45,7 +46,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [action, setAction] = useState<AgreementAction | null>(null);
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
-    const [activeReviewTab, setActiveReviewTab] = useState<'billing' | 'vehicles' | 'deposits' | 'history'>('billing');
+    const [activeReviewTab, setActiveReviewTab] = useState<'billing' | 'vehicles' | 'deposits' | 'financials' | 'history'>('billing');
     const [showSuccessor, setShowSuccessor] = useState(false);
     const [search, setSearch] = useState(() => {
         if (typeof window === 'undefined') return '';
@@ -261,6 +262,17 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                 )}
                 <button
                     type="button"
+                    onClick={() => setActiveReviewTab('financials')}
+                    className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
+                        activeReviewTab === 'financials'
+                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                    Financial Position & Notes
+                </button>
+                <button
+                    type="button"
                     onClick={() => setActiveReviewTab('history')}
                     className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
                         activeReviewTab === 'history'
@@ -293,6 +305,15 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
 
             {activeReviewTab === 'deposits' && kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && (
                 <DepositPanel key={selected.id} agreement={selected} canCreate={hasPermission(auth, DEPOSIT_PERMISSION.create)} />
+            )}
+
+            {activeReviewTab === 'financials' && (
+                <AgreementFinancialSummaryPanel
+                    key={`financials-${selected.id}-${selected.row_version}`}
+                    kind={kind}
+                    agreement={selected}
+                    canManageAdjustments={canBill}
+                />
             )}
 
             {activeReviewTab === 'history' && (

@@ -60,6 +60,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('{expense}', [RentalExpenseController::class, 'show'])->whereNumber('expense');
         Route::delete('{expense}', [RentalExpenseController::class, 'destroy'])->whereNumber('expense');
         Route::patch('{expense}/transition', [RentalExpenseController::class, 'transition'])->whereNumber('expense');
+        Route::post('allocations/{allocation}/bill', [RentalExpenseController::class, 'billAllocation'])->whereNumber('allocation');
+        Route::post('allocations/{allocation}/unlink-invoice', [RentalExpenseController::class, 'unlinkAllocationInvoice'])->whereNumber('allocation');
     });
 
     Route::prefix('incidents')->group(function (): void {
@@ -90,6 +92,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
             Route::post('{agreement}/base-charges', [BaseRentBillingController::class, 'store'])->whereNumber('agreement');
             Route::post('{agreement}/base-charges/{charge}/void', [BaseRentBillingController::class, 'void'])->whereNumber('agreement')->whereNumber('charge');
             Route::post('{agreement}/base-charges/{charge}/reissue', [BaseRentBillingController::class, 'reissue'])->whereNumber('agreement')->whereNumber('charge');
+            Route::get('{agreement}/financial-summary', [AgreementController::class, 'financialSummary'])->whereNumber('agreement');
+            Route::post('{agreement}/financial-adjustments', [AgreementController::class, 'createFinancialAdjustment'])->whereNumber('agreement');
         });
         Route::post('{agreement}/base-rent-preview', [AgreementController::class, 'previewBaseRent'])->whereNumber('agreement');
         Route::post('{agreement}/{action}', [AgreementController::class, 'transition'])->whereNumber('agreement')->whereIn('action', [AgreementAction::Activate->value, AgreementAction::Close->value]);
