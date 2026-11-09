@@ -47,9 +47,7 @@ final class OwnerSourceService
             $customerAgreement = CustomerAgreement::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->find((int) $data['customer_agreement_id']);
-            if ($customerAgreement?->ends_on !== null) {
-                $coverageUntil = $customerAgreement->ends_on->toDateString();
-            }
+            $coverageUntil = $customerAgreement?->ends_on?->toDateString() ?? $coverageFrom;
         }
 
         $search = trim($data['search'] ?? '');

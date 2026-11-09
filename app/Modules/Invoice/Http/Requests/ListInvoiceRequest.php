@@ -13,6 +13,26 @@ use Modules\Invoice\Enums\InvoiceType;
 
 final class ListInvoiceRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach ([
+            'search', 'invoice_type', 'direction', 'status', 'party_id',
+            'currency_id', 'date_from', 'date_to', 'balance_status',
+            'settlement_eligible', 'page', 'per_page',
+        ] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [

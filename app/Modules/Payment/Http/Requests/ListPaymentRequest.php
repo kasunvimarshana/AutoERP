@@ -15,6 +15,26 @@ use Modules\Payment\Enums\PaymentType;
 
 final class ListPaymentRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach ([
+            'search', 'payment_type', 'direction', 'document_status',
+            'allocation_status', 'posting_status', 'instrument_status',
+            'party_id', 'date_from', 'date_to', 'page', 'per_page',
+        ] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [

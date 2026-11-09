@@ -20,7 +20,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [owner, setOwner] = useState<NamedResource | null>(null);
     const [company, setCompany] = useState(false);
     const [oldOdometer, setOldOdometer] = useState(''); const [newOdometer, setNewOdometer] = useState('');
-    const [start, setStart] = useState(''); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
+    const [start, setStart] = useState(() => replacement?.handed_over_at ? replacement.handed_over_at.slice(0, 16) : (agreement.starts_on ? `${agreement.starts_on}T00:00` : '')); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
     const isSameReplacementVehicle = Boolean(replacement && vehicle && vehicle.id === replacement.vehicle.id);
     const minStart = replacement?.handed_over_at

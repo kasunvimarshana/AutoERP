@@ -15,8 +15,15 @@ final class RentalExpenseBillAllocationRequest extends TenantScopedRequest
     {
         parent::prepareForValidation();
 
-        if ($this->has('due_date') && ($this->input('due_date') === null || (is_string($this->input('due_date')) && trim($this->input('due_date')) === ''))) {
-            $this->merge(['due_date' => null]);
+        $merges = [];
+        foreach (['due_date', 'expected_agreement_version', 'is_debit_note'] as $field) {
+            if ($this->has($field) && ($this->input($field) === null || (is_string($this->input($field)) && trim($this->input($field)) === ''))) {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
         }
     }
 

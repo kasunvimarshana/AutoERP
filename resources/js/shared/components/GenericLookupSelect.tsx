@@ -105,14 +105,6 @@ export function GenericLookupSelect<T extends NamedResource>({
         && searchText !== debouncedSearchText;
     const hasMore = Boolean(meta && meta.current_page < meta.last_page);
 
-    useEffect(() => {
-        searchRef.current = search;
-    }, [search]);
-
-    useEffect(() => {
-        recentResultsRef.current = recentResultsEntry;
-    }, [recentResultsEntry]);
-
     const cancelRequest = useCallback(() => {
         requestRef.current?.abort();
         requestRef.current = null;
@@ -137,6 +129,24 @@ export function GenericLookupSelect<T extends NamedResource>({
         setLoadMoreError('');
         setActiveIndex(-1);
     }, []);
+
+    useEffect(() => {
+        searchRef.current = search;
+        cancelRequest();
+        queueMicrotask(clearResults);
+    }, [cancelRequest, clearResults, search]);
+
+    useEffect(() => {
+        queueMicrotask(() => {
+            setInputValue('');
+            setHasUserInput(false);
+            setSelectionError('');
+        });
+    }, [value]);
+
+    useEffect(() => {
+        recentResultsRef.current = recentResultsEntry;
+    }, [recentResultsEntry]);
 
     const closeDropdown = useCallback(() => {
         setOpen(false);
@@ -289,7 +299,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 label={label}
                 value={hasUserInput ? inputValue : selectedLabel}
                 placeholder={placeholder}
-                error={error ?? (value === null ? selectionError : '')}
+                error={error ?? (required && value === null ? selectionError : '')}
                 disabled={disabled}
                 required={required}
                 autoFocus={autoFocus}

@@ -87,9 +87,20 @@ final class StorePaymentRequest extends TenantScopedRequest
         parent::prepareForValidation();
 
         $header = $this->header(PaymentIdempotency::REQUEST_HEADER);
-        $this->merge([
+        $merges = [
             PaymentIdempotency::REQUEST_ATTRIBUTE => is_string($header) ? trim($header) : null,
-        ]);
+        ];
+
+        foreach ([
+            'party_type', 'party_id', 'currency_id', 'exchange_rate',
+            'reference_number', 'cheque_number', 'cheque_date', 'payee_name', 'notes',
+        ] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        $this->merge($merges);
     }
 
     private function intOrNull(string $key): ?int

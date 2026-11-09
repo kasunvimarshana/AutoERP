@@ -112,4 +112,29 @@ final class OwnerSourceTest extends TestCase
             self::assertSame($owner->reference, $result->items()[0]->reference);
         });
     }
+
+    public function test_sources_lookup_returns_covering_owner_agreements_when_customer_agreement_is_open_ended(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
+            $agreements = app(AgreementService::class);
+            // Open-ended customer agreement (ends_on is null)
+            $customer = $agreements->create(AgreementKind::Customer, $context, array_replace($customerInput, ['ends_on' => null]));
+            $customer = $agreements->change(AgreementKind::Customer, $context, $customer->id, $customer->row_version, AgreementAction::Activate);
+
+            // Finite owner agreement covering the vehicle
+            $owner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['ends_on' => '2026-12-31']));
+            $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
+
+            $lookup = app(OwnerSourceService::class);
+            // When planned return is blank, owner agreement covering the handover date is returned
+            $result = $lookup->list($context, $ownerInput['vehicle_id'], [
+                'starts_at' => '2026-09-07T00:00:00+00:00',
+                'ends_at' => '',
+                'customer_agreement_id' => $customer->id,
+            ], 10);
+            self::assertSame(1, $result->total());
+            self::assertSame($owner->reference, $result->items()[0]->reference);
+        });
+    }
 }

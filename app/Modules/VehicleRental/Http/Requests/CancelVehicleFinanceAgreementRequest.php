@@ -10,6 +10,15 @@ use Modules\VehicleRental\Data\AgreementContext;
 
 final class CancelVehicleFinanceAgreementRequest extends TenantScopedRequest
 {
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        if ($this->has('reason') && is_string($this->input('reason')) && trim($this->input('reason')) === '') {
+            $this->merge(['reason' => null]);
+        }
+    }
+
     public function rules(): array
     {
         return [

@@ -32,6 +32,25 @@ final class RefundPaymentRequest extends TenantScopedRequest
         ];
     }
 
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach ([
+            'reference_number', 'external_bank_name', 'external_bank_branch',
+            'instrument_number', 'instrument_date',
+        ] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function toData(int $paymentId): PaymentRefundData
     {
         return new PaymentRefundData(

@@ -27,6 +27,26 @@ final class StoreInvoiceRequest extends TenantScopedRequest
         InvoiceLineType::Manual->value,
     ];
 
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $merges = [];
+        foreach ([
+            'customer_id', 'supplier_id', 'due_date', 'currency_id', 'exchange_rate',
+            'document_tax_group_id', 'notes', 'supply_date', 'supply_period_start',
+            'supply_period_end',
+        ] as $field) {
+            if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
+                $merges[$field] = null;
+            }
+        }
+
+        if ($merges !== []) {
+            $this->merge($merges);
+        }
+    }
+
     public function rules(): array
     {
         return [
