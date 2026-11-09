@@ -441,4 +441,77 @@ final class RunningChartTest extends TestCase
             self::assertSame('SKEW-CHART', $skewChart->reference);
         });
     }
+
+    public function test_usage_coverage_accepts_sub_minute_handover_alignment_and_rejects_prior_period(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $useService = app(VehicleUseService::class);
+            $chartService = app(RunningChartService::class);
+
+            $use = $useService->plan($context, $customer->id, $customer->row_version, $input);
+            // Handover occurred at 09:00:38+05:30
+            $use = $useService->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-07T09:00:38+05:30',
+                'odometer' => '100',
+                'reason' => 'Collected with non-zero seconds',
+            ]);
+
+            // 1. User submits starts_at at 09:00:00 (within 1 minute before handover, e.g. operator keyed handover minute)
+            $chart = $chartService->create($context, $use->id, $use->row_version, [
+                'reference' => 'RC-MINUTE-ALIGN',
+                'starts_at' => '2026-09-07T09:00:00+05:30',
+                'ends_at' => '2026-09-07T12:00:00+05:30',
+                'start_odometer' => '100',
+                'end_odometer' => '150',
+            ]);
+            self::assertSame('2026-09-07 03:30:38', $chart->starts_at->format('Y-m-d H:i:s'));
+
+            // 2. User submits starts_at more than 1 minute before handover (08:55:00) -> rejected
+            try {
+                $chartService->create($context, $use->id, $use->row_version, [
+                    'reference' => 'RC-TOO-EARLY',
+                    'starts_at' => '2026-09-07T08:55:00+05:30',
+                    'ends_at' => '2026-09-07T12:00:00+05:30',
+                    'start_odometer' => '100',
+                    'end_odometer' => '150',
+                ]);
+                self::fail('Usage before handover was accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('period', $e->errors());
+                self::assertSame('Usage must fall within actual customer custody.', $e->errors()['period'][0]);
+            }
+
+            // Return vehicle at 18:00:15+05:30
+            $returnedUse = $useService->transition($context, $use->id, $use->row_version, VehicleUseAction::ReturnVehicle, [
+                'occurred_at' => '2026-09-07T18:00:15+05:30',
+                'odometer' => '200',
+                'reason' => 'Returned with non-zero seconds',
+            ]);
+
+            // 3. User submits ends_at with sub-minute skew after return (18:00:30) -> accepted and aligned
+            $returnSkewChart = $chartService->create($context, $returnedUse->id, $returnedUse->row_version, [
+                'reference' => 'RC-RETURN-SKEW',
+                'starts_at' => '2026-09-07T15:00:00+05:30',
+                'ends_at' => '2026-09-07T18:00:30+05:30',
+                'start_odometer' => '160',
+                'end_odometer' => '200',
+            ]);
+            self::assertSame('2026-09-07 12:30:15', $returnSkewChart->ends_at->format('Y-m-d H:i:s'));
+
+            // 4. User submits ends_at 10 minutes after return -> rejected
+            try {
+                $chartService->create($context, $returnedUse->id, $returnedUse->row_version, [
+                    'reference' => 'RC-AFTER-RETURN',
+                    'starts_at' => '2026-09-07T15:00:00+05:30',
+                    'ends_at' => '2026-09-07T18:10:00+05:30',
+                    'start_odometer' => '160',
+                    'end_odometer' => '200',
+                ]);
+                self::fail('Usage after return was accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('period', $e->errors());
+                self::assertSame('Usage must fall within actual customer custody.', $e->errors()['period'][0]);
+            }
+        });
+    }
 }

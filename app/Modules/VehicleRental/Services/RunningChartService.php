@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -125,7 +126,11 @@ final class RunningChartService
                 $this->assertCoverage($use, $data['starts_at'], $data['ends_at']);
                 $chart->forceFill($data);
             } elseif ($action === RunningChartAction::Finalize && $chart->status === RunningChartStatus::Draft) {
-                $this->assertCoverage($use, $chart->starts_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->ends_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT));
+                $startsAt = $chart->starts_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
+                $endsAt = $chart->ends_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
+                $this->assertCoverage($use, $startsAt, $endsAt);
+                $chart->starts_at = $startsAt;
+                $chart->ends_at = $endsAt;
                 $timeline = RunningChart::query()->forTenant($context->tenantId)->whereKeyNot($chart->id)->where('status', RunningChartStatus::Finalized->value)->whereHas('vehicleUse', fn ($q) => $q->where('vehicle_id', $use->vehicle_id));
                 if ((clone $timeline)->where('starts_at', '<', $chart->ends_at)->where('ends_at', '>', $chart->starts_at)->lockForUpdate()->first(['id']) !== null) {
                     throw new ConflictHttpException('Finalized usage already covers this vehicle period.');
@@ -211,10 +216,39 @@ final class RunningChartService
         return VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
     }
 
-    private function assertCoverage(VehicleUse $use, string $start, string $end): void
+    private function assertCoverage(VehicleUse $use, string &$start, string &$end): void
     {
-        if (! in_array($use->status, [VehicleUseStatus::InCustody, VehicleUseStatus::Returned], true) || $use->handed_over_at === null || $start < $use->handed_over_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT) || ($use->returned_at !== null && $end > $use->returned_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))) {
+        if (! in_array($use->status, [VehicleUseStatus::InCustody, VehicleUseStatus::Returned], true) || $use->handed_over_at === null) {
             throw ValidationException::withMessages(['period' => ['Usage must fall within actual customer custody.']]);
+        }
+
+        $handover = CarbonImmutable::createFromFormat(OperationalFields::DATABASE_TIMESTAMP_FORMAT, $use->handed_over_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), OperationalFields::UTC);
+        $usageStart = CarbonImmutable::createFromFormat(OperationalFields::DATABASE_TIMESTAMP_FORMAT, $start, OperationalFields::UTC);
+        $usageEnd = CarbonImmutable::createFromFormat(OperationalFields::DATABASE_TIMESTAMP_FORMAT, $end, OperationalFields::UTC);
+
+        if ($usageStart < $handover) {
+            if ($usageStart >= $handover->subMinute()) {
+                $start = $use->handed_over_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
+                $usageStart = $handover;
+            } else {
+                throw ValidationException::withMessages(['period' => ['Usage must fall within actual customer custody.']]);
+            }
+        }
+
+        if ($use->returned_at !== null) {
+            $return = CarbonImmutable::createFromFormat(OperationalFields::DATABASE_TIMESTAMP_FORMAT, $use->returned_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), OperationalFields::UTC);
+            if ($usageEnd > $return) {
+                if ($usageEnd <= $return->addMinute()) {
+                    $end = $use->returned_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
+                    $usageEnd = $return;
+                } else {
+                    throw ValidationException::withMessages(['period' => ['Usage must fall within actual customer custody.']]);
+                }
+            }
+        }
+
+        if ($usageEnd <= $usageStart) {
+            throw ValidationException::withMessages(['ends_at' => ['Record completed usage ending after its start, not in the future.']]);
         }
     }
 

@@ -7,7 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, ApiError } from '@/shared/api/apiError';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { formatBusinessDateTimeWithSeconds } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
@@ -50,16 +50,18 @@ export function RunningChartEditor({
     onSaved: () => void;
     onCancel: () => void;
 }) {
-    const custodyStart = use.handed_over_at ? localTimestampValue(use.handed_over_at).slice(0, 16) : undefined;
-    const custodyEnd = use.returned_at ? localTimestampValue(use.returned_at).slice(0, 16) : undefined;
-    const currentNow = localTimestampValue(new Date().toISOString()).slice(0, 16);
+    const custodyStart = use.handed_over_at ? localTimestampValue(use.handed_over_at) : undefined;
+    const custodyEnd = use.returned_at ? localTimestampValue(use.returned_at) : undefined;
+    const currentNow = localTimestampValue(new Date().toISOString());
 
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
     const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : '');
     const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
 
+    const minStart = custodyStart ? custodyStart.slice(0, 16) + ':00' : undefined;
     const maxEnd = custodyEnd && custodyEnd < currentNow ? custodyEnd : currentNow;
     const maxStart = end && end < maxEnd ? end : maxEnd;
+    const minEnd = start || minStart;
     const [values, setValues] = useState<Record<string, string>>(() => {
         const initial = Object.fromEntries(
             [...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [
@@ -229,13 +231,13 @@ export function RunningChartEditor({
                         label="Usage start"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={custodyStart}
+                        min={minStart}
                         max={maxStart}
                         required
                         value={start}
                         onChange={e => setStart(e.target.value)}
                         error={error?.fields.starts_at?.[0]}
-                        hint={use.handed_over_at ? `Vehicle in custody since: ${formatBusinessDateTime(use.handed_over_at)}` : undefined}
+                        hint={use.handed_over_at ? `Vehicle in custody since: ${formatBusinessDateTimeWithSeconds(use.handed_over_at)}` : undefined}
                     />
                     {custodyStart && (
                         <div className="flex flex-wrap gap-2 text-xs">
@@ -254,13 +256,13 @@ export function RunningChartEditor({
                         label="Usage end"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={start || custodyStart || undefined}
+                        min={minEnd}
                         max={maxEnd}
                         required
                         value={end}
                         onChange={e => setEnd(e.target.value)}
                         error={error?.fields.ends_at?.[0]}
-                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTime(use.returned_at)}` : undefined}
+                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTimeWithSeconds(use.returned_at)}` : undefined}
                     />
                     <div className="flex flex-wrap gap-2 text-xs">
                         {custodyEnd && (

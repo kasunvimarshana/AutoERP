@@ -159,8 +159,8 @@ it('sets end time via Use current time button and respects custody return button
     const returnedUse = {
         ...use,
         status: VehicleUseStatus.Returned,
-        handed_over_at: '2026-09-07T08:00:00+05:30',
-        returned_at: '2026-09-07T18:00:00+05:30',
+        handed_over_at: '2026-09-07T08:00:38+05:30',
+        returned_at: '2026-09-07T18:00:45+05:30',
     } as VehicleUse;
 
     render(<RunningChartEditor use={returnedUse} onSaved={() => undefined} onCancel={() => undefined} />);
@@ -168,7 +168,11 @@ it('sets end time via Use current time button and respects custody return button
     expect(screen.getByRole('button', { name: 'Use custody start time' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Use custody return time' })).toBeInTheDocument();
 
-    const endInput = screen.getByLabelText('Usage end');
+    const endInput = screen.getByLabelText('Usage end') as HTMLInputElement;
     fireEvent.click(screen.getByRole('button', { name: 'Use custody return time' }));
-    expect(endInput).toHaveValue('2026-09-07T18:00');
+    expect(endInput.value).toContain('2026-09-07T18:00:45');
+
+    const startInput = screen.getByLabelText('Usage start') as HTMLInputElement;
+    fireEvent.click(screen.getByRole('button', { name: 'Use custody start time' }));
+    expect(startInput.value).toContain('2026-09-07T08:00:38');
 });

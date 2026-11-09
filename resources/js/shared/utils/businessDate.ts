@@ -77,6 +77,22 @@ export function formatBusinessDateTime(
     }).format(date);
 }
 
+export function formatBusinessDateTimeWithSeconds(
+    value: string | Date | null | undefined,
+    fallback = '-',
+    timeZone = configuredTimeZone,
+): string {
+    if (value === null || value === undefined || value === '') return fallback;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return fallback;
+
+    return new Intl.DateTimeFormat(undefined, {
+        timeZone: timeZone ?? undefined,
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+    }).format(date);
+}
+
 export function businessDateTimeInputValue(
     date = new Date(),
     calendarDays = 0,
