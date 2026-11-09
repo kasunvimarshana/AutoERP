@@ -221,7 +221,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                     />
                 </div>
             )}
-            {!end && <p className="text-xs text-slate-500 sm:col-span-2">{agreement.ends_on ? `Planned return is optional. When left blank, assignment covers up to agreement end (${agreement.ends_on}).` : 'Planned return is optional. When left blank, usage remains open-ended until returned.'}</p>}
+            {!end && <p className="text-xs text-slate-500 sm:col-span-2">Planned return is optional. When left blank, vehicle assignment continues under the covering owner agreement until returned or replaced.</p>}
             {replacement && (
                 <>
                     <Input

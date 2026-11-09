@@ -120,18 +120,16 @@ final class VehicleUseService
                 if ((int) $owner->vehicle_id !== (int) $vehicle->id) {
                     throw ValidationException::withMessages(['owner_agreement_id' => ['Owner agreement must cover the selected vehicle.']]);
                 }
-                $ownerEffectiveEnd = $end;
-                if ($ownerEffectiveEnd === null && $customer->ends_on !== null) {
-                    $ownerEffectiveEnd = CarbonImmutable::parse($customer->ends_on->toDateString().' 23:59:59');
-                } elseif ($ownerEffectiveEnd === null && $customer->ends_on === null && $owner->ends_on !== null) {
+                if ($end !== null) {
+                    $this->coveragePeriod($owner, $context, $start, $end);
+                } elseif ($customer->ends_on === null && $owner->ends_on !== null) {
                     throw ValidationException::withMessages(['owner_agreement_id' => ['An open-ended customer rental requires open-ended vehicle supply.']]);
+                } else {
+                    $this->coveragePeriod($owner, $context, $start, null);
                 }
-                $this->coveragePeriod($owner, $context, $start, $ownerEffectiveEnd);
             } else {
-                $companyEffectiveEnd = $end !== null
-                    ? OperationalTime::database($end)
-                    : ($customer->ends_on !== null ? OperationalTime::database(CarbonImmutable::parse($customer->ends_on->toDateString().' 23:59:59')) : null);
-                if (! $this->companyCoverage->covers($context->tenantId, (int) $vehicle->id, OperationalTime::database($start), $companyEffectiveEnd)) {
+                $companyEnd = $end !== null ? OperationalTime::database($end) : null;
+                if (! $this->companyCoverage->covers($context->tenantId, (int) $vehicle->id, OperationalTime::database($start), $companyEnd)) {
                     throw ValidationException::withMessages(['owner_agreement_id' => ['Select the owner agreement, or record valid company ownership in Vehicle for the full planned period.']]);
                 }
             }

@@ -315,7 +315,31 @@ final class VehicleUseTest extends TestCase
         });
     }
 
-    public function test_vehicle_use_plan_with_owner_agreement_rejects_insufficient_coverage_when_planned_return_is_blank(): void
+    public function test_vehicle_use_plan_with_owner_agreement_succeeds_when_planned_return_is_blank_even_if_owner_ends_before_customer(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
+            $agreements = app(AgreementService::class);
+            $customer = $agreements->create(AgreementKind::Customer, $context, array_replace($customerInput, ['ends_on' => '2026-09-20']));
+            $customer = $agreements->change(AgreementKind::Customer, $context, $customer->id, $customer->row_version, AgreementAction::Activate);
+
+            $owner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['ends_on' => '2026-09-15']));
+            $owner = $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
+
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $ownerInput['vehicle_id'],
+                'owner_agreement_id' => $owner->id,
+                'starts_at' => '2026-09-07T09:00:00+00:00',
+                'ends_at' => null,
+            ]);
+            self::assertNull($use->ends_at);
+            self::assertSame(VehicleUseStatus::Planned, $use->status);
+            self::assertSame($owner->id, (int) $use->owner_agreement_id);
+        });
+    }
+
+    public function test_vehicle_use_plan_with_owner_agreement_rejects_insufficient_coverage_when_planned_return_exceeds_owner(): void
     {
         [$context, $customerInput, $ownerInput] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerInput, $ownerInput): void {
@@ -332,7 +356,7 @@ final class VehicleUseTest extends TestCase
                 'vehicle_id' => $ownerInput['vehicle_id'],
                 'owner_agreement_id' => $owner->id,
                 'starts_at' => '2026-09-07T09:00:00+00:00',
-                'ends_at' => null,
+                'ends_at' => '2026-09-18T00:00:00+00:00',
             ]);
         });
     }

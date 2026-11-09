@@ -44,10 +44,7 @@ final class OwnerSourceService
         if ($end !== null) {
             $coverageUntil = $this->calendar->civilDate($context, $end->subMicrosecond());
         } elseif (! empty($data['customer_agreement_id'])) {
-            $customerAgreement = CustomerAgreement::query()
-                ->forContext($context->tenantId, $context->organizationUnitId)
-                ->find((int) $data['customer_agreement_id']);
-            $coverageUntil = $customerAgreement?->ends_on?->toDateString() ?? $coverageFrom;
+            $coverageUntil = $coverageFrom;
         }
 
         $search = trim($data['search'] ?? '');

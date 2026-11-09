@@ -91,20 +91,21 @@ final class OwnerSourceTest extends TestCase
             $agreements->change(AgreementKind::Owner, $context, $owner->id, $owner->row_version, AgreementAction::Activate);
 
             $lookup = app(OwnerSourceService::class);
-            // When ends_at is empty/null, but customer_agreement_id is provided, owner agreement covering customer agreement is returned
+            // When ends_at is empty/null, owner agreements covering the handover date are returned
+            $shorterOwner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['reference' => 'OWNER-SHORT', 'ends_on' => '2026-09-09']));
+            $agreements->change(AgreementKind::Owner, $context, $shorterOwner->id, $shorterOwner->row_version, AgreementAction::Activate);
+
             $result = $lookup->list($context, $ownerInput['vehicle_id'], [
                 'starts_at' => '2026-09-07T00:00:00+00:00',
                 'ends_at' => '',
                 'customer_agreement_id' => $customer->id,
             ], 10);
-            self::assertSame(1, $result->total());
+            self::assertSame(2, $result->total());
 
-            // If owner agreement ends before the customer agreement, it is excluded
-            $shorterOwner = $agreements->create(AgreementKind::Owner, $context, array_replace($ownerInput, ['reference' => 'OWNER-SHORT', 'ends_on' => '2026-09-09']));
-            $agreements->change(AgreementKind::Owner, $context, $shorterOwner->id, $shorterOwner->row_version, AgreementAction::Activate);
+            // When ends_at is explicitly provided, owner agreement must cover up to that date
             $result = $lookup->list($context, $ownerInput['vehicle_id'], [
                 'starts_at' => '2026-09-07T00:00:00+00:00',
-                'ends_at' => null,
+                'ends_at' => '2026-09-11T00:00:00+00:00',
                 'customer_agreement_id' => $customer->id,
             ], 10);
             // Only the owner agreement ending on 2026-09-15 is returned, not the one ending on 2026-09-09

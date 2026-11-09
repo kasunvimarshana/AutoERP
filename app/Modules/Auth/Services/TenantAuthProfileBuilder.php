@@ -6,6 +6,8 @@ namespace Modules\Auth\Services;
 
 use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\Exceptions\AuthFailure;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
 use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
 use Modules\User\Contracts\TenantUserAuthenticationDirectoryInterface;
@@ -16,6 +18,7 @@ final readonly class TenantAuthProfileBuilder
         private TenantAuthenticationDirectoryInterface $tenants,
         private TenantUserAuthenticationDirectoryInterface $users,
         private OrganizationUnitDirectoryInterface $organizationUnits,
+        private ?ConfigurationResolverInterface $configuration = null,
     ) {}
 
     /** @param array<string,mixed> $token @return array<string,mixed> */
@@ -38,6 +41,23 @@ final readonly class TenantAuthProfileBuilder
 
         $roles = $this->users->roleNames($tenantId, $userId);
         $permissions = $this->users->permissionNames($tenantId, $userId);
+
+        $timezone = null;
+        if ($this->configuration !== null) {
+            try {
+                $timezone = (string) $this->configuration->value(
+                    ConfigurationKey::WORKSPACE_TIMEZONE,
+                    $tenantId,
+                    $organizationUnitId,
+                );
+            } catch (\Throwable) {
+                $timezone = null;
+            }
+        }
+        if ($timezone !== null && $timezone !== '') {
+            $tenant['timezone'] = $timezone;
+            $organizationUnit['timezone'] = $timezone;
+        }
 
         return [
             'user' => array_merge($user, ['roles' => $roles, 'permissions' => $permissions]),
