@@ -18,7 +18,7 @@ final class AgreementRequest extends TenantScopedRequest
         $rules = [
             'expected_version' => ['sometimes', 'required', 'integer', 'min:1'],
             'reason' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
-            'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
+            'search' => ['nullable', 'string', 'max:255'],
             'row_version' => ['prohibited'],
             'actor_id' => ['prohibited'],
             'activated_at' => ['prohibited'],

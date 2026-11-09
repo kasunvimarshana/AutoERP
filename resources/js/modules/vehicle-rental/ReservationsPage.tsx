@@ -261,7 +261,7 @@ export default function ReservationsPage() {
                     {selected.converted_agreement && (
                         <p className="text-sm font-medium">
                             <Link
-                                to="/vehicle-rental/customer/agreements"
+                                to={`/vehicle-rental/customer/agreements?search=${encodeURIComponent(selected.converted_agreement.reference)}`}
                                 className="text-blue-600 hover:text-blue-800 hover:underline"
                             >
                                 Converted to Customer Agreement: {selected.converted_agreement.reference}

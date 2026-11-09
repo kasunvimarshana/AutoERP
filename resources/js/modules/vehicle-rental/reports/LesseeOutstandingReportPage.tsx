@@ -202,7 +202,11 @@ export default function LesseeOutstandingReportPage() {
                                                 <tr key={inv.invoice_id} className="hover:bg-slate-50/60">
                                                     <td className="py-2 px-3 text-slate-600">{inv.txn_type}</td>
                                                     <td className="py-2 px-3 text-center text-slate-700">{inv.invoice_date}</td>
-                                                    <td className="py-2 px-3 font-bold text-blue-600">{inv.invoice_number}</td>
+                                                    <td className="py-2 px-3 font-bold text-blue-600">
+                                                        <Link to={`/invoices/${inv.invoice_id}`} className="hover:underline">
+                                                            {inv.invoice_number}
+                                                        </Link>
+                                                    </td>
                                                     <td className="py-2 px-3 text-slate-700">{inv.agreement_duration}</td>
                                                     <td className="py-2 px-3 font-semibold text-slate-800">{inv.vehicle_no}</td>
                                                     <td className="py-2 px-3 text-right font-mono text-slate-700">

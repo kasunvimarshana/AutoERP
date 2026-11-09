@@ -11,9 +11,12 @@ import { AgreementKind, type Agreement } from './agreements';
 export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: { kind: AgreementKind; agreement: Agreement; onSaved: () => void; onCancel: () => void }) {
     const minStartDate = (() => {
         try {
-            const d = new Date(agreement.starts_on);
-            d.setDate(d.getDate() + 1);
-            return d.toISOString().split('T')[0];
+            const [y, m, d] = agreement.starts_on.split('-').map(Number);
+            const nextDay = new Date(y, m - 1, d + 1);
+            const yyyy = nextDay.getFullYear();
+            const mm = String(nextDay.getMonth() + 1).padStart(2, '0');
+            const dd = String(nextDay.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
         } catch {
             return undefined;
         }

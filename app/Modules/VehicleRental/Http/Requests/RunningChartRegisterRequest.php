@@ -13,7 +13,7 @@ final class RunningChartRegisterRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
-            'search' => ['nullable', 'string', 'max:100'],
+            'search' => ['nullable', 'string', 'max:255'],
             'chart_status' => ['nullable', 'string'],
             'from' => ['nullable', 'string'],
             'until' => ['nullable', 'string'],

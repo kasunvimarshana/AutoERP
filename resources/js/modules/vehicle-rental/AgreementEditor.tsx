@@ -72,6 +72,8 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
                     required
                     disabled={isSuccessor}
                     error={fieldError('party_id')}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
                 {isSuccessor && (
                     <p className="mt-1 text-xs text-slate-500">
@@ -89,6 +91,8 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
                         required
                         disabled={isSuccessor}
                         error={fieldError('vehicle_id')}
+                        loadOnOpen
+                        minSearchLength={0}
                     />
                     {isSuccessor && (
                         <p className="mt-1 text-xs text-slate-500">
@@ -97,7 +101,16 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
                     )}
                 </div>
             )}
-            <LookupSelect label="Currency" value={currency} onChange={setCurrency} search={currencies} required error={fieldError('currency_id')} />
+            <LookupSelect
+                label="Currency"
+                value={currency}
+                onChange={setCurrency}
+                search={currencies}
+                required
+                error={fieldError('currency_id')}
+                loadOnOpen
+                minSearchLength={0}
+            />
             <Input label="Agreement date" type="date" value={agreedOn} onChange={e => setAgreedOn(e.target.value)} required error={fieldError('agreed_on')} />
             <Input label="Agreement executing date" type="date" value={executingOn} onChange={e => setExecutingOn(e.target.value)} error={fieldError('executing_on')} hint="Record the date stated in the agreement; leave blank if unknown." />
             <Input label="Start date" type="date" max={endsOn || undefined} value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />

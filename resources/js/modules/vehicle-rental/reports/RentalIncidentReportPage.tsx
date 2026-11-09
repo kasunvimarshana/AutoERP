@@ -214,7 +214,7 @@ export default function RentalIncidentReportPage() {
                                     {data.rows.map(row => (
                                         <tr key={row.incident_id} className="hover:bg-slate-50/80">
                                             <td className="py-2.5 px-3 font-bold text-blue-600">
-                                                <Link to={`/vehicle-rental/incidents`} className="hover:underline">
+                                                <Link to={`/vehicle-rental/incidents?search=${encodeURIComponent(row.reference)}`} className="hover:underline">
                                                     {row.reference}
                                                 </Link>
                                             </td>

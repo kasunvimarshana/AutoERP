@@ -319,6 +319,8 @@ export default function RentalExpensesPage() {
                                         onChange={setAllocCustomerAgreement}
                                         search={searchCustomerAgreements}
                                         required
+                                        loadOnOpen
+                                        minSearchLength={0}
                                     />
                                 )}
                                 {allocType === 'owner_deduction' && (
@@ -328,6 +330,8 @@ export default function RentalExpensesPage() {
                                         onChange={setAllocOwnerAgreement}
                                         search={searchOwnerAgreements}
                                         required
+                                        loadOnOpen
+                                        minSearchLength={0}
                                     />
                                 )}
                             </div>

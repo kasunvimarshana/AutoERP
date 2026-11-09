@@ -122,6 +122,8 @@ export default function RentalRunningChartReportPage() {
                         onChange={setAgreement}
                         search={searchCustomerAgreements}
                         required
+                        loadOnOpen
+                        minSearchLength={0}
                         error={error?.fields.agreement_id?.[0]}
                     />
                     <Input

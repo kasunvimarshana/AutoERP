@@ -258,7 +258,7 @@ export default function OwnerDisbursementReportPage() {
                                         {data.rows.map(row => (
                                             <tr key={row.owner_agreement_id} className="hover:bg-slate-50/80">
                                                 <td className="py-2.5 px-3 font-bold text-blue-600">
-                                                    <Link to={`/vehicle-rental/owner/agreements`} className="hover:underline">
+                                                    <Link to={`/vehicle-rental/owner/agreements?search=${encodeURIComponent(row.agreement_reference)}`} className="hover:underline">
                                                         {row.agreement_reference}
                                                     </Link>
                                                 </td>

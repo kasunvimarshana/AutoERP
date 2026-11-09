@@ -107,6 +107,8 @@ export function ReservationEditor({
                     search={lookupApi.customers}
                     required
                     error={error?.fields.customer_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
                 <LookupSelect
                     label="Requested Vehicle (Optional)"
@@ -114,6 +116,8 @@ export function ReservationEditor({
                     onChange={setVehicle}
                     search={vehicles}
                     error={error?.fields.requested_vehicle_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
             </div>
 
@@ -166,6 +170,8 @@ export function ReservationEditor({
                     search={currencies}
                     required
                     error={error?.fields.currency_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
                 <Input
                     label="Estimated Rent Amount"

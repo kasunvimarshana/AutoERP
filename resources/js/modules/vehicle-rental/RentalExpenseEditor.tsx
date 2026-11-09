@@ -87,6 +87,8 @@ export function RentalExpenseEditor({
                     search={vehicles}
                     required
                     error={error?.fields.vehicle_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
                 <Select
                     label="Expense Type"
@@ -118,6 +120,8 @@ export function RentalExpenseEditor({
                     search={currencies}
                     required
                     error={error?.fields.currency_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
                 <Input
                     label="Net Amount"
@@ -139,6 +143,8 @@ export function RentalExpenseEditor({
                     value={supplier}
                     onChange={setSupplier}
                     search={lookupApi.suppliers}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
             </div>
 

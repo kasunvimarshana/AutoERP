@@ -63,8 +63,8 @@ export default function IncidentRegisterPage() {
     const chartMeta = runningCharts.data?.meta;
     const chartsLoading = runningCharts.loading;
 
-    const [incidentSearch, setIncidentSearch] = useState('');
-    const [incidentQuery, setIncidentQuery] = useState('');
+    const [incidentSearch, setIncidentSearch] = useState(() => (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('search') ?? '') : ''));
+    const [incidentQuery, setIncidentQuery] = useState(() => (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('search') ?? '') : ''));
 
     useEffect(() => {
         const controller = new AbortController();
@@ -200,7 +200,14 @@ export default function IncidentRegisterPage() {
                 onSubmit={event => {
                     event.preventDefault();
                     setPage(1);
-                    setIncidentQuery(incidentSearch.trim());
+                    const q = incidentSearch.trim();
+                    setIncidentQuery(q);
+                    if (typeof window !== 'undefined') {
+                        const url = new URL(window.location.href);
+                        if (q) url.searchParams.set('search', q);
+                        else url.searchParams.delete('search');
+                        window.history.replaceState({}, '', url.toString());
+                    }
                 }}
                 className="mb-4 flex flex-wrap items-center gap-2"
             >
@@ -223,6 +230,11 @@ export default function IncidentRegisterPage() {
                             setIncidentSearch('');
                             setIncidentQuery('');
                             setPage(1);
+                            if (typeof window !== 'undefined') {
+                                const url = new URL(window.location.href);
+                                url.searchParams.delete('search');
+                                window.history.replaceState({}, '', url.toString());
+                            }
                         }}
                     >
                         Clear

@@ -110,6 +110,8 @@ export function VehicleFinanceEditor({
                     search={lookupApi.suppliers}
                     required
                     error={error?.fields.supplier_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
                 <LookupSelect
                     label="Financed Vehicle"
@@ -118,6 +120,8 @@ export function VehicleFinanceEditor({
                     search={vehicles}
                     required
                     error={error?.fields.vehicle_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
             </div>
 
@@ -159,6 +163,8 @@ export function VehicleFinanceEditor({
                     search={currencies}
                     required
                     error={error?.fields.currency_id?.[0]}
+                    loadOnOpen
+                    minSearchLength={0}
                 />
                 <Input
                     label="Principal Financed Amount"
