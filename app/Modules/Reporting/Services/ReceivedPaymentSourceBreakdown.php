@@ -10,24 +10,24 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Payment\Enums\AllocationStatus;
-use Modules\Payment\Enums\PaymentMethodType;
 
-final class ReceivedCashSourceBreakdown
+final class ReceivedPaymentSourceBreakdown
 {
     public function __construct(private readonly DecimalMath $math) {}
 
     /**
      * @param  Collection<int, object>  $paymentLines
-     * @return array{selected_invoices: string, earlier_invoices: string, other_invoices: string, unapplied: string}
+     * @return array<string, array{selected_invoices: string, earlier_invoices: string, other_invoices: string, unapplied: string}>
      */
     public function run(Collection $paymentLines, int $tenantId, ?int $organizationUnitId, string $dateFrom, string $dateTo): array
     {
-        $totals = [
+        $emptyTotals = [
             'selected_invoices' => '0.000000',
             'earlier_invoices' => '0.000000',
             'other_invoices' => '0.000000',
             'unapplied' => '0.000000',
         ];
+        $totals = [];
         $byPayment = $paymentLines->groupBy('payment_id');
         if ($byPayment->isEmpty()) {
             return $totals;
@@ -56,39 +56,39 @@ final class ReceivedCashSourceBreakdown
 
         foreach ($byPayment as $paymentId => $lines) {
             $first = $lines->first();
-            $cashLines = $lines->filter(fn (object $line): bool => $line->type === PaymentMethodType::Cash->value);
-            if ($first === null || $cashLines->isEmpty()) {
+            if ($first === null) {
                 continue;
             }
 
-            $cashAmount = $this->math->sum($cashLines->pluck('amount')->map(fn ($amount): string => (string) $amount));
-            $cashBaseAmount = $this->math->sum($cashLines->map(
-                fn (object $line): string => $this->math->mul((string) $line->amount, (string) $line->exchange_rate),
-            ));
-            $remainingCash = $cashAmount;
-            $remainingBase = $cashBaseAmount;
             $paymentTotal = (string) $first->payment_total;
+            foreach ($lines->groupBy(fn (object $line): string => $line->type."\0".$line->name) as $methodKey => $methodLines) {
+                $methodAmount = $this->math->sum($methodLines->pluck('amount')->map(fn ($amount): string => (string) $amount));
+                $methodBaseAmount = $this->math->mul($methodAmount, (string) $first->exchange_rate);
+                $remainingAmount = $methodAmount;
+                $remainingBase = $methodBaseAmount;
+                $totals[$methodKey] ??= $emptyTotals;
 
-            foreach ($allocations->get($paymentId, collect()) as $allocation) {
-                if ($this->math->compare($paymentTotal, '0') <= 0 || $this->math->compare($remainingCash, '0') <= 0) {
-                    break;
+                foreach ($allocations->get($paymentId, collect()) as $allocation) {
+                    if ($this->math->compare($paymentTotal, '0') <= 0 || $this->math->compare($remainingAmount, '0') <= 0) {
+                        break;
+                    }
+
+                    $share = $this->math->div(
+                        $this->math->mul((string) $allocation->allocated_amount, $methodAmount, 12),
+                        $paymentTotal,
+                    );
+                    $share = $this->math->compare($share, $remainingAmount) > 0 ? $remainingAmount : $share;
+                    $baseShare = $this->math->mul($share, (string) $first->exchange_rate);
+                    $baseShare = $this->math->compare($baseShare, $remainingBase) > 0 ? $remainingBase : $baseShare;
+                    $category = $this->invoiceCategory($allocation, $dateFrom, $dateTo);
+
+                    $totals[$methodKey][$category] = $this->math->add($totals[$methodKey][$category], $baseShare);
+                    $remainingAmount = $this->math->sub($remainingAmount, $share);
+                    $remainingBase = $this->math->sub($remainingBase, $baseShare);
                 }
 
-                $share = $this->math->div(
-                    $this->math->mul((string) $allocation->allocated_amount, $cashAmount, 12),
-                    $paymentTotal,
-                );
-                $share = $this->math->compare($share, $remainingCash) > 0 ? $remainingCash : $share;
-                $baseShare = $this->math->mul($share, (string) $first->exchange_rate);
-                $baseShare = $this->math->compare($baseShare, $remainingBase) > 0 ? $remainingBase : $baseShare;
-                $category = $this->invoiceCategory($allocation, $dateFrom, $dateTo);
-
-                $totals[$category] = $this->math->add($totals[$category], $baseShare);
-                $remainingCash = $this->math->sub($remainingCash, $share);
-                $remainingBase = $this->math->sub($remainingBase, $baseShare);
+                $totals[$methodKey]['unapplied'] = $this->math->add($totals[$methodKey]['unapplied'], $remainingBase);
             }
-
-            $totals['unapplied'] = $this->math->add($totals['unapplied'], $remainingBase);
         }
 
         return $totals;

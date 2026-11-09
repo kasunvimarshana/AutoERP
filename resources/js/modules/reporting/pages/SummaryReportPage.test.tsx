@@ -33,6 +33,7 @@ describe('SummaryReportPage', () => {
             sales_settlement: {
                 cash: { amount: '376270', document_count: 40 },
                 card: { amount: '349125.71', document_count: 41 },
+                bank_transfer: { amount: '0', document_count: 0 },
                 credit: { amount: '127857.60', document_count: 3 },
                 other_paid: { amount: '0', document_count: 0 },
                 credits_applied: '0',
@@ -48,20 +49,26 @@ describe('SummaryReportPage', () => {
                             name: 'Cash',
                             transaction_count: 40,
                             amount: '376270',
+                            sources: {
+                                selected_invoices: '100000',
+                                earlier_invoices: '200000',
+                                other_invoices: '0',
+                                unapplied: '76270',
+                            },
                         },
                         {
                             type: 'card',
                             name: 'Card',
                             transaction_count: 41,
                             amount: '349125.71',
+                            sources: {
+                                selected_invoices: '349125.71',
+                                earlier_invoices: '0',
+                                other_invoices: '0',
+                                unapplied: '0',
+                            },
                         },
                     ],
-                    cash_sources: {
-                        selected_invoices: '100000',
-                        earlier_invoices: '200000',
-                        other_invoices: '0',
-                        unapplied: '76270',
-                    },
                 },
                 sent: {
                     amount: '0',
@@ -125,14 +132,15 @@ describe('SummaryReportPage', () => {
         expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Cash' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Card' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Bank Transfer' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Outstanding now' })).toBeInTheDocument();
         expect(screen.getByText('Payments received during selected dates')).toBeInTheDocument();
-        expect(screen.getAllByText(/376,270\.00/)).toHaveLength(3);
+        expect(screen.getAllByText(/376,270\.00/)).toHaveLength(2);
         expect(screen.getByRole('heading', { name: 'Payments received' })).toBeInTheDocument();
-        await user.click(screen.getByText('Cash received breakdown'));
-        expect(screen.getByText('Invoices dated in selected period')).toBeInTheDocument();
-        expect(screen.getByText('Earlier invoices')).toBeInTheDocument();
-        expect(screen.getByText('Not allocated to an invoice')).toBeInTheDocument();
+        expect(screen.getAllByText('Sales invoices in selected dates')).toHaveLength(2);
+        expect(screen.getByText('Earlier invoices — outstanding payments')).toBeInTheDocument();
+        expect(screen.getByText('Received, not yet applied to an invoice')).toBeInTheDocument();
+        expect(screen.queryByText('Other invoices')).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Total expenses' })).toBeInTheDocument();
         expect(screen.getByText(/Rent was the largest paid expense type at 100%/)).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Not connected yet' })).toBeInTheDocument();

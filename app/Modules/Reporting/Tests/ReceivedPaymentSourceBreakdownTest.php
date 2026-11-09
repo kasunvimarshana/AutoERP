@@ -15,10 +15,10 @@ use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
-use Modules\Reporting\Services\ReceivedCashSourceBreakdown;
+use Modules\Reporting\Services\ReceivedPaymentSourceBreakdown;
 use Tests\TestCase;
 
-final class ReceivedCashSourceBreakdownTest extends TestCase
+final class ReceivedPaymentSourceBreakdownTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -46,18 +46,24 @@ final class ReceivedCashSourceBreakdownTest extends TestCase
         $this->allocation($tenantId, $paymentId, $reversedInvoiceId, '2026-09-01', '5.000000', AllocationStatus::Reversed);
 
         $rows = collect([
-            (object) ['payment_id' => $paymentId, 'payment_total' => '100.000000', 'exchange_rate' => '2.000000', 'amount' => '60.000000', 'type' => 'cash'],
-            (object) ['payment_id' => $paymentId, 'payment_total' => '100.000000', 'exchange_rate' => '2.000000', 'amount' => '40.000000', 'type' => 'card'],
+            (object) ['payment_id' => $paymentId, 'payment_total' => '100.000000', 'exchange_rate' => '2.000000', 'amount' => '60.000000', 'type' => 'cash', 'name' => 'Cash'],
+            (object) ['payment_id' => $paymentId, 'payment_total' => '100.000000', 'exchange_rate' => '2.000000', 'amount' => '40.000000', 'type' => 'card', 'name' => 'Card'],
         ]);
 
-        $result = app(ReceivedCashSourceBreakdown::class)->run($rows, $tenantId, null, '2026-07-01', '2026-07-31');
+        $result = app(ReceivedPaymentSourceBreakdown::class)->run($rows, $tenantId, null, '2026-07-01', '2026-07-31');
 
         self::assertSame([
             'selected_invoices' => '60.000000',
             'earlier_invoices' => '36.000000',
             'other_invoices' => '12.000000',
             'unapplied' => '12.000000',
-        ], $result);
+        ], $result["cash\0Cash"]);
+        self::assertSame([
+            'selected_invoices' => '40.000000',
+            'earlier_invoices' => '24.000000',
+            'other_invoices' => '8.000000',
+            'unapplied' => '8.000000',
+        ], $result["card\0Card"]);
     }
 
     private function payment(int $tenantId, string $amount): int

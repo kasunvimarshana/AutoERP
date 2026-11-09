@@ -29,6 +29,8 @@ final class SalesSettlementBreakdownService
 
     private const CARD = 'card';
 
+    private const BANK_TRANSFER = 'bank_transfer';
+
     private const OTHER_PAID = 'other_paid';
 
     public function __construct(private readonly DecimalMath $math) {}
@@ -59,11 +61,13 @@ final class SalesSettlementBreakdownService
         $breakdown = [
             self::CASH => $this->emptyMetric(),
             self::CARD => $this->emptyMetric(),
+            self::BANK_TRANSFER => $this->emptyMetric(),
             self::OTHER_PAID => $this->emptyMetric(),
         ];
         $invoiceIds = [
             self::CASH => [],
             self::CARD => [],
+            self::BANK_TRANSFER => [],
             self::OTHER_PAID => [],
         ];
 
@@ -78,13 +82,14 @@ final class SalesSettlementBreakdownService
         return [
             'cash' => $breakdown[self::CASH],
             'card' => $breakdown[self::CARD],
+            'bank_transfer' => $breakdown[self::BANK_TRANSFER],
             'credit' => [
                 'amount' => $creditAmount,
                 'document_count' => $creditDocumentCount,
             ],
             'other_paid' => $breakdown[self::OTHER_PAID],
             'credits_applied' => $creditsApplied,
-            'source_note' => 'These invoices are selected by invoice date. Cash and card include all active receipts against them, even when received later. Outstanding is the current unpaid balance.',
+            'source_note' => 'These invoices are selected by invoice date. Paid amounts include active receipts against them, even when received later. Outstanding is the current unpaid balance.',
         ];
     }
 
@@ -201,6 +206,7 @@ final class SalesSettlementBreakdownService
         return match ($methodType) {
             PaymentMethodType::Cash->value => self::CASH,
             PaymentMethodType::Card->value => self::CARD,
+            PaymentMethodType::BankTransfer->value => self::BANK_TRANSFER,
             default => self::OTHER_PAID,
         };
     }

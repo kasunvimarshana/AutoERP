@@ -23,7 +23,7 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_separates_allocated_cash_card_other_methods_and_open_credit(): void
+    public function test_it_separates_allocated_cash_card_bank_transfer_and_open_credit(): void
     {
         $tenantId = $this->tenant();
         $cashMethodId = $this->paymentMethod($tenantId, 'CASH', PaymentMethodType::Cash);
@@ -57,7 +57,8 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
 
         self::assertSame(['amount' => '300.000000', 'document_count' => 1], $result['cash']);
         self::assertSame(['amount' => '450.000000', 'document_count' => 1], $result['card']);
-        self::assertSame(['amount' => '500.000000', 'document_count' => 1], $result['other_paid']);
+        self::assertSame(['amount' => '500.000000', 'document_count' => 1], $result['bank_transfer']);
+        self::assertSame(['amount' => '0.000000', 'document_count' => 0], $result['other_paid']);
         self::assertSame(['amount' => '450.000000', 'document_count' => 2], $result['credit']);
         self::assertSame('0.000000', $result['credits_applied']);
     }
