@@ -182,8 +182,8 @@ final class VehicleUseService
                 $record->status = VehicleUseStatus::Cancelled;
             } elseif ($action === VehicleUseAction::Handover && $record->status === VehicleUseStatus::Planned) {
                 $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at');
-                if ($at->isFuture() || $at < $record->starts_at || ($record->ends_at !== null && $at >= $record->ends_at)) {
-                    throw ValidationException::withMessages(['occurred_at' => ['Record an actual handover within the planned period, not a future event.']]);
+                if ($at->greaterThan(now()->addMinute()) || ($record->ends_at !== null && $at >= $record->ends_at)) {
+                    throw ValidationException::withMessages(['occurred_at' => ['Record an actual handover before the planned return, not a future event.']]);
                 }
                 $this->coverageInstant($customer, $context, $at);
                 if ($owner !== null) {

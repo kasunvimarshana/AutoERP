@@ -47,6 +47,17 @@ it('makes open-ended coverage explicit in the source request', async () => {
     expect(requestLookup).toHaveBeenLastCalledWith(`${AGREEMENT_API}/vehicles/11/sources`, expect.any(Object), { starts_at: timestampWithOffset(start), ends_at: '', customer_agreement_id: 3 });
 });
 
+it('allows auto-selecting covering owner agreement when planned handover is set', async () => {
+    render(<VehicleUseEditor agreement={agreement} onSaved={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: 'CAR' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'CAR-123' }));
+    fireEvent.change(screen.getByLabelText('Planned handover'), { target: { value: '2026-09-07T09:00' } });
+    const autoSelectBtn = await screen.findByRole('button', { name: 'Auto-select owner agreement' });
+    fireEvent.click(autoSelectBtn);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Owner agreement' })).toHaveValue('OWNER-A · Example Owner'));
+    expect(screen.getByRole('button', { name: 'Save assignment' })).toBeEnabled();
+});
+
 it('allows saving assignment with owner agreement when planned return is left blank', async () => {
     render(<VehicleUseEditor agreement={agreement} onSaved={vi.fn()} onCancel={vi.fn()} />);
     fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: 'CAR' } });

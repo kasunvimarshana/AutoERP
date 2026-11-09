@@ -52,7 +52,53 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
             return () => controller.abort();
         }
     }, [initialVehicleId, replacement, vehicle]);
-    const sources = useCallback((params: LookupLoadParams) => requestLookup<NamedResource>(`${AGREEMENT_API}/vehicles/${vehicle?.id}/sources`, params, { starts_at: timestampWithOffset(start), ends_at: end ? timestampWithOffset(end) : '', customer_agreement_id: agreement.id }), [vehicle?.id, start, end, agreement.id]);
+    const sources = useCallback((params: LookupLoadParams) => {
+        if (!vehicle?.id || !start) {
+            return Promise.resolve({ data: [], links: {}, meta: undefined });
+        }
+        let startIso = '';
+        let endIso = '';
+        try {
+            startIso = timestampWithOffset(start);
+            if (end) endIso = timestampWithOffset(end);
+        } catch {
+            return Promise.resolve({ data: [], links: {}, meta: undefined });
+        }
+        return requestLookup<NamedResource>(
+            `${AGREEMENT_API}/vehicles/${vehicle.id}/sources`,
+            params,
+            { starts_at: startIso, ends_at: endIso, customer_agreement_id: agreement.id },
+        );
+    }, [vehicle, start, end, agreement.id]);
+    useEffect(() => {
+        if (!company && vehicle && start && !owner) {
+            let active = true;
+            const controller = new AbortController();
+            let startIso = '';
+            let endIso = '';
+            try {
+                startIso = timestampWithOffset(start);
+                if (end) endIso = timestampWithOffset(end);
+            } catch {
+                return;
+            }
+            requestLookup<NamedResource>(
+                `${AGREEMENT_API}/vehicles/${vehicle.id}/sources`,
+                { search: '', page: 1, perPage: 10, signal: controller.signal },
+                { starts_at: startIso, ends_at: endIso, customer_agreement_id: agreement.id },
+            ).then((res) => {
+                if (active && res.data.length === 1) {
+                    setOwner(res.data[0]);
+                }
+            }).catch(() => {});
+
+            return () => {
+                active = false;
+                controller.abort();
+            };
+        }
+    }, [company, vehicle, start, end, owner, agreement.id]);
+
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!vehicle || !start || (!company && !owner)) return;
         setSaving(true); setError(null);
@@ -120,7 +166,39 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
             <label className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><input className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" checked={company} onChange={event => { setCompany(event.target.checked); setOwner(null); }} /><span>Company-owned vehicle</span></label>
             {company && <p className="text-sm text-slate-600 sm:col-span-2">Vehicle ownership records must cover the entire period. No owner payable is created for company supply.</p>}
             {!company && vehicle && !start && <p className="text-sm text-slate-600 sm:col-span-2">Enter planned handover to find owner agreements covering it.</p>}
-            {!company && vehicle && start && <LookupSelect key={`${vehicle.id}:${start}:${end}`} label="Owner agreement" value={owner} onChange={setOwner} search={sources} required error={error?.fields.owner_agreement_id?.[0]} />}
+            {!company && vehicle && start && (
+                <div className="space-y-1 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-700">Owner agreement</span>
+                        {!owner && (
+                            <button
+                                type="button"
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
+                                onClick={async () => {
+                                    try {
+                                        const res = await sources({ search: '', page: 1, perPage: 10, signal: new AbortController().signal });
+                                        if (res.data.length > 0) {
+                                            setOwner(res.data[0]);
+                                        }
+                                    } catch {}
+                                }}
+                            >
+                                Auto-select owner agreement
+                            </button>
+                        )}
+                    </div>
+                    <LookupSelect
+                        label="Owner agreement"
+                        value={owner}
+                        onChange={setOwner}
+                        search={sources}
+                        loadOnOpen
+                        minSearchLength={0}
+                        required
+                        error={error?.fields.owner_agreement_id?.[0]}
+                    />
+                </div>
+            )}
             {!end && <p className="text-xs text-slate-500 sm:col-span-2">{agreement.ends_on ? `Planned return is optional. When left blank, assignment covers up to agreement end (${agreement.ends_on}).` : 'Planned return is optional. When left blank, usage remains open-ended until returned.'}</p>}
             {replacement && (
                 <>

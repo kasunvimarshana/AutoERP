@@ -18,7 +18,7 @@ import { AgreementStatus, type Agreement } from './agreements';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 import { listVehicleUses, transitionVehicleUse } from './vehicleUseApi';
-import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, VehicleUseStatus, VehicleUseAction, USE_ACTION_CONFIRM_LABELS, USE_ACTION_LABELS, USE_LABELS, type VehicleUse } from './vehicleUse';
+import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, localTimestampValue, VehicleUseStatus, VehicleUseAction, USE_ACTION_CONFIRM_LABELS, USE_ACTION_LABELS, USE_LABELS, type VehicleUse } from './vehicleUse';
 export function VehicleUsePanel({
     agreement,
     canManage,
@@ -38,7 +38,19 @@ export function VehicleUsePanel({
     const [action, setAction] = useState<{ row: VehicleUse; type: VehicleUseAction } | null>(null); const [at, setAt] = useState(''); const [odometer, setOdometer] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [history, setHistory] = useState<number | null>(null);
     useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
     function reload() { setReplacement(null); setLoading(true); setAdding(false); setAction(null); setHistory(null); setRevision(v => v + 1); }
-    function choose(row: VehicleUse, type: VehicleUseAction) { setAction({ row, type }); setAt(''); setOdometer(''); setReason(''); setError(null); }
+    function choose(row: VehicleUse, type: VehicleUseAction) {
+        setAction({ row, type });
+        setAt('');
+        setOdometer('');
+        setReason(
+            type === VehicleUseAction.Handover
+                ? 'Vehicle handed over to customer'
+                : type === VehicleUseAction.Return
+                    ? 'Vehicle returned by customer'
+                    : ''
+        );
+        setError(null);
+    }
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!action) return; setSaving(true); setError(null);
         try { await transitionVehicleUse(action.row, action.type, { reason: reason.trim(), ...(action.type === VehicleUseAction.Cancel ? {} : { occurred_at: timestampWithOffset(at), odometer: odometer.trim() || null }) }); reload(); }
@@ -107,7 +119,7 @@ export function VehicleUsePanel({
                             type="datetime-local"
                             step={OPERATIONAL_TIME_STEP_SECONDS}
                             min={action.type === VehicleUseAction.Handover
-                                ? (action.row.starts_at ? action.row.starts_at.slice(0, 16) : undefined)
+                                ? (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined)
                                 : (action.row.handed_over_at ? action.row.handed_over_at.slice(0, 16) : undefined)
                             }
                             max={action.type === VehicleUseAction.Handover && action.row.ends_at
@@ -123,6 +135,30 @@ export function VehicleUsePanel({
                             }
                             error={error?.fields.occurred_at?.[0]}
                         />
+                        {action.type === VehicleUseAction.Handover && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => setAt(action.row.starts_at ? action.row.starts_at.slice(0, 16) : '')}
+                                >
+                                    Use planned handover time
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        try {
+                                            setAt(localTimestampValue(new Date().toISOString()).slice(0, 16));
+                                        } catch {
+                                            setAt(action.row.starts_at ? action.row.starts_at.slice(0, 16) : '');
+                                        }
+                                    }}
+                                >
+                                    Use current time
+                                </Button>
+                            </div>
+                        )}
                         <Input
                             label="Odometer (optional)"
                             value={odometer}
@@ -131,7 +167,7 @@ export function VehicleUsePanel({
                             min={action.type === VehicleUseAction.Return && action.row.handover_odometer ? action.row.handover_odometer : undefined}
                             hint={action.type === VehicleUseAction.Return && action.row.handover_odometer
                                 ? `Handover reading was ${action.row.handover_odometer}. Return reading cannot be lower.`
-                                : undefined
+                                : (action.type === VehicleUseAction.Handover ? 'Record the physical vehicle odometer reading at handover if verified.' : undefined)
                             }
                             error={error?.fields.odometer?.[0]}
                         />

@@ -17,6 +17,7 @@ use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Services\AgreementService;
+use Modules\VehicleRental\Services\OperationalTime;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\VehicleUseAvailabilityBlocker;
 use Modules\VehicleRental\Services\VehicleUseService;
@@ -470,6 +471,45 @@ final class VehicleUseTest extends TestCase
 
             $empty = $register->list($context, ['search' => 'NonExistentNotes123'], 10);
             self::assertSame(0, $empty->total());
+        });
+    }
+
+    public function test_handover_allows_early_collection_within_contract_period(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            // Planned handover is 2026-09-07 09:00:00+05:30. Customer arrives early at 08:30:00+05:30.
+            $use = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $earlyHandover = '2026-09-07T08:30:00+05:30';
+            $handedOver = $service->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => $earlyHandover,
+                'odometer' => '100',
+                'reason' => 'Customer arrived early',
+            ]);
+            self::assertSame(VehicleUseStatus::InCustody, $handedOver->status);
+            self::assertSame('2026-09-07 03:00:00', $handedOver->handed_over_at->format('Y-m-d H:i:s'));
+        });
+    }
+
+    public function test_operational_time_parse_normalizes_space_offset_and_missing_seconds(): void
+    {
+        $withSpace = OperationalTime::parse('2026-09-07T09:00:00 05:30', 'occurred_at');
+        self::assertSame('2026-09-07T09:00:00+05:30', $withSpace->toIso8601String());
+
+        $withoutSeconds = OperationalTime::parse('2026-09-07T09:00+05:30', 'occurred_at');
+        self::assertSame('2026-09-07T09:00:00+05:30', $withoutSeconds->toIso8601String());
+    }
+
+    public function test_handover_rejects_actual_time_at_or_after_planned_return(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $this->expectException(ValidationException::class);
+            $service->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => $input['ends_at'], // Handover at planned return time is invalid
+                'reason' => 'Invalid handover at return',
+            ]);
         });
     }
 }

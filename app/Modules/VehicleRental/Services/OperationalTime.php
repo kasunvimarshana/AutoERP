@@ -13,6 +13,14 @@ final class OperationalTime
 {
     public static function parse(mixed $value, string $field): CarbonImmutable
     {
+        if (is_string($value)) {
+            if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}) (\d{2}:\d{2})$/', $value, $matches)) {
+                $value = $matches[1].'+'.$matches[2];
+            } elseif (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})([+-]\d{2}:\d{2}|Z)$/', $value, $matches)) {
+                $value = substr($value, 0, 16).':00'.$matches[2];
+            }
+        }
+
         Validator::make([$field => $value], [$field => ['required', 'string', 'date_format:'.OperationalFields::TIMESTAMP_FORMAT]])->validate();
 
         return CarbonImmutable::createFromFormat(OperationalFields::TIMESTAMP_FORMAT, $value);

@@ -44,9 +44,20 @@ describe('Rental vehicle use', () => {
 it('requires the actual event time before a handover can be confirmed', async () => {
     render(<VehicleUsePanel agreement={agreement} canManage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Hand over vehicle' }));
-    fireEvent.change(screen.getByLabelText('Action reason'), { target: { value: 'Vehicle collected' } });
+    expect(screen.getByLabelText('Action reason')).toHaveValue('Vehicle handed over to customer');
     expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Actual event time'), { target: { value: '2026-09-07T09:00' } });
+    expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeEnabled();
+});
+
+it('allows one-click population of planned handover time and bounds to agreement start', async () => {
+    const datedAgreement = { ...agreement, starts_on: '2026-09-05' };
+    render(<VehicleUsePanel agreement={datedAgreement} canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand over vehicle' }));
+    const eventTimeInput = screen.getByLabelText('Actual event time');
+    expect(eventTimeInput).toHaveAttribute('min', '2026-09-05T00:00');
+    fireEvent.click(screen.getByRole('button', { name: 'Use planned handover time' }));
+    expect(eventTimeInput).toHaveValue('2026-09-07T09:00');
     expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeEnabled();
 });
 
