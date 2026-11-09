@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { RunningChartEditor } from './RunningChartEditor';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
-import { localTimestampValue, VehicleUseStatus, type VehicleUse } from './vehicleUse';
+import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
 import { createChart } from './runningChartApi';
 
 vi.mock('./runningChartApi', () => ({
@@ -177,20 +177,26 @@ it('sets end time via Use current time button and respects custody return button
     expect(startInput.value).toContain('2026-09-07T08:00:38');
 });
 
-it('allows current timestamp with clock skew tolerance and rejects distant future start/end', async () => {
-    render(<RunningChartEditor use={use} onSaved={() => undefined} onCancel={() => undefined} />);
+it('submits valid usage period directly to API without redundant client clock barriers', async () => {
+    vi.mocked(createChart).mockResolvedValueOnce({} as RunningChart);
+    const onSaved = vi.fn();
+    render(<RunningChartEditor use={use} onSaved={onSaved} onCancel={() => undefined} />);
 
     const startInput = screen.getByLabelText('Usage start');
     const endInput = screen.getByLabelText('Usage end');
 
-    // Future start beyond tolerance (> 1 min ahead)
-    const futureStart = localTimestampValue(new Date(Date.now() + 10 * 60_000).toISOString()).slice(0, 16);
-    const futureEnd = localTimestampValue(new Date(Date.now() + 20 * 60_000).toISOString()).slice(0, 16);
-    fireEvent.change(startInput, { target: { value: futureStart } });
-    fireEvent.change(endInput, { target: { value: futureEnd } });
+    fireEvent.change(startInput, { target: { value: '2026-09-07T10:00' } });
+    fireEvent.change(endInput, { target: { value: '2026-09-07T12:00' } });
     fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
 
-    const errors = await screen.findAllByText(/Record completed usage (starting before or at the current time|ending after its start), not in the future\./);
-    expect(errors.length).toBeGreaterThanOrEqual(1);
-    expect(createChart).not.toHaveBeenCalled();
+    await waitFor(() => {
+        expect(createChart).toHaveBeenCalledWith(
+            use,
+            expect.objectContaining({
+                starts_at: expect.stringContaining('2026-09-07T10:00'),
+                ends_at: expect.stringContaining('2026-09-07T12:00'),
+            }),
+            undefined,
+        );
+    });
 });

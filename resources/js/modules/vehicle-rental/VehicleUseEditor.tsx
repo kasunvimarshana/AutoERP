@@ -19,6 +19,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [vehicle, setVehicle] = useState<NamedResource | null>(null);
     const [owner, setOwner] = useState<NamedResource | null>(null);
     const [company, setCompany] = useState(false);
+    const [sourceCount, setSourceCount] = useState<number | null>(null);
     const [oldOdometer, setOldOdometer] = useState(''); const [newOdometer, setNewOdometer] = useState('');
     const [start, setStart] = useState(() => replacement?.handed_over_at ? replacement.handed_over_at.slice(0, 16) : (agreement.starts_on ? `${agreement.starts_on}T00:00` : '')); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
@@ -87,8 +88,11 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 { search: '', page: 1, perPage: 10, signal: controller.signal },
                 { starts_at: startIso, ends_at: endIso, customer_agreement_id: agreement.id },
             ).then((res) => {
-                if (active && res.data.length === 1) {
-                    setOwner(res.data[0]);
+                if (active) {
+                    setSourceCount(res.data.length);
+                    if (res.data.length === 1) {
+                        setOwner(res.data[0]);
+                    }
                 }
             }).catch(() => {});
 
@@ -132,7 +136,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
             <LookupSelect
                 label="Vehicle"
                 value={vehicle}
-                onChange={value => { setVehicle(value); setOwner(null); }}
+                onChange={value => { setVehicle(value); setOwner(null); setSourceCount(null); }}
                 search={vehicles}
                 loadOnOpen
                 minSearchLength={0}
@@ -147,7 +151,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                     min={minStart}
                     max={end || maxEnd}
                     value={start}
-                    onChange={e => { setStart(e.target.value); setOwner(null); }}
+                    onChange={e => { setStart(e.target.value); setOwner(null); setSourceCount(null); }}
                     required
                     hint={replacement?.handed_over_at
                         ? `Previous vehicle handed over: ${formatBusinessDateTime(replacement.handed_over_at)}`
@@ -167,6 +171,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                                     setStart(new Date().toISOString().slice(0, 16));
                                 }
                                 setOwner(null);
+                                setSourceCount(null);
                             }}
                         >
                             Use current time
@@ -181,11 +186,11 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 min={start || minStart || undefined}
                 max={maxEnd}
                 value={end}
-                onChange={e => { setEnd(e.target.value); setOwner(null); }}
+                onChange={e => { setEnd(e.target.value); setOwner(null); setSourceCount(null); }}
                 hint={agreement.ends_on ? `Agreement ends: ${agreement.ends_on}` : undefined}
                 error={error?.fields.ends_at?.[0]}
             />
-            <label className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><input className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" checked={company} onChange={event => { setCompany(event.target.checked); setOwner(null); }} /><span>Company-owned vehicle</span></label>
+            <label className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><input className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" checked={company} onChange={event => { setCompany(event.target.checked); setOwner(null); setSourceCount(null); }} /><span>Company-owned vehicle</span></label>
             {company && <p className="text-sm text-slate-600 sm:col-span-2">Vehicle ownership records must cover the entire period. No owner payable is created for company supply.</p>}
             {!company && vehicle && !start && <p className="text-sm text-slate-600 sm:col-span-2">Enter planned handover to find owner agreements covering it.</p>}
             {!company && vehicle && start && (
@@ -209,6 +214,11 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                             </button>
                         )}
                     </div>
+                    {!owner && sourceCount === 0 && (
+                        <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                            No active owner agreement covers this vehicle on the handover date. If this vehicle is owned by the company, select &quot;Company-owned vehicle&quot; above.
+                        </p>
+                    )}
                     <LookupSelect
                         label="Owner agreement"
                         value={owner}

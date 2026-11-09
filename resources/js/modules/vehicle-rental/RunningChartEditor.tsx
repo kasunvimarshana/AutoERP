@@ -37,10 +37,6 @@ function freshLocalNow(): string {
     return localTimestampValue(new Date().toISOString());
 }
 
-function freshToleranceNow(): string {
-    return localTimestampValue(new Date(Date.now() + 60_000).toISOString());
-}
-
 export function RunningChartEditor({
     use,
     chart,
@@ -148,32 +144,7 @@ export function RunningChartEditor({
                 setSaving(false);
                 return;
             }
-            const toleranceNow = freshToleranceNow();
-            const maxAllowedEnd = custodyEnd && custodyEnd < toleranceNow ? custodyEnd : toleranceNow;
-            const maxAllowedStart = end && end < maxAllowedEnd ? end : maxAllowedEnd;
 
-            if (start && start > maxAllowedStart) {
-                setError(new ApiError(
-                    'Record completed usage starting before or at the current time, not in the future.',
-                    422,
-                    'VALIDATION_FAILED',
-                    'validation_error',
-                    { starts_at: ['Record completed usage starting before or at the current time, not in the future.'] },
-                ));
-                setSaving(false);
-                return;
-            }
-            if (end && end > maxAllowedEnd) {
-                setError(new ApiError(
-                    'Record completed usage ending after its start, not in the future.',
-                    422,
-                    'VALIDATION_FAILED',
-                    'validation_error',
-                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
-                ));
-                setSaving(false);
-                return;
-            }
             const trimmedReference = reference.trim();
             const parseDistance = (val?: string) => {
                 const t = val?.trim();
