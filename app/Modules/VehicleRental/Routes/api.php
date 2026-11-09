@@ -38,6 +38,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::post('/', [RentalReservationController::class, 'store']);
         Route::get('{reservation}', [RentalReservationController::class, 'show'])->whereNumber('reservation');
         Route::put('{reservation}', [RentalReservationController::class, 'update'])->whereNumber('reservation');
+        Route::delete('{reservation}', [RentalReservationController::class, 'destroy'])->whereNumber('reservation');
         Route::patch('{reservation}/transition', [RentalReservationController::class, 'transition'])->whereNumber('reservation');
         Route::post('{reservation}/convert', [RentalReservationController::class, 'convert'])->whereNumber('reservation');
     });
@@ -46,6 +47,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('/', [VehicleFinanceController::class, 'index']);
         Route::post('/', [VehicleFinanceController::class, 'store']);
         Route::get('{agreement}', [VehicleFinanceController::class, 'show'])->whereNumber('agreement');
+        Route::delete('{agreement}', [VehicleFinanceController::class, 'destroy'])->whereNumber('agreement');
         Route::patch('{agreement}/activate', [VehicleFinanceController::class, 'activate'])->whereNumber('agreement');
         Route::patch('{agreement}/cancel', [VehicleFinanceController::class, 'cancel'])->whereNumber('agreement');
         Route::post('installments/{installment}/payable', [VehicleFinanceController::class, 'createPayable'])->whereNumber('installment');
@@ -56,6 +58,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('/', [RentalExpenseController::class, 'index']);
         Route::post('/', [RentalExpenseController::class, 'store']);
         Route::get('{expense}', [RentalExpenseController::class, 'show'])->whereNumber('expense');
+        Route::delete('{expense}', [RentalExpenseController::class, 'destroy'])->whereNumber('expense');
         Route::patch('{expense}/transition', [RentalExpenseController::class, 'transition'])->whereNumber('expense');
     });
 
@@ -67,6 +70,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('/', [RentalIncidentController::class, 'index']);
         Route::post('/', [RentalIncidentController::class, 'store']);
         Route::get('{incident}', [RentalIncidentController::class, 'show'])->whereNumber('incident');
+        Route::delete('{incident}', [RentalIncidentController::class, 'destroy'])->whereNumber('incident');
         Route::get('{incident}/history', [RentalIncidentController::class, 'history'])->whereNumber('incident');
         Route::post('{incident}/{action}', [RentalIncidentController::class, 'review'])
             ->whereNumber('incident')

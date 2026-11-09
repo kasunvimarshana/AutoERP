@@ -272,4 +272,27 @@ final class RentalExpenseTest extends TestCase
         $this->assertSame('0.000000', (string) $alloc['tax_amount']);
         $this->assertSame('5000.000000', (string) $alloc['total_amount']);
     }
+
+    public function test_rental_expense_delete_is_strictly_prohibited(): void
+    {
+        [$context, , $ownerData] = $this->loginFixture();
+
+        $createResponse = $this->postJson($this->rentalRoot . '/expenses', [
+            'vehicle_id' => $ownerData['vehicle_id'],
+            'expense_type' => RentalExpenseType::Fuel->value,
+            'expense_date' => '2026-09-15',
+            'currency_id' => $ownerData['currency_id'],
+            'net_amount' => '3000.000000',
+        ])->assertCreated();
+
+        $expenseId = (int) $createResponse->json('data.id');
+
+        $this->deleteJson($this->rentalRoot . '/expenses/' . $expenseId)->assertStatus(405);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($expenseId): void {
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Rental expenses must be preserved for audit history.');
+            \Modules\VehicleRental\Models\RentalExpense::query()->findOrFail($expenseId)->delete();
+        });
+    }
 }

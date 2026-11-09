@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -110,5 +111,10 @@ final class RentalExpense extends TenantOwnedModel
     public function allocations(): HasMany
     {
         return $this->hasMany(RentalExpenseAllocation::class, 'expense_id')->orderBy('sequence');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(static fn () => throw new LogicException('Rental expenses must be preserved for audit history. Reject or reverse the expense instead.'));
     }
 }

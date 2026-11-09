@@ -411,4 +411,28 @@ final class RentalReservationTest extends TestCase
         $convertResponse->assertCreated();
         $this->assertNotEmpty($convertResponse->json('data.reference'));
     }
+
+    public function test_rental_reservation_delete_is_strictly_prohibited(): void
+    {
+        [$context, $customerData] = $this->loginFixture();
+
+        $response = $this->postJson($this->rentalRoot . '/reservations', [
+            'customer_id' => $customerData['party_id'],
+            'rental_mode' => DriverMode::SelfDrive->value,
+            'billing_cycle' => RentalBasis::Daily->value,
+            'requested_start_at' => '2026-11-20T10:00:00+05:30',
+            'requested_end_at' => '2026-11-25T18:00:00+05:30',
+            'currency_id' => $customerData['currency_id'],
+        ])->assertCreated();
+
+        $reservationId = (int) $response->json('data.id');
+
+        $this->deleteJson($this->rentalRoot . '/reservations/' . $reservationId)->assertStatus(405);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($reservationId): void {
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Rental reservations must be preserved for audit history.');
+            \Modules\VehicleRental\Models\RentalReservation::query()->findOrFail($reservationId)->delete();
+        });
+    }
 }

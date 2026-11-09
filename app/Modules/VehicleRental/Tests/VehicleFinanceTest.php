@@ -239,4 +239,32 @@ final class VehicleFinanceTest extends TestCase
             'as_at' => '',
         ])->assertOk();
     }
+
+    public function test_vehicle_finance_delete_is_strictly_prohibited(): void
+    {
+        [$context, , $ownerData] = $this->loginFixture();
+
+        $response = $this->postJson($this->rentalRoot . '/finance-agreements', [
+            'supplier_id' => $ownerData['party_id'],
+            'vehicle_id' => $ownerData['vehicle_id'],
+            'agreement_date' => '2026-03-01',
+            'starts_at' => '2026-03-01T00:00:00+05:30',
+            'matures_at' => '2027-03-01T00:00:00+05:30',
+            'currency_id' => $ownerData['currency_id'],
+            'principal_amount' => '300000.000000',
+            'annual_interest_rate' => '10.000000',
+            'installment_frequency' => 'monthly',
+            'installment_count' => 3,
+        ])->assertCreated();
+
+        $agreementId = (int) $response->json('data.id');
+
+        $this->deleteJson($this->rentalRoot . '/finance-agreements/' . $agreementId)->assertStatus(405);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($agreementId): void {
+            $this->expectException(\LogicException::class);
+            $this->expectExceptionMessage('Vehicle finance agreements must be preserved for audit history.');
+            \Modules\VehicleRental\Models\VehicleFinanceAgreement::query()->findOrFail($agreementId)->delete();
+        });
+    }
 }

@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Invoice\Models\Invoice;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -57,5 +58,10 @@ final class VehicleFinanceInstallment extends TenantOwnedModel
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class, 'invoice_id');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(static fn () => throw new LogicException('Vehicle finance installments must be preserved for audit history.'));
     }
 }

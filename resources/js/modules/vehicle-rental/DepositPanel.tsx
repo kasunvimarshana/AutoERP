@@ -14,7 +14,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { compareDecimalStrings, isPositiveDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { AgreementStatus, type Agreement } from './agreements';
-import { getDepositSummary, receiveDeposit } from './depositApi';
+import { getDepositSummary, receiveDeposit, type DepositReceiptInput } from './depositApi';
 const DIRECTION = 'inbound';
 const FIRST_LINE = 1;
 const METHOD_PAGE_SIZE = 100;
@@ -25,6 +25,8 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
     const [busy, setBusy] = useState(false);
     const [date, setDate] = useState(businessDateInputValue);
     const [rate, setRate] = useState('1.00');
+    const [referenceNumber, setReferenceNumber] = useState('');
+    const [notes, setNotes] = useState('');
     const [lines, setLines] = useState<PaymentLineDraft[]>([emptyLine(FIRST_LINE)]);
     const nextLine = useRef(FIRST_LINE + 1);
     const inFlight = useRef(false);
@@ -41,13 +43,21 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
         if (!valid || inFlight.current) return;
         inFlight.current = true; setBusy(true); setError(null);
         try {
-            const input = { expected_version: agreement.row_version, payment_date: date, exchange_rate: rate,
-                lines: lines.map(line => linePayload(line, rows.find(method => String(method.id) === line.paymentMethodId)!, DIRECTION)) };
+            const input: DepositReceiptInput = {
+                expected_version: agreement.row_version,
+                payment_date: date,
+                exchange_rate: rate,
+                reference_number: referenceNumber.trim() || undefined,
+                notes: notes.trim() || undefined,
+                lines: lines.map(line => linePayload(line, rows.find(method => String(method.id) === line.paymentMethodId)!, DIRECTION)),
+            };
             const signature = JSON.stringify(input);
             const key = requests.current.get(signature) ?? crypto.randomUUID();
             requests.current.set(signature, key);
             await receiveDeposit(agreement.id, input, key);
             requests.current.delete(signature);
+            setReferenceNumber('');
+            setNotes('');
             setLines([emptyLine(nextLine.current++)]);
             setRevision(value => value + 1);
         } catch (failure) { setError(toApiError(failure)); }
@@ -63,8 +73,14 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
                 <p className="text-sm text-slate-700">Agreed: {summary.requirement === null ? 'Not specified' : <MoneyDisplay value={summary.requirement} currency={agreement.currency.code} />} · Net receipts including drafts: <MoneyDisplay value={summary.net_receipts} currency={agreement.currency.code} /> · Remaining collection capacity: {summary.remaining_to_receive === null ? 'Not specified' : <MoneyDisplay value={summary.remaining_to_receive} currency={agreement.currency.code} />}</p>
             </div>
             {canCreate && agreement.status === AgreementStatus.Active && isPositiveDecimal(summary.remaining_to_receive ?? '0') && <fieldset disabled={busy} className="space-y-3">
-                <Input label="Deposit receipt date" type="date" value={date} onChange={event => setDate(event.target.value)} required error={error?.fields.payment_date?.[0]} />
-                <Input label="Deposit exchange rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} required error={error?.fields.exchange_rate?.[0]} />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Input label="Deposit receipt date" type="date" value={date} onChange={event => setDate(event.target.value)} required error={error?.fields.payment_date?.[0]} />
+                    <Input label="Deposit exchange rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} required error={error?.fields.exchange_rate?.[0]} />
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Input label="Reference / Cheque # (optional)" value={referenceNumber} onChange={event => setReferenceNumber(event.target.value)} error={error?.fields.reference_number?.[0]} />
+                    <Input label="Receipt notes / reason (optional)" value={notes} onChange={event => setNotes(event.target.value)} error={error?.fields.notes?.[0]} hint="Required when posting backdated cash receipts" />
+                </div>
                 <PaymentLineTable lines={lines} methods={rows} methodsLoading={methods.loading} total={total}
                     onLineChange={(key, patch) => setLines(current => current.map(line => line.key === key ? { ...line, ...patch } : line))}
                     onMetadataChange={(key, field, value) => setLines(current => current.map(line => line.key === key ? { ...line, metadata: { ...line.metadata, [field]: value } } : line))}

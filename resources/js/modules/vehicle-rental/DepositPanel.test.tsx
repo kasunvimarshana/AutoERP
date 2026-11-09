@@ -63,3 +63,19 @@ it('maps deposit validation errors to the receipt fields', async () => {
     expect(await screen.findByText('Choose a valid receipt date.')).toBeInTheDocument();
     expect(screen.getByText('Enter a positive exchange rate.')).toBeInTheDocument();
 });
+
+it('sends optional reference number and notes when provided', async () => {
+    vi.mocked(receiveDeposit).mockResolvedValue({ id: 22 } as never);
+    await fill();
+    fireEvent.change(screen.getByLabelText('Reference / Cheque # (optional)'), { target: { value: 'CHQ-9876' } });
+    fireEvent.change(screen.getByLabelText('Receipt notes / reason (optional)'), { target: { value: 'Cash collected on advance confirmation' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create deposit receipt' }));
+    await waitFor(() => expect(receiveDeposit).toHaveBeenCalled());
+    expect(vi.mocked(receiveDeposit).mock.calls[0][1]).toMatchObject({
+        expected_version: 2,
+        exchange_rate: '1',
+        reference_number: 'CHQ-9876',
+        notes: 'Cash collected on advance confirmation',
+        lines: [{ payment_method_id: 4, amount: '600' }],
+    });
+});

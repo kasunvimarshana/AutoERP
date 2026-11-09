@@ -15,6 +15,7 @@ use Modules\VehicleRental\Http\Resources\RentalExpenseResource;
 use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalExpenseService;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class RentalExpenseController extends Controller
 {
@@ -84,5 +85,10 @@ final class RentalExpenseController extends Controller
         );
 
         return new RentalExpenseResource($updated);
+    }
+
+    public function destroy(): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Rental expenses cannot be deleted to preserve financial audit history. Reject or reverse the expense instead.');
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Hr\Models\HrEmployee;
@@ -95,5 +96,10 @@ final class RentalExpenseAllocation extends TenantOwnedModel
     public function organizationUnit(): BelongsTo
     {
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(static fn () => throw new LogicException('Rental expense allocations must be preserved for audit history.'));
     }
 }

@@ -146,6 +146,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
         $url = self::ROOT.'/customer/agreements/'.$agreement['id'].'/deposits';
         $payload = ['expected_version' => $agreement['row_version'], 'payment_date' => '2026-09-09', 'exchange_rate' => '1',
+            'notes' => 'Customer security deposit receipt',
             'lines' => [['payment_method_id' => $method, 'amount' => '1000']]];
         $this->postJson($url, $payload)->assertUnprocessable();
         $this->withHeader('Idempotency-Key', 'deposit-a');
@@ -250,6 +251,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
             'expected_version' => $agreement['row_version'],
             'payment_date' => '2026-09-09',
             'exchange_rate' => '2',
+            'notes' => 'Foreign currency security deposit receipt',
             'lines' => [['payment_method_id' => $method, 'amount' => '1000']],
         ])->assertCreated()->assertJsonPath('data.currency.id', $foreignCurrencyId)->json('data');
 
@@ -571,6 +573,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         self::assertStringContainsString('attachment;', $response->headers->get('Content-Disposition'));
         self::assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $this->post($path.'/attachments', ['expected_version' => 1, 'file' => $file()], ['Accept' => 'application/json'])->assertConflict();
+        $this->deleteJson($path)->assertStatus(405);
         $this->getJson(self::ROOT.'/incidents/999999/attachments/'.$updated['attachments'][0]['id'])->assertNotFound();
         $this->assertDatabaseCount('invoices', 0);
         $this->loginFixture(permissions: [\Modules\VehicleRental\Enums\IncidentPermission::View->value]);

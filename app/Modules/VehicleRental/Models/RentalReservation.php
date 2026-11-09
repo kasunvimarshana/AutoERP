@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -91,5 +92,10 @@ final class RentalReservation extends TenantOwnedModel
     public function history(): HasMany
     {
         return $this->hasMany(RentalReservationHistory::class, 'reservation_id')->orderBy('id');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(static fn () => throw new LogicException('Rental reservations must be preserved for audit history. Cancel the reservation instead.'));
     }
 }

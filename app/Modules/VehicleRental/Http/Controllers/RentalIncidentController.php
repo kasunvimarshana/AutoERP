@@ -13,6 +13,7 @@ use Modules\VehicleRental\Http\Resources\IncidentVehicleUseOptionResource;
 use Modules\VehicleRental\Http\Resources\IncidentRunningChartOptionResource;
 use Modules\VehicleRental\Services\RentalIncidentService;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class RentalIncidentController
 {
@@ -72,5 +73,10 @@ final class RentalIncidentController
             IncidentReviewAction::from($action),
             (string) $request->input('reason', ''),
         ));
+    }
+
+    public function destroy(): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Rental incidents cannot be deleted to preserve legal and risk evidence.');
     }
 }

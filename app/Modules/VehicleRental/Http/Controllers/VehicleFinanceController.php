@@ -19,6 +19,7 @@ use Modules\VehicleRental\Models\VehicleFinanceAgreement;
 use Modules\VehicleRental\Models\VehicleFinanceInstallment;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\VehicleFinanceService;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class VehicleFinanceController extends Controller
 {
@@ -139,5 +140,10 @@ final class VehicleFinanceController extends Controller
         );
 
         return response()->json(['updated' => $count]);
+    }
+
+    public function destroy(): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Vehicle finance agreements cannot be deleted to preserve financial audit history. Cancel the agreement instead.');
     }
 }

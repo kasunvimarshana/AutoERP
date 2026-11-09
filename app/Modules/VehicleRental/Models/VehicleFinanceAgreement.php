@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\ReferenceData\Models\CurrencyModel;
@@ -90,5 +91,10 @@ final class VehicleFinanceAgreement extends TenantOwnedModel
     public function history(): HasMany
     {
         return $this->hasMany(VehicleFinanceStatusHistory::class, 'finance_agreement_id')->orderBy('id');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(static fn () => throw new LogicException('Vehicle finance agreements must be preserved for audit history. Cancel the agreement instead.'));
     }
 }

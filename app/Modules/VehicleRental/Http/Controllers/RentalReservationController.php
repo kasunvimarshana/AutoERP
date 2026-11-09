@@ -18,6 +18,7 @@ use Modules\VehicleRental\Http\Resources\RentalReservationResource;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalReservationService;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class RentalReservationController extends Controller
 {
@@ -126,5 +127,10 @@ final class RentalReservationController extends Controller
         );
 
         return (new AgreementResource($agreement))->response()->setStatusCode(201);
+    }
+
+    public function destroy(): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Rental reservations cannot be deleted to preserve inquiry and booking audit history. Cancel the reservation instead.');
     }
 }
