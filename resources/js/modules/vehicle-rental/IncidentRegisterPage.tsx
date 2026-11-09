@@ -43,6 +43,7 @@ export default function IncidentRegisterPage() {
     const [occurredOn, setOccurredOn] = useState(businessDateInputValue);
     const [evidenceReference, setEvidenceReference] = useState('');
     const [description, setDescription] = useState('');
+    const [showRecordForm, setShowRecordForm] = useState(true);
     const [reviewing, setReviewing] = useState<RentalIncident | null>(null);
     const [historyId, setHistoryId] = useState<number | null>(null);
     const [reviewReason, setReviewReason] = useState('');
@@ -113,8 +114,18 @@ export default function IncidentRegisterPage() {
     return <div className="space-y-5">
         <ContentHeader title="Rental incident evidence" description="Record fuel, toll, repair, damage and other rental evidence. Confirmation verifies the record only; it never creates an invoice, owner deduction or payment." />
         <ErrorAlert error={error ?? vehicleUses.error ?? runningCharts.error} inline />
-        {canRecord && <Panel title="Record new incident">
-            <form aria-label="Record rental incident" className="space-y-3" onSubmit={create}>
+        {canRecord && <Panel>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+                <h2 className="font-semibold text-slate-900">Record new incident</h2>
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setShowRecordForm(v => !v)}
+                >
+                    {showRecordForm ? 'Collapse Form' : '+ Record Incident Form'}
+                </Button>
+            </div>
+            {showRecordForm && <form aria-label="Record rental incident" className="space-y-3" onSubmit={create}>
                 <div className="flex flex-wrap items-end gap-2">
                     <div className="w-80">
                         <Input
@@ -193,7 +204,7 @@ export default function IncidentRegisterPage() {
                     onChange={event => setDescription(event.target.value)} error={error?.fields.description?.[0]} />
                 <p className="text-sm text-slate-600">No party liability, tax amount, debit note, credit note or payable is inferred from this record. Financial adjustments need a separate authorized decision.</p>
                 <Button type="submit" loading={busy} disabled={!selectedUse || !type || !occurredOn || !evidenceReference.trim() || !description.trim()}>Record evidence</Button>
-            </form>
+            </form>}
         </Panel>}
         <Panel title="Recorded incidents">
             <form

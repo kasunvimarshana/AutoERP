@@ -118,7 +118,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             <Select label="Rental basis" options={basisOptions} value={basis} onChange={e => setBasis(e.target.value as RentalBasis)} required error={fieldError('basis')} />
             <Select label="Driver arrangement" options={driverOptions} value={driver} onChange={e => setDriver(e.target.value as DriverMode)} required error={fieldError('driver_mode')} />
         </fieldset>
-        <details open={Boolean(error && Object.keys(error.fields).some(key => key.startsWith('terms.')))}>
+        <details open={Boolean(!record || (error && Object.keys(error.fields).some(key => key.startsWith('terms.'))) || Object.values(terms).some(v => v !== null && v !== ''))}>
             <summary className="cursor-pointer font-medium">Agreed rates and allowances</summary>
             <p className="my-3 text-sm text-slate-600">Enter only the terms agreed with this party. Blank means unknown; enter zero only when explicitly agreed.</p>
             <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
