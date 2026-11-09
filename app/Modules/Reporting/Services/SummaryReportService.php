@@ -31,7 +31,7 @@ final class SummaryReportService
         private readonly FinanceStatementService $statements,
         private readonly ReportBrandingResolver $branding,
         private readonly SalesSettlementBreakdownService $salesSettlements,
-        private readonly ReceivedCashSourceBreakdown $receivedCashSources,
+        private readonly ReceivedPaymentSourceBreakdown $receivedPaymentSources,
         private readonly ExpenseReportService $expenses,
     ) {}
 
@@ -305,12 +305,19 @@ final class SummaryReportService
             $methodTotals[$methodKey]['amount'] = $this->math->add($methodTotals[$methodKey]['amount'], $baseAmount);
         }
 
-        $methods = array_values(array_map(static fn (array $method): array => [
-            'type' => $method['type'],
-            'name' => $method['name'],
-            'transaction_count' => count($method['transaction_ids']),
-            'amount' => $method['amount'],
-        ], $methodTotals));
+        $sources = $direction === PaymentDirection::Inbound
+            ? $this->receivedPaymentSources->run($rows, $tenantId, $organizationUnitId, $dateFrom, $dateTo)
+            : [];
+        $methods = [];
+        foreach ($methodTotals as $methodKey => $method) {
+            $methods[] = [
+                'type' => $method['type'],
+                'name' => $method['name'],
+                'transaction_count' => count($method['transaction_ids']),
+                'amount' => $method['amount'],
+                'sources' => $sources[$methodKey] ?? null,
+            ];
+        }
         usort($methods, fn (array $left, array $right): int => $this->math->compare($right['amount'], $left['amount']));
 
         $summary = [
@@ -318,16 +325,6 @@ final class SummaryReportService
             'transaction_count' => count($paymentIds),
             'methods' => $methods,
         ];
-
-        if ($direction === PaymentDirection::Inbound) {
-            $summary['cash_sources'] = $this->receivedCashSources->run(
-                $rows,
-                $tenantId,
-                $organizationUnitId,
-                $dateFrom,
-                $dateTo,
-            );
-        }
 
         return $summary;
     }

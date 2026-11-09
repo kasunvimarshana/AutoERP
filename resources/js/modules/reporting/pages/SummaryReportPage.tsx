@@ -5,7 +5,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatMoney } from '@/shared/utils/formatMoney';
-import { compareDecimalStrings, sumDecimals } from '@/shared/utils/decimal';
+import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { runSummaryReport } from '../reportingApi';
 import type {
@@ -333,16 +333,17 @@ function SalesSettlementStrip({
 
     return (
         <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 shadow-sm">
-            <div className="flex flex-col gap-2 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.17em] text-emerald-700">Current settlement of selected sales</p>
                     <p className="mt-1 text-sm text-slate-600">Current settlement of invoices dated in the selected period. Receipts may have arrived later.</p>
                 </div>
-                <p className="text-sm font-semibold tabular-nums text-slate-700">
-                    Sales total {money(salesTotal, currency)}
-                </p>
+                <div className="sm:text-right">
+                    <p className="text-xs font-medium text-slate-600">Sales total</p>
+                    <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-950 sm:text-3xl">{money(salesTotal, currency)}</p>
+                </div>
             </div>
-            <div className="grid gap-px bg-emerald-100 sm:grid-cols-3">
+            <div className="grid gap-px bg-emerald-100 sm:grid-cols-2 xl:grid-cols-4">
                 <SettlementTile
                     label="Cash"
                     description="Allocated cash receipts"
@@ -358,6 +359,14 @@ function SalesSettlementStrip({
                     documentCount={settlement.card.document_count}
                     currency={currency}
                     accent="blue"
+                />
+                <SettlementTile
+                    label="Bank Transfer"
+                    description="Allocated bank transfers"
+                    amount={settlement.bank_transfer.amount}
+                    documentCount={settlement.bank_transfer.document_count}
+                    currency={currency}
+                    accent="indigo"
                 />
                 <SettlementTile
                     label="Outstanding now"
@@ -391,11 +400,12 @@ function SettlementTile({
     amount: string;
     documentCount: number;
     currency: string;
-    accent: 'emerald' | 'blue' | 'amber';
+    accent: 'emerald' | 'blue' | 'indigo' | 'amber';
 }) {
     const accentClasses = {
         emerald: 'bg-emerald-500',
         blue: 'bg-blue-600',
+        indigo: 'bg-indigo-600',
         amber: 'bg-amber-500',
     };
 
@@ -484,10 +494,6 @@ function PaymentCard({
     metrics: SummaryPaymentMetrics;
     currency: string;
 }) {
-    const cashTotal = sumDecimals(metrics.methods
-        .filter((method) => method.type === 'cash')
-        .map((method) => method.amount));
-
     return (
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -497,44 +503,41 @@ function PaymentCard({
                     </p>
                     <h3 className="mt-1 text-lg font-bold text-slate-950">{title}</h3>
                 </div>
-                <p className="text-xl font-bold text-slate-950">{money(metrics.amount, currency)}</p>
+                <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-950">{money(metrics.amount, currency)}</p>
             </div>
             <div className="mt-5 divide-y divide-slate-100 border-t border-slate-100">
                 {metrics.methods.length > 0 ? metrics.methods.map((method) => (
-                    <div key={`${method.type}-${method.name}`} className="flex items-center justify-between gap-4 py-3 text-sm">
-                        <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-800">{method.name}</p>
-                            <p className="text-xs text-slate-400">{method.transaction_count} transactions</p>
+                    <div key={`${method.type}-${method.name}`} className="py-3 text-sm">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="truncate font-semibold text-slate-900">{method.name}</p>
+                                <p className="text-xs text-slate-500">{method.transaction_count} transactions</p>
+                            </div>
+                            <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                                {money(method.amount, currency)}
+                            </span>
                         </div>
-                        <span className="shrink-0 font-semibold tabular-nums text-slate-700">
-                            {money(method.amount, currency)}
-                        </span>
+                        {method.sources ? (
+                            <dl className="mt-2 space-y-1.5 border-l-2 border-emerald-100 pl-3 text-xs sm:text-sm">
+                                <PaymentSourceRow label="Sales invoices in selected dates" amount={method.sources.selected_invoices} currency={currency} />
+                                <PaymentSourceRow label="Earlier invoices — outstanding payments" amount={method.sources.earlier_invoices} currency={currency} />
+                                <PaymentSourceRow label="Other invoices" amount={method.sources.other_invoices} currency={currency} />
+                                <PaymentSourceRow label="Received, not yet applied to an invoice" amount={method.sources.unapplied} currency={currency} />
+                            </dl>
+                        ) : null}
                     </div>
                 )) : (
                     <p className="py-7 text-center text-sm text-slate-500">No posted payments in this period.</p>
                 )}
             </div>
-            {metrics.cash_sources && compareDecimalStrings(cashTotal, '0') > 0 ? (
-                <details className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
-                    <summary className="flex cursor-pointer items-center justify-between gap-4 font-semibold text-slate-900">
-                        <span>Cash received breakdown</span>
-                        <span className="tabular-nums">{money(cashTotal, currency)}</span>
-                    </summary>
-                    <p className="mt-2 text-xs text-slate-600">Cash received on selected dates, grouped by its current invoice allocation.</p>
-                    <dl className="mt-3 space-y-2 border-t border-emerald-100 pt-3 text-sm">
-                        <CashSourceRow label="Invoices dated in selected period" amount={metrics.cash_sources.selected_invoices} currency={currency} />
-                        <CashSourceRow label="Earlier invoices" amount={metrics.cash_sources.earlier_invoices} currency={currency} />
-                        <CashSourceRow label="Other invoices" amount={metrics.cash_sources.other_invoices} currency={currency} />
-                        <CashSourceRow label="Not allocated to an invoice" amount={metrics.cash_sources.unapplied} currency={currency} />
-                    </dl>
-                </details>
-            ) : null}
         </article>
     );
 }
 
-function CashSourceRow({ label, amount, currency }: { label: string; amount: string; currency: string }) {
-    return <div className="flex items-center justify-between gap-4"><dt className="text-slate-600">{label}</dt><dd className="font-medium tabular-nums text-slate-900">{money(amount, currency)}</dd></div>;
+function PaymentSourceRow({ label, amount, currency }: { label: string; amount: string; currency: string }) {
+    if (compareDecimalStrings(amount, '0') === 0) return null;
+
+    return <div className="flex items-center justify-between gap-4"><dt className="text-slate-600">{label}</dt><dd className="shrink-0 font-medium tabular-nums text-slate-800">{money(amount, currency)}</dd></div>;
 }
 
 function BridgeRow({ label, value, currency, width, tone }: {

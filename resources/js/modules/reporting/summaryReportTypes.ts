@@ -16,18 +16,20 @@ export interface SummaryPaymentMethod {
     name: string;
     transaction_count: number;
     amount: string;
+    sources?: PaymentSourceBreakdown | null;
+}
+
+export interface PaymentSourceBreakdown {
+    selected_invoices: string;
+    earlier_invoices: string;
+    other_invoices: string;
+    unapplied: string;
 }
 
 export interface SummaryPaymentMetrics {
     amount: string;
     transaction_count: number;
     methods: SummaryPaymentMethod[];
-    cash_sources?: {
-        selected_invoices: string;
-        earlier_invoices: string;
-        other_invoices: string;
-        unapplied: string;
-    };
 }
 
 export interface SalesSettlementMetric {
@@ -38,6 +40,7 @@ export interface SalesSettlementMetric {
 export interface SalesSettlementBreakdown {
     cash: SalesSettlementMetric;
     card: SalesSettlementMetric;
+    bank_transfer: SalesSettlementMetric;
     credit: SalesSettlementMetric;
     other_paid: SalesSettlementMetric;
     credits_applied: string;
