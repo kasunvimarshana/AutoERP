@@ -156,7 +156,22 @@ final class SaleReturnPostingService
                 $withholding = $wholeLine
                     ? $lineWithholding
                     : $this->math->mul($fraction, $lineWithholding);
-                $credit = $this->math->sub($gross, $withholding);
+                $netLineCredit = $this->math->sub(
+                    $this->math->sub((string) $invoiceLine->line_total, $lineWithholding),
+                    (string) $line->bill_discount_allocated,
+                );
+                $returnedQuantity = $this->math->add($alreadyReturned, $quantity);
+                $cumulativeCredit = $this->math->compare($returnedQuantity, (string) $line->quantity) === 0
+                    ? $netLineCredit
+                    : $this->math->mul(
+                        $this->math->div($returnedQuantity, (string) $line->quantity, self::QUANTITY_FRACTION_SCALE),
+                        $netLineCredit,
+                    );
+                $previousCredit = $this->math->normalize((string) SaleReturnLine::query()
+                    ->where('tenant_id', $sale->tenant_id)
+                    ->where('sale_line_id', $line->getKey())
+                    ->sum('credit_amount'));
+                $credit = $this->math->sub($cumulativeCredit, $previousCredit);
                 $baseQuantity = $wholeLine
                     ? (string) $line->base_quantity
                     : $this->math->mul($fraction, (string) $line->base_quantity);
@@ -193,7 +208,7 @@ final class SaleReturnPostingService
                 $returnLine->inventory_movement_id = $movement->getKey();
                 $returnLine->save();
                 $creditAmount = $this->math->add($creditAmount, $credit);
-                $revenueAmount = $this->math->add($revenueAmount, $this->math->sub($gross, $tax));
+                $revenueAmount = $this->math->add($revenueAmount, $this->math->sub($this->math->add($credit, $withholding), $tax));
                 $taxAmount = $this->math->add($taxAmount, $tax);
                 $withholdingAmount = $this->math->add($withholdingAmount, $withholding);
             }

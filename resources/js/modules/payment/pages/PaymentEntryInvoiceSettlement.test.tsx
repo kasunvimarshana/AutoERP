@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PaymentEntryPage from './PaymentEntryPage';
 
 const invoiceApiMocks = vi.hoisted(() => ({
     getInvoice: vi.fn(),
+    getInvoiceSignedPrintLink: vi.fn(),
 }));
 const paymentApiMocks = vi.hoisted(() => ({
     createPayment: vi.fn(),
+    finalizeSellingPayment: vi.fn(),
     listUsablePaymentMethods: vi.fn(),
 }));
 
@@ -21,7 +23,8 @@ vi.mock('@/modules/customer/components/CustomerLookupSelect', () => ({
 vi.mock('@/modules/supplier/components/SupplierLookupSelect', () => ({
     SupplierLookupSelect: () => <div>Supplier lookup</div>,
 }));
-vi.mock('../components/PaymentLineTable', () => ({
+vi.mock('../components/PaymentLineTable', async (importOriginal) => ({
+    ...await importOriginal<typeof import('../components/PaymentLineTable')>(),
     PaymentLineTable: ({
         lines,
         total,
@@ -87,6 +90,8 @@ describe('Payment invoice settlement entry', () => {
             },
         });
         paymentApiMocks.createPayment.mockResolvedValue({ id: 801 });
+        paymentApiMocks.finalizeSellingPayment.mockResolvedValue({ id: 802, payment_number: 'PAY-802', total_amount: '1310.000000' });
+        invoiceApiMocks.getInvoiceSignedPrintLink.mockResolvedValue({ pdf_url: null });
     });
 
     it.each(settlementCases)(
@@ -152,4 +157,54 @@ describe('Payment invoice settlement entry', () => {
             ));
         },
     );
+
+    it.each([
+        { invoiceRate: '1.000000', paymentRate: '1.000000', currency: 'LKR' },
+        { invoiceRate: '355.000000', paymentRate: '360.000000', currency: 'USD' },
+    ])('finalizes a selling invoice with the $currency exchange rate', async ({ invoiceRate, paymentRate, currency }) => {
+        invoiceApiMocks.getInvoice.mockResolvedValue({
+            id: 805,
+            row_version: 1,
+            invoice_number: 'SALES-2026-000001',
+            invoice_type: 'sales',
+            direction: 'outbound',
+            status: 'posted',
+            party_type: 'customer',
+            party: { id: 71, name: 'Direct Customer' },
+            currency: { id: 3, code: currency },
+            exchange_rate: invoiceRate,
+            grand_total: '1310.000000',
+            balance_due: '1310.000000',
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/payments/create?invoice_id=805&view=selling']}>
+                <PaymentEntryPage />
+            </MemoryRouter>,
+        );
+
+        const cashReceived = await screen.findByLabelText('Cash received');
+        fireEvent.change(cashReceived, { target: { value: '1310.00' } });
+
+        const rate = screen.getByLabelText(`${currency} to base currency`);
+        expect(rate).toHaveValue(invoiceRate);
+        if (paymentRate !== invoiceRate) {
+            expect(rate.closest('details')).toHaveAttribute('open');
+            fireEvent.change(rate, { target: { value: paymentRate } });
+        }
+
+        const finalize = screen.getByRole('button', { name: 'Finalize payment' });
+        await waitFor(() => expect(finalize).toBeEnabled());
+        await userEvent.click(finalize);
+
+        await waitFor(() => expect(paymentApiMocks.finalizeSellingPayment).toHaveBeenCalledWith(
+            expect.objectContaining({
+                currency_id: 3,
+                exchange_rate: paymentRate,
+                party_id: 71,
+                lines: [expect.objectContaining({ payment_method_id: 9, amount: '1310.000000' })],
+                allocations: [expect.objectContaining({ invoice_id: 805, allocated_amount: '1310.000000' })],
+            }),
+        ));
+    });
 });

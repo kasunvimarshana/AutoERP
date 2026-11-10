@@ -1,5 +1,6 @@
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoader } from '@/shared/types/lookup';
 import type { ReactNode } from 'react';
 import { searchCustomers } from '../customerApi';
 import type { CustomerSummary } from '../customerTypes';
@@ -33,6 +34,7 @@ export function CustomerLookupSelect({
     minSearchLength,
     dropdownPlacement,
     lookupKind = 'active',
+    search,
 }: {
     value: CustomerSummary | null;
     onChange: (customer: CustomerSummary | null) => void;
@@ -45,13 +47,14 @@ export function CustomerLookupSelect({
     minSearchLength?: number;
     dropdownPlacement?: 'top' | 'bottom';
     lookupKind?: 'active' | 'all' | 'credit-allowed';
+    search?: LookupLoader<CustomerSummary>;
 }) {
     return (
         <GenericLookupSelect
             label={label}
             value={value}
             onChange={onChange}
-            search={(params) => searchCustomers(params, lookupKind)}
+            search={search ?? ((params) => searchCustomers(params, lookupKind))}
             formatLabel={formatCustomerLookupLabel}
             renderOption={(customer) => renderCustomerLookupOption(customer)}
             error={error}

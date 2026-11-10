@@ -21,9 +21,12 @@ use Modules\Inventory\Services\StockMovementService;
 use Modules\Inventory\Validators\InventoryValidationService;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
+use Modules\Invoice\Enums\AdjustmentEffect;
+use Modules\Invoice\Enums\AdjustmentType;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -31,6 +34,7 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Item\Services\ItemPriceResolutionService;
+use Modules\Selling\Enums\SaleDiscountType;
 use Modules\Selling\Models\Sale;
 use Modules\Selling\Models\SaleLine;
 use Modules\Tax\DTOs\TaxCalculationData;
@@ -53,6 +57,7 @@ final class SalePostingService
         private readonly InvoiceCreationService $invoices,
         private readonly InvoicePostingPlanFactory $postingPlans,
         private readonly IdempotencyService $idempotency,
+        private readonly SaleDiscountService $discounts,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -126,6 +131,7 @@ final class SalePostingService
             $sourceLines = [];
             $invoiceBase = self::ZERO;
             $itemSummaries = [];
+            $lineBases = [];
             foreach (array_values($payload['lines']) as $index => $lineData) {
                 $item = $this->inventoryValidation->item($tenantId, $organizationUnitId, (int) $lineData['item_id']);
                 $this->inventoryValidation->assertStockable($item);
@@ -148,6 +154,11 @@ final class SalePostingService
                     throw new InvalidArgumentException('A current sales price is not configured for '.$item->name.'.');
                 }
                 $unitPrice = (string) $price->amount;
+                $lineSubtotal = $this->math->mul($quantity, $unitPrice);
+                $discountType = SaleDiscountType::from((string) ($lineData['discount_type'] ?? SaleDiscountType::Fixed->value));
+                $discountValue = (string) ($lineData['discount_value'] ?? self::ZERO);
+                $lineDiscount = $this->discounts->amount($discountType, $discountValue, $lineSubtotal);
+                $lineBase = $this->math->sub($lineSubtotal, $lineDiscount);
                 $description = (string) $item->name.($variant?->name ? ' - '.$variant->name : '');
                 $saleLine = SaleLine::query()->create([
                     'tenant_id' => $tenantId,
@@ -162,8 +173,11 @@ final class SalePostingService
                     'quantity' => $quantity,
                     'base_quantity' => self::ZERO,
                     'unit_price' => $unitPrice,
+                    'discount_type' => $discountType->value,
+                    'discount_value' => $discountValue,
+                    'discount_amount' => $lineDiscount,
                     'unit_cost_snapshot' => self::ZERO,
-                    'line_total' => $this->math->mul($quantity, $unitPrice),
+                    'line_total' => $lineBase,
                     'description' => $description,
                 ]);
                 $movement = $this->stockMovements->record(new StockMovementData(
@@ -200,8 +214,10 @@ final class SalePostingService
                     unitPrice: $unitPrice,
                     itemId: (int) $item->getKey(),
                     taxGroupId: $item->sales_tax_group_id === null ? null : (int) $item->sales_tax_group_id,
+                    discountBeforeTax: $lineDiscount,
                 );
-                $invoiceBase = $this->math->add($invoiceBase, $this->math->mul($quantity, $unitPrice));
+                $invoiceBase = $this->math->add($invoiceBase, $lineBase);
+                $lineBases[] = $lineBase;
                 $sourceLines[] = new InvoiceSourceLineData(
                     tenantId: $tenantId,
                     organizationUnitId: $organizationUnitId,
@@ -216,6 +232,18 @@ final class SalePostingService
                     invoicedLineTotal: (string) $saleLine->line_total,
                 );
                 $itemSummaries[] = ['line' => $saleLine, 'item' => $item];
+            }
+
+            $billDiscountType = SaleDiscountType::from((string) ($payload['bill_discount_type'] ?? SaleDiscountType::Fixed->value));
+            $billDiscountValue = (string) ($payload['bill_discount_value'] ?? self::ZERO);
+            $billDiscount = $this->discounts->amount($billDiscountType, $billDiscountValue, $invoiceBase);
+            $sale->forceFill([
+                'bill_discount_type' => $billDiscountType->value,
+                'bill_discount_value' => $billDiscountValue,
+                'bill_discount_amount' => $billDiscount,
+            ])->save();
+            foreach ($this->discounts->allocate($billDiscount, $lineBases) as $index => $allocated) {
+                $itemSummaries[$index]['line']->forceFill(['bill_discount_allocated' => $allocated])->save();
             }
 
             $taxCalculation = $this->taxes->calculate(new TaxCalculationData(
@@ -251,6 +279,7 @@ final class SalePostingService
                     lineType: InvoiceLineType::Item,
                     itemId: (int) $saleLine->item_id,
                     uomId: (int) $saleLine->uom_id,
+                    discountAmount: (string) $saleLine->discount_amount,
                     taxAmount: $taxResult->taxAmount,
                     lineTotal: $this->math->add($taxResult->totalAmount, $taxResult->withholdingAmount),
                     sourceLineType: 'sale_line',
@@ -277,6 +306,18 @@ final class SalePostingService
                 notes: $payload['notes'] ?? null,
                 createdBy: isset($payload['current_user_id']) ? (int) $payload['current_user_id'] : null,
                 lines: $invoiceLines,
+                adjustments: $this->math->isZero($billDiscount) ? [] : [new InvoiceAdjustmentData(
+                    name: 'Sale bill discount',
+                    adjustmentType: AdjustmentType::Discount,
+                    effect: AdjustmentEffect::Decrease,
+                    amount: $billDiscount,
+                    sourceType: 'sale',
+                    sourceId: (int) $sale->getKey(),
+                    calculationType: $billDiscountType->value,
+                    rate: $billDiscountType === SaleDiscountType::Percentage ? $billDiscountValue : self::ZERO,
+                    sourceAmount: $billDiscount,
+                    isSystemGenerated: true,
+                )],
                 sources: [new InvoiceSourceData(
                     tenantId: $tenantId,
                     organizationUnitId: $organizationUnitId,
@@ -285,8 +326,10 @@ final class SalePostingService
                     sourceDocumentNumber: (string) $sale->sale_number,
                     sourceDocumentDate: (string) $sale->sale_date->toDateString(),
                     sourceSubtotal: $invoiceBase,
-                    sourceGrandTotal: $taxCalculation->totalAmount,
+                    sourceAdjustmentTotal: $billDiscount,
+                    sourceGrandTotal: $this->math->sub($taxCalculation->totalAmount, $billDiscount),
                     invoicedAmount: $taxCalculation->totalAmount,
+                    allocatedAdjustmentAmount: $billDiscount,
                 )],
                 sourceLines: $sourceLines,
                 taxCalculation: $taxCalculation,
@@ -294,7 +337,7 @@ final class SalePostingService
                     FinancePostingProfileCode::SalesInvoice,
                     (string) $payload['sale_date'],
                     FinanceAccountRoleCode::Revenue,
-                    $taxCalculation->taxableAmount,
+                    $this->math->sub($taxCalculation->taxableAmount, $billDiscount),
                     $taxCalculation->taxAmount,
                     $taxCalculation->withholdingAmount,
                     'Sales invoice '.$sale->sale_number,

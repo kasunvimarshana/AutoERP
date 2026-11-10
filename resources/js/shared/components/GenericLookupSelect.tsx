@@ -63,6 +63,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     const requestRef = useRef<AbortController | null>(null);
     const searchRef = useRef(search);
     const requestSeqRef = useRef(0);
+    const preserveSearchOnClearRef = useRef(false);
     const inFlightKeyRef = useRef<string | null>(null);
     const recentResultsEntry = useLookupCacheStore((state) =>
         recentResultsKey ? state.recentEntries[recentResultsKey] : undefined,
@@ -137,6 +138,11 @@ export function GenericLookupSelect<T extends NamedResource>({
     }, [cancelRequest, clearResults, search]);
 
     useEffect(() => {
+        if (value === null && preserveSearchOnClearRef.current) {
+            preserveSearchOnClearRef.current = false;
+            return;
+        }
+        preserveSearchOnClearRef.current = false;
         queueMicrotask(() => {
             setInputValue('');
             setHasUserInput(false);
@@ -335,10 +341,14 @@ export function GenericLookupSelect<T extends NamedResource>({
                     abortRequest();
                     clearResults();
 
-                    if (value && onChange(null) === false) {
-                        setInputValue('');
-                        setHasUserInput(false);
-                        closeDropdown();
+                    if (value) {
+                        preserveSearchOnClearRef.current = true;
+                        if (onChange(null) === false) {
+                            preserveSearchOnClearRef.current = false;
+                            setInputValue('');
+                            setHasUserInput(false);
+                            closeDropdown();
+                        }
                     }
                 }}
             />

@@ -32,15 +32,20 @@ final class ItemQueryService
         int $perPage,
         ?string $relevanceSearch = null,
         ?int $page = null,
-    ): LengthAwarePaginator
-    {
+    ): LengthAwarePaginator {
         $query = $this->baseQuery($tenantId, $organizationUnitId)->with($this->summaryRelations());
         $this->applyCriteria($query, $criteria);
         if (! empty($criteria['require_available_stock'])) {
-            $query->whereIn('items.id', function (QueryBuilder $balances) use ($tenantId, $organizationUnitId): void {
+            $query->whereIn('items.id', function (QueryBuilder $balances) use ($tenantId, $organizationUnitId, $criteria): void {
                 $balances->from('inventory_stock_balances')
                     ->select('item_id')
                     ->where('tenant_id', $tenantId);
+                if (isset($criteria['available_stock_warehouse_id'])) {
+                    $balances->where('warehouse_id', (int) $criteria['available_stock_warehouse_id']);
+                }
+                if (isset($criteria['available_stock_location_id'])) {
+                    $balances->where('warehouse_location_id', (int) $criteria['available_stock_location_id']);
+                }
                 if ($organizationUnitId === null) {
                     $balances->whereNull('organization_unit_id');
                 } else {
@@ -80,8 +85,7 @@ final class ItemQueryService
         bool $prioritizeSearch = false,
         ?int $page = null,
         bool $requireAvailableStock = false,
-    ): LengthAwarePaginator
-    {
+    ): LengthAwarePaginator {
         $criteria['is_active'] = true;
         match ($kind) {
             'stock' => [$criteria['item_type'] = ItemType::Stock->value, $criteria['is_stockable'] = true],

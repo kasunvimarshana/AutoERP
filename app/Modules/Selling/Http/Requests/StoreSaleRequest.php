@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Selling\Http\Requests;
 
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Selling\Enums\SaleDiscountType;
 
 final class StoreSaleRequest extends TenantScopedRequest
 {
@@ -21,6 +23,8 @@ final class StoreSaleRequest extends TenantScopedRequest
             'currency_id' => ['nullable', 'integer', 'min:1'],
             'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'bill_discount_type' => ['nullable', Rule::enum(SaleDiscountType::class)],
+            'bill_discount_value' => ['nullable', 'decimal:0,6', 'min:0', 'required_with:bill_discount_type'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'integer', 'min:1'],
             'lines.*.item_variant_id' => ['nullable', 'integer', 'min:1'],
@@ -28,6 +32,8 @@ final class StoreSaleRequest extends TenantScopedRequest
             'lines.*.batch_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.serial_number_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.quantity' => ['required', 'decimal:0,6', 'gt:0'],
+            'lines.*.discount_type' => ['nullable', Rule::enum(SaleDiscountType::class)],
+            'lines.*.discount_value' => ['nullable', 'decimal:0,6', 'min:0', 'required_with:lines.*.discount_type'],
             'idempotency_key' => ['prohibited'],
         ];
     }

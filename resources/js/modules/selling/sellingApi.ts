@@ -4,6 +4,7 @@ import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { NamedResource } from '@/shared/types/common';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
+import type { CustomerSummary } from '@/modules/customer/customerTypes';
 
 export interface SaleLine {
     id: number;
@@ -12,6 +13,10 @@ export interface SaleLine {
     quantity: string;
     base_quantity: string;
     unit_price: string;
+    discount_type: SaleDiscountType;
+    discount_value: string;
+    discount_amount: string;
+    bill_discount_allocated: string;
     line_total: string;
     variant?: NamedResource & { code: string } | null;
     batch?: NamedResource | null;
@@ -27,6 +32,9 @@ export interface SaleDocument {
     sale_date: string;
     due_date: string | null;
     status: string;
+    bill_discount_type: SaleDiscountType;
+    bill_discount_value: string;
+    bill_discount_amount: string;
     customer: (NamedResource & { customer_number: string }) | null;
     warehouse: NamedResource | null;
     warehouse_location: NamedResource | null;
@@ -55,7 +63,16 @@ export interface SalePayload {
     warehouse_location_id?: number;
     sale_date: string;
     due_date?: string;
-    lines: Array<{ item_id: number; uom_id: number; quantity: string; item_variant_id?: number; batch_id?: number; serial_number_id?: number }>;
+    bill_discount_type?: SaleDiscountType;
+    bill_discount_value?: string;
+    lines: Array<{ item_id: number; uom_id: number; quantity: string; discount_type?: SaleDiscountType; discount_value?: string; item_variant_id?: number; batch_id?: number; serial_number_id?: number }>;
+}
+
+export type SaleDiscountType = 'fixed' | 'percentage';
+
+export async function getDirectCustomer(signal?: AbortSignal): Promise<CustomerSummary> {
+    const response = await apiClient.post<ApiResource<CustomerSummary>>('/api/v1/selling/direct-customer', undefined, { signal });
+    return response.data.data;
 }
 
 export async function listSales(params: { page?: number; per_page?: number; search?: string } = {}, signal?: AbortSignal) {
@@ -108,8 +125,8 @@ export async function refundSaleReturn(returnId: number, payload: {
     return response.data.data;
 }
 
-export function searchSellingCustomers(params: LookupLoadParams): Promise<LookupResult<NamedResource & { customer_number: string }>> {
-    return requestLookup('/api/v1/customers/lookup/active', params);
+export function searchSellingCustomers(params: LookupLoadParams): Promise<LookupResult<CustomerSummary>> {
+    return requestLookup('/api/v1/selling/customers/lookup', params);
 }
 
 export function searchSellingWarehouses(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {

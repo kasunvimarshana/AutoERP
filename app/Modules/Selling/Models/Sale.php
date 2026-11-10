@@ -25,6 +25,8 @@ final class Sale extends TenantOwnedModel
     {
         return array_merge(parent::casts(), [
             'row_version' => 'integer',
+            'bill_discount_value' => 'decimal:6',
+            'bill_discount_amount' => 'decimal:6',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'customer_id' => 'integer',

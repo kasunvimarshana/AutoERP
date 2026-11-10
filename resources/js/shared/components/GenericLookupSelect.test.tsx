@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { NamedResource } from '@/shared/types/common';
@@ -6,6 +7,26 @@ import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import { GenericLookupSelect } from './GenericLookupSelect';
 
 describe('GenericLookupSelect', () => {
+    it('preserves typed search when replacing a selected value', async () => {
+        const search = vi.fn(async (): Promise<LookupResult<NamedResource>> => ({
+            data: [resource(2, 'New source')],
+        }));
+        function LookupWithSelection() {
+            const [value, setValue] = useState<NamedResource | null>(resource(1));
+            return <GenericLookupSelect label="Source" value={value} onChange={setValue}
+                search={search}
+                formatLabel={(item) => item.name} debounceMs={0} />;
+        }
+
+        render(<LookupWithSelection />);
+        const input = screen.getByRole('combobox', { name: 'Source' });
+        await act(async () => undefined);
+        fireEvent.change(input, { target: { value: 'New' } });
+
+        expect(input).toHaveValue('New');
+        expect(await screen.findByRole('option', { name: 'New source' })).toBeInTheDocument();
+    });
+
     it('applies multiple exclusions across preload and pagination and deduplicates options', async () => {
         const search = vi.fn(async ({ page }: LookupLoadParams): Promise<LookupResult<NamedResource>> => ({
             data: page === 1

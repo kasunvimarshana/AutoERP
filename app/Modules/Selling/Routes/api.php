@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Selling\Http\Controllers\SaleController;
-use Modules\Selling\Http\Controllers\SellingPaymentController;
 use Modules\Payment\Constants\PaymentPermission;
+use Modules\Selling\Http\Controllers\DirectCustomerController;
+use Modules\Selling\Http\Controllers\SaleController;
+use Modules\Selling\Http\Controllers\SellingCustomerLookupController;
+use Modules\Selling\Http\Controllers\SellingPaymentController;
 use Modules\Selling\Services\SellingAuthorizationService;
 
 $middleware = [
@@ -20,6 +22,14 @@ $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
 
 Route::prefix('api/v1/selling')->middleware($middleware)->name('api.v1.selling.')->group(function () use ($requires): void {
+    Route::post('direct-customer', [DirectCustomerController::class, 'store'])->middleware([
+        'tenant.feature:customer',
+        $requires(SellingAuthorizationService::SALES_CREATE),
+    ])->name('directCustomer.store');
+    Route::get('customers/lookup', [SellingCustomerLookupController::class, 'index'])->middleware([
+        'tenant.feature:customer',
+        $requires(SellingAuthorizationService::SALES_CREATE),
+    ])->name('customers.lookup');
     Route::get('items/lookup', [SaleController::class, 'itemLookup'])->middleware([
         'tenant.feature:item',
         $requires(SellingAuthorizationService::SALES_CREATE),

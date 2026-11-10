@@ -38,6 +38,7 @@ const PAYMENT_DIRECTION_OUTBOUND = 'outbound';
 const ALLOCATION_METHOD_SPECIFIC_INVOICE = 'specific_invoice';
 const SETTLEABLE_INVOICE_STATUSES = ['posted', 'partially_paid'] as const;
 const SELLING_INVOICE_TYPE = 'sales';
+const BASE_EXCHANGE_RATE = '1.000000';
 const ZERO_AMOUNT = '0.000000';
 const SELLING_PAYMENT_METHODS = [
     { kind: 'cash', label: 'Cash', section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/40', badge: 'bg-emerald-100 text-emerald-900' },
@@ -117,6 +118,7 @@ export default function PaymentEntryPage() {
     const [paymentDate, setPaymentDate] = useState(today());
     const [reference, setReference] = useState('');
     const [exchangeRate, setExchangeRate] = useState('1.000000');
+    const [exchangeRateExpanded, setExchangeRateExpanded] = useState(false);
     const [party, setParty] = useState<NamedResource | null>(null);
     const [lines, setLines] = useState<PaymentLineDraft[]>([emptyLine(1)]);
     const [sellingRows, setSellingRows] = useState<SellingPaymentRow[]>(emptySellingRows);
@@ -156,7 +158,8 @@ export default function PaymentEntryPage() {
         setDirection(nextDirection);
         setParty(invoiceParty(invoice));
         setReference(`Settlement for ${invoice.invoice_number ?? 'invoice'}`);
-        setExchangeRate('');
+        setExchangeRate(invoice.exchange_rate ?? '');
+        setExchangeRateExpanded(!isPositiveDecimal(invoice.exchange_rate ?? '') || compareDecimalStrings(invoice.exchange_rate ?? ZERO_AMOUNT, BASE_EXCHANGE_RATE) !== 0);
         setLines([{ ...emptyLine(1), amount: balance }]);
         setSellingRows(emptySellingRows());
         setNextKey(2);
@@ -357,6 +360,15 @@ export default function PaymentEntryPage() {
                             </div>
                         </fieldset>
                     </div>
+
+                    {sellingMode === 'payment' && sellingInvoice.currency?.id && (
+                        <details key={sellingInvoice.id} className="mt-4 rounded-lg border border-slate-200 px-4 py-3" open={exchangeRateExpanded} onToggle={(event) => setExchangeRateExpanded(event.currentTarget.open)}>
+                            <summary className="cursor-pointer text-sm font-medium text-slate-700">Exchange rate</summary>
+                            <div className="mt-3">
+                                <Input label={`${sellingInvoice.currency.code ?? 'Invoice currency'} to base currency`} inputMode="decimal" value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} required />
+                            </div>
+                        </details>
+                    )}
 
                     {sellingMode === 'payment' ? <div>
                         <h2 className="text-lg font-semibold text-slate-950">Payment amounts</h2>

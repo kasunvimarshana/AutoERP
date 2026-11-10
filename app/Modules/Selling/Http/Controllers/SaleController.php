@@ -13,16 +13,16 @@ use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Selling\Http\Requests\SaleItemLookupRequest;
 use Modules\Selling\Http\Requests\SaleQueryRequest;
 use Modules\Selling\Http\Requests\StoreSaleRequest;
-use Modules\Selling\Http\Requests\StoreSaleReturnRequest;
 use Modules\Selling\Http\Requests\StoreSaleReturnRefundRequest;
+use Modules\Selling\Http\Requests\StoreSaleReturnRequest;
 use Modules\Selling\Http\Resources\SaleResource;
 use Modules\Selling\Http\Resources\SaleReturnResource;
 use Modules\Selling\Http\Resources\SellingItemLookupResource;
 use Modules\Selling\Models\Sale;
 use Modules\Selling\Models\SaleReturn;
 use Modules\Selling\Services\SalePostingService;
-use Modules\Selling\Services\SaleReturnRefundService;
 use Modules\Selling\Services\SaleReturnPostingService;
+use Modules\Selling\Services\SaleReturnRefundService;
 use Modules\Selling\Services\SellingAuthorizationService;
 
 final class SaleController
@@ -40,6 +40,8 @@ final class SaleController
             'search' => $request->validated('search'),
             'page' => $request->validated('page', 1),
             'per_page' => $request->validated('per_page', 20),
+            'available_stock_warehouse_id' => (int) $request->validated('warehouse_id'),
+            'available_stock_location_id' => $request->filled('warehouse_location_id') ? (int) $request->validated('warehouse_location_id') : null,
         ];
         $results = $items->lookup(
             $criteria,
@@ -47,6 +49,7 @@ final class SaleController
             $request->organizationUnitId(),
             (int) $criteria['per_page'],
             'stockable',
+            requireAvailableStock: true,
         );
         $availableByItemId = $availability->availableByItemIds(
             $results->getCollection()->modelKeys(),

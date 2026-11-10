@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
+use Modules\Customer\Services\DirectCustomerService;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
@@ -66,6 +68,71 @@ final class SellingWorkflowTest extends TestCase
             ->assertJsonPath('data', []);
     }
 
+    public function test_direct_customer_is_created_once_for_a_tenant_and_available_to_sales_creators(): void
+    {
+        $context = $this->context();
+        $token = $this->authenticateSalesViewer($context['tenant_id'], true);
+
+        $first = $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->postJson('/api/v1/selling/direct-customer')
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Direct Customer')
+            ->assertJsonPath('data.code', DirectCustomerService::CODE);
+
+        $second = $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->postJson('/api/v1/selling/direct-customer')
+            ->assertOk();
+
+        $this->assertSame($first->json('data.id'), $second->json('data.id'));
+        $this->assertDatabaseCount('customers', 2);
+
+        $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->getJson('/api/v1/selling/customers/lookup?search=Direct')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $first->json('data.id'));
+    }
+
+    public function test_direct_customer_sale_and_invoice_use_the_same_customer(): void
+    {
+        $context = $this->context();
+        FinancePostingFixture::seedCustomerInvoiceProfiles($context['tenant_id']);
+
+        $this->withTenantExecutionContext($context['tenant_id'], function () use ($context): void {
+            $directCustomer = app(DirectCustomerService::class)->ensure($context['tenant_id']);
+            app(StockMovementService::class)->record(new StockMovementData(
+                tenantId: $context['tenant_id'],
+                movementDate: '2026-09-26',
+                movementType: InventoryMovementType::Receipt,
+                direction: InventoryDirection::In,
+                itemId: $context['item_id'],
+                warehouseId: $context['warehouse_id'],
+                warehouseLocationId: $context['location_id'],
+                quantity: '2.000000',
+                unitCost: '20.000000',
+                uomId: $context['uom_id'],
+            ));
+
+            $sale = app(SalePostingService::class)->create([
+                'tenant_id' => $context['tenant_id'],
+                'customer_id' => $directCustomer->getKey(),
+                'warehouse_id' => $context['warehouse_id'],
+                'warehouse_location_id' => $context['location_id'],
+                'sale_date' => '2026-09-26',
+                'lines' => [[
+                    'item_id' => $context['item_id'],
+                    'uom_id' => $context['uom_id'],
+                    'quantity' => '1.000000',
+                ]],
+            ], 'selling-direct-customer-'.Str::uuid());
+
+            $this->assertSame($directCustomer->getKey(), $sale->customer->getKey());
+            $this->assertSame($directCustomer->getKey(), (int) $sale->invoice->party_id);
+        });
+    }
+
     public function test_sale_detail_uses_a_concrete_scoped_request(): void
     {
         $context = $this->context();
@@ -81,6 +148,13 @@ final class SellingWorkflowTest extends TestCase
     {
         $context = $this->context();
         $token = $this->authenticateSalesViewer($context['tenant_id'], true);
+
+        $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->getJson('/api/v1/selling/items/lookup?warehouse_id='.$context['warehouse_id'].'&warehouse_location_id='.$context['location_id'].'&sale_date=2026-09-26&search=Sales')
+            ->assertOk()
+            ->assertJsonPath('data', [])
+            ->assertJsonPath('meta.total', 0);
 
         $this->withTenantExecutionContext($context['tenant_id'], function () use ($context): void {
             $otherLocationId = (int) DB::table('warehouse_locations')->insertGetId([
@@ -127,6 +201,86 @@ final class SellingWorkflowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.warehouse.id', $context['warehouse_id'])
             ->assertJsonPath('data.location.id', $context['location_id']);
+    }
+
+    public function test_sale_discounts_flow_to_invoice_and_partial_returns(): void
+    {
+        $context = $this->context();
+        FinancePostingFixture::seedCustomerInvoiceProfiles($context['tenant_id']);
+
+        $this->withTenantExecutionContext($context['tenant_id'], function () use ($context): void {
+            app(StockMovementService::class)->record(new StockMovementData(
+                tenantId: $context['tenant_id'],
+                movementDate: '2026-09-26',
+                movementType: InventoryMovementType::Receipt,
+                direction: InventoryDirection::In,
+                itemId: $context['item_id'],
+                warehouseId: $context['warehouse_id'],
+                warehouseLocationId: $context['location_id'],
+                quantity: '2.000000',
+                unitCost: '20.000000',
+                uomId: $context['uom_id'],
+            ));
+
+            $payload = [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => null,
+                'customer_id' => $context['customer_id'],
+                'warehouse_id' => $context['warehouse_id'],
+                'warehouse_location_id' => $context['location_id'],
+                'sale_date' => '2026-09-26',
+                'bill_discount_type' => 'percentage',
+                'bill_discount_value' => '10.000000',
+                'lines' => [[
+                    'item_id' => $context['item_id'],
+                    'uom_id' => $context['uom_id'],
+                    'quantity' => '2.000000',
+                    'discount_type' => 'fixed',
+                    'discount_value' => '20.000000',
+                ]],
+            ];
+            try {
+                app(SalePostingService::class)->create(
+                    array_replace($payload, ['bill_discount_type' => 'fixed', 'bill_discount_value' => '200.000000']),
+                    'selling-excess-discount-'.Str::uuid(),
+                );
+                $this->fail('An excessive discount must not post a sale.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('Discount cannot exceed', $exception->getMessage());
+            }
+            $this->assertDatabaseCount('sales', 0);
+            $this->assertDatabaseCount('invoices', 0);
+
+            $sale = app(SalePostingService::class)->create($payload, 'selling-discounts-'.Str::uuid());
+
+            $this->assertSame('20.000000', (string) $sale->lines->first()->discount_amount);
+            $this->assertSame('18.000000', (string) $sale->lines->first()->bill_discount_allocated);
+            $this->assertSame('18.000000', (string) $sale->bill_discount_amount);
+            $this->assertSame('162.000000', (string) $sale->invoice->grand_total);
+            $this->assertSame('38.000000', (string) $sale->invoice->discount_total);
+            $this->assertSame('162.000000', (string) $sale->invoice->balance_due);
+            $printedAmounts = app(InvoicePrintService::class)->viewData($sale->invoice)['document']['amounts'];
+            $this->assertSame('20.000000', $printedAmounts['line_discount_total']['raw']);
+            $this->assertSame('18.000000', $printedAmounts['bill_discount_total']['raw']);
+
+            foreach (['1.000000', '1.000000'] as $quantity) {
+                $sale = app(SaleReturnPostingService::class)->create([
+                    'tenant_id' => $context['tenant_id'],
+                    'organization_unit_id' => null,
+                    'sale_id' => (int) $sale->getKey(),
+                    'expected_version' => (int) $sale->row_version,
+                    'return_date' => '2026-09-26',
+                    'reason' => 'Discounted item returned',
+                    'lines' => [[
+                        'sale_line_id' => (int) $sale->lines->first()->getKey(),
+                        'quantity' => $quantity,
+                    ]],
+                ], 'selling-discount-return-'.Str::uuid());
+            }
+
+            $this->assertSame('162.000000', app(DecimalMath::class)->normalize((string) $sale->returns->sum('credit_amount')));
+            $this->assertSame('0.000000', (string) $sale->invoice->refresh()->balance_due);
+        });
     }
 
     public function test_sale_posts_invoice_and_stock_atomically_and_return_records_credit_note(): void

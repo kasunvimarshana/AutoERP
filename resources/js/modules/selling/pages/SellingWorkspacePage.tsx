@@ -19,19 +19,30 @@ import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLook
 import { listPaymentMethods, type PaymentMethod } from '@/modules/payment/paymentApi';
 import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { InventoryDimensionFields, emptyInventoryDimensions, type InventoryDimensionValue } from '@/modules/inventory/components/InventoryDimensionFields';
-import { compareDecimalStrings, multiplyDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
+import { addDecimal, compareDecimalStrings, multiplyDecimal, percentageOfDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import type { NamedResource } from '@/shared/types/common';
-import { searchSellingWarehouses, searchSellingLocations, getSellingWarehouseSource, createSale, createSaleReturn, refundSaleReturn, getSale, listSales, listSaleReturns, type SaleDocument, type SalePayload, type SaleReturnDocument } from '../sellingApi';
+import { searchSellingCustomers, searchSellingWarehouses, searchSellingLocations, getSellingWarehouseSource, getDirectCustomer, createSale, createSaleReturn, refundSaleReturn, getSale, listSales, listSaleReturns, type SaleDiscountType, type SaleDocument, type SalePayload, type SaleReturnDocument } from '../sellingApi';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { sellingPermissions } from '../sellingPermissions';
 import { SellingItemLookup } from '../components/SellingItemLookup';
+import { SaleDiscountInput } from '../components/SaleDiscountInput';
+
+const ZERO_AMOUNT = '0.000000';
+const ONE_QUANTITY = '1.000000';
+const MAX_PERCENT = '100';
+
+function discountAmount(base: string, type: SaleDiscountType, value: string): string {
+    return type === 'percentage' ? percentageOfDecimal(base, value || '0') : value || ZERO_AMOUNT;
+}
 
 interface SaleDraftLine {
     key: string;
     item: ItemLookupResource;
     quantity: string;
+    discountType: SaleDiscountType;
+    discountValue: string;
     dimensions: InventoryDimensionValue;
 }
 
@@ -65,12 +76,30 @@ function SellingWorkspace() {
     const isCreatePage = location.pathname === '/selling/create';
     const isReturnsPage = location.pathname === '/selling/returns';
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
+    const [loadingDirectCustomer, setLoadingDirectCustomer] = useState(isCreatePage);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
     const [resolvingSource, setResolvingSource] = useState(false);
     const [saleDate, setSaleDate] = useState(businessDateInputValue);
     const [dueDate, setDueDate] = useState('');
     const [lines, setLines] = useState<SaleDraftLine[]>([]);
+    const [billDiscountType, setBillDiscountType] = useState<SaleDiscountType>('fixed');
+    const [billDiscountValue, setBillDiscountValue] = useState('0');
+    const lineSubtotal = (line: SaleDraftLine) => multiplyDecimal(line.quantity || '0', line.item.resolved_sales_unit_price ?? '0');
+    const lineDiscount = (line: SaleDraftLine) => discountAmount(lineSubtotal(line), line.discountType, line.discountValue);
+    const lineTotal = (line: SaleDraftLine) => subtractDecimal(lineSubtotal(line), lineDiscount(line));
+    const grossSubtotal = sumDecimals(lines.map(lineSubtotal));
+    const lineDiscountTotal = sumDecimals(lines.map(lineDiscount));
+    const billDiscountBase = subtractDecimal(grossSubtotal, lineDiscountTotal);
+    const billDiscount = discountAmount(billDiscountBase, billDiscountType, billDiscountValue);
+    const totalBeforeTax = subtractDecimal(billDiscountBase, billDiscount);
+    const invalidDiscount = compareDecimalStrings(billDiscountValue || '0', ZERO_AMOUNT) < 0
+        || (billDiscountType === 'percentage' && compareDecimalStrings(billDiscountValue || '0', MAX_PERCENT) > 0)
+        || compareDecimalStrings(billDiscount, billDiscountBase) > 0
+        || lines.some((line) => compareDecimalStrings(line.discountValue || '0', ZERO_AMOUNT) < 0
+            || (line.discountType === 'percentage' && compareDecimalStrings(line.discountValue || '0', MAX_PERCENT) > 0)
+            || compareDecimalStrings(lineDiscount(line), lineSubtotal(line)) > 0);
+    const saleCurrency = lines[0]?.item.tenant_base_currency?.symbol ?? lines[0]?.item.tenant_base_currency?.code ?? '';
     const [sales, setSales] = useState<SaleDocument[]>([]);
     const [returns, setReturns] = useState<SaleReturnDocument[]>([]);
     const [listMeta, setListMeta] = useState<PaginationMeta | null>(null);
@@ -160,6 +189,24 @@ function SellingWorkspace() {
         return () => controller.abort();
     }, [id, isCreatePage]);
 
+    useEffect(() => {
+        if (id || !isCreatePage) return;
+
+        const controller = new AbortController();
+        void getDirectCustomer(controller.signal)
+            .then((directCustomer) => {
+                if (!controller.signal.aborted) setCustomer(directCustomer);
+            })
+            .catch((failure: unknown) => {
+                if (!controller.signal.aborted) setError(toApiError(failure));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoadingDirectCustomer(false);
+            });
+
+        return () => controller.abort();
+    }, [id, isCreatePage]);
+
     const quantityTotal = useMemo(() => Object.values(returnQuantities).filter((value) => Number(value) > 0).length, [returnQuantities]);
     const returnExceedsRemaining = sale?.lines.some((line) => {
         const alreadyReturned = sumDecimals((sale.returns ?? []).flatMap((saleReturn) => saleReturn.lines.filter((returnLine) => returnLine.sale_line_id === line.id).map((returnLine) => returnLine.quantity)));
@@ -174,17 +221,21 @@ function SellingWorkspace() {
 
     async function submitSale(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        if (!customer || !warehouse || lines.length === 0 || lines.some((line) => Number(line.quantity) <= 0)) return;
+        if (!customer || !warehouse || lines.length === 0 || invalidDiscount || lines.some((line) => Number(line.quantity) <= 0 || !line.item.resolved_sales_unit_price)) return;
         const payload: SalePayload = {
             customer_id: customer.id,
             warehouse_id: warehouse.id,
             ...(warehouseLocation ? { warehouse_location_id: warehouseLocation.id } : {}),
             sale_date: saleDate,
             ...(dueDate ? { due_date: dueDate } : {}),
+            bill_discount_type: billDiscountType,
+            bill_discount_value: billDiscountValue || '0',
             lines: lines.map((line) => ({
                 item_id: line.item.id,
                 uom_id: line.item.base_uom?.id ?? 0,
                 quantity: line.quantity,
+                discount_type: line.discountType,
+                discount_value: line.discountValue || '0',
                 ...(line.dimensions.itemVariant ? { item_variant_id: line.dimensions.itemVariant.id } : {}),
                 ...(line.dimensions.batch ? { batch_id: line.dimensions.batch.id } : {}),
                 ...(line.dimensions.serial ? { serial_number_id: line.dimensions.serial.id } : {}),
@@ -236,6 +287,8 @@ function SellingWorkspace() {
             key: crypto.randomUUID(),
             item,
             quantity: '1',
+            discountType: 'fixed',
+            discountValue: '0',
             dimensions: emptyInventoryDimensions(),
         }]);
     }
@@ -319,8 +372,10 @@ function SellingWorkspace() {
                                 { key: 'item', header: 'Item', render: (line) => `${line.item.code} · ${line.item.name}${line.variant ? ` · ${line.variant.name}` : ''}${line.batch ? ` · Batch ${line.batch.name}` : ''}${line.serial_number ? ` · Serial ${line.serial_number}` : ''}` },
                                 { key: 'quantity', header: 'Quantity', render: (line) => `${line.quantity} ${line.uom.code}` },
                                 { key: 'price', header: 'Unit price', render: (line) => line.unit_price },
+                                { key: 'discount', header: 'Line discount', render: (line) => line.discount_amount },
                                 { key: 'total', header: 'Line total', render: (line) => line.line_total },
                             ]} />
+                            {compareDecimalStrings(sale.bill_discount_amount, ZERO_AMOUNT) > 0 && <p className="mt-3 text-right text-sm text-slate-700">Total bill discount: <span className="font-semibold">{sale.bill_discount_amount}</span></p>}
                             {sale.invoice && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm">
                                 <div><span className="font-semibold">Invoice {sale.invoice.number}</span><span className="ml-3 text-slate-600">Balance due {sale.invoice.balance_due}</span></div>
                                 <div className="flex gap-4">
@@ -459,7 +514,7 @@ function SellingWorkspace() {
                 <form className="space-y-5" onSubmit={(event) => void submitSale(event)}>
                     <Panel title="Sale details">
                         <div className="grid gap-4 md:grid-cols-2">
-                            <CustomerLookupSelect value={customer} onChange={setCustomer} placeholder="Search customers..." required />
+                            <CustomerLookupSelect value={customer} onChange={setCustomer} search={searchSellingCustomers} placeholder={loadingDirectCustomer ? 'Loading default customer...' : 'Search customers...'} disabled={loadingDirectCustomer} required />
                             <LookupSelect<NamedResource> label="Warehouse" value={warehouse} onChange={changeWarehouse} search={searchSellingWarehouses} placeholder="Choose a warehouse..." required loadOnOpen minSearchLength={0} />
                             <LookupSelect<NamedResource> label="Location" value={warehouseLocation} onChange={setWarehouseLocation} search={locationSearch} placeholder={warehouse ? 'Choose a location...' : 'Choose a warehouse first'} disabled={!warehouse || resolvingSource} loadOnOpen minSearchLength={0} />
                             <Input label="Sale date" type="date" value={saleDate} onChange={(event) => setSaleDate(event.target.value)} required />
@@ -473,15 +528,37 @@ function SellingWorkspace() {
                                 { key: 'item', header: 'Item', render: (line) => <div className="min-w-64 space-y-2">
                                     <div><div className="font-medium text-slate-900">{line.item.name}</div><div className="text-xs text-slate-500">{line.item.code}</div></div>
                                     <InventoryDimensionFields item={line.item} warehouse={warehouse} value={line.dimensions} includeLocation={false} includeSerial includeUom={false} onChange={(dimensions) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, dimensions } : row))} />
+                                </div>, footer: 'Total' },
+                                { key: 'quantity', header: 'Quantity', render: (line) => <div className="flex items-center gap-1">
+                                    <Button type="button" variant="secondary" aria-label={`Decrease ${line.item.name} quantity`} disabled={compareDecimalStrings(line.quantity || '0', ONE_QUANTITY) <= 0} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: subtractDecimal(row.quantity, ONE_QUANTITY) } : row))}>−</Button>
+                                    <DecimalInput aria-label={`Quantity for ${line.item.name}`} className="w-20" maxFractionDigits={3} value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: event.target.value } : row))} />
+                                    <Button type="button" variant="secondary" aria-label={`Increase ${line.item.name} quantity`} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: addDecimal(row.quantity || '0', ONE_QUANTITY) } : row))}>+</Button>
+                                    <span className="text-xs text-slate-500">{line.item.base_uom?.code}</span>
                                 </div> },
-                                { key: 'quantity', header: 'Quantity', render: (line) => <DecimalInput aria-label={`Quantity for ${line.item.name}`} className="w-28" maxFractionDigits={3} value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: event.target.value } : row))} /> },
                                 { key: 'price', header: 'Unit price', render: (line) => `${line.item.tenant_base_currency?.symbol ?? line.item.tenant_base_currency?.code ?? ''} ${line.item.resolved_sales_unit_price ?? 'Not configured'}` },
-                                { key: 'subtotal', header: 'Subtotal', render: (line) => line.item.resolved_sales_unit_price === null || line.item.resolved_sales_unit_price === undefined ? '—' : `${line.item.tenant_base_currency?.symbol ?? line.item.tenant_base_currency?.code ?? ''} ${multiplyDecimal(line.quantity, line.item.resolved_sales_unit_price)}` },
+                                { key: 'discount', header: 'Discount', render: (line) => <div>
+                                    <SaleDiscountInput label={`Discount for ${line.item.name}`} currency={saleCurrency} type={line.discountType} value={line.discountValue} onTypeChange={(discountType) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountType } : row))} onValueChange={(discountValue) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountValue } : row))} />
+                                    <span className="text-xs text-slate-500">{saleCurrency} {lineDiscount(line)}</span>
+                                </div>, footer: `${saleCurrency} ${lineDiscountTotal}` },
+                                { key: 'subtotal', header: 'Subtotal', render: (line) => line.item.resolved_sales_unit_price === null || line.item.resolved_sales_unit_price === undefined ? '—' : `${saleCurrency} ${lineTotal(line)}`, footer: `${saleCurrency} ${billDiscountBase}` },
                                 { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <Button type="button" variant="secondary" aria-label={`Remove ${line.item.name}`} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>Remove</Button> },
                             ]} />
+                            {lines.length > 0 && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">
+                                    <SaleDiscountInput label="Total bill discount" currency={saleCurrency} type={billDiscountType} value={billDiscountValue} onTypeChange={setBillDiscountType} onValueChange={setBillDiscountValue} />
+                                    <dl className="space-y-1 text-sm text-slate-700">
+                                        <div className="flex justify-between"><dt>Item subtotal</dt><dd>{saleCurrency} {grossSubtotal}</dd></div>
+                                        <div className="flex justify-between"><dt>Line discounts</dt><dd>− {saleCurrency} {lineDiscountTotal}</dd></div>
+                                        <div className="flex justify-between"><dt>Bill discount</dt><dd>− {saleCurrency} {billDiscount}</dd></div>
+                                        <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900"><dt>Total before tax</dt><dd>{saleCurrency} {totalBeforeTax}</dd></div>
+                                    </dl>
+                                </div>
+                                {invalidDiscount && <p className="mt-2 text-sm text-rose-700" role="alert">Discount cannot exceed the eligible amount or 100%.</p>}
+                                <p className="mt-2 text-xs text-slate-500">Applicable tax is calculated when the sale is posted. The invoice shows the final payable total.</p>
+                            </div>}
                         </div>
                     </Panel>
-                    <Button type="submit" loading={busy} disabled={!customer || !warehouse || lines.length === 0 || lines.some((line) => !line.item.base_uom || Number(line.quantity) <= 0)}>Post sale and invoice</Button>
+                    <Button type="submit" loading={busy} disabled={!customer || !warehouse || lines.length === 0 || invalidDiscount || lines.some((line) => !line.item.base_uom || !line.item.resolved_sales_unit_price || Number(line.quantity) <= 0)}>Post sale and invoice</Button>
                 </form>
                 <Panel title="Workflow guidance"><p className="text-sm text-slate-600">Choose the customer and warehouse, add available items, then post the sale. The customer invoice is created with the sale.</p></Panel>
             </div>
