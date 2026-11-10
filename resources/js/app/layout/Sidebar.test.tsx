@@ -11,6 +11,26 @@ const sections: NavigationSection[] = [
         label: 'Operations',
         items: [
             {
+                id: 'vehicle-service',
+                type: 'module',
+                label: 'Vehicle Service',
+                icon: 'service',
+                children: [
+                    { id: 'create-service-job', type: 'link', label: 'Create Service Job', to: '/vehicle-service/jobs/create' },
+                    { id: 'service-jobs', type: 'link', label: 'Service Job List', to: '/vehicle-service/jobs' },
+                ],
+            },
+            {
+                id: 'selling',
+                type: 'module',
+                label: 'Selling',
+                icon: 'purchase',
+                children: [
+                    { id: 'selling-create', type: 'link', label: 'Create Selling', to: '/selling/create' },
+                    { id: 'selling-list', type: 'link', label: 'Selling List', to: '/selling' },
+                ],
+            },
+            {
                 id: 'purchase',
                 type: 'module',
                 label: 'Purchase',
@@ -32,6 +52,24 @@ const sections: NavigationSection[] = [
     },
 ];
 describe('Sidebar', () => {
+    it('keeps visible service and selling shortcuts outside the scrolling navigation', () => {
+        render(<SidebarHarness />);
+        const quickAccess = screen.getByRole('navigation', { name: 'Quick access' });
+        expect(quickAccess).toHaveClass('shrink-0');
+        expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('overflow-y-auto');
+        expect(quickAccess.querySelectorAll('a')).toHaveLength(4);
+        expect(screen.getByRole('link', { name: 'Create Service Job' })).toHaveAttribute('href', '/vehicle-service/jobs/create');
+        expect(screen.getByRole('link', { name: 'Service Job List' })).toHaveAttribute('href', '/vehicle-service/jobs');
+        expect(screen.getByRole('link', { name: 'Create Selling' })).toHaveAttribute('href', '/selling/create');
+        expect(screen.getByRole('link', { name: 'Selling List' })).toHaveAttribute('href', '/selling');
+    });
+
+    it('keeps quick access links named when the desktop sidebar is collapsed', () => {
+        render(sidebarElement(true, () => undefined, true));
+        expect(screen.getByRole('navigation', { name: 'Quick access' }).querySelectorAll('a')).toHaveLength(4);
+        expect(screen.getByRole('link', { name: 'Create Service Job' })).toHaveAttribute('title', 'Create Service Job');
+    });
+
     it('keeps only one module expanded and highlights the active child', async () => {
         const user = userEvent.setup();
         render(<SidebarHarness />);
@@ -81,7 +119,7 @@ function SidebarHarness() {
 function renderSidebar(mobileOpen: boolean, onClose: () => void) {
     return render(sidebarElement(mobileOpen, onClose));
 }
-function sidebarElement(mobileOpen: boolean, onClose: () => void) {
+function sidebarElement(mobileOpen: boolean, onClose: () => void, collapsed = false) {
     return (
         <TestRouter>
             <Sidebar
@@ -90,7 +128,7 @@ function sidebarElement(mobileOpen: boolean, onClose: () => void) {
                 activeParentId={null}
                 expandedModuleId={null}
                 mobileOpen={mobileOpen}
-                collapsed={false}
+                collapsed={collapsed}
                 user={null}
                 tenant={null}
                 organizationUnit={null}
