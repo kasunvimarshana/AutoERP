@@ -231,7 +231,10 @@ final class RunningChartService
                 $start = $use->handed_over_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
                 $usageStart = $handover;
             } else {
-                throw ValidationException::withMessages(['period' => ['Usage must fall within actual customer custody.']]);
+                throw ValidationException::withMessages([
+                    'period' => ['Usage must fall within actual customer custody.'],
+                    'starts_at' => ['Usage must fall within actual customer custody.'],
+                ]);
             }
         }
 
@@ -242,7 +245,10 @@ final class RunningChartService
                     $end = $use->returned_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
                     $usageEnd = $return;
                 } else {
-                    throw ValidationException::withMessages(['period' => ['Usage must fall within actual customer custody.']]);
+                    throw ValidationException::withMessages([
+                        'period' => ['Usage must fall within actual customer custody.'],
+                        'ends_at' => ['Usage must fall within actual customer custody.'],
+                    ]);
                 }
             }
         }

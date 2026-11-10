@@ -145,6 +145,86 @@ export function RunningChartEditor({
                 return;
             }
 
+            const nowMs = Date.now() + 60_000;
+            let startIso = '';
+            let endIso = '';
+            try {
+                if (start) startIso = timestampWithOffset(start);
+                if (end) endIso = timestampWithOffset(end);
+            } catch {
+                // fall through to backend
+            }
+
+            if (startIso && new Date(startIso).getTime() > nowMs) {
+                setError(new ApiError(
+                    'Record completed usage starting before or at the current time, not in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation_error',
+                    { starts_at: ['Record completed usage starting before or at the current time, not in the future.'] },
+                ));
+                setSaving(false);
+                return;
+            }
+
+            if (endIso && new Date(endIso).getTime() > nowMs) {
+                setError(new ApiError(
+                    'Record completed usage ending after its start, not in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation_error',
+                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
+                ));
+                setSaving(false);
+                return;
+            }
+
+            if (custodyStart && startIso) {
+                let custodyStartIso = '';
+                try {
+                    custodyStartIso = timestampWithOffset(custodyStart);
+                } catch {
+                    // fall through
+                }
+                if (custodyStartIso && new Date(startIso).getTime() < new Date(custodyStartIso).getTime() - 60_000) {
+                    setError(new ApiError(
+                        'Usage must fall within actual customer custody.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation_error',
+                        {
+                            period: ['Usage must fall within actual customer custody.'],
+                            starts_at: ['Usage must fall within actual customer custody.'],
+                        },
+                    ));
+                    setSaving(false);
+                    return;
+                }
+            }
+
+            if (custodyEnd && endIso) {
+                let custodyEndIso = '';
+                try {
+                    custodyEndIso = timestampWithOffset(custodyEnd);
+                } catch {
+                    // fall through
+                }
+                if (custodyEndIso && new Date(endIso).getTime() > new Date(custodyEndIso).getTime() + 60_000) {
+                    setError(new ApiError(
+                        'Usage must fall within actual customer custody.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation_error',
+                        {
+                            period: ['Usage must fall within actual customer custody.'],
+                            ends_at: ['Usage must fall within actual customer custody.'],
+                        },
+                    ));
+                    setSaving(false);
+                    return;
+                }
+            }
+
             const trimmedReference = reference.trim();
             const parseDistance = (val?: string) => {
                 const t = val?.trim();

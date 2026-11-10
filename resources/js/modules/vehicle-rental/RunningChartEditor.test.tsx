@@ -200,3 +200,36 @@ it('submits valid usage period directly to API without redundant client clock ba
         );
     });
 });
+
+it('prevents submitting usage start prior to customer custody with immediate feedback', async () => {
+    const custodyUse = {
+        ...use,
+        status: VehicleUseStatus.InCustody,
+        handed_over_at: '2026-09-07T09:00:00+05:30',
+        returned_at: null,
+    } as VehicleUse;
+
+    render(<RunningChartEditor use={custodyUse} onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T07:00' } });
+    fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-07T10:00' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
+
+    await waitFor(() => {
+        expect(screen.getAllByText('Usage must fall within actual customer custody.').length).toBeGreaterThan(0);
+    });
+    expect(createChart).not.toHaveBeenCalled();
+});
+
+it('prevents submitting usage end in the future with immediate validation feedback', async () => {
+    render(<RunningChartEditor use={use} onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T10:00' } });
+    fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2099-01-01T12:00' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
+
+    await waitFor(() => {
+        expect(screen.getAllByText('Record completed usage ending after its start, not in the future.').length).toBeGreaterThan(0);
+    });
+    expect(createChart).not.toHaveBeenCalled();
+});

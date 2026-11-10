@@ -196,7 +196,7 @@ it('prevents submitting future replacement time with immediate validation feedba
     fireEvent.change(screen.getByLabelText('Replacement reason'), { target: { value: 'Workshop replacement' } });
     fireEvent.submit(screen.getByRole('form', { name: 'Replace vehicle' }));
     await waitFor(() => {
-        expect(screen.getByText('Replacement time cannot be in the future.')).toBeInTheDocument();
+        expect(screen.getAllByText('Replacement time cannot be in the future.').length).toBeGreaterThan(0);
     });
     expect(replaceVehicleUse).not.toHaveBeenCalled();
 });
@@ -223,9 +223,9 @@ it('prevents submitting replacement time at or before previous handover with imm
     fireEvent.click(screen.getByRole('checkbox', { name: 'Company-owned vehicle' }));
     fireEvent.change(screen.getByLabelText('Replacement time'), { target: { value: '2026-09-07T09:00' } });
     fireEvent.change(screen.getByLabelText('Replacement reason'), { target: { value: 'Workshop replacement' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm replacement' }));
+    fireEvent.submit(screen.getByRole('form', { name: 'Replace vehicle' }));
     await waitFor(() => {
-        expect(screen.getByText("Replacement time must follow the previous vehicle's handover time.")).toBeInTheDocument();
+        expect(screen.getAllByText("Replacement time must follow the previous vehicle's handover time.").length).toBeGreaterThan(0);
     });
     expect(replaceVehicleUse).not.toHaveBeenCalled();
 });
