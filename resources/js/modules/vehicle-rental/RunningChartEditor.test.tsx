@@ -221,7 +221,7 @@ it('prevents submitting usage start prior to customer custody with immediate fee
     expect(createChart).not.toHaveBeenCalled();
 });
 
-it('prevents submitting usage end in the future with immediate validation feedback', async () => {
+it('allows saving draft usage ending in the future for ongoing custody and submits to API', async () => {
     render(<RunningChartEditor use={use} onSaved={vi.fn()} onCancel={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T10:00' } });
@@ -229,7 +229,31 @@ it('prevents submitting usage end in the future with immediate validation feedba
     fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
 
     await waitFor(() => {
-        expect(screen.getAllByText('Completed usage cannot end in the future.').length).toBeGreaterThan(0);
+        expect(createChart).toHaveBeenCalledWith(
+            use,
+            expect.objectContaining({
+                starts_at: '2026-09-07T10:00:00+05:30',
+                ends_at: '2099-01-01T12:00:00+05:30',
+            }),
+            undefined,
+        );
+    });
+});
+
+it('prevents submitting usage end after custody return for returned vehicles', async () => {
+    const returnedUse: VehicleUse = {
+        ...use,
+        status: VehicleUseStatus.Returned,
+        returned_at: '2026-09-07T18:00:00Z',
+    };
+    render(<RunningChartEditor use={returnedUse} onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T10:00' } });
+    fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-08T02:00' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
+
+    await waitFor(() => {
+        expect(screen.getAllByText('Usage must fall within actual customer custody.').length).toBeGreaterThan(0);
     });
     expect(createChart).not.toHaveBeenCalled();
 });

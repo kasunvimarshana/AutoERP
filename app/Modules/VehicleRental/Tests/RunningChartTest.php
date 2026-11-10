@@ -101,7 +101,7 @@ final class RunningChartTest extends TestCase
     {
         $this->custodyFixture(function ($context, $use, $facts): void {
             $s = app(RunningChartService::class);
-            foreach ([['end_odometer' => '99'], ['garage_km' => '51'], ['normal_ot_minutes' => '24.30'], ['starts_at' => '2026-09-07T08:00:00+05:30'], ['ends_at' => '2026-09-11T08:00:00+05:30'], ['starts_at' => '2026-09-31T08:00:00+05:30']] as $bad) {
+            foreach ([['end_odometer' => '99'], ['garage_km' => '51'], ['normal_ot_minutes' => '24.30'], ['starts_at' => '2026-09-07T08:00:00+05:30'], ['ends_at' => '2026-09-07T08:30:00+05:30'], ['starts_at' => '2026-09-31T08:00:00+05:30']] as $bad) {
                 try {
                     $s->create($context, $use->id, $use->row_version, array_replace($facts, $bad));
                     self::fail('Invalid chart');
@@ -407,29 +407,21 @@ final class RunningChartTest extends TestCase
             }
 
             // Current travel time is 2026-09-10T12:00:00+00:00 (17:30 in Asia/Colombo).
-            // Rejects end later than current time + tolerance
+            // Permits future end date for draft running chart on ongoing custody
+            $futureChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'FUTURE-USAGE',
+                'starts_at' => '2026-09-07T09:00:00+05:30',
+                'ends_at' => '2026-09-10T17:35:00+05:30',
+            ]));
+            self::assertSame(RunningChartStatus::Draft, $futureChart->status);
+
+            // Rejects finalizing future usage before it has actually completed
             try {
-                $service->create($context, $use->id, $use->row_version, array_replace($facts, [
-                    'reference' => 'FUTURE-USAGE',
-                    'starts_at' => '2026-09-07T09:00:00+05:30',
-                    'ends_at' => '2026-09-10T17:35:00+05:30',
-                ]));
-                self::fail('Future usage was accepted');
+                $service->change($context, $futureChart->id, $futureChart->row_version, RunningChartAction::Finalize);
+                self::fail('Finalizing future usage was accepted');
             } catch (ValidationException $e) {
                 self::assertArrayHasKey('ends_at', $e->errors());
                 self::assertSame('Completed usage cannot end in the future.', $e->errors()['ends_at'][0]);
-            }
-
-            // Rejects start later than current time
-            try {
-                $service->create($context, $use->id, $use->row_version, array_replace($facts, [
-                    'reference' => 'FUTURE-START',
-                    'starts_at' => '2026-09-10T17:35:00+05:30',
-                    'ends_at' => '2026-09-10T17:40:00+05:30',
-                ]));
-                self::fail('Future start was accepted');
-            } catch (ValidationException $e) {
-                self::assertArrayHasKey('starts_at', $e->errors());
             }
 
             // Accepts usage ending at current time with 90-second clock skew

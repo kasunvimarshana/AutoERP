@@ -73,16 +73,9 @@ final class RunningChartValidation
         $timezone = $this->calendar->timezone($context);
         $start = OperationalTime::parse($data['starts_at'], 'starts_at')->setTimezone($timezone);
         $end = OperationalTime::parse($data['ends_at'], 'ends_at')->setTimezone($timezone);
-        $now = $this->calendar->now($context)->addMinutes(2);
 
-        if ($start->greaterThan($now)) {
-            throw ValidationException::withMessages(['starts_at' => ['Completed usage cannot start in the future.']]);
-        }
         if ($end <= $start) {
             throw ValidationException::withMessages(['ends_at' => ['Usage end must follow usage start.']]);
-        }
-        if ($end->greaterThan($now)) {
-            throw ValidationException::withMessages(['ends_at' => ['Completed usage cannot end in the future.']]);
         }
         $data['starts_at_input'] = $data['starts_at'];
         $data['ends_at_input'] = $data['ends_at'];

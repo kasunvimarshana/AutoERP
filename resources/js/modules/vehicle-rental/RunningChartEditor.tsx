@@ -162,7 +162,6 @@ export function RunningChartEditor({
                 }
             }
 
-            const nowMs = Date.now() + 120_000;
             let startIso = '';
             let endIso = '';
             try {
@@ -170,30 +169,6 @@ export function RunningChartEditor({
                 if (end) endIso = timestampWithOffset(end);
             } catch {
                 // fall through to backend
-            }
-
-            if (startIso && new Date(startIso).getTime() > nowMs) {
-                setError(new ApiError(
-                    'Completed usage cannot start in the future.',
-                    422,
-                    'VALIDATION_FAILED',
-                    'validation_error',
-                    { starts_at: ['Completed usage cannot start in the future.'] },
-                ));
-                setSaving(false);
-                return;
-            }
-
-            if (endIso && new Date(endIso).getTime() > nowMs) {
-                setError(new ApiError(
-                    'Completed usage cannot end in the future.',
-                    422,
-                    'VALIDATION_FAILED',
-                    'validation_error',
-                    { ends_at: ['Completed usage cannot end in the future.'] },
-                ));
-                setSaving(false);
-                return;
             }
 
             if (custodyStart && startIso) {
@@ -353,7 +328,7 @@ export function RunningChartEditor({
                         value={end}
                         onChange={e => setEnd(e.target.value)}
                         error={error?.fields.ends_at?.[0]}
-                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTimeWithSeconds(use.returned_at)}` : 'Usage end must follow usage start and cannot be in the future.'}
+                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTimeWithSeconds(use.returned_at)}` : 'Usage end must follow usage start.'}
                     />
                     <div className="flex flex-wrap gap-2 text-xs">
                         {custodyEnd && (
