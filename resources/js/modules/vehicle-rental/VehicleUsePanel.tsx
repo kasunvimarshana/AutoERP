@@ -3,7 +3,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { CHART_PERMISSION } from './runningCharts';
 import { RunningChartsPanel } from './RunningChartsPanel';
 import { useEffect, useState, type FormEvent } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -76,7 +76,51 @@ export function VehicleUsePanel({
         setError(null);
     }
     async function submit(event: FormEvent) {
-        event.preventDefault(); if (!action) return; setSaving(true); setError(null);
+        event.preventDefault(); if (!action) return;
+
+        if (action.type !== VehicleUseAction.Cancel) {
+            let atIso = '';
+            try {
+                atIso = timestampWithOffset(at);
+            } catch {
+                return;
+            }
+            const parsedAt = new Date(atIso);
+            if (parsedAt.getTime() > Date.now() + 120_000) {
+                setError(new ApiError(
+                    action.type === VehicleUseAction.Handover ? 'Handover time cannot be in the future.' : 'Return time cannot be in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { occurred_at: [action.type === VehicleUseAction.Handover ? 'Handover time cannot be in the future.' : 'Return time cannot be in the future.'] },
+                ));
+                return;
+            }
+            if (action.type === VehicleUseAction.Return && action.row.handed_over_at && atIso <= action.row.handed_over_at) {
+                setError(new ApiError(
+                    'Return must follow handover.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { occurred_at: ['Return must follow handover.'] },
+                ));
+                return;
+            }
+            if (action.type === VehicleUseAction.Return && action.row.handover_odometer !== null && odometer.trim() !== '') {
+                if (Number(odometer) < Number(action.row.handover_odometer)) {
+                    setError(new ApiError(
+                        'Return odometer cannot be less than handover odometer.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation',
+                        { odometer: ['Return odometer cannot be less than handover odometer.'] },
+                    ));
+                    return;
+                }
+            }
+        }
+
+        setSaving(true); setError(null);
         try { await transitionVehicleUse(action.row, action.type, { reason: reason.trim(), ...(action.type === VehicleUseAction.Cancel ? {} : { occurred_at: timestampWithOffset(at), odometer: odometer.trim() || null }) }); reload(); }
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }

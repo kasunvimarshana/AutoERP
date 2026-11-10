@@ -155,6 +155,15 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 ));
                 return;
             }
+        } else if (end && end <= start) {
+            setError(new ApiError(
+                'Planned return must follow planned handover.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { ends_at: ['Planned return must follow planned handover.'] },
+            ));
+            return;
         }
         setSaving(true); setError(null);
         try {

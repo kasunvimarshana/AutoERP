@@ -5,13 +5,12 @@ import { Select } from '@/shared/components/Select';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { toHourFloor } from '@/shared/utils/businessDate';
 import { DriverMode, RentalBasis } from './agreements';
 import { createReservation, updateReservation, type RentalReservation, type StoreReservationPayload } from './reservationApi';
 
@@ -64,6 +63,18 @@ export function ReservationEditor({
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!customer || !currency || !startAt || !endAt) return;
+
+        if (new Date(endAt).getTime() <= new Date(startAt).getTime()) {
+            setError(new ApiError(
+                'Reservation end must follow start date & time.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { requested_end_at: ['Reservation end must follow start date & time.'] },
+            ));
+            return;
+        }
+
         setSaving(true);
         setError(null);
 
@@ -156,14 +167,13 @@ export function ReservationEditor({
                     label="Requested End Date & Time"
                     type="datetime-local"
                     value={endAt}
-                    min={startAt ? toHourFloor(startAt) : undefined}
                     onChange={e => setEndAt(e.target.value)}
                     required
                     error={error?.fields.requested_end_at?.[0]}
                 />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <LookupSelect
                     label="Currency"
                     value={currency}
@@ -181,35 +191,42 @@ export function ReservationEditor({
                     inputMode="decimal"
                     error={error?.fields.estimated_amount?.[0]}
                 />
-                <Input
-                    label="Estimated Deposit Amount"
-                    value={estimatedDeposit}
-                    onChange={e => setEstimatedDeposit(e.target.value)}
-                    inputMode="decimal"
-                    error={error?.fields.estimated_deposit_amount?.[0]}
-                />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Select
-                    label="Inquiry Source"
-                    value={source}
-                    onChange={e => setSource(e.target.value)}
-                    options={[
-                        { value: 'phone', label: 'Phone Inquiry' },
-                        { value: 'walk_in', label: 'Walk-in' },
-                        { value: 'email', label: 'Email' },
-                        { value: 'website', label: 'Website Booking' },
-                    ]}
-                />
-                <Textarea
-                    label="Remarks & Notes"
-                    value={remarks}
-                    onChange={e => setRemarks(e.target.value)}
-                    rows={2}
-                    error={error?.fields.remarks?.[0]}
-                />
-            </div>
+            <details open={Boolean(isEdit || (remarks && remarks.trim()) || (source && source !== 'phone') || (estimatedDeposit && estimatedDeposit !== '0.00'))} className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <summary className="cursor-pointer text-sm font-medium text-slate-700">
+                    Additional details & notes (optional)
+                </summary>
+                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Input
+                        label="Estimated Deposit Amount"
+                        value={estimatedDeposit}
+                        onChange={e => setEstimatedDeposit(e.target.value)}
+                        inputMode="decimal"
+                        error={error?.fields.estimated_deposit_amount?.[0]}
+                    />
+                    <Select
+                        label="Inquiry Source"
+                        value={source}
+                        onChange={e => setSource(e.target.value)}
+                        options={[
+                            { value: 'phone', label: 'Phone Inquiry' },
+                            { value: 'walk_in', label: 'Walk-in' },
+                            { value: 'email', label: 'Email' },
+                            { value: 'website', label: 'Website Booking' },
+                        ]}
+                    />
+                    <div className="md:col-span-2">
+                        <Textarea
+                            label="Remarks & Notes"
+                            value={remarks}
+                            onChange={e => setRemarks(e.target.value)}
+                            rows={2}
+                            error={error?.fields.remarks?.[0]}
+                        />
+                    </div>
+                </div>
+            </details>
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                 <Button type="submit" loading={saving} disabled={!customer || !currency || !startAt || !endAt}>{isEdit ? 'Save Changes' : 'Create Reservation'}</Button>
