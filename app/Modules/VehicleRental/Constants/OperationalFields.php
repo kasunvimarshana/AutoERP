@@ -12,6 +12,8 @@ final class OperationalFields
 
     public const UTC = 'UTC';
 
+    public const CLOCK_DRIFT_TOLERANCE_MINUTES = 2;
+
     public const HANDOVER_STATUS_REASON = 'Rental handover: ';
 
     public const RETURN_STATUS_REASON = 'Rental return: ';

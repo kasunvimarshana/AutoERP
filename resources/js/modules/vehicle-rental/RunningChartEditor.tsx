@@ -130,6 +130,8 @@ export function RunningChartEditor({
 
     const isReferenceRequired = Boolean(chart && !correction);
     const isReferenceValid = isReferenceRequired ? Boolean(reference.trim()) : true;
+    const [mountTime] = useState(() => freshLocalNow());
+    const isFutureTrip = Boolean(end && end > mountTime);
 
     async function submit(event: FormEvent) {
         event.preventDefault(); setSaving(true); setError(null);
@@ -186,7 +188,7 @@ export function RunningChartEditor({
                         'validation_error',
                         {
                             period: ['Usage must fall within actual customer custody.'],
-                            starts_at: ['Usage must fall within actual customer custody.'],
+                            starts_at: [use.handed_over_at ? `Usage cannot start before vehicle handover (${formatBusinessDateTimeWithSeconds(use.handed_over_at)}).` : 'Usage must fall within actual customer custody.'],
                         },
                     ));
                     setSaving(false);
@@ -201,6 +203,20 @@ export function RunningChartEditor({
                 } catch {
                     // fall through
                 }
+                if (custodyEndIso && new Date(startIso).getTime() >= new Date(custodyEndIso).getTime()) {
+                    setError(new ApiError(
+                        'Usage must fall within actual customer custody.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation_error',
+                        {
+                            period: ['Usage must fall within actual customer custody.'],
+                            starts_at: [use.returned_at ? `Usage cannot start after vehicle return (${formatBusinessDateTimeWithSeconds(use.returned_at)}).` : 'Usage must fall within actual customer custody.'],
+                        },
+                    ));
+                    setSaving(false);
+                    return;
+                }
                 if (custodyEndIso && new Date(endIso).getTime() > new Date(custodyEndIso).getTime() + 60_000) {
                     setError(new ApiError(
                         'Usage must fall within actual customer custody.',
@@ -209,7 +225,7 @@ export function RunningChartEditor({
                         'validation_error',
                         {
                             period: ['Usage must fall within actual customer custody.'],
-                            ends_at: ['Usage must fall within actual customer custody.'],
+                            ends_at: [use.returned_at ? `Usage cannot end after vehicle return (${formatBusinessDateTimeWithSeconds(use.returned_at)}).` : 'Usage must fall within actual customer custody.'],
                         },
                     ));
                     setSaving(false);
@@ -358,6 +374,11 @@ export function RunningChartEditor({
                     </div>
                 </div>
             </div>
+            {isFutureTrip && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-800">
+                    This trip extends into the future. It will be saved as a draft and can be finalized as physical evidence after the trip concludes.
+                </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
                 {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}
                 {decimal('end_odometer', DISTANCE_LABELS.end_odometer)}

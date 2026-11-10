@@ -11,7 +11,7 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, toApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { exportRunningChartReport, listChartRegister } from './runningChartApi';
 import { AC_LABELS, CHART_LABELS, COUNT_LABELS, DISTANCE_LABELS, RunningChartStatus, type ChartRegisterFilters, type ChartRegisterRow } from './runningCharts';
@@ -86,6 +86,16 @@ export default function RunningChartRegisterPage() {
     }
     function apply(event: FormEvent) {
         event.preventDefault();
+        if (from && until && until <= from) {
+            setError(new ApiError(
+                'Period end must follow period start.',
+                422,
+                'VALIDATION_FAILED',
+                'validation_error',
+                { until: ['Period end must follow period start.'] },
+            ));
+            return;
+        }
         try {
             const next = { search: search.trim() || undefined, chart_status: status || undefined, from: from ? timestampWithOffset(from) : undefined, until: until ? timestampWithOffset(until) : undefined };
             syncUrl(search, status, from, until);

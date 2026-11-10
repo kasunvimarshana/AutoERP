@@ -135,12 +135,12 @@ final class RunningChartService
                 $this->assertCoverage($use, $startsAt, $endsAt);
 
                 $tz = $this->calendar->timezone($context);
-                $now = $this->calendar->now($context)->addMinutes(2);
+                $now = $this->calendar->now($context)->addMinutes(OperationalFields::CLOCK_DRIFT_TOLERANCE_MINUTES);
                 if ($chart->starts_at->setTimezone($tz)->greaterThan($now)) {
-                    throw ValidationException::withMessages(['starts_at' => ['Completed usage cannot start in the future.']]);
+                    throw ValidationException::withMessages(['starts_at' => ['Usage has not started yet. Running charts can only be finalized as physical evidence after the trip has concluded.']]);
                 }
                 if ($chart->ends_at->setTimezone($tz)->greaterThan($now)) {
-                    throw ValidationException::withMessages(['ends_at' => ['Completed usage cannot end in the future.']]);
+                    throw ValidationException::withMessages(['ends_at' => ['Usage is currently ongoing. Running charts can only be finalized as physical evidence after the trip has concluded.']]);
                 }
 
                 $chart->starts_at = $startsAt;
@@ -269,6 +269,12 @@ final class RunningChartService
 
         if ($use->returned_at !== null) {
             $return = CarbonImmutable::createFromFormat(OperationalFields::DATABASE_TIMESTAMP_FORMAT, $use->returned_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), OperationalFields::UTC);
+            if ($usageStart >= $return) {
+                throw ValidationException::withMessages([
+                    'period' => ['Usage must fall within actual customer custody.'],
+                    'starts_at' => ['Usage cannot start after vehicle return.'],
+                ]);
+            }
             if ($usageEnd > $return) {
                 if ($usageEnd <= $return->addMinute()) {
                     $end = $use->returned_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);

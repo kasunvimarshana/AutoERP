@@ -11,7 +11,7 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, toApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { listVehicleUseRegister } from './vehicleUseApi';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, USE_LABELS, VehicleUseStatus, type VehicleUse, type VehicleUseRegisterFilters } from './vehicleUse';
@@ -71,6 +71,16 @@ export default function VehicleUseRegisterPage() {
     }
     function apply(event: FormEvent) {
         event.preventDefault();
+        if (from && until && until <= from) {
+            setError(new ApiError(
+                'Planned period end must follow period start.',
+                422,
+                'VALIDATION_FAILED',
+                'validation_error',
+                { until: ['Planned period end must follow period start.'] },
+            ));
+            return;
+        }
         try {
             const next = { search: search.trim() || undefined, use_status: status || undefined, from: from ? timestampWithOffset(from) : undefined, until: until ? timestampWithOffset(until) : undefined };
             syncUrl(search, status, from, until);
