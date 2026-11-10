@@ -6,7 +6,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, toHourFloor } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
@@ -90,7 +90,7 @@ export default function VehicleUseRegisterPage() {
             <Input label="Vehicle, agreement or party" value={search} onChange={event => setSearch(event.target.value)} error={error?.fields.search?.[0]} />
             <Select label="Use status" placeholder="All states" options={statusOptions} value={status} onChange={event => setStatus(event.target.value as VehicleUseStatus | '')} />
             <Input label="Planned period start (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} max={until || undefined} value={from} onChange={event => setFrom(event.target.value)} error={error?.fields.from?.[0]} />
-            <Input label="Planned period end (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={from || undefined} value={until} onChange={event => setUntil(event.target.value)} error={error?.fields.until?.[0]} />
+            <Input label="Planned period end (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={from ? toHourFloor(from) : undefined} value={until} onChange={event => setUntil(event.target.value)} error={error?.fields.until?.[0]} />
             <p className="text-sm text-slate-600 md:col-span-2">Filter times use {operationalTimeZoneLabel()}. Results overlap the planned period. Actual custody is shown separately; no rental charges are calculated.</p>
             <div className="flex flex-wrap gap-2 md:col-span-2"><Button type="submit" loading={loading}>Apply filters</Button><Button type="button" variant="secondary" disabled={loading} onClick={clearFilters}>Clear filters</Button></div>
         </form></Panel>

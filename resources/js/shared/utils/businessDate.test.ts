@@ -9,6 +9,7 @@ import {
     configureBusinessTimeZone,
     formatBusinessDate,
     formatBusinessDateTime,
+    toHourFloor,
 } from './businessDate';
 
 afterEach(() => configureBusinessTimeZone(null));
@@ -71,5 +72,16 @@ describe('business date utilities', () => {
 
         expect(businessDateTimeInputValue(new Date(timestamp))).toBe('2026-09-07T09:00');
         expect(businessDateTimeInputValueWithSeconds(new Date(timestamp))).toBe('2026-09-07T09:00:15');
+    });
+
+    it('floors datetime-local timestamps to the top of the hour to prevent browser picker truncation', () => {
+        expect(toHourFloor('2026-11-10T15:41:09')).toBe('2026-11-10T15:00');
+        expect(toHourFloor('2026-11-10T15:41')).toBe('2026-11-10T15:00');
+        expect(toHourFloor('2026-09-07T09:00')).toBe('2026-09-07T09:00');
+        expect(toHourFloor('2026-09-07T09:00:00')).toBe('2026-09-07T09:00');
+        expect(toHourFloor('2026-09-05')).toBe('2026-09-05');
+        expect(toHourFloor(null)).toBeUndefined();
+        expect(toHourFloor(undefined)).toBeUndefined();
+        expect(toHourFloor('   ')).toBeUndefined();
     });
 });

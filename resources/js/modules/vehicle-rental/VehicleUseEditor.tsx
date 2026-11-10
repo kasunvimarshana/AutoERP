@@ -8,7 +8,7 @@ import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
-import { formatBusinessDateTime, businessDateInputValue } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateInputValue, businessDateTimeInputValueWithSeconds, toHourFloor } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { AGREEMENT_API, type Agreement } from './agreements';
@@ -32,7 +32,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [start, setStart] = useState(() => {
         if (replacement) {
             try {
-                return localTimestampValue(new Date().toISOString());
+                return businessDateTimeInputValueWithSeconds();
             } catch {
                 return new Date().toISOString().slice(0, 19);
             }
@@ -45,7 +45,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [saving, setSaving] = useState(false);
     const isSameReplacementVehicle = Boolean(replacement && vehicle && vehicle.id === replacement.vehicle.id);
     const minStart = replacementHandoverLocal
-        ? replacementHandoverLocal.slice(0, 16)
+        ? toHourFloor(replacementHandoverLocal)
         : (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined);
     const maxEnd = agreement.ends_on ? `${agreement.ends_on}T23:59` : undefined;
     const todayEnd = `${businessDateInputValue()}T23:59:59`;
@@ -145,7 +145,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 return;
             }
             const parsedStart = new Date(startIso);
-            if (parsedStart.getTime() > Date.now() + 60000) {
+            if (parsedStart.getTime() > Date.now() + 120_000) {
                 setError(new ApiError(
                     'Replacement time cannot be in the future.',
                     422,
@@ -217,7 +217,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                             variant="secondary"
                             onClick={() => {
                                 try {
-                                    setStart(localTimestampValue(new Date().toISOString()));
+                                    setStart(businessDateTimeInputValueWithSeconds());
                                 } catch {
                                     setStart(new Date().toISOString().slice(0, 19));
                                 }
@@ -234,7 +234,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 label="Planned return (optional)"
                 type="datetime-local"
                 step={OPERATIONAL_TIME_STEP_SECONDS}
-                min={start || minStart || undefined}
+                min={start ? toHourFloor(start) : (minStart ? toHourFloor(minStart) : undefined)}
                 max={maxEnd}
                 value={end}
                 onChange={e => { setEnd(e.target.value); setOwner(null); setSourceCount(null); }}

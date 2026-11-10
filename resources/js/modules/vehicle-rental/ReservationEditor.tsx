@@ -11,6 +11,7 @@ import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
+import { toHourFloor } from '@/shared/utils/businessDate';
 import { DriverMode, RentalBasis } from './agreements';
 import { createReservation, updateReservation, type RentalReservation, type StoreReservationPayload } from './reservationApi';
 
@@ -155,7 +156,7 @@ export function ReservationEditor({
                     label="Requested End Date & Time"
                     type="datetime-local"
                     value={endAt}
-                    min={startAt || undefined}
+                    min={startAt ? toHourFloor(startAt) : undefined}
                     onChange={e => setEndAt(e.target.value)}
                     required
                     error={error?.fields.requested_end_at?.[0]}

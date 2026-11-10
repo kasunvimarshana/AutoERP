@@ -8,7 +8,7 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { businessDateInputValue, toHourFloor } from '@/shared/utils/businessDate';
 import { fetchAvailableVehicles, type AvailableVehicleOption } from './vehicleUseApi';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset } from './vehicleUse';
 
@@ -128,7 +128,7 @@ export default function VehicleAvailabilityPage() {
                         label="Expected end date & time (optional)"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={startsAt || undefined}
+                        min={startsAt ? toHourFloor(startsAt) : undefined}
                         value={endsAt}
                         onChange={e => setEndsAt(e.target.value)}
                         error={error?.fields.ends_at?.[0]}

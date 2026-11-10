@@ -7,7 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, ApiError } from '@/shared/api/apiError';
-import { formatBusinessDateTimeWithSeconds, businessDateInputValue } from '@/shared/utils/businessDate';
+import { formatBusinessDateTimeWithSeconds, businessDateInputValue, businessDateTimeInputValueWithSeconds, toHourFloor } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
@@ -34,7 +34,7 @@ export interface InitialDriverState {
 }
 
 function freshLocalNow(): string {
-    return localTimestampValue(new Date().toISOString());
+    return businessDateTimeInputValueWithSeconds();
 }
 
 export function RunningChartEditor({
@@ -43,6 +43,7 @@ export function RunningChartEditor({
     correction,
     initialDriver,
     initialOdometer,
+    initialStartTime,
     onSaved,
     onCancel,
 }: {
@@ -51,6 +52,7 @@ export function RunningChartEditor({
     correction?: boolean;
     initialDriver?: InitialDriverState;
     initialOdometer?: string;
+    initialStartTime?: string;
     onSaved: () => void;
     onCancel: () => void;
 }) {
@@ -59,13 +61,18 @@ export function RunningChartEditor({
     const todayEnd = `${businessDateInputValue()}T23:59:59`;
 
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
-    const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : '');
+    const [start, setStart] = useState(() => {
+        if (chart) return localTimestampValue(chart.starts_at);
+        if (initialStartTime) return initialStartTime;
+        if (custodyStart) return custodyStart;
+        return '';
+    });
     const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
 
-    const minStart = custodyStart ? custodyStart.slice(0, 16) + ':00' : undefined;
+    const minStart = toHourFloor(custodyStart);
     const maxEnd = custodyEnd ?? todayEnd;
-    const maxStart = end && end < maxEnd ? end : maxEnd;
-    const minEnd = start || minStart;
+    const maxStart = maxEnd;
+    const minEnd = toHourFloor(start || custodyStart);
     const [values, setValues] = useState<Record<string, string>>(() => {
         const initial = Object.fromEntries(
             [...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [
@@ -143,6 +150,22 @@ export function RunningChartEditor({
                 ));
                 setSaving(false);
                 return;
+            }
+
+            if (values.start_odometer && values.end_odometer) {
+                const startOdo = parseFloat(values.start_odometer);
+                const endOdo = parseFloat(values.end_odometer);
+                if (!isNaN(startOdo) && !isNaN(endOdo) && endOdo < startOdo) {
+                    setError(new ApiError(
+                        'End odometer cannot be lower than start odometer.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation_error',
+                        { end_odometer: ['End odometer cannot be lower than start odometer.'] },
+                    ));
+                    setSaving(false);
+                    return;
+                }
             }
 
             const nowMs = Date.now() + 120_000;
@@ -321,7 +344,7 @@ export function RunningChartEditor({
                                     const target = end && end < now ? end : now;
                                     setStart(target);
                                 } catch {
-                                    setStart(new Date().toISOString().slice(0, 19));
+                                    setStart(freshLocalNow());
                                 }
                             }}
                         >
@@ -361,7 +384,7 @@ export function RunningChartEditor({
                                     const target = custodyEnd && custodyEnd < now ? custodyEnd : now;
                                     setEnd(target);
                                 } catch {
-                                    setEnd(new Date().toISOString().slice(0, 19));
+                                    setEnd(freshLocalNow());
                                 }
                             }}
                         >

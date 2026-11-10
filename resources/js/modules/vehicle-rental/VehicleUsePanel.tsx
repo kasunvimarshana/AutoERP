@@ -10,7 +10,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';
 import { Pagination } from '@/shared/components/Pagination';
-import { formatBusinessDateTime, businessDateInputValue } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateInputValue, businessDateTimeInputValueWithSeconds, toHourFloor } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
@@ -144,7 +144,7 @@ export function VehicleUsePanel({
                             step={OPERATIONAL_TIME_STEP_SECONDS}
                             min={action.type === VehicleUseAction.Handover
                                 ? (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined)
-                                : (actionHandoverLocal ? actionHandoverLocal.slice(0, 16) : undefined)
+                                : (actionHandoverLocal ? toHourFloor(actionHandoverLocal) : undefined)
                             }
                             max={action.type === VehicleUseAction.Handover && actionPlannedEndLocal
                                 ? actionPlannedEndLocal
@@ -173,7 +173,7 @@ export function VehicleUsePanel({
                                     variant="secondary"
                                     onClick={() => {
                                         try {
-                                            setAt(localTimestampValue(new Date().toISOString()));
+                                            setAt(businessDateTimeInputValueWithSeconds());
                                         } catch {
                                             setAt(actionPlannedStartLocal ?? '');
                                         }
@@ -190,7 +190,7 @@ export function VehicleUsePanel({
                                     variant="secondary"
                                     onClick={() => {
                                         try {
-                                            setAt(localTimestampValue(new Date().toISOString()));
+                                            setAt(businessDateTimeInputValueWithSeconds());
                                         } catch {
                                             setAt(new Date().toISOString().slice(0, 19));
                                         }

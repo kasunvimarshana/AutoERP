@@ -11,7 +11,7 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
-import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
+import { VehicleUseStatus, localTimestampValue, type VehicleUse } from './vehicleUse';
 import { CHART_ACTION_CONFIRM_LABELS, CHART_PERMISSION, DriverIdentitySource, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
 import { exportRunningChartReport, listCharts, transitionChart } from './runningChartApi';
 import { UsageChargePanel } from './UsageChargePanel';
@@ -28,6 +28,8 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     const latestDriverChart = rows.find(r => r.driver_identity_source !== null);
     const latestChartWithOdo = rows.find(r => r.end_odometer !== null);
     const initialOdometer = latestChartWithOdo?.end_odometer ?? use.handover_odometer ?? undefined;
+    const latestChart = rows.find(r => r.ends_at !== null);
+    const initialStartTime = latestChart ? localTimestampValue(latestChart.ends_at) : (use.handed_over_at ? localTimestampValue(use.handed_over_at) : undefined);
     const initialDriver = latestDriverChart ? {
         source: latestDriverChart.driver_identity_source as DriverIdentitySource,
         employee: latestDriverChart.driver?.source === DriverIdentitySource.Employee && latestDriverChart.driver.employee_id
@@ -69,7 +71,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     }
 
     return <section aria-label="Running Charts" className="space-y-3 border-t pt-3"><div className="flex flex-wrap items-center gap-2"><h4 className="grow font-semibold">Running Charts · {use.vehicle.label}</h4><Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'lessee'} onClick={() => void handlePrint('lessee')}>Print Sheet</Button>{use.owner_agreement !== null && <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'owner'} onClick={() => void handlePrint('owner')}>Print Owner Sheet</Button>}<Button variant="secondary" disabled={loading || saving || !!editor} onClick={reload}>Reload charts</Button>{canManage && [VehicleUseStatus.InCustody, VehicleUseStatus.Returned].includes(use.status) && <Button disabled={loading || saving || !!editor || !!action} onClick={() => setEditor({})}>Record usage</Button>}</div>
-        <ErrorAlert error={error} inline />{editor && <RunningChartEditor use={use} chart={editor.chart} correction={editor.correction} initialDriver={initialDriver} initialOdometer={initialOdometer} onSaved={reload} onCancel={() => setEditor(null)} />}
+        <ErrorAlert error={error} inline />{editor && <RunningChartEditor use={use} chart={editor.chart} correction={editor.correction} initialDriver={initialDriver} initialOdometer={initialOdometer} initialStartTime={initialStartTime} onSaved={reload} onCancel={() => setEditor(null)} />}
         {loading ? <LoadingState label="Loading Running Charts…" /> : error ? null : rows.map(chart => <article key={chart.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{chart.reference}</p><StatusBadge status={chart.status} /></div><p className="text-sm text-slate-600">{formatBusinessDateTime(chart.starts_at)} — {formatBusinessDateTime(chart.ends_at)}</p><p className="text-sm text-slate-700">Driver: {chart.driver ? `${chart.driver.name} · ${chart.driver.reference}` : 'Not recorded'}</p><p className="text-sm text-slate-700">Total distance: {chart.total_km === null ? 'Not recorded' : <><QuantityDisplay value={chart.total_km} /> km</>}</p>{chart.corrects_chart && <p className="text-xs text-blue-600 font-medium">Corrects {chart.corrects_chart.reference}</p>}{chart.corrected_by_chart && <p className="text-xs text-amber-700 font-medium">Corrected by chart {chart.corrected_by_chart.reference}</p>}
             <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" aria-expanded={history === chart.id} onClick={() => setHistory(history === chart.id ? null : chart.id)}>{history === chart.id ? 'Hide chart history' : 'Chart history'}</Button>{!editor && !action && <>
                 {canManage && chart.status === RunningChartStatus.Draft && <Button onClick={() => setEditor({ chart })}>Edit draft</Button>}
