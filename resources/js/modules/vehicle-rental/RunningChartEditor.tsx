@@ -7,7 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, ApiError } from '@/shared/api/apiError';
-import { formatBusinessDateTimeWithSeconds, businessDateInputValue, businessDateTimeInputValueWithSeconds, toHourFloor } from '@/shared/utils/businessDate';
+import { formatBusinessDateTimeWithSeconds, businessDateTimeInputValueWithSeconds } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
@@ -58,7 +58,6 @@ export function RunningChartEditor({
 }) {
     const custodyStart = use.handed_over_at ? localTimestampValue(use.handed_over_at) : undefined;
     const custodyEnd = use.returned_at ? localTimestampValue(use.returned_at) : undefined;
-    const todayEnd = `${businessDateInputValue()}T23:59:59`;
 
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
     const [start, setStart] = useState(() => {
@@ -68,11 +67,6 @@ export function RunningChartEditor({
         return '';
     });
     const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
-
-    const minStart = toHourFloor(custodyStart);
-    const maxEnd = custodyEnd ?? todayEnd;
-    const maxStart = maxEnd;
-    const minEnd = toHourFloor(start || custodyStart);
     const [values, setValues] = useState<Record<string, string>>(() => {
         const initial = Object.fromEntries(
             [...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [
@@ -317,8 +311,6 @@ export function RunningChartEditor({
                         label="Usage start"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={minStart}
-                        max={maxStart}
                         required
                         value={start}
                         onChange={e => setStart(e.target.value)}
@@ -357,8 +349,6 @@ export function RunningChartEditor({
                         label="Usage end"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={minEnd}
-                        max={maxEnd}
                         required
                         value={end}
                         onChange={e => setEnd(e.target.value)}

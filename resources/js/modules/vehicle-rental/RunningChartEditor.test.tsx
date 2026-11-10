@@ -45,7 +45,6 @@ it('keeps save disabled until required chart identity and period are complete', 
 
     fireEvent.change(screen.getByLabelText('Chart reference'), { target: { value: 'CHART-NEW' } });
     fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T09:00' } });
-    expect(screen.getByLabelText('Usage end')).toHaveAttribute('min', '2026-09-07T09:00');
     expect(save).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-07T17:00' } });
@@ -135,15 +134,16 @@ it('submits null for blank optional fields when creating a chart', async () => {
     });
 });
 
-it('restricts usage end input to current time or return time and rejects client-side future usage', async () => {
+it('keeps usage date inputs unconstrained by browser min/max and rejects client-side invalid usage period', async () => {
     render(<RunningChartEditor use={use} onSaved={() => undefined} onCancel={() => undefined} />);
 
     const startInput = screen.getByLabelText('Usage start');
     const endInput = screen.getByLabelText('Usage end');
 
-    expect(endInput).toHaveAttribute('max');
-    const maxEnd = endInput.getAttribute('max')!;
-    expect(maxEnd.length).toBeGreaterThanOrEqual(16);
+    expect(startInput).not.toHaveAttribute('min');
+    expect(startInput).not.toHaveAttribute('max');
+    expect(endInput).not.toHaveAttribute('min');
+    expect(endInput).not.toHaveAttribute('max');
 
     // End cannot precede start
     fireEvent.change(startInput, { target: { value: '2026-09-07T12:00' } });
