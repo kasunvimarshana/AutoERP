@@ -59,6 +59,7 @@ export interface RunningChartReportData {
         remarks: string;
         driver_name: string;
         is_active_day: boolean;
+        is_replacement_day?: boolean;
     }>;
     summary: {
         total_comparative_mileage: number;

@@ -233,7 +233,13 @@ export default function RentalRunningChartReportPage() {
                                 {report.rows.map(row => (
                                     <tr
                                         key={row.date}
-                                        className={row.is_active_day ? 'hover:bg-slate-50' : 'bg-slate-50/50 text-slate-400'}
+                                        className={
+                                            row.is_replacement_day
+                                                ? 'bg-amber-50/80 hover:bg-amber-100/80 text-amber-950 font-medium'
+                                                : row.is_active_day
+                                                ? 'hover:bg-slate-50'
+                                                : 'bg-slate-50/50 text-slate-400'
+                                        }
                                     >
                                         <td className="p-2 border-r border-slate-200 font-semibold">{row.date}</td>
                                         <td className="p-2 border-r border-slate-200 text-right font-mono">{row.start_odometer || '-'}</td>
@@ -251,7 +257,15 @@ export default function RentalRunningChartReportPage() {
                                         <td className="p-2 border-r border-slate-200 text-right font-mono font-semibold">{row.pass || '-'}</td>
                                         <td className="p-2 border-r border-slate-200 text-right">{row.garage_km || '-'}</td>
                                         <td className="p-2 border-r border-slate-200 font-medium">{row.driver_name || '-'}</td>
-                                        <td className="p-2 text-slate-500 truncate max-w-xs">{row.remarks || '-'}</td>
+                                        <td className="p-2 truncate max-w-xs">
+                                            {row.is_replacement_day ? (
+                                                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold bg-amber-200 text-amber-900">
+                                                    {row.remarks}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-500">{row.remarks || '-'}</span>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
