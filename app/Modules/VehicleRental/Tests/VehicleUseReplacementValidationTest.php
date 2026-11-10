@@ -261,4 +261,51 @@ final class VehicleUseReplacementValidationTest extends TestCase
             $this->assertDatabaseCount('vehicle_rental_uses', 2);
         });
     }
+
+    public function test_replacement_at_current_time_with_clock_skew_succeeds_and_distant_future_is_rejected(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $use = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $use = $service->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => $input['starts_at'],
+                'odometer' => '100',
+                'reason' => 'Collected',
+            ]);
+
+            $newVehicleId = DB::table('vehicles')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'vehicle_number' => 'REPLACEMENT-SKEW',
+                'registration_number' => 'REPLACEMENT-SKEW',
+                'status' => VehicleStatus::Active->value,
+            ]);
+            DB::table('vehicle_ownerships')->insert([
+                'tenant_id' => $context->tenantId,
+                'vehicle_id' => $newVehicleId,
+                'owner_type' => VehicleOwnerType::Company->value,
+                'owner_key' => 'company',
+                'owner_code_snapshot' => 'COMPANY',
+                'owner_name_snapshot' => 'Company',
+                'ownership_type' => VehicleOwnershipType::CompanyOwned->value,
+                'started_at' => '2026-09-01 00:00:00',
+            ]);
+
+            // Travel time is 2026-09-07T12:00:00+00:00 (17:30:00+05:30).
+            // Replacement at 17:31:30+05:30 (90 seconds ahead, within 2-minute tolerance) succeeds.
+            $skewReplacementTime = '2026-09-07T17:31:30+05:30';
+            $next = $service->replace($context, $use->id, $use->row_version, [
+                'vehicle_id' => $newVehicleId,
+                'owner_agreement_id' => null,
+                'starts_at' => $skewReplacementTime,
+                'ends_at' => null,
+                'return_odometer' => '160',
+                'handover_odometer' => '600',
+                'reason' => 'Skew exchange',
+                'notes' => 'Tolerates clock skew',
+            ]);
+
+            self::assertSame(VehicleUseStatus::Returned, $use->refresh()->status);
+            self::assertSame(VehicleUseStatus::InCustody, $next->status);
+        });
+    }
 }

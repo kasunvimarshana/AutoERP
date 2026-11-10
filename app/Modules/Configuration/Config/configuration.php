@@ -35,7 +35,7 @@ return [
                 ConfigurationScope::TENANT,
                 ConfigurationScope::ORGANIZATION_UNIT,
             ],
-            'default' => 'UTC',
+            'default' => env('APP_TIMEZONE', 'UTC'),
             'nullable' => false,
             'sensitive' => false,
             'runtime_mutable' => true,

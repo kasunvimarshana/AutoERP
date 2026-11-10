@@ -145,7 +145,7 @@ export function RunningChartEditor({
                 return;
             }
 
-            const nowMs = Date.now() + 60_000;
+            const nowMs = Date.now() + 120_000;
             let startIso = '';
             let endIso = '';
             try {
@@ -302,8 +302,8 @@ export function RunningChartEditor({
                         error={error?.fields.starts_at?.[0]}
                         hint={use.handed_over_at ? `Vehicle in custody since: ${formatBusinessDateTimeWithSeconds(use.handed_over_at)}` : undefined}
                     />
-                    {custodyStart && (
-                        <div className="flex flex-wrap gap-2 text-xs">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        {custodyStart && (
                             <Button
                                 type="button"
                                 variant="secondary"
@@ -311,8 +311,23 @@ export function RunningChartEditor({
                             >
                                 Use custody start time
                             </Button>
-                        </div>
-                    )}
+                        )}
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                                try {
+                                    const now = freshLocalNow();
+                                    const target = end && end < now ? end : now;
+                                    setStart(target);
+                                } catch {
+                                    setStart(new Date().toISOString().slice(0, 19));
+                                }
+                            }}
+                        >
+                            Use current time
+                        </Button>
+                    </div>
                 </div>
                 <div className="space-y-1">
                     <Input
@@ -325,7 +340,7 @@ export function RunningChartEditor({
                         value={end}
                         onChange={e => setEnd(e.target.value)}
                         error={error?.fields.ends_at?.[0]}
-                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTimeWithSeconds(use.returned_at)}` : undefined}
+                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTimeWithSeconds(use.returned_at)}` : 'Usage end must follow usage start and cannot be in the future.'}
                     />
                     <div className="flex flex-wrap gap-2 text-xs">
                         {custodyEnd && (

@@ -73,7 +73,7 @@ final class RunningChartValidation
         $timezone = $this->calendar->timezone($context);
         $start = OperationalTime::parse($data['starts_at'], 'starts_at')->setTimezone($timezone);
         $end = OperationalTime::parse($data['ends_at'], 'ends_at')->setTimezone($timezone);
-        $now = $this->calendar->now($context)->addMinute();
+        $now = $this->calendar->now($context)->addMinutes(2);
 
         if ($start->greaterThan($now)) {
             throw ValidationException::withMessages(['starts_at' => ['Record completed usage starting before or at the current time, not in the future.']]);

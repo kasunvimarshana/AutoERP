@@ -572,13 +572,48 @@ final class VehicleUseTest extends TestCase
                 self::assertArrayHasKey('occurred_at', $e->errors());
             }
 
-            // Return at current time with 30-second skew tolerance is accepted
+            // Return at current time with 90-second skew tolerance is accepted
             $returned = $service->transition($context, $handedOver->id, $handedOver->row_version, VehicleUseAction::ReturnVehicle, [
-                'occurred_at' => '2026-09-10T17:30:30+05:30',
+                'occurred_at' => '2026-09-10T17:31:30+05:30',
                 'odometer' => '150',
                 'reason' => 'Returned on time',
             ]);
             self::assertSame(VehicleUseStatus::Returned, $returned->status);
+
+            // Distinct vehicle can be planned, handed over, and returned in the past (between handover and now)
+            $pastVehicleId = DB::table('vehicles')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'vehicle_number' => 'PAST-RETURN-CAR',
+                'registration_number' => 'PAST-RETURN-CAR',
+                'status' => VehicleStatus::Active->value,
+            ]);
+            DB::table('vehicle_ownerships')->insert([
+                'tenant_id' => $context->tenantId,
+                'vehicle_id' => $pastVehicleId,
+                'owner_type' => VehicleOwnerType::Company->value,
+                'owner_key' => 'company',
+                'owner_code_snapshot' => 'COMPANY',
+                'owner_name_snapshot' => 'Company',
+                'ownership_type' => VehicleOwnershipType::CompanyOwned->value,
+                'started_at' => '2026-09-01 00:00:00',
+            ]);
+            $pastUse = $service->plan($context, $customer->id, $customer->row_version, [
+                'vehicle_id' => $pastVehicleId,
+                'owner_agreement_id' => null,
+                'starts_at' => '2026-09-08T09:00:00+05:30',
+                'ends_at' => '2026-09-09T18:00:00+05:30',
+            ]);
+            $pastHandedOver = $service->transition($context, $pastUse->id, $pastUse->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-08T09:00:00+05:30',
+                'odometer' => '100',
+                'reason' => 'Past collection',
+            ]);
+            $pastReturned = $service->transition($context, $pastHandedOver->id, $pastHandedOver->row_version, VehicleUseAction::ReturnVehicle, [
+                'occurred_at' => '2026-09-09T17:00:00+05:30',
+                'odometer' => '130',
+                'reason' => 'Past return',
+            ]);
+            self::assertSame(VehicleUseStatus::Returned, $pastReturned->status);
         });
     }
 }

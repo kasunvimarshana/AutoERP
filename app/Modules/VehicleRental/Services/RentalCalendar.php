@@ -19,11 +19,22 @@ final class RentalCalendar
 
     public function timezone(AgreementContext $context): string
     {
-        return (string) $this->configuration->value(
-            RentalConfiguration::WORKSPACE_TIMEZONE,
-            $context->tenantId,
-            $context->organizationUnitId,
-        );
+        try {
+            $tz = (string) $this->configuration->value(
+                RentalConfiguration::WORKSPACE_TIMEZONE,
+                $context->tenantId,
+                $context->organizationUnitId,
+            );
+            if ($tz !== '' && in_array($tz, \DateTimeZone::listIdentifiers(), true)) {
+                return $tz;
+            }
+        } catch (\Throwable) {
+            // fallback below
+        }
+
+        $appTz = (string) config('app.timezone', 'UTC');
+
+        return in_array($appTz, \DateTimeZone::listIdentifiers(), true) ? $appTz : 'UTC';
     }
 
     public function today(AgreementContext $context): CarbonImmutable

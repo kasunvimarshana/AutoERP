@@ -432,13 +432,21 @@ final class RunningChartTest extends TestCase
                 self::assertArrayHasKey('starts_at', $e->errors());
             }
 
-            // Accepts usage ending at current time with 30-second clock skew
+            // Accepts usage ending at current time with 90-second clock skew
             $skewChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
                 'reference' => 'SKEW-CHART',
                 'starts_at' => '2026-09-07T09:00:00+05:30',
-                'ends_at' => '2026-09-10T17:30:30+05:30',
+                'ends_at' => '2026-09-10T17:31:30+05:30',
             ]));
             self::assertSame('SKEW-CHART', $skewChart->reference);
+
+            // Accepts past completed usage wholly within custody
+            $pastChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'PAST-CHART',
+                'starts_at' => '2026-09-08T09:00:00+05:30',
+                'ends_at' => '2026-09-08T12:00:00+05:30',
+            ]));
+            self::assertSame('PAST-CHART', $pastChart->reference);
         });
     }
 

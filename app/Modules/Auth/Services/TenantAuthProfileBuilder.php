@@ -54,10 +54,11 @@ final readonly class TenantAuthProfileBuilder
                 $timezone = null;
             }
         }
-        if ($timezone !== null && $timezone !== '') {
-            $tenant['timezone'] = $timezone;
-            $organizationUnit['timezone'] = $timezone;
+        if ($timezone === null || $timezone === '') {
+            $timezone = (string) config('app.timezone', 'UTC');
         }
+        $tenant['timezone'] = $timezone;
+        $organizationUnit['timezone'] = $timezone;
 
         return [
             'user' => array_merge($user, ['roles' => $roles, 'permissions' => $permissions]),
