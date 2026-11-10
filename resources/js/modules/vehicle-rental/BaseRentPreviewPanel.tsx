@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -18,6 +18,16 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
     useEffect(() => () => request.current?.abort(), []);
     async function calculate(event: FormEvent) {
         event.preventDefault();
+        if (until && from && until < from) {
+            setError(new ApiError(
+                'Estimate through date must follow estimate from date.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { until: ['Estimate through date must follow estimate from date.'] },
+            ));
+            return;
+        }
         const controller = new AbortController(); request.current = controller;
         setBusy(true); setError(null); setResult(null);
         try {
@@ -32,7 +42,7 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
             {' '}This estimates base rent only. It does not include mileage, extras, deductions or tax, change the agreement, or create an invoice.</p>
         <form onSubmit={calculate} className="space-y-3">
             <Input label="Estimate from" type="date" required min={agreement.starts_on} max={agreement.ends_on ?? undefined} value={from} disabled={busy} onChange={event => { setFrom(event.target.value); setResult(null); }} error={error?.fields.from?.[0]} />
-            <Input label="Estimate through" type="date" required min={from} max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={event => { setUntil(event.target.value); setResult(null); }} error={error?.fields.until?.[0]} />
+            <Input label="Estimate through" type="date" required max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={event => { setUntil(event.target.value); setResult(null); }} error={error?.fields.until?.[0]} />
             <ErrorAlert error={error} inline />
             <Button type="submit" loading={busy} disabled={!from || !until || agreement.terms.base_rate === null}>Calculate base rent</Button>
             {agreement.terms.base_rate === null && <p className="text-sm text-amber-700">Record a base rental rate to calculate an estimate.</p>}

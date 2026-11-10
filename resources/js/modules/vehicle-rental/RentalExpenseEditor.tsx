@@ -5,7 +5,7 @@ import { Select } from '@/shared/components/Select';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { requestLookup } from '@/shared/api/lookupRequest';
@@ -42,6 +42,29 @@ export function RentalExpenseEditor({
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!vehicle || !currency) return;
+
+        if (isNaN(Number(netAmount)) || Number(netAmount) < 0) {
+            setError(new ApiError(
+                'Net amount must be a non-negative decimal.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { net_amount: ['Net amount must be a non-negative decimal.'] },
+            ));
+            return;
+        }
+
+        if (taxAmount && (isNaN(Number(taxAmount)) || Number(taxAmount) < 0)) {
+            setError(new ApiError(
+                'Tax amount must be a non-negative decimal.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { tax_amount: ['Tax amount must be a non-negative decimal.'] },
+            ));
+            return;
+        }
+
         setSaving(true);
         setError(null);
 
@@ -73,13 +96,7 @@ export function RentalExpenseEditor({
             <h3 className="text-lg font-semibold text-slate-900">Record Rental Fleet Expense</h3>
             <ErrorAlert error={error} inline />
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <Input
-                    label="Expense Number (Optional)"
-                    value={expenseNumber}
-                    onChange={e => setExpenseNumber(e.target.value)}
-                    placeholder="Auto-generated if blank"
-                />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <LookupSelect
                     label="Vehicle"
                     value={vehicle}
@@ -110,9 +127,6 @@ export function RentalExpenseEditor({
                     required
                     error={error?.fields.expense_date?.[0]}
                 />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                 <LookupSelect
                     label="Currency"
                     value={currency}
@@ -138,30 +152,50 @@ export function RentalExpenseEditor({
                     inputMode="decimal"
                     error={error?.fields.tax_amount?.[0]}
                 />
-                <LookupSelect
-                    label="Supplier / Station (Optional)"
-                    value={supplier}
-                    onChange={setSupplier}
-                    search={lookupApi.suppliers}
-                    loadOnOpen
-                    minSearchLength={0}
-                />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Input
-                    label="Bill / Receipt Reference"
-                    value={referenceNumber}
-                    onChange={e => setReferenceNumber(e.target.value)}
-                    placeholder="e.g. Receipt #12345"
-                />
-                <Textarea
-                    label="Description"
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    rows={2}
-                />
-            </div>
+            <details
+                open={Boolean(expenseNumber || supplier || referenceNumber || description || error?.fields.expense_number || error?.fields.supplier_id || error?.fields.reference_number || error?.fields.description)}
+                className="rounded-lg border border-slate-200 bg-slate-50/50 p-4"
+            >
+                <summary className="cursor-pointer text-sm font-medium text-slate-700">
+                    Additional details & supplier reference (optional)
+                </summary>
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Input
+                        label="Expense Number (Optional)"
+                        value={expenseNumber}
+                        onChange={e => setExpenseNumber(e.target.value)}
+                        placeholder="Auto-generated if blank"
+                        error={error?.fields.expense_number?.[0]}
+                    />
+                    <LookupSelect
+                        label="Supplier / Station (Optional)"
+                        value={supplier}
+                        onChange={setSupplier}
+                        search={lookupApi.suppliers}
+                        error={error?.fields.supplier_id?.[0]}
+                        loadOnOpen
+                        minSearchLength={0}
+                    />
+                    <Input
+                        label="Bill / Receipt Reference"
+                        value={referenceNumber}
+                        onChange={e => setReferenceNumber(e.target.value)}
+                        placeholder="e.g. Receipt #12345"
+                        error={error?.fields.reference_number?.[0]}
+                    />
+                    <div className="sm:col-span-2">
+                        <Textarea
+                            label="Description"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            rows={2}
+                            error={error?.fields.description?.[0]}
+                        />
+                    </div>
+                </div>
+            </details>
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                 <Button type="submit" loading={saving} disabled={!vehicle || !currency || !expenseDate || !netAmount}>Save Expense Record</Button>

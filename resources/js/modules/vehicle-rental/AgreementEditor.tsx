@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
@@ -42,6 +42,16 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!party || !currency || (kind === AgreementKind.Owner && !vehicle)) return;
+        if (endsOn && endsOn < startsOn) {
+            setError(new ApiError(
+                'End date must be on or after start date.',
+                422,
+                'VALIDATION_FAILED',
+                'validation_error',
+                { ends_on: ['End date must be on or after start date.'] },
+            ));
+            return;
+        }
         setSaving(true); setError(null);
         try {
             const submittedTerms = Object.fromEntries(termKeys.map(key => [key, terms[key] ?? null])) as Partial<Record<TermKey, string | null>>;
@@ -113,7 +123,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             />
             <Input label="Agreement date" type="date" value={agreedOn} onChange={e => setAgreedOn(e.target.value)} required error={fieldError('agreed_on')} />
             <Input label="Agreement executing date" type="date" value={executingOn} onChange={e => setExecutingOn(e.target.value)} error={fieldError('executing_on')} hint="Record the date stated in the agreement; leave blank if unknown." />
-            <Input label="Start date" type="date" max={endsOn || undefined} value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />
+            <Input label="Start date" type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />
             <Input label="End date" type="date" min={startsOn || undefined} value={endsOn} onChange={e => setEndsOn(e.target.value)} error={fieldError('ends_on')} hint="Leave blank if no end date has been agreed." />
             <Select label="Rental basis" options={basisOptions} value={basis} onChange={e => setBasis(e.target.value as RentalBasis)} required error={fieldError('basis')} />
             <Select label="Driver arrangement" options={driverOptions} value={driver} onChange={e => setDriver(e.target.value as DriverMode)} required error={fieldError('driver_mode')} />

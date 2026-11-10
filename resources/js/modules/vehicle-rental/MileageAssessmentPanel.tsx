@@ -8,7 +8,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import { useApi } from '@/shared/hooks/useApi';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { AgreementKind } from './agreements';
 import { rentalBillingPresentation } from './billingPresentation';
 import type { RunningChart } from './runningCharts';
@@ -23,6 +23,16 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
     const [recorded, setRecorded] = useState<MileageAssessment | null>(null); const inFlight = useRef(false);
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!quote || !accepted || inFlight.current) return;
+        if (due && due < date) {
+            setError(new ApiError(
+                'Due date cannot precede document date.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { due_date: ['Due date cannot precede document date.'] },
+            ));
+            return;
+        }
         inFlight.current = true; setBusy(true); setError(null);
         try { const result = await assessMileage(kind, chart, quote, { invoice_date: date, due_date: due || null, exchange_rate: exchange }); setRecorded(result); quoteRequest.setData(() => null); setAccepted(false); onSaved(); }
         catch (failure) { const apiError = toApiError(failure); setError(apiError); if (apiError.status === 409) quoteRequest.setData(() => null); setAccepted(false); }
@@ -45,7 +55,7 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
             </dl>
             <div className="grid gap-3 sm:grid-cols-2">
                 <Input label={billing.documentDateLabel} type="date" required value={date} disabled={busy} onChange={e => setDate(e.target.value)} error={error?.fields.invoice_date?.[0]} />
-                <Input label="Due date (optional)" type="date" min={date} value={due} disabled={busy} onChange={e => setDue(e.target.value)} error={error?.fields.due_date?.[0]} />
+                <Input label="Due date (optional)" type="date" value={due} disabled={busy} onChange={e => setDue(e.target.value)} error={error?.fields.due_date?.[0]} />
                 <div className="sm:col-span-2">
                     <Input label="Exchange rate to base currency" required inputMode="decimal" value={exchange} disabled={busy} onChange={e => setExchange(e.target.value)} error={error?.fields.exchange_rate?.[0]} />
                 </div>
