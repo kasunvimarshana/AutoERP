@@ -24,6 +24,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'offer_id', 'occurred_at'], 'promotion_offer_events_history_ix');
+            $table->unique(['id', 'tenant_id'], 'promotion_offer_events_id_tenant_uk');
             $table->foreign(['actor_id', 'tenant_id'], 'promotion_offer_events_actor_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
         });

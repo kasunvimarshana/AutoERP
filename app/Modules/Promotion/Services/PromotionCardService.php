@@ -89,7 +89,7 @@ final class PromotionCardService
 
         try {
             $templateId = DB::transaction(function () use ($tenantId, $organizationUnitId, $actorId, $input): int {
-                $templateId = DB::table('promotion_card_templates')->insertGetId([
+                $templateId = $this->scoped('promotion_card_templates', $tenantId)->insertGetId([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'code' => Str::upper(trim((string) $input['code'])),
@@ -103,7 +103,7 @@ final class PromotionCardService
                     'updated_at' => now(),
                 ]);
                 foreach ($input['benefits'] as $position => $benefit) {
-                    DB::table('promotion_card_benefits')->insert([
+                    $this->scoped('promotion_card_benefits', $tenantId)->insert([
                         'tenant_id' => $tenantId,
                         'template_id' => $templateId,
                         'position' => $position + 1,
@@ -468,5 +468,10 @@ final class PromotionCardService
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function scoped(string $table, int $tenantId): \Illuminate\Database\Query\Builder
+    {
+        return DB::table($table)->where('tenant_id', $tenantId);
     }
 }

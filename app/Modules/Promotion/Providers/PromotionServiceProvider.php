@@ -9,10 +9,17 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Promotion\Constants\PromotionPermission;
 use Modules\Promotion\Services\PromotionCardService;
+use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\Vehicle\Events\CurrentCustomerOwnershipEnded;
+use Modules\VehicleService\Contracts\JobPromotionHandlerInterface;
 
 final class PromotionServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->bind(JobPromotionHandlerInterface::class, PromotionRuntimeService::class);
+    }
+
     public function boot(): void
     {
         Event::listen(CurrentCustomerOwnershipEnded::class, function (CurrentCustomerOwnershipEnded $event): void {

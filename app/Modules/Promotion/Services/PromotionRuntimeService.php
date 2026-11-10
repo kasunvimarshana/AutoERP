@@ -13,13 +13,14 @@ use Modules\Promotion\Enums\PromotionBenefitKind;
 use Modules\Promotion\Enums\PromotionDiscountType;
 use Modules\Promotion\Enums\PromotionEventType;
 use Modules\Promotion\Enums\PromotionStatus;
+use Modules\VehicleService\Contracts\JobPromotionHandlerInterface;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Services\VehicleServiceLineCalculationService;
 use Modules\VehicleService\Services\VehicleServiceValidationService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
-final class PromotionRuntimeService
+final class PromotionRuntimeService implements JobPromotionHandlerInterface
 {
     private const ZERO = '0.000000';
 

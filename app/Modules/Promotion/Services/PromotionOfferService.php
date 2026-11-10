@@ -263,7 +263,7 @@ final class PromotionOfferService
         ?string $oldStatus,
         ?string $newStatus,
     ): void {
-        DB::table('promotion_offer_lifecycle_events')->insert([
+        $this->scoped('promotion_offer_lifecycle_events', $tenantId)->insert([
             'tenant_id' => $tenantId,
             'offer_id' => $offer->id,
             'offer_code' => $offer->code,
@@ -276,5 +276,10 @@ final class PromotionOfferService
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function scoped(string $table, int $tenantId): \Illuminate\Database\Query\Builder
+    {
+        return DB::table($table)->where('tenant_id', $tenantId);
     }
 }

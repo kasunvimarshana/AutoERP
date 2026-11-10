@@ -6,7 +6,7 @@ namespace Modules\VehicleService\Services\Invoice;
 
 use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
 use Modules\Invoice\Data\InvoiceSourceRestorationContext;
-use Modules\Promotion\Services\PromotionRuntimeService;
+use Modules\VehicleService\Contracts\JobPromotionHandlerInterface;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
@@ -15,7 +15,7 @@ final class VehicleServiceInvoiceRestorationHandler implements InvoiceSourceRest
 {
     public function __construct(
         private readonly VehicleServiceStatusService $statuses,
-        private readonly PromotionRuntimeService $promotions,
+        private readonly JobPromotionHandlerInterface $promotions,
     ) {}
 
     public function supports(InvoiceSourceRestorationContext $context): bool
