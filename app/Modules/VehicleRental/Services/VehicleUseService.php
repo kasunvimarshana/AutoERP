@@ -182,8 +182,11 @@ final class VehicleUseService
                 $tz = $this->calendar->timezone($context);
                 $now = CarbonImmutable::now($tz)->addMinute();
                 $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at')->setTimezone($tz);
-                if ($at->greaterThan($now) || ($record->ends_at !== null && $at >= $record->ends_at)) {
-                    throw ValidationException::withMessages(['occurred_at' => ['Record an actual handover before the planned return, not a future event.']]);
+                if ($at->greaterThan($now)) {
+                    throw ValidationException::withMessages(['occurred_at' => ['Handover time cannot be in the future.']]);
+                }
+                if ($record->ends_at !== null && $at >= $record->ends_at) {
+                    throw ValidationException::withMessages(['occurred_at' => ['Record an actual handover before the planned return.']]);
                 }
                 $this->coverageInstant($customer, $context, $at);
                 if ($owner !== null) {
@@ -205,8 +208,11 @@ final class VehicleUseService
                 $tz = $this->calendar->timezone($context);
                 $now = CarbonImmutable::now($tz)->addMinute();
                 $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at')->setTimezone($tz);
-                if ($at->greaterThan($now) || $at <= $record->handed_over_at) {
-                    throw ValidationException::withMessages(['occurred_at' => ['Return must follow handover and cannot be in the future.']]);
+                if ($at->greaterThan($now)) {
+                    throw ValidationException::withMessages(['occurred_at' => ['Return time cannot be in the future.']]);
+                }
+                if ($at <= $record->handed_over_at) {
+                    throw ValidationException::withMessages(['occurred_at' => ['Return must follow handover.']]);
                 }
                 if (($data['odometer'] ?? null) !== null && $record->handover_odometer !== null && bccomp($data['odometer'], $record->handover_odometer, AgreementFields::DECIMAL_SCALE) < 0) {
                     throw ValidationException::withMessages(['odometer' => ['Return odometer cannot be lower than handover.']]);
@@ -275,10 +281,24 @@ final class VehicleUseService
         // Validate the complete planned replacement period before mutating the existing custody record.
         OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at'] ?? null);
 
-        return DB::transaction(function () use ($context, $id, $expectedVersion, $data): VehicleUse {
+        $tz = $this->calendar->timezone($context);
+        $now = CarbonImmutable::now($tz)->addMinute();
+        $startsAt = OperationalTime::parse($data['starts_at'], 'starts_at')->setTimezone($tz);
+        if ($startsAt->greaterThan($now)) {
+            throw ValidationException::withMessages(['starts_at' => ['Replacement time cannot be in the future.']]);
+        }
+
+        return DB::transaction(function () use ($context, $id, $expectedVersion, $data, $startsAt): VehicleUse {
             $previous = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
+            $this->version($previous->row_version, $expectedVersion);
             if ((int) $previous->vehicle_id === (int) $data['vehicle_id']) {
                 throw ValidationException::withMessages(['vehicle_id' => ['Select a different physical vehicle.']]);
+            }
+            if ($previous->status !== VehicleUseStatus::InCustody) {
+                throw ValidationException::withMessages(['status' => ['Only in-custody vehicles can be replaced.']]);
+            }
+            if ($previous->handed_over_at !== null && $startsAt <= $previous->handed_over_at) {
+                throw ValidationException::withMessages(['starts_at' => ["Replacement time must follow the previous vehicle's handover time."]]);
             }
             Vehicle::query()->where('tenant_id', $context->tenantId)->whereIn('id', [(int) $previous->vehicle_id, (int) $data['vehicle_id']])->orderBy('id')->lockForUpdate()->get();
 
@@ -295,7 +315,16 @@ final class VehicleUseService
                     unset($messages['odometer']);
                 }
                 if (isset($messages['occurred_at'])) {
-                    $messages['starts_at'] = $messages['occurred_at'];
+                    $messages['starts_at'] = array_map(static function (string $msg): string {
+                        if (str_contains($msg, 'future')) {
+                            return 'Replacement time cannot be in the future.';
+                        }
+                        if (str_contains($msg, 'handover') || str_contains($msg, 'follow')) {
+                            return "Replacement time must follow the previous vehicle's handover time.";
+                        }
+
+                        return $msg;
+                    }, $messages['occurred_at']);
                     unset($messages['occurred_at']);
                 }
                 throw ValidationException::withMessages($messages);
@@ -317,7 +346,13 @@ final class VehicleUseService
                     unset($messages['odometer']);
                 }
                 if (isset($messages['occurred_at'])) {
-                    $messages['starts_at'] = $messages['occurred_at'];
+                    $messages['starts_at'] = array_map(static function (string $msg): string {
+                        if (str_contains($msg, 'future')) {
+                            return 'Replacement time cannot be in the future.';
+                        }
+
+                        return $msg;
+                    }, $messages['occurred_at']);
                     unset($messages['occurred_at']);
                 }
                 throw ValidationException::withMessages($messages);

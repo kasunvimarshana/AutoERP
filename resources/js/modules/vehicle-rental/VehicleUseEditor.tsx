@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { apiClient } from '@/shared/api/apiClient';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { endpoints } from '@/shared/api/endpoints';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateInputValue } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { AGREEMENT_API, type Agreement } from './agreements';
@@ -29,13 +29,27 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
             return replacement.handed_over_at.slice(0, 19);
         }
     })();
-    const [start, setStart] = useState(() => replacementHandoverLocal ?? (agreement.starts_on ? `${agreement.starts_on}T00:00` : '')); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
-    const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
+    const [start, setStart] = useState(() => {
+        if (replacement) {
+            try {
+                return localTimestampValue(new Date().toISOString());
+            } catch {
+                return new Date().toISOString().slice(0, 19);
+            }
+        }
+        return agreement.starts_on ? `${agreement.starts_on}T00:00` : '';
+    });
+    const [end, setEnd] = useState('');
+    const [notes, setNotes] = useState('');
+    const [error, setError] = useState<ApiError | null>(null);
+    const [saving, setSaving] = useState(false);
     const isSameReplacementVehicle = Boolean(replacement && vehicle && vehicle.id === replacement.vehicle.id);
     const minStart = replacementHandoverLocal
         ? replacementHandoverLocal.slice(0, 16)
         : (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined);
     const maxEnd = agreement.ends_on ? `${agreement.ends_on}T23:59` : undefined;
+    const todayEnd = `${businessDateInputValue()}T23:59:59`;
+    const maxStart = replacement ? (end && end < todayEnd ? end : todayEnd) : (end || maxEnd);
 
     useEffect(() => {
         if (!replacement && initialVehicleId && !vehicle) {
@@ -113,6 +127,35 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
 
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!vehicle || !start || (!company && !owner)) return;
+        if (replacement) {
+            let startIso = '';
+            try {
+                startIso = timestampWithOffset(start);
+            } catch {
+                return;
+            }
+            if (replacement.handed_over_at && startIso <= replacement.handed_over_at) {
+                setError(new ApiError(
+                    "Replacement time must follow the previous vehicle's handover time.",
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { starts_at: ["Replacement time must follow the previous vehicle's handover time."] },
+                ));
+                return;
+            }
+            const parsedStart = new Date(startIso);
+            if (parsedStart.getTime() > Date.now() + 60000) {
+                setError(new ApiError(
+                    'Replacement time cannot be in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { starts_at: ['Replacement time cannot be in the future.'] },
+                ));
+                return;
+            }
+        }
         setSaving(true); setError(null);
         try {
             const input = {
@@ -157,12 +200,12 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                     type="datetime-local"
                     step={OPERATIONAL_TIME_STEP_SECONDS}
                     min={minStart}
-                    max={end || maxEnd}
+                    max={maxStart}
                     value={start}
                     onChange={e => { setStart(e.target.value); setOwner(null); setSourceCount(null); }}
                     required
                     hint={replacement?.handed_over_at
-                        ? `Previous vehicle handed over: ${formatBusinessDateTime(replacement.handed_over_at)}`
+                        ? `Replacement time must follow previous handover (${formatBusinessDateTime(replacement.handed_over_at)}) and cannot be in the future.`
                         : (minStart ? `Agreement starts: ${agreement.starts_on}` : undefined)
                     }
                     error={error?.fields.starts_at?.[0]}
