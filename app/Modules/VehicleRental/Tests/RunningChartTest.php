@@ -403,7 +403,7 @@ final class RunningChartTest extends TestCase
                 self::fail('Usage end before start was accepted');
             } catch (ValidationException $e) {
                 self::assertArrayHasKey('ends_at', $e->errors());
-                self::assertSame('Record completed usage ending after its start, not in the future.', $e->errors()['ends_at'][0]);
+                self::assertSame('Usage end must follow usage start.', $e->errors()['ends_at'][0]);
             }
 
             // Current travel time is 2026-09-10T12:00:00+00:00 (17:30 in Asia/Colombo).
@@ -417,7 +417,7 @@ final class RunningChartTest extends TestCase
                 self::fail('Future usage was accepted');
             } catch (ValidationException $e) {
                 self::assertArrayHasKey('ends_at', $e->errors());
-                self::assertSame('Record completed usage ending after its start, not in the future.', $e->errors()['ends_at'][0]);
+                self::assertSame('Completed usage cannot end in the future.', $e->errors()['ends_at'][0]);
             }
 
             // Rejects start later than current time

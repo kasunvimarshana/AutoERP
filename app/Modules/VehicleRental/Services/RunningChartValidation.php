@@ -76,10 +76,13 @@ final class RunningChartValidation
         $now = $this->calendar->now($context)->addMinutes(2);
 
         if ($start->greaterThan($now)) {
-            throw ValidationException::withMessages(['starts_at' => ['Record completed usage starting before or at the current time, not in the future.']]);
+            throw ValidationException::withMessages(['starts_at' => ['Completed usage cannot start in the future.']]);
         }
-        if ($end <= $start || $end->greaterThan($now)) {
-            throw ValidationException::withMessages(['ends_at' => ['Record completed usage ending after its start, not in the future.']]);
+        if ($end <= $start) {
+            throw ValidationException::withMessages(['ends_at' => ['Usage end must follow usage start.']]);
+        }
+        if ($end->greaterThan($now)) {
+            throw ValidationException::withMessages(['ends_at' => ['Completed usage cannot end in the future.']]);
         }
         $data['starts_at_input'] = $data['starts_at'];
         $data['ends_at_input'] = $data['ends_at'];

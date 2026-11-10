@@ -150,7 +150,7 @@ it('keeps usage date inputs unconstrained by browser min/max and rejects client-
     fireEvent.change(endInput, { target: { value: '2026-09-07T11:00' } });
     fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
 
-    const matchingErrors = await screen.findAllByText('Record completed usage ending after its start, not in the future.');
+    const matchingErrors = await screen.findAllByText('Usage end must follow usage start.');
     expect(matchingErrors.length).toBeGreaterThanOrEqual(1);
     expect(createChart).not.toHaveBeenCalled();
 });
@@ -229,7 +229,7 @@ it('prevents submitting usage end in the future with immediate validation feedba
     fireEvent.submit(screen.getByRole('form', { name: 'Running Chart' }));
 
     await waitFor(() => {
-        expect(screen.getAllByText('Record completed usage ending after its start, not in the future.').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Completed usage cannot end in the future.').length).toBeGreaterThan(0);
     });
     expect(createChart).not.toHaveBeenCalled();
 });

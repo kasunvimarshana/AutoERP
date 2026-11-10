@@ -254,7 +254,7 @@ final class RunningChartService
         }
 
         if ($usageEnd <= $usageStart) {
-            throw ValidationException::withMessages(['ends_at' => ['Record completed usage ending after its start, not in the future.']]);
+            throw ValidationException::withMessages(['ends_at' => ['Usage end must follow usage start.']]);
         }
     }
 

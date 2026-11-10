@@ -136,11 +136,11 @@ export function RunningChartEditor({
         try {
             if (start && end && end <= start) {
                 setError(new ApiError(
-                    'Record completed usage ending after its start, not in the future.',
+                    'Usage end must follow usage start.',
                     422,
                     'VALIDATION_FAILED',
                     'validation_error',
-                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
+                    { ends_at: ['Usage end must follow usage start.'] },
                 ));
                 setSaving(false);
                 return;
@@ -174,11 +174,11 @@ export function RunningChartEditor({
 
             if (startIso && new Date(startIso).getTime() > nowMs) {
                 setError(new ApiError(
-                    'Record completed usage starting before or at the current time, not in the future.',
+                    'Completed usage cannot start in the future.',
                     422,
                     'VALIDATION_FAILED',
                     'validation_error',
-                    { starts_at: ['Record completed usage starting before or at the current time, not in the future.'] },
+                    { starts_at: ['Completed usage cannot start in the future.'] },
                 ));
                 setSaving(false);
                 return;
@@ -186,11 +186,11 @@ export function RunningChartEditor({
 
             if (endIso && new Date(endIso).getTime() > nowMs) {
                 setError(new ApiError(
-                    'Record completed usage ending after its start, not in the future.',
+                    'Completed usage cannot end in the future.',
                     422,
                     'VALIDATION_FAILED',
                     'validation_error',
-                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
+                    { ends_at: ['Completed usage cannot end in the future.'] },
                 ));
                 setSaving(false);
                 return;
