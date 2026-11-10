@@ -120,6 +120,11 @@ export default function VehicleUseRegisterPage() {
                         </Link>
                     </h2>
                     <StatusBadge status={row.status} label={USE_LABELS[row.status]} />
+                    {row.customer_agreement.driver_mode && (
+                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 border border-slate-200">
+                            {row.customer_agreement.driver_mode === 'self_drive' ? 'Self-drive' : 'With driver'}
+                        </span>
+                    )}
                 </div>
                 <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
                     <p>Customer: {row.customer_agreement.party_name}</p>

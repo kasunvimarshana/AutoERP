@@ -113,6 +113,7 @@ export function RunningChartEditor({
     ].includes(k)));
 
     const hasDetailsContent = Boolean(
+        use.customer_agreement?.driver_mode === 'with_driver' ||
         driverSource ||
         ac ||
         initialDriver?.source ||
@@ -387,8 +388,20 @@ export function RunningChartEditor({
                 open={detailsOpen}
                 onToggle={e => setUserToggledOpen(e.currentTarget.open)}
             >
-                <summary className="cursor-pointer font-medium">Additional usage observations</summary>
+                <summary className="cursor-pointer font-medium flex items-center justify-between">
+                    <span>Additional usage observations</span>
+                    {use.customer_agreement?.driver_mode === 'with_driver' && (
+                        <span className="text-xs font-normal text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            Agreement: With driver
+                        </span>
+                    )}
+                </summary>
                 <div className="space-y-3 pt-3">
+                    {use.customer_agreement?.driver_mode === 'with_driver' && !driverSource && (
+                        <p className="rounded-md border border-sky-200 bg-sky-50 p-2 text-xs text-sky-800">
+                            This agreement includes driver services. Select Employee driver or External driver below.
+                        </p>
+                    )}
                     <div className="grid gap-3 sm:grid-cols-2">
                         {decimal('garage_km', DISTANCE_LABELS.garage_km)}
                         {decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
