@@ -10,7 +10,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';
 import { Pagination } from '@/shared/components/Pagination';
-import { formatBusinessDateTime, businessDateInputValue, businessDateTimeInputValueWithSeconds, toHourFloor } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateTimeInputValueWithSeconds } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
@@ -36,28 +36,12 @@ export function VehicleUsePanel({
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true);
     const [adding, setAdding] = useState(Boolean(initialVehicleId));
     const [action, setAction] = useState<{ row: VehicleUse; type: VehicleUseAction } | null>(null); const [at, setAt] = useState(''); const [odometer, setOdometer] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [history, setHistory] = useState<number | null>(null);
-    const actionHandoverLocal = (() => {
-        if (!action?.row?.handed_over_at) return undefined;
-        try {
-            return localTimestampValue(action.row.handed_over_at);
-        } catch {
-            return action.row.handed_over_at.slice(0, 19);
-        }
-    })();
     const actionPlannedStartLocal = (() => {
         if (!action?.row?.starts_at) return undefined;
         try {
             return localTimestampValue(action.row.starts_at);
         } catch {
             return action.row.starts_at.slice(0, 19);
-        }
-    })();
-    const actionPlannedEndLocal = (() => {
-        if (!action?.row?.ends_at) return undefined;
-        try {
-            return localTimestampValue(action.row.ends_at);
-        } catch {
-            return action.row.ends_at.slice(0, 19);
         }
     })();
     useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
@@ -186,14 +170,6 @@ export function VehicleUsePanel({
                             label="Actual event time"
                             type="datetime-local"
                             step={OPERATIONAL_TIME_STEP_SECONDS}
-                            min={action.type === VehicleUseAction.Handover
-                                ? (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined)
-                                : (actionHandoverLocal ? toHourFloor(actionHandoverLocal) : undefined)
-                            }
-                            max={action.type === VehicleUseAction.Handover && actionPlannedEndLocal
-                                ? actionPlannedEndLocal
-                                : `${businessDateInputValue()}T23:59:59`
-                            }
                             value={at}
                             onChange={e => setAt(e.target.value)}
                             required

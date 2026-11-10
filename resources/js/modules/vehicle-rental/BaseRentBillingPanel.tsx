@@ -76,8 +76,8 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
         <p className="my-3 text-sm">{billing.createDraftDescription} from the recorded base rate and actual-calendar policy. Monthly partial periods use actual anniversary-cycle days. This bills base rent only; mileage, extras and deductions are separate. Tax uses the configured Tax rules. {billing.reviewDraftText}</p>
         <form onSubmit={submit} className="space-y-3">
             {selected ? <p>{action === ChargeAction.Void ? 'Void original charge:' : 'Reissue original charge:'} {formatBusinessDate(selected.from)} – {formatBusinessDate(selected.until)} · <MoneyDisplay value={selected.amount} currency={selected.currency} /> <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAccepted(false); }}>Cancel selection</Button></p> : <>
-                <Input label="Charge from" type="date" required min={agreement.starts_on} value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setAccepted(false); }} error={error?.fields.from?.[0]} />
-                <Input label="Charge through" type="date" required max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={e => { setUntil(e.target.value); setAccepted(false); }} error={error?.fields.until?.[0]} />
+                <Input label="Charge from" type="date" required value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setAccepted(false); }} error={error?.fields.from?.[0]} />
+                <Input label="Charge through" type="date" required value={until} disabled={busy} onChange={e => { setUntil(e.target.value); setAccepted(false); }} error={error?.fields.until?.[0]} />
             </>}
             {selected && action === ChargeAction.Void ? <Textarea label="Void reason" required value={reason} disabled={busy} onChange={e => setReason(e.target.value)} error={error?.fields.reason?.[0]} /> : <>
             <Input label={billing.documentDateLabel} type="date" required value={invoiceDate} disabled={busy} onChange={e => setInvoiceDate(e.target.value)} error={error?.fields.invoice_date?.[0]} />

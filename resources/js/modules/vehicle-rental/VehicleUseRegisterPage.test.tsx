@@ -43,9 +43,9 @@ describe('Vehicle Use register', () => {
         const startInput = screen.getByLabelText('Planned period start (optional)');
         const endInput = screen.getByLabelText('Planned period end (optional)');
         fireEvent.change(startInput, { target: { value: start } });
-        expect(endInput).toHaveAttribute('min', start);
+        expect(endInput).not.toHaveAttribute('min');
         fireEvent.change(endInput, { target: { value: end } });
-        expect(startInput).toHaveAttribute('max', end);
+        expect(startInput).not.toHaveAttribute('max');
         fireEvent.change(endInput, { target: { value: '' } });
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('No vehicle uses match these filters.')).toBeInTheDocument();

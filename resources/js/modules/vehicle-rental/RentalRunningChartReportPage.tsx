@@ -8,7 +8,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { AgreementKind } from './agreements';
@@ -110,6 +110,16 @@ export default function RentalRunningChartReportPage() {
         if (!agreement?.id) {
             return;
         }
+        if (startDate && endDate && endDate < startDate) {
+            setError(new ApiError(
+                'Period end date must be on or after period start date.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { end_date: ['Period end date must be on or after period start date.'] },
+            ));
+            return;
+        }
         void loadReport(agreement.id, startDate, endDate, sheetMode);
     }
 
@@ -145,7 +155,6 @@ export default function RentalRunningChartReportPage() {
                         label="Period end date"
                         type="date"
                         required
-                        min={startDate}
                         value={endDate}
                         onChange={e => setEndDate(e.target.value)}
                         error={error?.fields.end_date?.[0]}

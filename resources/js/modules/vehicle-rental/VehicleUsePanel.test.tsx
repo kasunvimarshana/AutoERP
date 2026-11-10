@@ -50,12 +50,13 @@ it('requires the actual event time before a handover can be confirmed', async ()
     expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeEnabled();
 });
 
-it('allows one-click population of planned handover time and bounds to agreement start', async () => {
+it('allows one-click population of planned handover time and avoids native date clamping', async () => {
     const datedAgreement = { ...agreement, starts_on: '2026-09-05' };
     render(<VehicleUsePanel agreement={datedAgreement} canManage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Hand over vehicle' }));
     const eventTimeInput = screen.getByLabelText('Actual event time');
-    expect(eventTimeInput).toHaveAttribute('min', '2026-09-05T00:00');
+    expect(eventTimeInput).not.toHaveAttribute('min');
+    expect(eventTimeInput).not.toHaveAttribute('max');
     fireEvent.click(screen.getByRole('button', { name: 'Use planned handover time' }));
     expect(eventTimeInput).toHaveValue('2026-09-07T09:00');
     expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeEnabled();
@@ -82,7 +83,8 @@ it('provides handover odometer guidance and timestamp bounds when recording retu
     fireEvent.click(await screen.findByRole('button', { name: 'Record return' }));
     expect(screen.getByText(/Handover reading was 1500\.00\. Return reading cannot be lower\./)).toBeInTheDocument();
     const eventTimeInput = screen.getByLabelText('Actual event time');
-    expect(eventTimeInput).toHaveAttribute('min', '2026-09-07T09:00');
+    expect(eventTimeInput).not.toHaveAttribute('min');
+    expect(screen.getByLabelText('Odometer (optional)')).toHaveAttribute('min', '1500.00');
 });
 
 it('removes stale rows when a vehicle-use reload fails', async () => {
