@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; }
         @page {
-            size: A4 landscape;
+            size: {{ in_array($header['report_type'] ?? 'summary', ['statement_detail_1', 'statement_detail_2'], true) ? 'A4 portrait' : 'A4 landscape' }};
             margin: 8mm 10mm 8mm 10mm;
         }
         html, body {
@@ -21,7 +21,7 @@
         }
         .sheet-container {
             width: 100%;
-            max-width: 1120px;
+            max-width: {{ in_array($header['report_type'] ?? 'summary', ['statement_detail_1', 'statement_detail_2'], true) ? '820px' : '1120px' }};
             margin: 0 auto;
             padding: 10px;
         }
@@ -146,6 +146,15 @@
         .font-bold { font-weight: 700; }
         .nowrap { white-space: nowrap; }
 
+        .section-header-row td {
+            background: #e2e8f0;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 9px;
+            padding: 4px 6px;
+            border: 1px solid #555;
+        }
+
         .footer-branding {
             margin-top: 10px;
             padding-top: 4px;
@@ -244,6 +253,249 @@
             </tr>
         </tfoot>
         @endif
+    </table>
+
+    @elseif (($header['report_type'] ?? 'summary') === 'statement_detail_1' && isset($statement))
+    <!-- Statement of Accounts - Vehicle Wise (Detail I) (pmcre1vehstat_b.frx) -->
+    <table class="chart-header-table">
+        <tr>
+            <td style="width: 70%;">
+                <div class="company-name">{{ $header['company_name'] }}</div>
+                <div class="report-subtitle" style="font-size: 12px; margin-top: 4px;">
+                    Statement of Accounts - Vehicle Wise (Detail)
+                    <span style="display: inline-block; margin-left: 10px; font-weight: 600; font-size: 10.5px; border-bottom: 1px dashed #444;">
+                        {{ $statement['driver_badge'] }}
+                    </span>
+                </div>
+            </td>
+            <td style="width: 30%; text-align: right; font-size: 9.5px;">
+                <span class="meta-label">Page 1</span><br>
+                <span class="meta-label">Date :</span> <span class="meta-val">{{ $statement['report_date'] }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <table class="meta-table" style="border: 1px solid #777; padding: 4px; margin-bottom: 8px;">
+        <tr>
+            <td style="width: 65%;">
+                <span class="meta-label">Vehicle No :</span> <span class="meta-val" style="font-size: 11px;">{{ $statement['vehicle_number'] }}</span><br>
+                <span class="meta-label">Owner's Name :</span> <span class="meta-val">{{ $statement['owner_name'] }} {{ $statement['owner_code'] }}</span><br>
+                <span class="meta-label">Lessor :</span> <span class="meta-val">{{ $statement['owner_name'] }}</span>
+            </td>
+            <td style="width: 35%; text-align: right;">
+                <span class="meta-label">Period :</span> <span class="meta-val">{{ $statement['period'] }}</span><br>
+                <span class="meta-label">Account Reference :</span> <span class="meta-val">{{ $statement['account_reference'] }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <table class="data-table">
+        <thead>
+            <tr style="background: #f1f5f9;">
+                <th style="width: 25%; text-align: left;">Date & Reference</th>
+                <th style="width: 40%; text-align: left;">Description</th>
+                <th style="width: 12%; text-align: center;">Unit</th>
+                <th style="width: 11%; text-align: right;">Rate</th>
+                <th style="width: 12%; text-align: right;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Balance B/F -->
+            <tr style="background: #fafafa; font-weight: 700;">
+                <td class="font-bold">{{ $statement['balance_bf_label'] }}</td>
+                <td colspan="3"></td>
+                <td class="text-right font-bold">{{ $statement['balance_bf'] }}</td>
+            </tr>
+
+            <!-- Rental & Other Payable -->
+            <tr class="section-header-row">
+                <td colspan="5">Rental & Other Payable</td>
+            </tr>
+            @foreach ($statement['payables'] as $p)
+            <tr>
+                <td class="text-left font-medium">{{ $p['date_reference'] }}</td>
+                <td class="text-left">{{ $p['description'] }}</td>
+                <td class="text-center">{{ $p['unit'] }}</td>
+                <td class="text-right">{{ $p['rate'] }}</td>
+                <td class="text-right font-bold">{{ $p['amount'] }}</td>
+            </tr>
+            @endforeach
+            <tr style="border-top: 1px solid #777; font-weight: 700; background: #f8fafc;">
+                <td colspan="4" class="text-right font-bold">Total Rental & Other Payable:</td>
+                <td class="text-right font-bold">{{ $statement['total_payable'] }}</td>
+            </tr>
+
+            <!-- Settlements -->
+            <tr class="section-header-row">
+                <td colspan="5">Settlement</td>
+            </tr>
+            @forelse ($statement['settlements'] as $s)
+            <tr>
+                <td class="text-left font-medium">{{ $s['date'] }}  {{ $s['reference'] }}</td>
+                <td colspan="3" class="text-left">{{ $s['description'] }}</td>
+                <td class="text-right font-bold" style="color: #0369a1;">{{ $s['amount'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="4" class="text-left" style="color: #64748b; font-style: italic;">No bank vouchers or cheque settlements recorded in this period.</td>
+                <td class="text-right">-</td>
+            </tr>
+            @endforelse
+
+            <!-- Deductions for Repair -->
+            <tr class="section-header-row">
+                <td colspan="5">Deduction for Repair</td>
+            </tr>
+            @forelse ($statement['repair_deductions'] as $r)
+            <tr>
+                <td class="text-left font-medium">{{ $r['date'] }}  {{ $r['reference'] }}</td>
+                <td colspan="3" class="text-left">{{ $r['description'] }}</td>
+                <td class="text-right font-bold text-rose-700">{{ $r['amount'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="4" class="text-left" style="color: #64748b; font-style: italic;">No repair chargebacks or debit notes recorded in this period.</td>
+                <td class="text-right">-</td>
+            </tr>
+            @endforelse
+        </tbody>
+        <tfoot>
+            <tr style="border-top: 2px solid #000; border-bottom: 2px double #000; font-size: 10px; font-weight: 800; background: #f1f5f9;">
+                <td colspan="4" class="text-left" style="padding: 6px;">{{ $statement['balance_closing_label'] }}</td>
+                <td class="text-right font-bold" style="padding: 6px; font-size: 10.5px;">{{ $statement['balance_closing'] }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    @elseif (($header['report_type'] ?? 'summary') === 'statement_detail_2' && isset($statement))
+    <!-- Statement of Accounts - Vehicle Wise (Detail II) (pmcre1vehstat_c.frx) -->
+    <table class="chart-header-table">
+        <tr>
+            <td style="width: 70%;">
+                <div class="company-name">{{ $header['company_name'] }}</div>
+                <div class="report-subtitle" style="font-size: 12px; margin-top: 4px;">
+                    Statement of Accounts - Vehicle Wise (Detail II)
+                    <span style="display: inline-block; margin-left: 10px; font-weight: 600; font-size: 10.5px; border-bottom: 1px dashed #444;">
+                        {{ $statement['driver_badge'] }}
+                    </span>
+                </div>
+            </td>
+            <td style="width: 30%; text-align: right; font-size: 9.5px;">
+                <span class="meta-label">Page 1</span><br>
+                <span class="meta-label">Date :</span> <span class="meta-val">{{ $statement['report_date'] }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <table class="meta-table" style="border: 1px solid #777; padding: 4px; margin-bottom: 8px;">
+        <tr>
+            <td style="width: 65%;">
+                <span class="meta-label">Vehicle No :</span> <span class="meta-val" style="font-size: 11px;">{{ $statement['vehicle_number'] }}</span><br>
+                <span class="meta-label">Owner's Name :</span> <span class="meta-val">{{ $statement['owner_name'] }} {{ $statement['owner_code'] }}</span><br>
+                <span class="meta-label">Lessor :</span> <span class="meta-val">{{ $statement['owner_name'] }}</span>
+            </td>
+            <td style="width: 35%; text-align: right;">
+                <span class="meta-label">Period :</span> <span class="meta-val">{{ $statement['period'] }}</span><br>
+                <span class="meta-label">Account Reference :</span> <span class="meta-val">{{ $statement['account_reference'] }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Opening Balance Row -->
+    <div style="display: flex; justify-content: space-between; padding: 4px 6px; background: #fafafa; border: 1px solid #777; margin-bottom: 6px; font-weight: 700;">
+        <span>{{ $statement['balance_bf_label'] }}</span>
+        <span style="font-size: 10px;">{{ $statement['balance_bf'] }}</span>
+    </div>
+
+    <!-- Rental & Other Payable Operational Grid -->
+    <div style="font-weight: 800; text-transform: uppercase; margin-top: 6px; margin-bottom: 2px;">Rental & Other Payable</div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Hirer / Client</th>
+                <th>Hire Start</th>
+                <th>Hire Finish</th>
+                <th>Calculated By</th>
+                <th>Unit</th>
+                <th>Total KM</th>
+                <th>Rate</th>
+                <th>Hire Amount</th>
+                <th>N/O Hrs</th>
+                <th>D/O Hrs</th>
+                <th>T/O Hrs</th>
+                <th>OT Amount</th>
+                <th>Driver Salary</th>
+                <th>BATA</th>
+                <th>Other</th>
+                <th>VAT</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            @php $d = $statement['detail_ii_row']; @endphp
+            <tr>
+                <td class="text-left font-bold">{{ $d['client_name'] }}</td>
+                <td class="text-center nowrap">{{ $d['hire_start'] }}</td>
+                <td class="text-center nowrap">{{ $d['hire_finish'] }}</td>
+                <td class="text-center">{{ $d['calculated_by'] }}</td>
+                <td class="text-center">{{ $d['unit'] }}</td>
+                <td class="text-right">{{ $d['total_km'] }}</td>
+                <td class="text-right">{{ $d['non_ac_rate'] }}</td>
+                <td class="text-right font-bold">{{ $d['hire_amount'] }}</td>
+                <td class="text-center">{{ $d['no_hrs'] }}</td>
+                <td class="text-center">{{ $d['do_hrs'] }}</td>
+                <td class="text-center">{{ $d['to_hrs'] }}</td>
+                <td class="text-right font-bold">{{ $d['ot_amount'] }}</td>
+                <td class="text-right">{{ $d['driver_salary'] }}</td>
+                <td class="text-right">{{ $d['driver_bata'] }}</td>
+                <td class="text-right">{{ $d['other_charges'] }}</td>
+                <td class="text-right">{{ $d['vat_amount'] }}</td>
+                <td class="text-right font-bold" style="background: #f1f5f9;">{{ $d['total_payable'] }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Settlements and Deductions -->
+    <table class="data-table" style="margin-top: 8px;">
+        <tbody>
+            <tr class="section-header-row">
+                <td colspan="4">Settlement</td>
+            </tr>
+            @forelse ($statement['settlements'] as $s)
+            <tr>
+                <td style="width: 25%;" class="text-left font-medium">{{ $s['date'] }}  {{ $s['reference'] }}</td>
+                <td colspan="2" class="text-left">{{ $s['description'] }}</td>
+                <td style="width: 15%;" class="text-right font-bold" style="color: #0369a1;">{{ $s['amount'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="3" class="text-left" style="color: #64748b; font-style: italic;">No settlements recorded in this period.</td>
+                <td class="text-right">-</td>
+            </tr>
+            @endforelse
+
+            <tr class="section-header-row">
+                <td colspan="4">Deduction for Repair</td>
+            </tr>
+            @forelse ($statement['repair_deductions'] as $r)
+            <tr>
+                <td style="width: 25%;" class="text-left font-medium">{{ $r['date'] }}  {{ $r['reference'] }}</td>
+                <td colspan="2" class="text-left">{{ $r['description'] }}</td>
+                <td style="width: 15%;" class="text-right font-bold text-rose-700">{{ $r['amount'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="3" class="text-left" style="color: #64748b; font-style: italic;">No repair deductions recorded in this period.</td>
+                <td class="text-right">-</td>
+            </tr>
+            @endforelse
+        </tbody>
+        <tfoot>
+            <tr style="border-top: 2px solid #000; border-bottom: 2px double #000; font-size: 10px; font-weight: 800; background: #f1f5f9;">
+                <td colspan="3" class="text-left" style="padding: 6px;">{{ $statement['balance_closing_label'] }}</td>
+                <td class="text-right font-bold" style="padding: 6px; font-size: 10.5px;">{{ $statement['balance_closing'] }}</td>
+            </tr>
+        </tfoot>
     </table>
 
     @else

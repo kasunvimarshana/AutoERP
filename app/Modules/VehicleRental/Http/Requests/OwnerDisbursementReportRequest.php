@@ -16,7 +16,7 @@ final class OwnerDisbursementReportRequest extends TenantScopedRequest
         parent::prepareForValidation();
 
         $merges = [];
-        foreach (['supplier_id', 'owner_agreement_id', 'wht_rate', 'report_type'] as $field) {
+        foreach (['supplier_id', 'owner_agreement_id', 'vehicle_id', 'wht_rate', 'report_type'] as $field) {
             if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
                 $merges[$field] = null;
             }
@@ -34,8 +34,9 @@ final class OwnerDisbursementReportRequest extends TenantScopedRequest
             'end_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:start_date'],
             'supplier_id' => ['nullable', 'integer', 'min:1'],
             'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'wht_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'report_type' => ['nullable', 'string', 'in:summary,wht_ledger'],
+            'report_type' => ['nullable', 'string', 'in:summary,wht_ledger,statement_detail_1,statement_detail_2'],
         ];
     }
 

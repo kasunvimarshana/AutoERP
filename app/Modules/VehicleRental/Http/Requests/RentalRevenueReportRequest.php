@@ -16,7 +16,7 @@ final class RentalRevenueReportRequest extends TenantScopedRequest
         parent::prepareForValidation();
 
         $merges = [];
-        foreach (['customer_id', 'agreement_id'] as $field) {
+        foreach (['customer_id', 'agreement_id', 'report_type'] as $field) {
             if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
                 $merges[$field] = null;
             }
@@ -34,6 +34,7 @@ final class RentalRevenueReportRequest extends TenantScopedRequest
             'end_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:start_date'],
             'customer_id' => ['nullable', 'integer', 'min:1'],
             'agreement_id' => ['nullable', 'integer', 'min:1'],
+            'report_type' => ['nullable', 'string', 'in:summary,invoice_listing'],
         ];
     }
 
