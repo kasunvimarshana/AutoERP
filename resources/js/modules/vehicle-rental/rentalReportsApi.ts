@@ -1,4 +1,5 @@
 import { apiClient } from '@/shared/api/apiClient';
+import { exportReportBlob } from '@/shared/utils/reportExport';
 
 export interface ReportHeader {
     company_name: string;
@@ -421,4 +422,20 @@ export const getLesseeOutstandingReportExportUrl = (params: LesseeOutstandingRep
         ...(params.aging_bucket ? { aging_bucket: params.aging_bucket } : {}),
     });
     return `/api/v1/vehicle-rental/reports/lessee-outstanding/export/${format}?${query.toString()}`;
+};
+
+export const exportRentalReport = (
+    endpoint: string,
+    params: Record<string, unknown>,
+    format: 'pdf' | 'print' | 'html',
+    previewWindow?: Window | null,
+    filename?: string,
+) => {
+    return exportReportBlob({
+        url: `/api/v1/vehicle-rental/reports/${endpoint}/export/${format}`,
+        params,
+        format,
+        previewWindow,
+        filename,
+    });
 };

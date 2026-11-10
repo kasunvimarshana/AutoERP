@@ -35,6 +35,7 @@ use Modules\Core\Http\Middleware\ResolveCurrentTenantMiddleware;
 use Modules\Core\Http\Middleware\RequireCurrentTenantAccessMiddleware;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -83,6 +84,14 @@ return Application::configure(basePath: dirname(__DIR__))
             Authorize::class,
         ]);
 
+        $middleware->redirectGuestsTo(static function (Request $request): ?string {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return null;
+            }
+
+            return route('login');
+        });
+
         $middleware->append(RequestCorrelationIdMiddleware::class);
         $middleware->append(EnsureApiErrorResponseMiddleware::class);
     })
@@ -112,6 +121,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (ModelNotFoundException $exception, Request $request) use ($errorResponse) {
             return $request->is('api/*') || $request->expectsJson()
                 ? $errorResponse(404, 'Resource not found.')
+                : null;
+        });
+
+        $exceptions->render(function (RouteNotFoundException $exception, Request $request) use ($errorResponse) {
+            return $request->is('api/*') || $request->expectsJson()
+                ? $errorResponse(404, 'Route not found.')
                 : null;
         });
 

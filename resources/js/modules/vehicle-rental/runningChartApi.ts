@@ -1,5 +1,6 @@
 import type { ChartRegisterFilters, ChartRegisterRow } from './runningCharts';
 import { apiClient } from '@/shared/api/apiClient';
+import { exportReportBlob } from '@/shared/utils/reportExport';
 import type { ApiCollection, ApiResource } from '@/shared/types/api';
 import { PAGE_SIZE } from './agreements';
 import { USE_API, type VehicleUse } from './vehicleUse';
@@ -89,4 +90,25 @@ export const getRunningChartReportExportUrl = (params: RunningChartReportParams,
         ...(params.sheet_mode ? { sheet_mode: params.sheet_mode } : {}),
     });
     return `/api/v1/vehicle-rental/reports/running-chart-sheet/export/${format}?${query.toString()}`;
+};
+
+export const exportRunningChartReport = (
+    params: RunningChartReportParams,
+    format: 'pdf' | 'print' | 'html',
+    previewWindow?: Window | null,
+) => {
+    const filename = `running-chart-${params.agreement_id}-${params.start_date}-to-${params.end_date}.${format === 'pdf' ? 'pdf' : 'html'}`;
+    return exportReportBlob({
+        url: `/api/v1/vehicle-rental/reports/running-chart-sheet/export/${format}`,
+        params: {
+            agreement_id: params.agreement_id,
+            start_date: params.start_date,
+            end_date: params.end_date,
+            ...(params.vehicle_use_id ? { vehicle_use_id: params.vehicle_use_id } : {}),
+            ...(params.sheet_mode ? { sheet_mode: params.sheet_mode } : {}),
+        },
+        format,
+        previewWindow,
+        filename,
+    });
 };

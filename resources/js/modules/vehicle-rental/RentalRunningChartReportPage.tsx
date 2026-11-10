@@ -13,7 +13,7 @@ import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { AgreementKind } from './agreements';
 import { getAgreement, searchCustomerAgreements } from './agreementApi';
-import { fetchRunningChartReport, getRunningChartReportExportUrl, type RunningChartReportData } from './runningChartApi';
+import { exportRunningChartReport, fetchRunningChartReport, type RunningChartReportData } from './runningChartApi';
 
 const sheetModeOptions = [
     { value: 'lessee', label: 'Lessee Sheet (Customer format)' },
@@ -32,6 +32,31 @@ export default function RentalRunningChartReportPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [report, setReport] = useState<RunningChartReportData | null>(null);
+    const [busyExport, setBusyExport] = useState<'print' | 'pdf' | null>(null);
+
+    async function handleExport(format: 'print' | 'pdf') {
+        if (!report) return;
+        setBusyExport(format);
+        setError(null);
+        const preview = format === 'print' ? window.open('', '_blank') : null;
+        if (preview) {
+            preview.document.title = 'Preparing running chart…';
+            preview.document.body.textContent = 'Preparing running chart…';
+        }
+        try {
+            await exportRunningChartReport({
+                agreement_id: report.header.agreement_id,
+                start_date: report.header.start_date,
+                end_date: report.header.end_date,
+                sheet_mode: report.header.is_owner_sheet ? 'owner' : 'lessee',
+            }, format, preview);
+        } catch (err) {
+            preview?.close();
+            setError(toApiError(err));
+        } finally {
+            setBusyExport(null);
+        }
+    }
 
     useEffect(() => {
         const agId = searchParams.get('agreement_id');
@@ -87,24 +112,6 @@ export default function RentalRunningChartReportPage() {
         }
         void loadReport(agreement.id, startDate, endDate, sheetMode);
     }
-
-    const exportPdfUrl = report
-        ? getRunningChartReportExportUrl({
-            agreement_id: report.header.agreement_id,
-            start_date: report.header.start_date,
-            end_date: report.header.end_date,
-            sheet_mode: report.header.is_owner_sheet ? 'owner' : 'lessee',
-        }, 'pdf')
-        : '#';
-
-    const exportPrintUrl = report
-        ? getRunningChartReportExportUrl({
-            agreement_id: report.header.agreement_id,
-            start_date: report.header.start_date,
-            end_date: report.header.end_date,
-            sheet_mode: report.header.is_owner_sheet ? 'owner' : 'lessee',
-        }, 'print')
-        : '#';
 
     return (
         <div className="space-y-5">
@@ -178,21 +185,23 @@ export default function RentalRunningChartReportPage() {
                             </p>
                         </div>
                         <div className="flex gap-2">
-                            <a
-                                href={exportPrintUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={busyExport !== null}
+                                loading={busyExport === 'print'}
+                                onClick={() => void handleExport('print')}
                             >
                                 Print Sheet
-                            </a>
-                            <a
-                                href={exportPdfUrl}
-                                download
-                                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={busyExport !== null}
+                                loading={busyExport === 'pdf'}
+                                onClick={() => void handleExport('pdf')}
                             >
                                 Download PDF
-                            </a>
+                            </Button>
                         </div>
                     </div>
 

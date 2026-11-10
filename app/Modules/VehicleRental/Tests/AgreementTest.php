@@ -232,6 +232,10 @@ final class AgreementTest extends TestCase
     public function test_routes_reject_unauthenticated_access(): void
     {
         $this->getJson('/api/v1/vehicle-rental/customer/agreements')->assertUnauthorized();
+        $this->get('/api/v1/vehicle-rental/customer/agreements')->assertUnauthorized();
+        $this->get('/api/v1/vehicle-rental/reports/running-chart-sheet/export/print?agreement_id=1&start_date=2026-11-01&end_date=2026-11-10')
+            ->assertUnauthorized()
+            ->assertJsonPath('error.code', 'AUTHENTICATION_FAILED');
     }
 
     public function test_owner_agreement_accepts_selected_organization_vehicle(): void

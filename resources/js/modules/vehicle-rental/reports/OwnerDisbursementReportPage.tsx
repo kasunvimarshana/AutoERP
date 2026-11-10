@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
+    exportRentalReport,
     fetchOwnerDisbursementReport,
-    getOwnerDisbursementReportExportUrl,
     OwnerDisbursementReportData,
     OwnerDisbursementReportParams,
 } from '../rentalReportsApi';
@@ -25,6 +26,24 @@ export default function OwnerDisbursementReportPage() {
     const [data, setData] = useState<OwnerDisbursementReportData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [busyExport, setBusyExport] = useState<'print' | 'pdf' | null>(null);
+
+    const handleExport = async (format: 'print' | 'pdf') => {
+        setBusyExport(format);
+        const preview = format === 'print' ? window.open('', '_blank') : null;
+        if (preview) {
+            preview.document.title = 'Preparing report…';
+            preview.document.body.textContent = 'Preparing report…';
+        }
+        try {
+            await exportRentalReport('owner-disbursements', currentExportParams as unknown as Record<string, unknown>, format, preview, `owner-disbursements-${currentExportParams.start_date}-to-${currentExportParams.end_date}.${format === 'pdf' ? 'pdf' : 'html'}`);
+        } catch (e) {
+            preview?.close();
+            setError(e instanceof Error ? e.message : 'Export failed.');
+        } finally {
+            setBusyExport(null);
+        }
+    };
 
     const executeFetch = (fetchParams: OwnerDisbursementReportParams) => {
         setLoading(true);
@@ -85,22 +104,23 @@ export default function OwnerDisbursementReportPage() {
                         </Link>
                         {data && (
                             <>
-                                <a
-                                    href={getOwnerDisbursementReportExportUrl(currentExportParams, 'print')}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={busyExport !== null}
+                                    loading={busyExport === 'print'}
+                                    onClick={() => void handleExport('print')}
                                 >
                                     Print Preview
-                                </a>
-                                <a
-                                    href={getOwnerDisbursementReportExportUrl(currentExportParams, 'pdf')}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 shadow-sm"
+                                </Button>
+                                <Button
+                                    type="button"
+                                    disabled={busyExport !== null}
+                                    loading={busyExport === 'pdf'}
+                                    onClick={() => void handleExport('pdf')}
                                 >
                                     Download PDF
-                                </a>
+                                </Button>
                             </>
                         )}
                     </div>

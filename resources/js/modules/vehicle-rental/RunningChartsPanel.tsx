@@ -13,7 +13,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
 import { CHART_ACTION_CONFIRM_LABELS, CHART_PERMISSION, DriverIdentitySource, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
-import { getRunningChartReportExportUrl, listCharts, transitionChart } from './runningChartApi';
+import { exportRunningChartReport, listCharts, transitionChart } from './runningChartApi';
 import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartEditor } from './RunningChartEditor';
 import { RunningChartHistoryPanel } from './RunningChartHistoryPanel';
@@ -21,6 +21,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     const auth = useAuth(); const canManage = hasPermission(auth, CHART_PERMISSION.manage);
     const [rows, setRows] = useState<RunningChart[]>([]); const [page, setPage] = useState(1); const [meta, setMeta] = useState<PaginationMeta>(); const [revision, setRevision] = useState(0);
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
+    const [printing, setPrinting] = useState<'lessee' | 'owner' | null>(null);
     const [editor, setEditor] = useState<{ chart?: RunningChart; correction?: boolean } | null>(null); const [history, setHistory] = useState<number | null>(null);
     const [action, setAction] = useState<{ chart: RunningChart; type: RunningChartAction } | null>(null); const [reason, setReason] = useState('');
 
@@ -40,7 +41,34 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     function reload() { setLoading(true); setEditor(null); setAction(null); setHistory(null); setRevision(v => v + 1); }
     async function submit(event: FormEvent) { event.preventDefault(); if (!action) return; setSaving(true); setError(null); try { await transitionChart(action.chart, action.type, action.type === RunningChartAction.Reverse ? reason.trim() : undefined); reload(); } catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); } }
     function choose(chart: RunningChart, type: RunningChartAction) { setAction({ chart, type }); setReason(''); setError(null); }
-    return <section aria-label="Running Charts" className="space-y-3 border-t pt-3"><div className="flex flex-wrap items-center gap-2"><h4 className="grow font-semibold">Running Charts · {use.vehicle.label}</h4><Button variant="secondary" disabled={loading || saving} onClick={() => { const s = use.starts_at.slice(0, 10); const e = use.ends_at ? use.ends_at.slice(0, 10) : s; window.open(getRunningChartReportExportUrl({ agreement_id: use.customer_agreement.id, start_date: s, end_date: e, vehicle_use_id: use.id, sheet_mode: 'lessee' }, 'print'), '_blank'); }}>Print Sheet</Button>{use.owner_agreement !== null && <Button variant="secondary" disabled={loading || saving} onClick={() => { const s = use.starts_at.slice(0, 10); const e = use.ends_at ? use.ends_at.slice(0, 10) : s; window.open(getRunningChartReportExportUrl({ agreement_id: use.customer_agreement.id, start_date: s, end_date: e, vehicle_use_id: use.id, sheet_mode: 'owner' }, 'print'), '_blank'); }}>Print Owner Sheet</Button>}<Button variant="secondary" disabled={loading || saving || !!editor} onClick={reload}>Reload charts</Button>{canManage && [VehicleUseStatus.InCustody, VehicleUseStatus.Returned].includes(use.status) && <Button disabled={loading || saving || !!editor || !!action} onClick={() => setEditor({})}>Record usage</Button>}</div>
+
+    async function handlePrint(mode: 'lessee' | 'owner') {
+        const s = use.starts_at.slice(0, 10);
+        const e = use.ends_at ? use.ends_at.slice(0, 10) : s;
+        setPrinting(mode);
+        setError(null);
+        const preview = window.open('', '_blank');
+        if (preview) {
+            preview.document.title = 'Preparing running chart…';
+            preview.document.body.textContent = 'Preparing running chart…';
+        }
+        try {
+            await exportRunningChartReport({
+                agreement_id: use.customer_agreement.id,
+                start_date: s,
+                end_date: e,
+                vehicle_use_id: use.id,
+                sheet_mode: mode,
+            }, 'print', preview);
+        } catch (err) {
+            preview?.close();
+            setError(toApiError(err));
+        } finally {
+            setPrinting(null);
+        }
+    }
+
+    return <section aria-label="Running Charts" className="space-y-3 border-t pt-3"><div className="flex flex-wrap items-center gap-2"><h4 className="grow font-semibold">Running Charts · {use.vehicle.label}</h4><Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'lessee'} onClick={() => void handlePrint('lessee')}>Print Sheet</Button>{use.owner_agreement !== null && <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'owner'} onClick={() => void handlePrint('owner')}>Print Owner Sheet</Button>}<Button variant="secondary" disabled={loading || saving || !!editor} onClick={reload}>Reload charts</Button>{canManage && [VehicleUseStatus.InCustody, VehicleUseStatus.Returned].includes(use.status) && <Button disabled={loading || saving || !!editor || !!action} onClick={() => setEditor({})}>Record usage</Button>}</div>
         <ErrorAlert error={error} inline />{editor && <RunningChartEditor use={use} chart={editor.chart} correction={editor.correction} initialDriver={initialDriver} initialOdometer={initialOdometer} onSaved={reload} onCancel={() => setEditor(null)} />}
         {loading ? <LoadingState label="Loading Running Charts…" /> : error ? null : rows.map(chart => <article key={chart.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{chart.reference}</p><StatusBadge status={chart.status} /></div><p className="text-sm text-slate-600">{formatBusinessDateTime(chart.starts_at)} — {formatBusinessDateTime(chart.ends_at)}</p><p className="text-sm text-slate-700">Driver: {chart.driver ? `${chart.driver.name} · ${chart.driver.reference}` : 'Not recorded'}</p><p className="text-sm text-slate-700">Total distance: {chart.total_km === null ? 'Not recorded' : <><QuantityDisplay value={chart.total_km} /> km</>}</p>{chart.corrects_chart && <p className="text-xs text-blue-600 font-medium">Corrects {chart.corrects_chart.reference}</p>}{chart.corrected_by_chart && <p className="text-xs text-amber-700 font-medium">Corrected by chart {chart.corrected_by_chart.reference}</p>}
             <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" aria-expanded={history === chart.id} onClick={() => setHistory(history === chart.id ? null : chart.id)}>{history === chart.id ? 'Hide chart history' : 'Chart history'}</Button>{!editor && !action && <>

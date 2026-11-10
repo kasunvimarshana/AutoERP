@@ -13,7 +13,7 @@ import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
-import { getRunningChartReportExportUrl, listChartRegister } from './runningChartApi';
+import { exportRunningChartReport, listChartRegister } from './runningChartApi';
 import { AC_LABELS, CHART_LABELS, COUNT_LABELS, DISTANCE_LABELS, RunningChartStatus, type ChartRegisterFilters, type ChartRegisterRow } from './runningCharts';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset } from './vehicleUse';
 import { UsageChargePanel } from './UsageChargePanel';
@@ -61,6 +61,7 @@ export default function RunningChartRegisterPage() {
     const [rows, setRows] = useState<ChartRegisterRow[]>([]); const [meta, setMeta] = useState<PaginationMeta>();
     const [loading, setLoading] = useState(true); const [error, setError] = useState<ApiError | null>(null); const [selected, setSelected] = useState<number | null>(null);
     const [history, setHistory] = useState<number | null>(null);
+    const [printingId, setPrintingId] = useState<number | null>(null);
     useEffect(() => {
         const controller = new AbortController();
         listChartRegister(filters, page, controller.signal).then(result => {
@@ -151,10 +152,31 @@ export default function RunningChartRegisterPage() {
                         <Button
                             type="button"
                             variant="secondary"
-                            onClick={() => {
+                            disabled={printingId !== null}
+                            loading={printingId === row.id}
+                            onClick={async () => {
                                 const s = row.starts_at.slice(0, 10);
                                 const e = row.ends_at ? row.ends_at.slice(0, 10) : s;
-                                window.open(getRunningChartReportExportUrl({ agreement_id: row.customer_agreement.id!, start_date: s, end_date: e, vehicle_use_id: row.vehicle_use.id }, 'print'), '_blank');
+                                setPrintingId(row.id);
+                                setError(null);
+                                const preview = window.open('', '_blank');
+                                if (preview) {
+                                    preview.document.title = 'Preparing running chart…';
+                                    preview.document.body.textContent = 'Preparing running chart…';
+                                }
+                                try {
+                                    await exportRunningChartReport({
+                                        agreement_id: row.customer_agreement.id!,
+                                        start_date: s,
+                                        end_date: e,
+                                        vehicle_use_id: row.vehicle_use.id,
+                                    }, 'print', preview);
+                                } catch (err) {
+                                    preview?.close();
+                                    setError(toApiError(err));
+                                } finally {
+                                    setPrintingId(null);
+                                }
                             }}
                         >
                             Print Sheet

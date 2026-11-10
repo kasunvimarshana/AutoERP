@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
 import {
+    exportRentalReport,
     fetchVehicleRevenueLicenseReport,
-    getVehicleRevenueLicenseReportExportUrl,
     VehicleRevenueLicenseReportData,
     VehicleRevenueLicenseReportParams,
 } from '../rentalReportsApi';
@@ -19,6 +20,24 @@ export default function VehicleRevenueLicenseReportPage() {
     const [data, setData] = useState<VehicleRevenueLicenseReportData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [busyExport, setBusyExport] = useState<'print' | 'pdf' | null>(null);
+
+    const handleExport = async (format: 'print' | 'pdf') => {
+        setBusyExport(format);
+        const preview = format === 'print' ? window.open('', '_blank') : null;
+        if (preview) {
+            preview.document.title = 'Preparing report…';
+            preview.document.body.textContent = 'Preparing report…';
+        }
+        try {
+            await exportRentalReport('revenue-licenses', params as unknown as Record<string, unknown>, format, preview, `revenue-licenses.${format === 'pdf' ? 'pdf' : 'html'}`);
+        } catch (e) {
+            preview?.close();
+            setError(e instanceof Error ? e.message : 'Export failed.');
+        } finally {
+            setBusyExport(null);
+        }
+    };
 
     const executeFetch = (fetchParams: VehicleRevenueLicenseReportParams) => {
         setLoading(true);
@@ -74,22 +93,23 @@ export default function VehicleRevenueLicenseReportPage() {
                         </Link>
                         {data && (
                             <>
-                                <a
-                                    href={getVehicleRevenueLicenseReportExportUrl(params, 'print')}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={busyExport !== null}
+                                    loading={busyExport === 'print'}
+                                    onClick={() => void handleExport('print')}
                                 >
                                     Print Preview
-                                </a>
-                                <a
-                                    href={getVehicleRevenueLicenseReportExportUrl(params, 'pdf')}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 shadow-sm"
+                                </Button>
+                                <Button
+                                    type="button"
+                                    disabled={busyExport !== null}
+                                    loading={busyExport === 'pdf'}
+                                    onClick={() => void handleExport('pdf')}
                                 >
                                     Download PDF
-                                </a>
+                                </Button>
                             </>
                         )}
                     </div>

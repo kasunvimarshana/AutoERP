@@ -9,6 +9,10 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/login', function () {
+    return view('welcome');
+})->name('login');
+
 $__printMiddleware = [
     'web',
     (string) config('core.current_user.middleware_alias', 'current.user'),
