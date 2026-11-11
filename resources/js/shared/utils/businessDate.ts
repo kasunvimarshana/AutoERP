@@ -25,6 +25,18 @@ export function configureBusinessTimeZone(timeZone?: string | null): void {
     configuredTimeZone = isValidTimeZone(timeZone) ? timeZone : null;
 }
 
+/**
+ * Floors a datetime-local input string to the top of its hour (:00)
+ * to prevent native browser time pickers (e.g. Chromium) from disabling
+ * or omitting the current hour when minutes are non-zero.
+ */
+export function toHourFloor(val?: string | null): string | undefined {
+    if (!val) return undefined;
+    const trimmed = val.trim();
+    if (!trimmed) return undefined;
+    return trimmed.length >= 13 ? `${trimmed.slice(0, 13)}:00` : trimmed;
+}
+
 export function businessTimeZoneLabel(timeZone = configuredTimeZone): string {
     return timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 }

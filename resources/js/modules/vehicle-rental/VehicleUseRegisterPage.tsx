@@ -11,7 +11,7 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, toApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { listVehicleUseRegister } from './vehicleUseApi';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, USE_LABELS, VehicleUseStatus, type VehicleUse, type VehicleUseRegisterFilters } from './vehicleUse';
@@ -71,6 +71,16 @@ export default function VehicleUseRegisterPage() {
     }
     function apply(event: FormEvent) {
         event.preventDefault();
+        if (from && until && until <= from) {
+            setError(new ApiError(
+                'Planned period end must follow period start.',
+                422,
+                'VALIDATION_FAILED',
+                'validation_error',
+                { until: ['Planned period end must follow period start.'] },
+            ));
+            return;
+        }
         try {
             const next = { search: search.trim() || undefined, use_status: status || undefined, from: from ? timestampWithOffset(from) : undefined, until: until ? timestampWithOffset(until) : undefined };
             syncUrl(search, status, from, until);
@@ -89,8 +99,8 @@ export default function VehicleUseRegisterPage() {
         <Panel title="Filters"><form aria-label="Filter vehicle use" onSubmit={apply} className="grid gap-3 md:grid-cols-2">
             <Input label="Vehicle, agreement or party" value={search} onChange={event => setSearch(event.target.value)} error={error?.fields.search?.[0]} />
             <Select label="Use status" placeholder="All states" options={statusOptions} value={status} onChange={event => setStatus(event.target.value as VehicleUseStatus | '')} />
-            <Input label="Planned period start (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} max={until || undefined} value={from} onChange={event => setFrom(event.target.value)} error={error?.fields.from?.[0]} />
-            <Input label="Planned period end (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={from || undefined} value={until} onChange={event => setUntil(event.target.value)} error={error?.fields.until?.[0]} />
+            <Input label="Planned period start (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={from} onChange={event => setFrom(event.target.value)} error={error?.fields.from?.[0]} />
+            <Input label="Planned period end (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={until} onChange={event => setUntil(event.target.value)} error={error?.fields.until?.[0]} />
             <p className="text-sm text-slate-600 md:col-span-2">Filter times use {operationalTimeZoneLabel()}. Results overlap the planned period. Actual custody is shown separately; no rental charges are calculated.</p>
             <div className="flex flex-wrap gap-2 md:col-span-2"><Button type="submit" loading={loading}>Apply filters</Button><Button type="button" variant="secondary" disabled={loading} onClick={clearFilters}>Clear filters</Button></div>
         </form></Panel>
@@ -110,6 +120,11 @@ export default function VehicleUseRegisterPage() {
                         </Link>
                     </h2>
                     <StatusBadge status={row.status} label={USE_LABELS[row.status]} />
+                    {row.customer_agreement.driver_mode && (
+                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 border border-slate-200">
+                            {row.customer_agreement.driver_mode === 'self_drive' ? 'Self-drive' : 'With driver'}
+                        </span>
+                    )}
                 </div>
                 <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
                     <p>Customer: {row.customer_agreement.party_name}</p>

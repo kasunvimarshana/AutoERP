@@ -267,9 +267,27 @@ final class RunningChartReportService
                 $dayTotalOtHours = ($normMin + $doubleMin + $tripleMin) / 60.0;
                 $otType = $current->isSunday() ? 'D' : ($doubleMin > 0 ? 'D' : ($normMin > 0 ? 'N' : ''));
 
+                $isReplacementDay = false;
+                $replacementRemark = '';
+                $dayUse = $firstChart->vehicleUse;
+                if ($dayUse !== null) {
+                    $dayVehNo = $dayUse->vehicle_label_snapshot
+                        ?? $dayUse->vehicle?->registration_number
+                        ?? $dayUse->vehicle?->vehicle_number;
+                    if ($dayUse->replaces_use_id !== null || ($primaryUse !== null && $dayUse->vehicle_id !== $primaryUse->vehicle_id)) {
+                        $isReplacementDay = true;
+                        if ($dayVehNo) {
+                            $replacementRemark = 'For Repl. '.$dayVehNo;
+                        }
+                    }
+                }
+
                 $remarks = $dayCharts->pluck('notes')->filter()->implode(', ');
                 if (empty($remarks)) {
                     $remarks = $dayCharts->pluck('driver_observation')->filter()->implode(', ');
+                }
+                if ($replacementRemark !== '') {
+                    $remarks = $remarks ? $replacementRemark.' · '.$remarks : $replacementRemark;
                 }
 
                 $driverName = $dayCharts->pluck('driver_name_snapshot')->filter()->unique()->implode(', ');
@@ -296,6 +314,7 @@ final class RunningChartReportService
                     'remarks' => $remarks,
                     'driver_name' => $driverName,
                     'is_active_day' => true,
+                    'is_replacement_day' => $isReplacementDay,
                 ];
             } else {
                 // Non-operational / idle day
@@ -317,6 +336,7 @@ final class RunningChartReportService
                     'remarks' => '',
                     'driver_name' => '',
                     'is_active_day' => false,
+                    'is_replacement_day' => false,
                 ];
             }
 

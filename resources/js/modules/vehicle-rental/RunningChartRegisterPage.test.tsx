@@ -51,9 +51,9 @@ describe('Running Chart register', () => {
         const startInput = screen.getByLabelText('Period start (optional)');
         const endInput = screen.getByLabelText('Period end (optional)');
         fireEvent.change(startInput, { target: { value: '2026-09-07T09:00' } });
-        expect(endInput).toHaveAttribute('min', '2026-09-07T09:00');
+        expect(endInput).not.toHaveAttribute('min');
         fireEvent.change(endInput, { target: { value: '2026-09-08T09:00' } });
-        expect(startInput).toHaveAttribute('max', '2026-09-08T09:00');
+        expect(startInput).not.toHaveAttribute('max');
         fireEvent.change(startInput, { target: { value: '' } });
         fireEvent.change(endInput, { target: { value: '' } });
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));

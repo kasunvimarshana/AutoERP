@@ -13,7 +13,7 @@ import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { MileageAssessmentPanel } from './MileageAssessmentPanel';
 import { AgreementKind } from './agreements';
@@ -49,6 +49,16 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
     function choose(charge: UsageCharge, next: ChargeAction) { setMileage(false); setSelected(charge); setAction(next); setAccepted(false); setReason(''); setCreated(null); setError(null); }
     async function submit(event: FormEvent) {
         event.preventDefault(); if (inFlight.current || !result || !accepted) return;
+        if (dueDate && invoiceDate && dueDate < invoiceDate) {
+            setError(new ApiError(
+                'Due date cannot precede document date.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { due_date: ['Due date cannot precede document date.'] },
+            ));
+            return;
+        }
         inFlight.current = true; setBusy(true); setError(null); setCreated(null);
         const document = { invoice_date: invoiceDate, due_date: dueDate || null, exchange_rate: exchange };
         try {
@@ -72,7 +82,7 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
             {!selected && quote && <div role="status" className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-sm text-blue-900">{quote.quantity ?? 'Not recorded'} {component === UsageChargeComponent.NightOut ? 'nights' : 'minutes'} · rate {quote.rate === null ? 'Not recorded' : <MoneyDisplay value={quote.rate} currency={result.currency} />} {component === UsageChargeComponent.NightOut ? 'per night' : 'per hour'} · {quote.amount === null ? 'Cannot calculate' : <MoneyDisplay value={quote.amount} currency={result.currency} />}{quote.error && ` · ${quote.error}`}</div>}
             {action === ChargeAction.Void ? <Textarea label="Void reason" required value={reason} disabled={busy} onChange={e => setReason(e.target.value)} error={error?.fields.reason?.[0]} /> : <>
                 <Input label={billing.documentDateLabel} type="date" required value={invoiceDate} disabled={busy} onChange={e => setInvoiceDate(e.target.value)} error={error?.fields.invoice_date?.[0]} />
-                <Input label="Due date (optional)" type="date" min={invoiceDate} value={dueDate} disabled={busy} onChange={e => setDueDate(e.target.value)} error={error?.fields.due_date?.[0]} />
+                <Input label="Due date (optional)" type="date" value={dueDate} disabled={busy} onChange={e => setDueDate(e.target.value)} error={error?.fields.due_date?.[0]} />
                 <Input label="Exchange rate to base currency" required inputMode="decimal" value={exchange} disabled={busy} onChange={e => setExchange(e.target.value)} error={error?.fields.exchange_rate?.[0]} />
             </>}
             <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"><input className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" checked={accepted} disabled={busy} onChange={e => setAccepted(e.target.checked)} /><span>{action === ChargeAction.Void ? 'Void this released charge and retain its calculation history.' : selected ? 'Reissue the unchanged charge with these document details.' : 'Apply the recorded-minutes and nights policy to this component.'}</span></label>

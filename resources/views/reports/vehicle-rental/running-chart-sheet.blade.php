@@ -143,6 +143,10 @@
             background: #fafafa;
             color: #444;
         }
+        .data-table tr.replacement-day td {
+            background: #fef9c3;
+            color: #713f12;
+        }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .text-left { text-align: left; }
@@ -332,7 +336,7 @@
         </thead>
         <tbody>
             @foreach ($rows as $row)
-            <tr class="{{ $row['is_active_day'] ? 'active-day' : 'idle-day' }}">
+            <tr class="{{ !empty($row['is_replacement_day']) ? 'replacement-day active-day' : ($row['is_active_day'] ? 'active-day' : 'idle-day') }}">
                 <td class="text-center nowrap">{{ $row['date'] }}</td>
                 <td class="text-right">{{ $row['start_odometer'] }}</td>
                 <td class="text-right">{{ $row['finish_odometer'] }}</td>

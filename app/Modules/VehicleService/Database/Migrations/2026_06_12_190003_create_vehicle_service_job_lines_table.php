@@ -29,6 +29,7 @@ return new class extends Migration
             $table->string('discount_calculation_type', 20)->nullable();
             $table->decimal('discount_rate', 20, 6)->default('0.000000');
             $table->decimal('discount_amount', 20, 6)->default('0.000000');
+            $table->decimal('promotion_discount_amount', 20, 6)->default('0.000000');
             $table->string('tax_calculation_type', 20)->nullable();
             $table->decimal('tax_rate', 20, 6)->default('0.000000');
             $table->decimal('tax_amount', 20, 6)->default('0.000000');

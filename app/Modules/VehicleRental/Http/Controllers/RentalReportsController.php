@@ -79,7 +79,7 @@ final class RentalReportsController
     {
         $data = $this->rentalRevenueService->generate(
             $request->context(),
-            $request->only(['start_date', 'end_date', 'customer_id', 'agreement_id']),
+            $request->only(['start_date', 'end_date', 'customer_id', 'agreement_id', 'report_type']),
         );
 
         return response()->json($data);
@@ -89,7 +89,7 @@ final class RentalReportsController
     {
         $data = $this->rentalRevenueService->generate(
             $request->context(),
-            $request->only(['start_date', 'end_date', 'customer_id', 'agreement_id']),
+            $request->only(['start_date', 'end_date', 'customer_id', 'agreement_id', 'report_type']),
         );
 
         return $this->respondExport('reports.vehicle-rental.rental-revenue', 'rental-revenue', $data, $format, $request, 'landscape');
@@ -119,7 +119,7 @@ final class RentalReportsController
     {
         $data = $this->ownerDisbursementService->generate(
             $request->context(),
-            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id', 'wht_rate', 'report_type']),
+            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id', 'vehicle_id', 'wht_rate', 'report_type']),
         );
 
         return response()->json($data);
@@ -129,10 +129,13 @@ final class RentalReportsController
     {
         $data = $this->ownerDisbursementService->generate(
             $request->context(),
-            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id', 'wht_rate', 'report_type']),
+            $request->only(['start_date', 'end_date', 'supplier_id', 'owner_agreement_id', 'vehicle_id', 'wht_rate', 'report_type']),
         );
 
-        return $this->respondExport('reports.vehicle-rental.owner-disbursement', 'owner-disbursement', $data, $format, $request, 'landscape');
+        $reportType = (string) ($request->input('report_type') ?? 'summary');
+        $orientation = ($reportType === 'statement_detail_1') ? 'portrait' : 'landscape';
+
+        return $this->respondExport('reports.vehicle-rental.owner-disbursement', 'owner-disbursement', $data, $format, $request, $orientation);
     }
 
     public function vehicleProfitability(VehicleProfitabilityReportRequest $request): JsonResponse

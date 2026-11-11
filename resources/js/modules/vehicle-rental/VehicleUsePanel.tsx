@@ -3,14 +3,14 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { CHART_PERMISSION } from './runningCharts';
 import { RunningChartsPanel } from './RunningChartsPanel';
 import { useEffect, useState, type FormEvent } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';
 import { Pagination } from '@/shared/components/Pagination';
-import { formatBusinessDateTime, businessDateInputValue } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateTimeInputValueWithSeconds } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
@@ -36,28 +36,12 @@ export function VehicleUsePanel({
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true);
     const [adding, setAdding] = useState(Boolean(initialVehicleId));
     const [action, setAction] = useState<{ row: VehicleUse; type: VehicleUseAction } | null>(null); const [at, setAt] = useState(''); const [odometer, setOdometer] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [history, setHistory] = useState<number | null>(null);
-    const actionHandoverLocal = (() => {
-        if (!action?.row?.handed_over_at) return undefined;
-        try {
-            return localTimestampValue(action.row.handed_over_at);
-        } catch {
-            return action.row.handed_over_at.slice(0, 19);
-        }
-    })();
     const actionPlannedStartLocal = (() => {
         if (!action?.row?.starts_at) return undefined;
         try {
             return localTimestampValue(action.row.starts_at);
         } catch {
             return action.row.starts_at.slice(0, 19);
-        }
-    })();
-    const actionPlannedEndLocal = (() => {
-        if (!action?.row?.ends_at) return undefined;
-        try {
-            return localTimestampValue(action.row.ends_at);
-        } catch {
-            return action.row.ends_at.slice(0, 19);
         }
     })();
     useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
@@ -76,7 +60,51 @@ export function VehicleUsePanel({
         setError(null);
     }
     async function submit(event: FormEvent) {
-        event.preventDefault(); if (!action) return; setSaving(true); setError(null);
+        event.preventDefault(); if (!action) return;
+
+        if (action.type !== VehicleUseAction.Cancel) {
+            let atIso = '';
+            try {
+                atIso = timestampWithOffset(at);
+            } catch {
+                return;
+            }
+            const parsedAt = new Date(atIso);
+            if (parsedAt.getTime() > Date.now() + 120_000) {
+                setError(new ApiError(
+                    action.type === VehicleUseAction.Handover ? 'Handover time cannot be in the future.' : 'Return time cannot be in the future.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { occurred_at: [action.type === VehicleUseAction.Handover ? 'Handover time cannot be in the future.' : 'Return time cannot be in the future.'] },
+                ));
+                return;
+            }
+            if (action.type === VehicleUseAction.Return && action.row.handed_over_at && atIso <= action.row.handed_over_at) {
+                setError(new ApiError(
+                    'Return must follow handover.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { occurred_at: ['Return must follow handover.'] },
+                ));
+                return;
+            }
+            if (action.type === VehicleUseAction.Return && action.row.handover_odometer !== null && odometer.trim() !== '') {
+                if (Number(odometer) < Number(action.row.handover_odometer)) {
+                    setError(new ApiError(
+                        'Return odometer cannot be less than handover odometer.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation',
+                        { odometer: ['Return odometer cannot be less than handover odometer.'] },
+                    ));
+                    return;
+                }
+            }
+        }
+
+        setSaving(true); setError(null);
         try { await transitionVehicleUse(action.row, action.type, { reason: reason.trim(), ...(action.type === VehicleUseAction.Cancel ? {} : { occurred_at: timestampWithOffset(at), odometer: odometer.trim() || null }) }); reload(); }
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
@@ -104,7 +132,15 @@ export function VehicleUsePanel({
             />
         )}
         {loading ? <LoadingState label="Loading assigned vehicles…" /> : error ? null : rows.map(row => <article key={row.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{row.vehicle.label}</p><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div><p className="text-sm text-slate-600">{formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>{row.replaces_use && <p className="text-xs text-blue-600 font-medium">Replaces {row.replaces_use.vehicle_label}</p>}{row.replaced_by_use && <p className="text-xs text-amber-600 font-medium">Replaced by {row.replaced_by_use.vehicle_label}</p>}<p className="text-sm text-slate-600">{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+            <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-slate-900">{row.vehicle.label}</p>
+                <StatusBadge status={row.status} label={USE_LABELS[row.status]} />
+                {row.customer_agreement.driver_mode && (
+                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 border border-slate-200">
+                        {row.customer_agreement.driver_mode === 'self_drive' ? 'Self-drive' : 'With driver'}
+                    </span>
+                )}
+            </div><p className="text-sm text-slate-600">{formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>{row.replaces_use && <p className="text-xs text-blue-600 font-medium">Replaces {row.replaces_use.vehicle_label}</p>}{row.replaced_by_use && <p className="text-xs text-amber-600 font-medium">Replaced by {row.replaced_by_use.vehicle_label}</p>}<p className="text-sm text-slate-600">{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
             {row.handed_over_at && <p className="text-xs text-slate-500">Actual handover: {formatBusinessDateTime(row.handed_over_at)} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}{row.returned_at && <p className="text-xs text-slate-500">Actual return: {formatBusinessDateTime(row.returned_at)} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
             <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" disabled={saving} aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>
@@ -142,14 +178,6 @@ export function VehicleUsePanel({
                             label="Actual event time"
                             type="datetime-local"
                             step={OPERATIONAL_TIME_STEP_SECONDS}
-                            min={action.type === VehicleUseAction.Handover
-                                ? (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined)
-                                : (actionHandoverLocal ? actionHandoverLocal.slice(0, 16) : undefined)
-                            }
-                            max={action.type === VehicleUseAction.Handover && actionPlannedEndLocal
-                                ? actionPlannedEndLocal
-                                : `${businessDateInputValue()}T23:59:59`
-                            }
                             value={at}
                             onChange={e => setAt(e.target.value)}
                             required
@@ -172,11 +200,7 @@ export function VehicleUsePanel({
                                     type="button"
                                     variant="secondary"
                                     onClick={() => {
-                                        try {
-                                            setAt(localTimestampValue(new Date().toISOString()));
-                                        } catch {
-                                            setAt(actionPlannedStartLocal ?? '');
-                                        }
+                                        setAt(businessDateTimeInputValueWithSeconds());
                                     }}
                                 >
                                     Use current time
@@ -189,11 +213,7 @@ export function VehicleUsePanel({
                                     type="button"
                                     variant="secondary"
                                     onClick={() => {
-                                        try {
-                                            setAt(localTimestampValue(new Date().toISOString()));
-                                        } catch {
-                                            setAt(new Date().toISOString().slice(0, 19));
-                                        }
+                                        setAt(businessDateTimeInputValueWithSeconds());
                                     }}
                                 >
                                     Use current time

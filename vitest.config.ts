@@ -20,7 +20,7 @@ export default defineConfig({
         clearMocks: true,
         fileParallelism: true,
         maxWorkers: TEST_WORKER_COUNT,
-        pool: 'vmThreads',
+        pool: 'threads',
         testTimeout: 10_000,
         hookTimeout: 10_000,
         teardownTimeout: 5_000,

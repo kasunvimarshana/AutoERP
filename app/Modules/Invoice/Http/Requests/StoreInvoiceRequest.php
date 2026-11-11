@@ -31,6 +31,12 @@ final class StoreInvoiceRequest extends TenantScopedRequest
     {
         parent::prepareForValidation();
 
+        if ($this->routeIs('api.v1.invoices.store')) {
+            $this->merge([
+                'idempotency_key' => $this->input('idempotency_key') ?: $this->header('Idempotency-Key'),
+            ]);
+        }
+
         $merges = [];
         foreach ([
             'customer_id', 'supplier_id', 'due_date', 'currency_id', 'exchange_rate',
@@ -137,17 +143,6 @@ final class StoreInvoiceRequest extends TenantScopedRequest
             'lines.*.source_line_id' => ['prohibited'],
             'lines.*.metadata' => ['prohibited'],
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        parent::prepareForValidation();
-
-        if ($this->routeIs('api.v1.invoices.store')) {
-            $this->merge([
-                'idempotency_key' => $this->input('idempotency_key') ?: $this->header('Idempotency-Key'),
-            ]);
-        }
     }
 
     public function toData(): ManualInvoiceData

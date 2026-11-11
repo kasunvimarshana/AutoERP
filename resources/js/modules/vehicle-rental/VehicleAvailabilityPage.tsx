@@ -7,7 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, toApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { fetchAvailableVehicles, type AvailableVehicleOption } from './vehicleUseApi';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset } from './vehicleUse';
@@ -26,6 +26,16 @@ export default function VehicleAvailabilityPage() {
     async function handleCheck(event: FormEvent) {
         event.preventDefault();
         if (!startsAt) return;
+        if (endsAt && endsAt <= startsAt) {
+            setError(new ApiError(
+                'Expected end date & time must follow start date & time.',
+                422,
+                'VALIDATION_FAILED',
+                'validation_error',
+                { ends_at: ['Expected end date & time must follow start date & time.'] },
+            ));
+            return;
+        }
         setLoading(true);
         setError(null);
         try {
@@ -128,7 +138,6 @@ export default function VehicleAvailabilityPage() {
                         label="Expected end date & time (optional)"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={startsAt || undefined}
                         value={endsAt}
                         onChange={e => setEndsAt(e.target.value)}
                         error={error?.fields.ends_at?.[0]}

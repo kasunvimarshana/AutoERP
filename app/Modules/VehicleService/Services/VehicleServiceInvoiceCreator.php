@@ -13,7 +13,7 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
-use Modules\Promotion\Services\PromotionRuntimeService;
+use Modules\VehicleService\Contracts\JobPromotionHandlerInterface;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -30,7 +30,7 @@ final class VehicleServiceInvoiceCreator
         private readonly VehicleServiceInvoiceSourceMapper $sources,
         private readonly VehicleServiceStatusService $statuses,
         private readonly VehicleServicePaymentIntegrationService $payments,
-        private readonly PromotionRuntimeService $promotions,
+        private readonly JobPromotionHandlerInterface $promotions,
     ) {}
 
     /** @param array<int, string> $lineQuantities */

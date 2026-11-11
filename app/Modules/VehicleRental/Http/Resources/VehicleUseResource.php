@@ -12,8 +12,20 @@ final class VehicleUseResource extends JsonResource
     public function toArray(Request $request): array
     {
         return ['id' => $this->id, 'row_version' => $this->row_version, 'status' => $this->status->value,
-            'customer_agreement' => ['id' => $this->customer_agreement_id, 'reference' => $this->customerAgreement->reference, 'party_name' => $this->customerAgreement->party_name_snapshot, 'version' => $this->customer_agreement_version],
-            'owner_agreement' => $this->ownerAgreement === null ? null : ['id' => $this->owner_agreement_id, 'reference' => $this->ownerAgreement->reference, 'party_name' => $this->ownerAgreement->party_name_snapshot, 'version' => $this->owner_agreement_version],
+            'customer_agreement' => [
+                'id' => $this->customer_agreement_id,
+                'reference' => $this->customerAgreement->reference,
+                'party_name' => $this->customerAgreement->party_name_snapshot,
+                'version' => $this->customer_agreement_version,
+                'driver_mode' => $this->customerAgreement->driver_mode->value,
+            ],
+            'owner_agreement' => $this->ownerAgreement === null ? null : [
+                'id' => $this->owner_agreement_id,
+                'reference' => $this->ownerAgreement->reference,
+                'party_name' => $this->ownerAgreement->party_name_snapshot,
+                'version' => $this->owner_agreement_version,
+                'driver_mode' => $this->ownerAgreement->driver_mode->value,
+            ],
             'vehicle' => ['id' => $this->vehicle_id, 'label' => $this->vehicle_label_snapshot],
             'replaces_use' => $this->replacesUse === null ? null : ['id' => $this->replacesUse->id, 'vehicle_label' => $this->replacesUse->vehicle_label_snapshot],
             'replaced_by_use' => $this->relationLoaded('replacedByUse') && $this->replacedByUse !== null ? ['id' => $this->replacedByUse->id, 'vehicle_label' => $this->replacedByUse->vehicle_label_snapshot] : null,

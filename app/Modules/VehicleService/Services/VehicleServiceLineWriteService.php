@@ -7,7 +7,7 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Promotion\Services\PromotionRuntimeService;
+use Modules\VehicleService\Contracts\JobPromotionHandlerInterface;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
@@ -28,7 +28,7 @@ final class VehicleServiceLineWriteService
         private readonly VehicleServiceLineRuleService $rules,
         private readonly VehicleServiceLineCalculationService $calculations,
         private readonly VehicleServiceInventoryIntegrationService $inventory,
-        private readonly PromotionRuntimeService $promotions,
+        private readonly JobPromotionHandlerInterface $promotions,
     ) {}
 
     public function create(

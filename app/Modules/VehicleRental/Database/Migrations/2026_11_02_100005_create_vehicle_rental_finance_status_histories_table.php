@@ -34,11 +34,11 @@ return new class extends Migration
             $table->foreign(['finance_agreement_id', 'tenant_id'], 'vr_fin_hist_agree_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_rental_finance_agreements')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['installment_id', 'tenant_id'], 'vr_fin_hist_inst_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_rental_finance_installments')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['changed_by', 'tenant_id'], 'vr_fin_hist_user_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')

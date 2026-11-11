@@ -101,7 +101,7 @@ final class RunningChartTest extends TestCase
     {
         $this->custodyFixture(function ($context, $use, $facts): void {
             $s = app(RunningChartService::class);
-            foreach ([['end_odometer' => '99'], ['garage_km' => '51'], ['normal_ot_minutes' => '24.30'], ['starts_at' => '2026-09-07T08:00:00+05:30'], ['ends_at' => '2026-09-11T08:00:00+05:30'], ['starts_at' => '2026-09-31T08:00:00+05:30']] as $bad) {
+            foreach ([['end_odometer' => '99'], ['garage_km' => '51'], ['normal_ot_minutes' => '24.30'], ['starts_at' => '2026-09-07T08:00:00+05:30'], ['ends_at' => '2026-09-07T08:30:00+05:30'], ['starts_at' => '2026-09-31T08:00:00+05:30']] as $bad) {
                 try {
                     $s->create($context, $use->id, $use->row_version, array_replace($facts, $bad));
                     self::fail('Invalid chart');
@@ -403,42 +403,59 @@ final class RunningChartTest extends TestCase
                 self::fail('Usage end before start was accepted');
             } catch (ValidationException $e) {
                 self::assertArrayHasKey('ends_at', $e->errors());
-                self::assertSame('Record completed usage ending after its start, not in the future.', $e->errors()['ends_at'][0]);
+                self::assertSame('Usage end must follow usage start.', $e->errors()['ends_at'][0]);
             }
 
             // Current travel time is 2026-09-10T12:00:00+00:00 (17:30 in Asia/Colombo).
-            // Rejects end later than current time + tolerance
+            // Permits future end date for draft running chart on ongoing custody
+            $futureChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'FUTURE-USAGE',
+                'starts_at' => '2026-09-07T09:00:00+05:30',
+                'ends_at' => '2026-09-10T17:45:00+05:30',
+            ]));
+            self::assertSame(RunningChartStatus::Draft, $futureChart->status);
+
+            // Rejects finalizing ongoing usage before it has actually completed
             try {
-                $service->create($context, $use->id, $use->row_version, array_replace($facts, [
-                    'reference' => 'FUTURE-USAGE',
-                    'starts_at' => '2026-09-07T09:00:00+05:30',
-                    'ends_at' => '2026-09-10T17:35:00+05:30',
-                ]));
-                self::fail('Future usage was accepted');
+                $service->change($context, $futureChart->id, $futureChart->row_version, RunningChartAction::Finalize);
+                self::fail('Finalizing ongoing usage was accepted');
             } catch (ValidationException $e) {
                 self::assertArrayHasKey('ends_at', $e->errors());
-                self::assertSame('Record completed usage ending after its start, not in the future.', $e->errors()['ends_at'][0]);
+                self::assertSame('Usage is currently ongoing. Running charts can only be finalized as physical evidence after the trip has concluded.', $e->errors()['ends_at'][0]);
             }
 
-            // Rejects start later than current time
+            // Permits future start date for draft running chart scheduled in advance
+            $futureStartChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'FUTURE-START-USAGE',
+                'starts_at' => '2026-09-11T09:00:00+05:30',
+                'ends_at' => '2026-09-11T12:00:00+05:30',
+            ]));
+            self::assertSame(RunningChartStatus::Draft, $futureStartChart->status);
+
+            // Rejects finalizing upcoming usage that has not started yet
             try {
-                $service->create($context, $use->id, $use->row_version, array_replace($facts, [
-                    'reference' => 'FUTURE-START',
-                    'starts_at' => '2026-09-10T17:35:00+05:30',
-                    'ends_at' => '2026-09-10T17:40:00+05:30',
-                ]));
-                self::fail('Future start was accepted');
+                $service->change($context, $futureStartChart->id, $futureStartChart->row_version, RunningChartAction::Finalize);
+                self::fail('Finalizing upcoming usage was accepted');
             } catch (ValidationException $e) {
                 self::assertArrayHasKey('starts_at', $e->errors());
+                self::assertSame('Usage has not started yet. Running charts can only be finalized as physical evidence after the trip has concluded.', $e->errors()['starts_at'][0]);
             }
 
-            // Accepts usage ending at current time with 30-second clock skew
+            // Accepts usage ending at current time with 90-second clock skew
             $skewChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
                 'reference' => 'SKEW-CHART',
                 'starts_at' => '2026-09-07T09:00:00+05:30',
-                'ends_at' => '2026-09-10T17:30:30+05:30',
+                'ends_at' => '2026-09-10T17:31:30+05:30',
             ]));
             self::assertSame('SKEW-CHART', $skewChart->reference);
+
+            // Accepts past completed usage wholly within custody
+            $pastChart = $service->create($context, $use->id, $use->row_version, array_replace($facts, [
+                'reference' => 'PAST-CHART',
+                'starts_at' => '2026-09-08T09:00:00+05:30',
+                'ends_at' => '2026-09-08T12:00:00+05:30',
+            ]));
+            self::assertSame('PAST-CHART', $pastChart->reference);
         });
     }
 
@@ -511,6 +528,21 @@ final class RunningChartTest extends TestCase
             } catch (ValidationException $e) {
                 self::assertArrayHasKey('period', $e->errors());
                 self::assertSame('Usage must fall within actual customer custody.', $e->errors()['period'][0]);
+            }
+
+            // 5. User submits starts_at after vehicle return -> rejected
+            try {
+                $chartService->create($context, $returnedUse->id, $returnedUse->row_version, [
+                    'reference' => 'RC-START-AFTER-RETURN',
+                    'starts_at' => '2026-09-07T18:05:00+05:30',
+                    'ends_at' => '2026-09-07T18:15:00+05:30',
+                    'start_odometer' => '200',
+                    'end_odometer' => '205',
+                ]);
+                self::fail('Usage starting after return was accepted');
+            } catch (ValidationException $e) {
+                self::assertArrayHasKey('starts_at', $e->errors());
+                self::assertSame('Usage cannot start after vehicle return.', $e->errors()['starts_at'][0]);
             }
         });
     }

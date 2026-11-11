@@ -9,18 +9,6 @@ import { createAgreementSuccessor } from './agreementApi';
 import { AgreementKind, type Agreement } from './agreements';
 
 export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: { kind: AgreementKind; agreement: Agreement; onSaved: () => void; onCancel: () => void }) {
-    const minStartDate = (() => {
-        try {
-            const [y, m, d] = agreement.starts_on.split('-').map(Number);
-            const nextDay = new Date(y, m - 1, d + 1);
-            const yyyy = nextDay.getFullYear();
-            const mm = String(nextDay.getMonth() + 1).padStart(2, '0');
-            const dd = String(nextDay.getDate()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd}`;
-        } catch {
-            return undefined;
-        }
-    })();
     const [reference, setReference] = useState('');
     const [agreedOn, setAgreedOn] = useState(businessDateInputValue);
     const [executingOn, setExecutingOn] = useState('');
@@ -58,15 +46,13 @@ export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: {
             <Input
                 label="Effective start date"
                 type="date"
-                min={minStartDate}
-                max={endsOn || undefined}
                 value={startsOn}
                 onChange={event => setStartsOn(event.target.value)}
                 required
                 hint={`Must be after predecessor start date (${agreement.starts_on})`}
                 error={error?.fields.starts_on?.[0]}
             />
-            <Input label="End date" type="date" min={startsOn || undefined} value={endsOn} onChange={event => setEndsOn(event.target.value)} error={error?.fields.ends_on?.[0]} />
+            <Input label="End date" type="date" value={endsOn} onChange={event => setEndsOn(event.target.value)} error={error?.fields.ends_on?.[0]} />
             <div className="sm:col-span-2"><Textarea label="Revision reason" value={reason} onChange={event => setReason(event.target.value)} required error={error?.fields.reason?.[0]} /></div>
         </fieldset>
         <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!agreedOn || !startsOn || !reason.trim()}>Create successor draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>

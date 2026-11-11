@@ -7,7 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, ApiError } from '@/shared/api/apiError';
-import { formatBusinessDateTimeWithSeconds, businessDateInputValue } from '@/shared/utils/businessDate';
+import { formatBusinessDateTimeWithSeconds, businessDateTimeInputValueWithSeconds } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
@@ -34,7 +34,7 @@ export interface InitialDriverState {
 }
 
 function freshLocalNow(): string {
-    return localTimestampValue(new Date().toISOString());
+    return businessDateTimeInputValueWithSeconds();
 }
 
 export function RunningChartEditor({
@@ -43,6 +43,7 @@ export function RunningChartEditor({
     correction,
     initialDriver,
     initialOdometer,
+    initialStartTime,
     onSaved,
     onCancel,
 }: {
@@ -51,21 +52,21 @@ export function RunningChartEditor({
     correction?: boolean;
     initialDriver?: InitialDriverState;
     initialOdometer?: string;
+    initialStartTime?: string;
     onSaved: () => void;
     onCancel: () => void;
 }) {
     const custodyStart = use.handed_over_at ? localTimestampValue(use.handed_over_at) : undefined;
     const custodyEnd = use.returned_at ? localTimestampValue(use.returned_at) : undefined;
-    const todayEnd = `${businessDateInputValue()}T23:59:59`;
 
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
-    const [start, setStart] = useState(chart ? localTimestampValue(chart.starts_at) : '');
+    const [start, setStart] = useState(() => {
+        if (chart) return localTimestampValue(chart.starts_at);
+        if (initialStartTime) return initialStartTime;
+        if (custodyStart) return custodyStart;
+        return '';
+    });
     const [end, setEnd] = useState(chart ? localTimestampValue(chart.ends_at) : '');
-
-    const minStart = custodyStart ? custodyStart.slice(0, 16) + ':00' : undefined;
-    const maxEnd = custodyEnd ?? todayEnd;
-    const maxStart = end && end < maxEnd ? end : maxEnd;
-    const minEnd = start || minStart;
     const [values, setValues] = useState<Record<string, string>>(() => {
         const initial = Object.fromEntries(
             [...Object.keys(DISTANCE_LABELS), ...Object.keys(COUNT_LABELS)].map(key => [
@@ -112,6 +113,7 @@ export function RunningChartEditor({
     ].includes(k)));
 
     const hasDetailsContent = Boolean(
+        use.customer_agreement?.driver_mode === 'with_driver' ||
         driverSource ||
         ac ||
         initialDriver?.source ||
@@ -129,23 +131,40 @@ export function RunningChartEditor({
 
     const isReferenceRequired = Boolean(chart && !correction);
     const isReferenceValid = isReferenceRequired ? Boolean(reference.trim()) : true;
+    const [mountTime] = useState(() => freshLocalNow());
+    const isFutureTrip = Boolean(end && end > mountTime);
 
     async function submit(event: FormEvent) {
         event.preventDefault(); setSaving(true); setError(null);
         try {
             if (start && end && end <= start) {
                 setError(new ApiError(
-                    'Record completed usage ending after its start, not in the future.',
+                    'Usage end must follow usage start.',
                     422,
                     'VALIDATION_FAILED',
                     'validation_error',
-                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
+                    { ends_at: ['Usage end must follow usage start.'] },
                 ));
                 setSaving(false);
                 return;
             }
 
-            const nowMs = Date.now() + 60_000;
+            if (values.start_odometer && values.end_odometer) {
+                const startOdo = parseFloat(values.start_odometer);
+                const endOdo = parseFloat(values.end_odometer);
+                if (!isNaN(startOdo) && !isNaN(endOdo) && endOdo < startOdo) {
+                    setError(new ApiError(
+                        'End odometer cannot be lower than start odometer.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation_error',
+                        { end_odometer: ['End odometer cannot be lower than start odometer.'] },
+                    ));
+                    setSaving(false);
+                    return;
+                }
+            }
+
             let startIso = '';
             let endIso = '';
             try {
@@ -153,30 +172,6 @@ export function RunningChartEditor({
                 if (end) endIso = timestampWithOffset(end);
             } catch {
                 // fall through to backend
-            }
-
-            if (startIso && new Date(startIso).getTime() > nowMs) {
-                setError(new ApiError(
-                    'Record completed usage starting before or at the current time, not in the future.',
-                    422,
-                    'VALIDATION_FAILED',
-                    'validation_error',
-                    { starts_at: ['Record completed usage starting before or at the current time, not in the future.'] },
-                ));
-                setSaving(false);
-                return;
-            }
-
-            if (endIso && new Date(endIso).getTime() > nowMs) {
-                setError(new ApiError(
-                    'Record completed usage ending after its start, not in the future.',
-                    422,
-                    'VALIDATION_FAILED',
-                    'validation_error',
-                    { ends_at: ['Record completed usage ending after its start, not in the future.'] },
-                ));
-                setSaving(false);
-                return;
             }
 
             if (custodyStart && startIso) {
@@ -194,7 +189,7 @@ export function RunningChartEditor({
                         'validation_error',
                         {
                             period: ['Usage must fall within actual customer custody.'],
-                            starts_at: ['Usage must fall within actual customer custody.'],
+                            starts_at: [use.handed_over_at ? `Usage cannot start before vehicle handover (${formatBusinessDateTimeWithSeconds(use.handed_over_at)}).` : 'Usage must fall within actual customer custody.'],
                         },
                     ));
                     setSaving(false);
@@ -209,6 +204,20 @@ export function RunningChartEditor({
                 } catch {
                     // fall through
                 }
+                if (custodyEndIso && new Date(startIso).getTime() >= new Date(custodyEndIso).getTime()) {
+                    setError(new ApiError(
+                        'Usage must fall within actual customer custody.',
+                        422,
+                        'VALIDATION_FAILED',
+                        'validation_error',
+                        {
+                            period: ['Usage must fall within actual customer custody.'],
+                            starts_at: [use.returned_at ? `Usage cannot start after vehicle return (${formatBusinessDateTimeWithSeconds(use.returned_at)}).` : 'Usage must fall within actual customer custody.'],
+                        },
+                    ));
+                    setSaving(false);
+                    return;
+                }
                 if (custodyEndIso && new Date(endIso).getTime() > new Date(custodyEndIso).getTime() + 60_000) {
                     setError(new ApiError(
                         'Usage must fall within actual customer custody.',
@@ -217,7 +226,7 @@ export function RunningChartEditor({
                         'validation_error',
                         {
                             period: ['Usage must fall within actual customer custody.'],
-                            ends_at: ['Usage must fall within actual customer custody.'],
+                            ends_at: [use.returned_at ? `Usage cannot end after vehicle return (${formatBusinessDateTimeWithSeconds(use.returned_at)}).` : 'Usage must fall within actual customer custody.'],
                         },
                     ));
                     setSaving(false);
@@ -294,16 +303,14 @@ export function RunningChartEditor({
                         label="Usage start"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={minStart}
-                        max={maxStart}
                         required
                         value={start}
                         onChange={e => setStart(e.target.value)}
                         error={error?.fields.starts_at?.[0]}
                         hint={use.handed_over_at ? `Vehicle in custody since: ${formatBusinessDateTimeWithSeconds(use.handed_over_at)}` : undefined}
                     />
-                    {custodyStart && (
-                        <div className="flex flex-wrap gap-2 text-xs">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        {custodyStart && (
                             <Button
                                 type="button"
                                 variant="secondary"
@@ -311,21 +318,30 @@ export function RunningChartEditor({
                             >
                                 Use custody start time
                             </Button>
-                        </div>
-                    )}
+                        )}
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                                const now = freshLocalNow();
+                                const target = end && end < now ? end : now;
+                                setStart(target);
+                            }}
+                        >
+                            Use current time
+                        </Button>
+                    </div>
                 </div>
                 <div className="space-y-1">
                     <Input
                         label="Usage end"
                         type="datetime-local"
                         step={OPERATIONAL_TIME_STEP_SECONDS}
-                        min={minEnd}
-                        max={maxEnd}
                         required
                         value={end}
                         onChange={e => setEnd(e.target.value)}
                         error={error?.fields.ends_at?.[0]}
-                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTimeWithSeconds(use.returned_at)}` : undefined}
+                        hint={use.returned_at ? `Vehicle returned: ${formatBusinessDateTimeWithSeconds(use.returned_at)}` : 'Usage end must follow usage start.'}
                     />
                     <div className="flex flex-wrap gap-2 text-xs">
                         {custodyEnd && (
@@ -341,13 +357,9 @@ export function RunningChartEditor({
                             type="button"
                             variant="secondary"
                             onClick={() => {
-                                try {
-                                    const now = freshLocalNow();
-                                    const target = custodyEnd && custodyEnd < now ? custodyEnd : now;
-                                    setEnd(target);
-                                } catch {
-                                    setEnd(new Date().toISOString().slice(0, 19));
-                                }
+                                const now = freshLocalNow();
+                                const target = custodyEnd && custodyEnd < now ? custodyEnd : now;
+                                setEnd(target);
                             }}
                         >
                             Use current time
@@ -355,6 +367,11 @@ export function RunningChartEditor({
                     </div>
                 </div>
             </div>
+            {isFutureTrip && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-800">
+                    This trip extends into the future. It will be saved as a draft and can be finalized as physical evidence after the trip concludes.
+                </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
                 {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}
                 {decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
@@ -363,8 +380,20 @@ export function RunningChartEditor({
                 open={detailsOpen}
                 onToggle={e => setUserToggledOpen(e.currentTarget.open)}
             >
-                <summary className="cursor-pointer font-medium">Additional usage observations</summary>
+                <summary className="cursor-pointer font-medium flex items-center justify-between">
+                    <span>Additional usage observations</span>
+                    {use.customer_agreement?.driver_mode === 'with_driver' && (
+                        <span className="text-xs font-normal text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            Agreement: With driver
+                        </span>
+                    )}
+                </summary>
                 <div className="space-y-3 pt-3">
+                    {use.customer_agreement?.driver_mode === 'with_driver' && !driverSource && (
+                        <p className="rounded-md border border-sky-200 bg-sky-50 p-2 text-xs text-sky-800">
+                            This agreement includes driver services. Select Employee driver or External driver below.
+                        </p>
+                    )}
                     <div className="grid gap-3 sm:grid-cols-2">
                         {decimal('garage_km', DISTANCE_LABELS.garage_km)}
                         {decimal('commercial_km', DISTANCE_LABELS.commercial_km)}

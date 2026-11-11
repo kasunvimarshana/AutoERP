@@ -8,12 +8,12 @@ import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Textarea } from '@/shared/components/Textarea';
-import { formatBusinessDateTime, businessDateInputValue } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateTimeInputValueWithSeconds } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { AGREEMENT_API, type Agreement } from './agreements';
 import { planVehicleUse, replaceVehicleUse } from './vehicleUseApi';
-import { operationalTimeZoneLabel, localTimestampValue, timestampWithOffset, OPERATIONAL_TIME_STEP_SECONDS, type VehicleUse } from './vehicleUse';
+import { operationalTimeZoneLabel, timestampWithOffset, OPERATIONAL_TIME_STEP_SECONDS, type VehicleUse } from './vehicleUse';
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params).then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number || row.vehicle_number) })) }));
 export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onSaved, onCancel }: { agreement: Agreement; replacement?: VehicleUse; initialVehicleId?: number; onSaved: () => void; onCancel: () => void }) {
     const [vehicle, setVehicle] = useState<NamedResource | null>(null);
@@ -21,21 +21,9 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [company, setCompany] = useState(false);
     const [sourceCount, setSourceCount] = useState<number | null>(null);
     const [oldOdometer, setOldOdometer] = useState(''); const [newOdometer, setNewOdometer] = useState('');
-    const replacementHandoverLocal = (() => {
-        if (!replacement?.handed_over_at) return undefined;
-        try {
-            return localTimestampValue(replacement.handed_over_at);
-        } catch {
-            return replacement.handed_over_at.slice(0, 19);
-        }
-    })();
     const [start, setStart] = useState(() => {
         if (replacement) {
-            try {
-                return localTimestampValue(new Date().toISOString());
-            } catch {
-                return new Date().toISOString().slice(0, 19);
-            }
+            return businessDateTimeInputValueWithSeconds();
         }
         return agreement.starts_on ? `${agreement.starts_on}T00:00` : '';
     });
@@ -44,12 +32,6 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
     const isSameReplacementVehicle = Boolean(replacement && vehicle && vehicle.id === replacement.vehicle.id);
-    const minStart = replacementHandoverLocal
-        ? replacementHandoverLocal.slice(0, 16)
-        : (agreement.starts_on ? `${agreement.starts_on}T00:00` : undefined);
-    const maxEnd = agreement.ends_on ? `${agreement.ends_on}T23:59` : undefined;
-    const todayEnd = `${businessDateInputValue()}T23:59:59`;
-    const maxStart = replacement ? (end && end < todayEnd ? end : todayEnd) : (end || maxEnd);
 
     useEffect(() => {
         if (!replacement && initialVehicleId && !vehicle) {
@@ -145,13 +127,44 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 return;
             }
             const parsedStart = new Date(startIso);
-            if (parsedStart.getTime() > Date.now() + 60000) {
+            if (parsedStart.getTime() > Date.now() + 120_000) {
                 setError(new ApiError(
                     'Replacement time cannot be in the future.',
                     422,
                     'VALIDATION_FAILED',
                     'validation',
                     { starts_at: ['Replacement time cannot be in the future.'] },
+                ));
+                return;
+            }
+        } else {
+            if (agreement.starts_on && start && start.slice(0, 10) < agreement.starts_on) {
+                setError(new ApiError(
+                    `Planned handover cannot precede agreement start date (${agreement.starts_on}).`,
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { starts_at: [`Planned handover cannot precede agreement start date (${agreement.starts_on}).`] },
+                ));
+                return;
+            }
+            if (agreement.ends_on && end && end.slice(0, 10) > agreement.ends_on) {
+                setError(new ApiError(
+                    `Planned return cannot exceed agreement end date (${agreement.ends_on}).`,
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { ends_at: [`Planned return cannot exceed agreement end date (${agreement.ends_on}).`] },
+                ));
+                return;
+            }
+            if (end && end <= start) {
+                setError(new ApiError(
+                    'Planned return must follow planned handover.',
+                    422,
+                    'VALIDATION_FAILED',
+                    'validation',
+                    { ends_at: ['Planned return must follow planned handover.'] },
                 ));
                 return;
             }
@@ -199,14 +212,12 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                     label={replacement ? "Replacement time" : "Planned handover"}
                     type="datetime-local"
                     step={OPERATIONAL_TIME_STEP_SECONDS}
-                    min={minStart}
-                    max={maxStart}
                     value={start}
                     onChange={e => { setStart(e.target.value); setOwner(null); setSourceCount(null); }}
                     required
                     hint={replacement?.handed_over_at
                         ? `Replacement time must follow previous handover (${formatBusinessDateTime(replacement.handed_over_at)}) and cannot be in the future.`
-                        : (minStart ? `Agreement starts: ${agreement.starts_on}` : undefined)
+                        : (agreement.starts_on ? `Agreement starts: ${agreement.starts_on}` : undefined)
                     }
                     error={error?.fields.starts_at?.[0]}
                 />
@@ -216,11 +227,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                             type="button"
                             variant="secondary"
                             onClick={() => {
-                                try {
-                                    setStart(localTimestampValue(new Date().toISOString()));
-                                } catch {
-                                    setStart(new Date().toISOString().slice(0, 19));
-                                }
+                                setStart(businessDateTimeInputValueWithSeconds());
                                 setOwner(null);
                                 setSourceCount(null);
                             }}
@@ -234,8 +241,6 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 label="Planned return (optional)"
                 type="datetime-local"
                 step={OPERATIONAL_TIME_STEP_SECONDS}
-                min={start || minStart || undefined}
-                max={maxEnd}
                 value={end}
                 onChange={e => { setEnd(e.target.value); setOwner(null); setSourceCount(null); }}
                 hint={agreement.ends_on ? `Agreement ends: ${agreement.ends_on}` : undefined}

@@ -229,6 +229,7 @@ final class CoreModulesApiTest extends TestCase
             PaymentPermission::PAYMENTS_APPROVE,
             PaymentPermission::PAYMENTS_POST,
             PaymentPermission::PAYMENTS_ALLOCATE,
+            PaymentPermission::PAYMENTS_BACKDATE_CASH,
         ], 'Payment');
         $this->paymentFinanceContext($tenantId, $organizationUnitId);
         $invoice = $this->createPostedInvoice($tenantId, $organizationUnitId);
@@ -240,6 +241,7 @@ final class CoreModulesApiTest extends TestCase
             'payment_type' => 'customer_receipt',
             'direction' => 'inbound',
             'payment_date' => '2026-06-06',
+            'notes' => 'Backdated cash settlement for invoice',
             'party_type' => 'customer',
             'party_id' => $invoice->party_id,
             'lines' => [[

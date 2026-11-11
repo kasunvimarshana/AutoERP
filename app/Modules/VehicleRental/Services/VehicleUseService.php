@@ -180,7 +180,7 @@ final class VehicleUseService
                 $record->status = VehicleUseStatus::Cancelled;
             } elseif ($action === VehicleUseAction::Handover && $record->status === VehicleUseStatus::Planned) {
                 $tz = $this->calendar->timezone($context);
-                $now = CarbonImmutable::now($tz)->addMinute();
+                $now = $this->calendar->now($context)->addMinutes(OperationalFields::CLOCK_DRIFT_TOLERANCE_MINUTES);
                 $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at')->setTimezone($tz);
                 if ($at->greaterThan($now)) {
                     throw ValidationException::withMessages(['occurred_at' => ['Handover time cannot be in the future.']]);
@@ -206,7 +206,7 @@ final class VehicleUseService
                 $record->handover_odometer = $data['odometer'] ?? null;
             } elseif ($action === VehicleUseAction::ReturnVehicle && $record->status === VehicleUseStatus::InCustody) {
                 $tz = $this->calendar->timezone($context);
-                $now = CarbonImmutable::now($tz)->addMinute();
+                $now = $this->calendar->now($context)->addMinutes(OperationalFields::CLOCK_DRIFT_TOLERANCE_MINUTES);
                 $at = OperationalTime::parse($data['occurred_at'] ?? null, 'occurred_at')->setTimezone($tz);
                 if ($at->greaterThan($now)) {
                     throw ValidationException::withMessages(['occurred_at' => ['Return time cannot be in the future.']]);
@@ -282,7 +282,7 @@ final class VehicleUseService
         OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at'] ?? null);
 
         $tz = $this->calendar->timezone($context);
-        $now = CarbonImmutable::now($tz)->addMinute();
+        $now = $this->calendar->now($context)->addMinutes(OperationalFields::CLOCK_DRIFT_TOLERANCE_MINUTES);
         $startsAt = OperationalTime::parse($data['starts_at'], 'starts_at')->setTimezone($tz);
         if ($startsAt->greaterThan($now)) {
             throw ValidationException::withMessages(['starts_at' => ['Replacement time cannot be in the future.']]);

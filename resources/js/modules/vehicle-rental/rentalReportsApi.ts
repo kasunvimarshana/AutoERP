@@ -75,11 +75,35 @@ export interface RentalRevenueReportParams {
     end_date: string;
     customer_id?: number | null;
     agreement_id?: number | null;
+    report_type?: 'summary' | 'invoice_listing';
+}
+
+export interface RentalInvoiceListingRow {
+    invoice_id: number;
+    invoice_number: string;
+    invoice_date: string;
+    raw_invoice_date: string;
+    customer_details: string;
+    vehicle_number: string;
+    rental_charge: string;
+    rental_charge_raw: number;
+    excess_km_charge: string;
+    excess_km_charge_raw: number;
+    vat_amount: string;
+    vat_amount_raw: number;
+    total_amount: string;
+    total_amount_raw: number;
 }
 
 export interface RentalRevenueReportData {
-    header: ReportHeader;
-    filters: { customer_id: number | null; agreement_id: number | null };
+    header: ReportHeader & {
+        report_type?: string;
+    };
+    filters: {
+        customer_id: number | null;
+        agreement_id: number | null;
+        report_type?: string;
+    };
     summary: {
         total_agreements: number;
         total_base_rent: string;
@@ -88,6 +112,11 @@ export interface RentalRevenueReportData {
         total_night_out: string;
         total_toll_pass: string;
         grand_total_revenue: string;
+        total_invoices_count?: number;
+        invoice_total_rental_charge?: string;
+        invoice_total_excess_km?: string;
+        invoice_total_vat?: string;
+        invoice_grand_total?: string;
     };
     rows: Array<{
         agreement_id: number;
@@ -108,6 +137,7 @@ export interface RentalRevenueReportData {
         toll_pass: string;
         total_revenue: string;
     }>;
+    invoices?: RentalInvoiceListingRow[];
     footer: ReportFooter;
 }
 
@@ -120,6 +150,7 @@ export const getRentalRevenueReportExportUrl = (params: RentalRevenueReportParam
         end_date: params.end_date,
         ...(params.customer_id ? { customer_id: String(params.customer_id) } : {}),
         ...(params.agreement_id ? { agreement_id: String(params.agreement_id) } : {}),
+        ...(params.report_type ? { report_type: params.report_type } : {}),
     });
     return `/api/v1/vehicle-rental/reports/rental-revenue/export/${format}?${query.toString()}`;
 };
@@ -130,8 +161,9 @@ export interface OwnerDisbursementReportParams {
     end_date: string;
     supplier_id?: number | null;
     owner_agreement_id?: number | null;
+    vehicle_id?: number | null;
     wht_rate?: number;
-    report_type?: 'summary' | 'wht_ledger';
+    report_type?: 'summary' | 'wht_ledger' | 'statement_detail_1' | 'statement_detail_2';
 }
 
 export interface WhtLedgerEntry {
@@ -148,6 +180,74 @@ export interface WhtLedgerEntry {
     wht_amount: string;
 }
 
+export interface OwnerStatementData {
+    owner_agreement_id: number;
+    agreement_reference: string;
+    vehicle_number: string;
+    owner_name: string;
+    owner_code: string;
+    client_name: string;
+    driver_badge: string;
+    period: string;
+    report_date: string;
+    account_reference: string;
+    balance_bf_label: string;
+    balance_bf: string;
+    balance_bf_raw: number;
+    payables: Array<{
+        date_reference: string;
+        description: string;
+        unit: string;
+        rate: string;
+        amount: string;
+        amount_raw: number;
+    }>;
+    total_payable: string;
+    total_payable_raw: number;
+    detail_ii_row: {
+        client_name: string;
+        hire_start: string;
+        hire_finish: string;
+        unit: string;
+        calculated_by: string;
+        total_km: string;
+        non_ac_rate: string;
+        hire_amount: string;
+        no_hrs: string;
+        do_hrs: string;
+        to_hrs: string;
+        ot_amount: string;
+        driver_salary: string;
+        driver_bata: string;
+        other_charges: string;
+        vat_amount: string;
+        total_payable: string;
+    };
+    settlements: Array<{
+        date: string;
+        reference: string;
+        description: string;
+        amount: string;
+        amount_raw: number;
+    }>;
+    total_settlements: string;
+    total_settlements_raw: number;
+    repair_deductions: Array<{
+        date: string;
+        reference: string;
+        description: string;
+        amount: string;
+        amount_raw: number;
+    }>;
+    total_repair_deductions: string;
+    total_repair_deductions_raw: number;
+    wht_rate: number;
+    wht_amount: string;
+    balance_closing_label: string;
+    balance_closing: string;
+    balance_closing_raw: number;
+}
+
 export interface OwnerDisbursementReportData {
     header: ReportHeader & {
         account_code?: string;
@@ -157,6 +257,7 @@ export interface OwnerDisbursementReportData {
     filters: {
         supplier_id: number | null;
         owner_agreement_id: number | null;
+        vehicle_id?: number | null;
         wht_rate?: number;
         report_type?: string;
     };
@@ -191,6 +292,7 @@ export interface OwnerDisbursementReportData {
         net_payable: string;
     }>;
     wht_ledger?: WhtLedgerEntry[];
+    statement?: OwnerStatementData | null;
     footer: ReportFooter;
 }
 
@@ -203,6 +305,7 @@ export const getOwnerDisbursementReportExportUrl = (params: OwnerDisbursementRep
         end_date: params.end_date,
         ...(params.supplier_id ? { supplier_id: String(params.supplier_id) } : {}),
         ...(params.owner_agreement_id ? { owner_agreement_id: String(params.owner_agreement_id) } : {}),
+        ...(params.vehicle_id ? { vehicle_id: String(params.vehicle_id) } : {}),
         ...(params.wht_rate !== undefined ? { wht_rate: String(params.wht_rate) } : {}),
         ...(params.report_type ? { report_type: params.report_type } : {}),
     });

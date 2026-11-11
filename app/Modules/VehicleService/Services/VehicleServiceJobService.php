@@ -7,8 +7,8 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Promotion\Services\PromotionRuntimeService;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleService\Contracts\JobPromotionHandlerInterface;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
@@ -35,7 +35,7 @@ final class VehicleServiceJobService
         private readonly VehicleServiceInspectionService $inspections,
         private readonly VehicleServiceAdmissionService $admission,
         private readonly VehicleServiceLineService $lines,
-        private readonly PromotionRuntimeService $promotions,
+        private readonly JobPromotionHandlerInterface $promotions,
     ) {}
 
     /** @param list<VehicleServiceLineData> $lines */

@@ -239,6 +239,42 @@ final class RentalReportsTest extends TestCase
             self::assertArrayHasKey('header', $profitData);
             self::assertArrayHasKey('summary', $profitData);
             self::assertArrayHasKey('rows', $profitData);
+
+            // Test Statement of Accounts (Vehicle Wise Detail I & Detail II)
+            $detail1Data = $ownerService->generate($context, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'report_type' => 'statement_detail_1',
+            ]);
+            self::assertSame('statement_detail_1', $detail1Data['header']['report_type']);
+            self::assertNotNull($detail1Data['statement']);
+            self::assertArrayHasKey('balance_bf', $detail1Data['statement']);
+            self::assertArrayHasKey('payables', $detail1Data['statement']);
+            self::assertArrayHasKey('settlements', $detail1Data['statement']);
+            self::assertArrayHasKey('repair_deductions', $detail1Data['statement']);
+            self::assertArrayHasKey('balance_closing', $detail1Data['statement']);
+
+            $detail2Data = $ownerService->generate($context, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'report_type' => 'statement_detail_2',
+            ]);
+            self::assertSame('statement_detail_2', $detail2Data['header']['report_type']);
+            self::assertNotNull($detail2Data['statement']);
+            self::assertArrayHasKey('detail_ii_row', $detail2Data['statement']);
+            self::assertArrayHasKey('client_name', $detail2Data['statement']['detail_ii_row']);
+            self::assertArrayHasKey('hire_amount', $detail2Data['statement']['detail_ii_row']);
+
+            // Test Rental Revenue - Lessee's All Invoice Listing (Summary)
+            $revService = app(RentalRevenueReportService::class);
+            $invoiceListingData = $revService->generate($context, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'report_type' => 'invoice_listing',
+            ]);
+            self::assertSame("Lessee's All Invoice Listing (Summary)", $invoiceListingData['header']['report_title']);
+            self::assertArrayHasKey('invoices', $invoiceListingData);
+            self::assertArrayHasKey('invoice_grand_total', $invoiceListingData['summary']);
         });
     }
 
@@ -290,6 +326,20 @@ final class RentalReportsTest extends TestCase
         $ownerWhtPrint = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
             ->get(self::ROOT.'/reports/owner-disbursements/export/print?start_date=2026-09-01&end_date=2026-09-30&report_type=wht_ledger&wht_rate=10');
         $ownerWhtPrint->assertOk()->assertSee('3305-000 WHT', false);
+
+        // Test Owner Statement Detail I & Detail II print exports
+        $ownerDetail1Print = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->get(self::ROOT.'/reports/owner-disbursements/export/print?start_date=2026-09-01&end_date=2026-09-30&report_type=statement_detail_1');
+        $ownerDetail1Print->assertOk()->assertSee('Statement of Accounts - Vehicle Wise (Detail)', false);
+
+        $ownerDetail2Print = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->get(self::ROOT.'/reports/owner-disbursements/export/print?start_date=2026-09-01&end_date=2026-09-30&report_type=statement_detail_2');
+        $ownerDetail2Print->assertOk()->assertSee('Statement of Accounts - Vehicle Wise (Detail II)', false);
+
+        // Test Lessee Invoice Listing print export
+        $invListingPrint = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
+            ->get(self::ROOT.'/reports/rental-revenue/export/print?start_date=2026-09-01&end_date=2026-09-30&report_type=invoice_listing');
+        $invListingPrint->assertOk()->assertSee("Lessee&#039;s All Invoice Listing", false);
     }
 
     public function test_reports_accept_empty_optional_query_filters(): void

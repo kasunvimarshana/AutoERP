@@ -5,7 +5,7 @@ import { Select } from '@/shared/components/Select';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Textarea } from '@/shared/components/Textarea';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { toApiError, ApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { requestLookup } from '@/shared/api/lookupRequest';
@@ -59,6 +59,29 @@ export function VehicleFinanceEditor({
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!supplier || !vehicle || !currency) return;
+
+        if (new Date(maturesAt).getTime() <= new Date(startsAt).getTime()) {
+            setError(new ApiError(
+                'Vehicle finance maturity must follow start date.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { matures_at: ['Vehicle finance maturity must follow start date.'] },
+            ));
+            return;
+        }
+
+        if (Number(depositAmount) > Number(principalAmount)) {
+            setError(new ApiError(
+                'Initial finance deposit cannot exceed the principal amount.',
+                422,
+                'VALIDATION_FAILED',
+                'validation',
+                { initial_deposit_amount: ['Initial finance deposit cannot exceed the principal amount.'] },
+            ));
+            return;
+        }
+
         setSaving(true);
         setError(null);
 
@@ -155,7 +178,7 @@ export function VehicleFinanceEditor({
                 />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <LookupSelect
                     label="Currency"
                     value={currency}
@@ -175,20 +198,6 @@ export function VehicleFinanceEditor({
                     error={error?.fields.principal_amount?.[0]}
                 />
                 <Input
-                    label="Initial Deposit Paid"
-                    value={depositAmount}
-                    onChange={e => setDepositAmount(e.target.value)}
-                    inputMode="decimal"
-                    error={error?.fields.initial_deposit_amount?.[0]}
-                />
-                <Input
-                    label="Residual / Balloon Value"
-                    value={residualValue}
-                    onChange={e => setResidualValue(e.target.value)}
-                    inputMode="decimal"
-                    error={error?.fields.residual_value?.[0]}
-                />
-                <Input
                     label="Annual Interest Rate (%)"
                     value={annualRate}
                     onChange={e => setAnnualRate(e.target.value)}
@@ -198,7 +207,7 @@ export function VehicleFinanceEditor({
                 />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Select
                     label="Interest Method"
                     value={interestMethod}
@@ -230,22 +239,45 @@ export function VehicleFinanceEditor({
                     min={1}
                     error={error?.fields.installment_count?.[0]}
                 />
-                <Input
-                    label="Payment Term (Days)"
-                    type="number"
-                    value={termDays}
-                    onChange={e => setTermDays(e.target.value)}
-                    min={0}
-                />
             </div>
 
-            <Textarea
-                label="Remarks & Conditions"
-                value={remarks}
-                onChange={e => setRemarks(e.target.value)}
-                rows={2}
-                error={error?.fields.remarks?.[0]}
-            />
+            <details open={Boolean((depositAmount && depositAmount !== '0.00') || (residualValue && residualValue !== '0.00') || (remarks && remarks.trim()))} className="rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+                <summary className="cursor-pointer text-sm font-medium text-slate-700">
+                    Additional lease terms & conditions (optional)
+                </summary>
+                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <Input
+                        label="Initial Deposit Paid"
+                        value={depositAmount}
+                        onChange={e => setDepositAmount(e.target.value)}
+                        inputMode="decimal"
+                        error={error?.fields.initial_deposit_amount?.[0]}
+                    />
+                    <Input
+                        label="Residual / Balloon Value"
+                        value={residualValue}
+                        onChange={e => setResidualValue(e.target.value)}
+                        inputMode="decimal"
+                        error={error?.fields.residual_value?.[0]}
+                    />
+                    <Input
+                        label="Payment Term (Days)"
+                        type="number"
+                        value={termDays}
+                        onChange={e => setTermDays(e.target.value)}
+                        min={0}
+                    />
+                    <div className="md:col-span-3">
+                        <Textarea
+                            label="Remarks & Conditions"
+                            value={remarks}
+                            onChange={e => setRemarks(e.target.value)}
+                            rows={2}
+                            error={error?.fields.remarks?.[0]}
+                        />
+                    </div>
+                </div>
+            </details>
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                 <Button type="submit" loading={saving} disabled={!supplier || !vehicle || !currency || !startsAt || !maturesAt}>Generate Schedule & Create Agreement</Button>

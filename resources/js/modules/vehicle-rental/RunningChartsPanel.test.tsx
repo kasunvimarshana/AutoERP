@@ -45,4 +45,65 @@ describe('Running Chart review', () => {
   expect(await screen.findByText('Charts could not be loaded.')).toBeInTheDocument();
   expect(screen.queryByText('CHART-A')).not.toBeInTheDocument();
  });
+ it('disables finalization and badges upcoming and ongoing draft charts', async () => {
+  session.permissions.push(CHART_PERMISSION.finalize);
+  const pastDraft = {
+   ...chart,
+   id: 10,
+   reference: 'CHART-PAST',
+   status: RunningChartStatus.Draft,
+   starts_at: '2026-09-07T09:00:00+05:30',
+   ends_at: '2026-09-07T12:00:00+05:30',
+  };
+  const upcomingDraft = {
+   ...chart,
+   id: 11,
+   reference: 'CHART-UPCOMING',
+   status: RunningChartStatus.Draft,
+   starts_at: '2099-01-01T09:00:00+05:30',
+   ends_at: '2099-01-01T12:00:00+05:30',
+  };
+  const ongoingDraft = {
+   ...chart,
+   id: 12,
+   reference: 'CHART-ONGOING',
+   status: RunningChartStatus.Draft,
+   starts_at: '2026-09-07T09:00:00+05:30',
+   ends_at: '2099-01-01T12:00:00+05:30',
+  };
+  vi.mocked(listCharts).mockResolvedValue({ data: [pastDraft, upcomingDraft, ongoingDraft] });
+  render(<RunningChartsPanel use={use} />);
+  expect(await screen.findByText('CHART-PAST')).toBeInTheDocument();
+  expect(screen.getByText('Ready to finalize')).toBeInTheDocument();
+  expect(screen.getByText('Upcoming trip')).toBeInTheDocument();
+  expect(screen.getByText('Trip in progress')).toBeInTheDocument();
+
+  const finalizeButtons = screen.getAllByRole('button', { name: 'Finalize usage' });
+  expect(finalizeButtons).toHaveLength(3);
+  expect(finalizeButtons[0]).toBeEnabled();
+  expect(finalizeButtons[1]).toBeDisabled();
+  expect(finalizeButtons[2]).toBeDisabled();
+ });
+ it('badges custody overrun and disables finalization when draft ends after return', async () => {
+  session.permissions.push(CHART_PERMISSION.finalize);
+  const returnedUse = {
+   ...use,
+   status: VehicleUseStatus.Returned,
+   handed_over_at: '2026-09-07T09:00:00+05:30',
+   returned_at: '2026-09-07T15:00:00+05:30',
+  } as VehicleUse;
+  const overrunDraft = {
+   ...chart,
+   id: 20,
+   reference: 'CHART-OVERRUN',
+   status: RunningChartStatus.Draft,
+   starts_at: '2026-09-07T09:00:00+05:30',
+   ends_at: '2026-09-07T16:00:00+05:30',
+  };
+  vi.mocked(listCharts).mockResolvedValue({ data: [overrunDraft] });
+  render(<RunningChartsPanel use={returnedUse} />);
+  expect(await screen.findByText('CHART-OVERRUN')).toBeInTheDocument();
+  expect(screen.getByText('Exceeds return custody')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Finalize usage' })).toBeDisabled();
+ });
 });

@@ -24,7 +24,7 @@ it('uses the planned period for owner lookup and clears its selection when dates
     expect(screen.queryByRole('combobox', { name: 'Owner agreement' })).not.toBeInTheDocument();
     const start = '2026-09-07T09:00'; const end = '2026-09-08T09:00';
     fireEvent.change(screen.getByLabelText('Planned handover'), { target: { value: start } });
-    expect(screen.getByLabelText('Planned return (optional)')).toHaveAttribute('min', start);
+    expect(screen.getByLabelText('Planned return (optional)')).not.toHaveAttribute('min');
     fireEvent.change(screen.getByLabelText('Planned return (optional)'), { target: { value: end } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Owner agreement' }), { target: { value: 'OWNER' } });
     fireEvent.click(await screen.findByRole('option', { name: 'OWNER-A · Example Owner' }));
@@ -164,8 +164,8 @@ it('provides return odometer guidance and min bound during replacement when old 
     } as VehicleUse;
     render(<VehicleUseEditor agreement={agreement} replacement={replacement} onSaved={vi.fn()} onCancel={vi.fn()} />);
     const timeInput = screen.getByLabelText('Replacement time');
-    expect(timeInput).toHaveAttribute('min', '2026-09-07T09:00');
-    expect(timeInput).toHaveAttribute('max', expect.stringContaining('T23:59:59'));
+    expect(timeInput).not.toHaveAttribute('min');
+    expect(timeInput).not.toHaveAttribute('max');
     expect(screen.getByText(/Replacement time must follow previous handover .* and cannot be in the future\./)).toBeInTheDocument();
     expect(screen.getByText(/Handover reading was 1250\.00\. Return reading cannot be lower\./)).toBeInTheDocument();
     const oldOdoInput = screen.getByLabelText('Old vehicle return odometer (optional)');

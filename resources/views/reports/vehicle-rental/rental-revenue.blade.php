@@ -207,6 +207,77 @@
         </tr>
     </table>
 
+    @if (($header['report_type'] ?? 'summary') === 'invoice_listing')
+    <!-- Lessee's All Invoice Listing (Summary) - matching legacy FoxPro prndebinv3_s.pdf -->
+    <div class="kpi-cards">
+        <div class="kpi-card">
+            <div class="kpi-title">Total Invoices</div>
+            <div class="kpi-value">{{ $summary['total_invoices_count'] }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Rental Charges</div>
+            <div class="kpi-value">{{ $summary['invoice_total_rental_charge'] }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Excess KM Charges</div>
+            <div class="kpi-value">{{ $summary['invoice_total_excess_km'] }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">VAT (18%)</div>
+            <div class="kpi-value">{{ $summary['invoice_total_vat'] }}</div>
+        </div>
+        <div class="kpi-card" style="background: #eff6ff; border-color: #bfdbfe;">
+            <div class="kpi-title" style="color: #1e40af;">Total Invoice Billing</div>
+            <div class="kpi-value" style="color: #1e3a8a;">{{ $summary['invoice_grand_total'] }}</div>
+        </div>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width: 14%;">Invoice No</th>
+                <th style="width: 10%;">Invoice Date</th>
+                <th style="width: 34%; text-align: left;">Lessee's Details & Period</th>
+                <th style="width: 12%;">Vehicle No</th>
+                <th style="width: 10%; text-align: right;">Rental Charge</th>
+                <th style="width: 10%; text-align: right;">Excess KM Charge</th>
+                <th style="width: 10%; text-align: right;">VAT</th>
+                <th style="width: 12%; text-align: right;">Total Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($invoices as $inv)
+            <tr>
+                <td class="text-center font-bold nowrap">{{ $inv['invoice_number'] }}</td>
+                <td class="text-center nowrap">{{ $inv['invoice_date'] }}</td>
+                <td class="text-left font-medium">{{ $inv['customer_details'] }}</td>
+                <td class="text-center font-bold nowrap">{{ $inv['vehicle_number'] }}</td>
+                <td class="text-right">{{ $inv['rental_charge'] }}</td>
+                <td class="text-right">{{ $inv['excess_km_charge'] }}</td>
+                <td class="text-right">{{ $inv['vat_amount'] }}</td>
+                <td class="text-right font-bold">{{ $inv['total_amount'] }}</td>
+            </tr>
+            @empty
+            <tr>
+                <td colspan="8" class="text-center" style="padding: 15px;">No customer invoices found for the selected period.</td>
+            </tr>
+            @endforelse
+        </tbody>
+        <tfoot>
+            <tr style="border-top: 2px solid #000; font-weight: 700; background: #f8fafc;">
+                <td colspan="4" class="text-right" style="padding: 6px 4px;">
+                    Invoice Totals ({{ $summary['total_invoices_count'] }} invoices)
+                </td>
+                <td class="text-right font-bold" style="padding: 6px 4px;">{{ $summary['invoice_total_rental_charge'] }}</td>
+                <td class="text-right font-bold" style="padding: 6px 4px;">{{ $summary['invoice_total_excess_km'] }}</td>
+                <td class="text-right font-bold" style="padding: 6px 4px;">{{ $summary['invoice_total_vat'] }}</td>
+                <td class="text-right font-bold" style="padding: 6px 4px; color: #1e3a8a;">{{ $summary['invoice_grand_total'] }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    @else
+
     <!-- KPI Cards -->
     <div class="kpi-cards">
         <div class="kpi-card">
@@ -289,6 +360,7 @@
             </tr>
         </tfoot>
     </table>
+    @endif
 
     <div class="footer-branding">
         <div>{{ $footer['software_provider'] }}</div>
