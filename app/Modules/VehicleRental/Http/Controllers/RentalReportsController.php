@@ -92,7 +92,10 @@ final class RentalReportsController
             $request->only(['start_date', 'end_date', 'customer_id', 'agreement_id', 'report_type']),
         );
 
-        return $this->respondExport('reports.vehicle-rental.rental-revenue', 'rental-revenue', $data, $format, $request, 'landscape');
+        $reportType = (string) ($request->input('report_type') ?? 'summary');
+        $orientation = ($reportType === 'invoice_listing') ? 'portrait' : 'landscape';
+
+        return $this->respondExport('reports.vehicle-rental.rental-revenue', 'rental-revenue', $data, $format, $request, $orientation);
     }
 
     public function lesseeOutstanding(LesseeOutstandingReportRequest $request): JsonResponse

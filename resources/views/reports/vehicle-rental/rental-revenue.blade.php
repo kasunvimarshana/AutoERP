@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; }
         @page {
-            size: A4 landscape;
+            size: {{ ($header['report_type'] ?? 'summary') === 'invoice_listing' ? 'A4 portrait' : 'A4 landscape' }};
             margin: 8mm 10mm 8mm 10mm;
         }
         html, body {
@@ -21,7 +21,7 @@
         }
         .sheet-container {
             width: 100%;
-            max-width: 1120px;
+            max-width: {{ ($header['report_type'] ?? 'summary') === 'invoice_listing' ? '820px' : '1120px' }};
             margin: 0 auto;
             padding: 10px;
         }
