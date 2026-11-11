@@ -217,11 +217,7 @@ export function VehicleUsePanel({
                                     type="button"
                                     variant="secondary"
                                     onClick={() => {
-                                        try {
-                                            setAt(businessDateTimeInputValueWithSeconds());
-                                        } catch {
-                                            setAt(new Date().toISOString().slice(0, 19));
-                                        }
+                                        setAt(businessDateTimeInputValueWithSeconds());
                                     }}
                                 >
                                     Use current time

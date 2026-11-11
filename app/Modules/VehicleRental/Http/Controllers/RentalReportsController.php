@@ -133,7 +133,7 @@ final class RentalReportsController
         );
 
         $reportType = (string) ($request->input('report_type') ?? 'summary');
-        $orientation = in_array($reportType, ['statement_detail_1', 'statement_detail_2'], true) ? 'portrait' : 'landscape';
+        $orientation = ($reportType === 'statement_detail_1') ? 'portrait' : 'landscape';
 
         return $this->respondExport('reports.vehicle-rental.owner-disbursement', 'owner-disbursement', $data, $format, $request, $orientation);
     }

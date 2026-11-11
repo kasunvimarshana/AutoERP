@@ -23,11 +23,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
     const [oldOdometer, setOldOdometer] = useState(''); const [newOdometer, setNewOdometer] = useState('');
     const [start, setStart] = useState(() => {
         if (replacement) {
-            try {
-                return businessDateTimeInputValueWithSeconds();
-            } catch {
-                return new Date().toISOString().slice(0, 19);
-            }
+            return businessDateTimeInputValueWithSeconds();
         }
         return agreement.starts_on ? `${agreement.starts_on}T00:00` : '';
     });
@@ -231,11 +227,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                             type="button"
                             variant="secondary"
                             onClick={() => {
-                                try {
-                                    setStart(businessDateTimeInputValueWithSeconds());
-                                } catch {
-                                    setStart(new Date().toISOString().slice(0, 19));
-                                }
+                                setStart(businessDateTimeInputValueWithSeconds());
                                 setOwner(null);
                                 setSourceCount(null);
                             }}
