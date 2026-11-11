@@ -1,542 +1,556 @@
-# AutoERP Vehicle Rental: End-User Operations Manual & Guide
+# AutoERP Vehicle Rental: End-User Operations Manual & Complete User Guide
 
-Welcome to the **AutoERP Vehicle Rental Operations Manual**. This guide is designed for rental managers, fleet dispatchers, front-desk agents, depot clerks, and accountants. It explains how to use the Vehicle Rental system to manage bookings, contracts, vehicle handovers, daily trip logs, customer billing, owner disbursements, and fleet reports.
+**Status:** Official Comprehensive User Manual & Operational Reference  
+**Audience:** Front-Desk Agents, Depot Clerks, Fleet Dispatchers, Rental Managers, Invoicing Specialists, Accountants, and New Team Members  
+**System Standard:** Operational Civil Business Calendar (`Asia/Colombo`) · Exact Currency Precision (`DecimalMath`)  
+
+---
+
+## Welcome to the Vehicle Rental Operations Manual
+
+Welcome to the **AutoERP Vehicle Rental Operations Manual**. This comprehensive, beginner-friendly guide walks you through every screen, feature, workflow, and business rule of the Vehicle Rental module.
+
+Whether you are booking your first customer reservation, dispatching a vehicle from the depot, logging a driver's daily trip sheet, generating monthly commercial invoices, calculating vehicle owner payout statements, or printing official A4 legal running charts, this manual provides clear, step-by-step instructions with real-world examples.
 
 ---
 
 ## Table of Contents
 
-1. [Introduction to Vehicle Rental](#1-introduction-to-vehicle-rental)
-2. [Navigating the Module & Quick Links](#2-navigating-the-module--quick-links)
-3. [Managing Reservations & Customer Inquiries](#3-managing-reservations--customer-inquiries)
-4. [Creating & Managing Customer Agreements](#4-creating--managing-customer-agreements)
-5. [Managing Third-Party Vehicle Owner Agreements](#5-managing-third-party-vehicle-owner-agreements)
-6. [Checking Vehicle Availability](#6-checking-vehicle-availability)
-7. [Assigning Vehicles & Physical Dispatch (Handover & Return)](#7-assigning-vehicles--physical-dispatch-handover--return)
-8. [Handling Vehicle Breakdowns & Swaps (Atomic Replacement)](#8-handling-vehicle-breakdowns--swaps-atomic-replacement)
-9. [Recording Daily Running Charts (Trip Sheets)](#9-recording-daily-running-charts-trip-sheets)
-10. [Customer Billing: Base Rent & Usage Invoicing](#10-customer-billing-base-rent--usage-invoicing)
-11. [Collecting & Refunding Security Deposits](#11-collecting--refunding-security-deposits)
-12. [Recording Fleet Operating Expenses (Fuel, Tolls, Repairs)](#12-recording-fleet-operating-expenses-fuel-tolls-repairs)
-13. [Logging Incidents, Accidents & Traffic Fines](#13-logging-incidents-accidents--traffic-fines)
-14. [Managing Vehicle Bank Leases & Financing](#14-managing-vehicle-bank-leases--financing)
-15. [Official Reports & Exporting A4 Trip Sheets](#15-official-reports--exporting-a4-trip-sheets)
-16. [Frequently Asked Questions & Troubleshooting](#16-frequently-asked-questions--troubleshooting)
+1. [Understanding the System: The Dual-Sided Business Model](#1-understanding-the-system-the-dual-sided-business-model)
+2. [Navigating the Workspace & User Interface Standards](#2-navigating-the-workspace--user-interface-standards)
+3. [The Complete Rental Journey at a Glance](#3-the-complete-rental-journey-at-a-glance)
+4. [Managing Reservations & Customer Inquiries](#4-managing-reservations--customer-inquiries)
+5. [Customer Agreements (Client Contracts & Pricing Terms)](#5-customer-agreements-client-contracts--pricing-terms)
+6. [Vehicle Owner Agreements (Leased Fleet Management)](#6-vehicle-owner-agreements-leased-fleet-management)
+7. [Fleet Availability & Checking Vehicle Status](#7-fleet-availability--checking-vehicle-status)
+8. [Vehicle Dispatches: Handover & Return Procedures](#8-vehicle-dispatches-handover--return-procedures)
+9. [Vehicle Breakdowns & Emergency Swaps (Atomic Replacement)](#9-vehicle-breakdowns--emergency-swaps-atomic-replacement)
+10. [Daily Running Charts (Official Trip Sheets)](#10-daily-running-charts-official-trip-sheets)
+11. [Customer Billing: Base Rent, Mileage & Usage Invoicing](#11-customer-billing-base-rent-mileage--usage-invoicing)
+12. [Vehicle Owner Settlements & Withholding Tax (WHT :3305-000)](#12-vehicle-owner-settlements--withholding-tax-wht-3305-000)
+13. [Customer Security Deposits & Payment Management](#13-customer-security-deposits--payment-management)
+14. [Fleet Operating Expenses & Cost Allocation Matrix](#14-fleet-operating-expenses--cost-allocation-matrix)
+15. [Incident Evidence Register & Private Proof Uploads](#15-incident-evidence-register--private-proof-uploads)
+16. [Vehicle Finance & Commercial Bank Leasing](#16-vehicle-finance--commercial-bank-leasing)
+17. [Official Reports Hub & Exporting A4 Printouts](#17-official-reports-hub--exporting-a4-printouts)
+18. [Troubleshooting & Frequently Asked Questions (FAQ)](#18-troubleshooting--frequently-asked-questions-faq)
+19. [Daily Operational Best Practices Checklist](#19-daily-operational-best-practices-checklist)
 
 ---
 
-## 1. Introduction to Vehicle Rental
+## 1. Understanding the System: The Dual-Sided Business Model
 
-### How AutoERP Manages Vehicle Rentals
-
-In commercial transport and fleet operations, vehicle rental works on a **dual-sided business model**:
-- **Customer Side (Revenue):** Clients rent vehicles from your company. You invoice them for daily or monthly base rent, excess kilometers driven, driver overtime, and overnight outlays.
-- **Owner Side (Cost):** When your company leases vehicles from external owners/suppliers, you pay those owners agreed monthly lease rates, reimburse them for driver overtime, or deduct operational expenses (like fuel or repairs paid on their behalf).
-- **Company Fleet:** When vehicles are owned directly by your company, they are flagged as company-owned; zero external owner payables are created.
+Commercial fleet management involves two independent commercial tracks connected by physical vehicles:
 
 ```text
-+---------------------------------------------------------------------------------+
-|                                 DAILY RUNNING CHART                             |
-|                   (Physical Log: Distance, Overtime, Tolls, Night-Outs)         |
-+---------------------------------------------------------------------------------+
-                                       |
-                   +-------------------+-------------------+
-                   |                                       |
-                   v                                       v
-        [ CUSTOMER BILLING ]                      [ OWNER DISBURSEMENT ]
-      Customer Base Rent Invoice                 Owner Base Lease Settlement
-     + Excess Mileage Invoices                  + Excess KM Payout
-     + Overtime & Night-Out Fees                + Driver OT Reimbursements
-     = Total Customer Receivable                - Operating Expense Deductions
-                                                = Net Owner Payable
++----------------------------------------------------------------------------------------------------+
+|                                    PHYSICAL FLEET OPERATIONS                                       |
+|               Vehicle Dispatches · Daily Speedometers · Odometer Continuity · Trip Sheets          |
++----------------------------------------------------------------------------------------------------+
+                                                  |
+                 +--------------------------------+--------------------------------+
+                 |                                                                 |
+                 v                                                                 v
++----------------------------------+                             +-----------------------------------+
+|      CUSTOMER TRACK (REVENUE)    |                             |        OWNER TRACK (COSTS)        |
+|  Corporate Client (Customer)     |                             |  Vehicle Owner / Lessor (Supplier)|
+|  Customer Agreement (Contract)   |                             |  Owner Agreement (Lease Terms)    |
+|  Monthly Base Rent Invoices      |                             |  Monthly Base Lease Entitlements  |
+|  Excess KM & Overtime Billing    |                             |  Driver OT Pass-Through Payouts   |
+|  Security Deposit Receipts       |                             |  Repair Deductions (CDN Notes)    |
+|  Receivables (Money Coming In)   |                             |  10% Statutory Withholding Tax    |
+|                                  |                             |  Payables (Money Going Out)       |
++----------------------------------+                             +-----------------------------------+
 ```
 
-### Key Rules to Remember
+### Three Fundamental Rules to Know:
 
-1. **No Raw Database Codes:** The system displays human-readable names, vehicle registration numbers (e.g., `WP-PX-2020`), and party names instead of raw database IDs.
-2. **Never Edit an Active Contract Directly:** Once an agreement is marked **Active**, its rates are locked to protect past invoices. If rates change, use the **Create Successor** button to establish a revision without disrupting current billing.
-3. **Physical Truth is Permanent:** Finalized trip sheets (Running Charts) cannot be altered directly. If a mistake was made, use the **Correct** button to issue an auditable correction.
+1. **We Never Invent Money:** Physical evidence (speedometer readings, trip sheets, petrol bills, accident photos) can be recorded freely as operational truth. However, **no financial invoice, debit note, or cheque voucher** is ever generated automatically without an explicit, approved contract term and an authorized user action.
+2. **Customer Pricing Never Derives Owner Costs:** What you bill the customer is completely independent of what you pay the vehicle owner. Each side has its own formal agreement.
+3. **Company Vehicles Incur Zero Fictitious Owner Costs:** When your company owns the vehicle directly, the system flags it as company-owned; zero artificial owner agreements or supplier vouchers are created.
 
 ---
 
-## 2. Navigating the Module & Quick Links
+## 2. Navigating the Workspace & User Interface Standards
 
-When you log into AutoERP, select the **Vehicle Rental** workspace from the main navigation sidebar. The key screens available to you are:
+AutoERP is designed for speed, clarity, and ease of use. You never need to memorize database codes or complex technical IDs.
 
-| Menu Item / Feature | URL Path | What You Can Do Here |
+### 2.1 Workspace Navigation Menu
+
+Access the Vehicle Rental module from the left sidebar navigation under **Vehicle Rental**:
+
+| Menu Item | Screen URL | Primary Purpose |
 |---|---|---|
-| **Rental Dashboard** | `/vehicle-rental/dashboard` | View live metrics: active agreements, vehicles in custody, pending bookings, and today's trips. |
-| **Reservations** | `/vehicle-rental/reservations` | Log phone/email inquiries, check dates, and convert confirmed leads into agreements. |
-| **Customer Agreements** | `/vehicle-rental/customer/agreements` | Create client contracts, set daily/monthly rates, bill rent, and track deposits. |
-| **Owner Agreements** | `/vehicle-rental/owner/agreements` | Manage contracts with external vehicle owners and lessors. |
-| **Vehicle Dispatch Register** | `/vehicle-rental/uses` | View all active and planned vehicle assignments across your fleet. |
-| **Fleet Availability** | `/vehicle-rental/vehicles/available` | Check real-time vehicle availability for future dates without booking collisions. |
-| **Running Charts Register** | `/vehicle-rental/running-charts` | Log daily trip sheets, start/end odometers, commercial KM, overtime, and AC modes. |
-| **Fleet Expenses** | `/vehicle-rental/expenses` | Record petrol, tolls, and maintenance bills; allocate them to company, customer, or owner. |
-| **Incident Register** | `/vehicle-rental/incidents` | Record accidents, damage, police fines, or traffic violations and attach file proofs. |
-| **Vehicle Finance** | `/vehicle-rental/finance-agreements` | Track bank leasing contracts, installment schedules, and maturing payable invoices. |
-| **Reports Hub** | `/vehicle-rental/reports` | Generate 8 official reports, including the 31-day Running Chart matrix sheet. |
+| **Dashboard** | `/vehicle-rental/dashboard` | Live overview of active rentals, dispatches, pending inquiries, and today's trips. |
+| **Reservations** | `/vehicle-rental/reservations` | Capture customer inquiries, quotes, and convert bookings into contracts. |
+| **Customer Agreements** | `/vehicle-rental/customer/agreements` | Manage customer leasing contracts, rate cards, base billing, and deposits. |
+| **Owner Agreements** | `/vehicle-rental/owner/agreements` | Manage contracts with external vehicle owners and fleet suppliers. |
+| **Vehicle Dispatches** | `/vehicle-rental/uses` | Global register of all planned, in-custody, and returned vehicle assignments. |
+| **Fleet Availability** | `/vehicle-rental/vehicles/available` | Real-time vehicle availability search across any selected date range. |
+| **Running Charts** | `/vehicle-rental/running-charts` | Daily operational trip sheets, speedometer readings, overtime, and toll passes. |
+| **Fleet Expenses** | `/vehicle-rental/expenses` | Log petrol, toll receipts, maintenance bills, and assign who pays for them. |
+| **Incident Register** | `/vehicle-rental/incidents` | Record accidents, damage, police fines, and attach photographic proofs. |
+| **Vehicle Finance** | `/vehicle-rental/finance-agreements` | Manage commercial bank leasing contracts, installments, and payment schedules. |
+| **Reports Hub** | `/vehicle-rental/reports` | Access all 8 official printable reports, including 31-day running chart sheets. |
+
+### 2.2 User Interface Principles Built for You
+
+- **Zero Raw Database IDs:** You will never see cryptic database numbers. All vehicles display their registration plate number and model (e.g. `CBC-9180 · Toyota HiAce Super GL`), and customers/suppliers display their official business names.
+- **Smart Search Dropdowns (`LookupSelect`):** When selecting a vehicle, customer, owner, or driver, simply start typing any part of their name or registration number. The system instantly filters and presents matching results.
+- **Progressive Disclosure:** Forms keep primary fields front and center. Secondary details (rate adjustments, history logs, audit notes) are organized inside neat tabs and expandable `<details>` sections so your screen stays uncluttered.
+- **Civil Business Calendar:** All dates automatically format to the civil business timezone (`Asia/Colombo`). Forms default to today's date so you don't waste time typing dates manually.
 
 ---
 
-## 3. Managing Reservations & Customer Inquiries
+## 3. The Complete Rental Journey at a Glance
 
-When a prospective client contacts your company to rent a vehicle, use the **Reservations** screen to capture their inquiry before creating a binding contract.
+Here is how a typical monthly rental progresses through the system:
 
 ```text
-[ Step 1: Lead Capture ]       [ Step 2: Verification ]       [ Step 3: Commitment ]
-  Customer Inquires     -->     Verify Availability     -->    Convert to Agreement
-  (Draft Reservation)           (Confirm Booking)             (Execute Contract)
+[ 1. INQUIRY & RESERVATION ]
+Customer calls for a vehicle -> Agent records dates & quote -> System checks fleet availability -> Confirmed!
+                     |
+                     v
+[ 2. CONTRACT ACTIVATION ]
+One-click Convert to Customer Agreement -> Set monthly rates, free KM & overtime terms -> Click "Activate"
+                     |
+                     v
+[ 3. SECURITY DEPOSIT ]
+Customer pays deposit -> Clerk records receipt via Payment module -> System tracks remaining deposit capacity
+                     |
+                     v
+[ 4. FLEET DISPATCH (HANDOVER) ]
+Customer arrives -> Clerk enters starting speedometer (e.g. 190,491 KM) & handover time -> Vehicle is "In Custody"
+                     |
+                     v
+[ 5. DAILY OPERATION (RUNNING CHARTS) ]
+Driver submits daily trip sheet -> Clerk records Start/End KM, duty times, overtime hours, and expressway toll passes
+                     |
+                     v
+[ 6. FLEET RETURN (CHECK-IN) ]
+Rental period concludes -> Clerk enters final speedometer (e.g. 192,316 KM) & return time -> Vehicle is "Available"
+                     |
+                     v
+[ 7. COMMERCIAL INVOICING ]
+Manager generates Base Rent Invoice (calendar proration) -> Runs Mileage Assessment (excess KM) -> Invoices Overtime
+                     |
+                     v
+[ 8. LESSOR SETTLEMENT (IF LEASED) ]
+System calculates owner hire earnings + overtime - repair deductions - 10% statutory WHT -> Issues settlement cheque
 ```
 
-### How to Create a New Reservation
+---
 
-1. Navigate to **Vehicle Rental > Reservations** (`/vehicle-rental/reservations`).
-2. Click the **New Reservation** button in the top right.
-3. Complete the form:
-   - **Customer:** Type the customer's name to select them from the dropdown list.
-   - **Requested Vehicle (Optional):** If the customer requested a specific vehicle, select it. Otherwise, leave it blank.
+## 4. Managing Reservations & Customer Inquiries
+
+The **Reservations** screen (`/vehicle-rental/reservations`) handles early booking inquiries from walk-ins, phone calls, emails, or company websites before signing a binding contract.
+
+```text
++----------------------------------------------------------------------------------------------------+
+|                                    RESERVATIONS MANAGEMENT                                         |
+|  [ + New Reservation ]                                          Search: [ Unilever               ] |
++----------------------------------------------------------------------------------------------------+
+| Ref Number      | Customer Name            | Vehicle / Category     | Rental Dates         | Status|
++----------------------------------------------------------------------------------------------------+
+| RES-2026-0012   | Unilever Sri Lanka Ltd   | CBC-9180 (Toyota KDH)  | 01/07/26 to 30/07/26 | Conf. |
+| RES-2026-0013   | John Keells Holdings     | Luxury Sedan Category  | 15/08/26 to 20/08/26 | Pend. |
++----------------------------------------------------------------------------------------------------+
+```
+
+### How to Create a New Reservation:
+
+1. Click **New Reservation** in the top right corner.
+2. Complete the form:
+   - **Customer:** Type to select the corporate client or private individual.
+   - **Requested Vehicle (Optional):** If the customer requested a specific car, select it. If they only requested a type (e.g. "Van" or "Sedan"), leave the vehicle blank and select the category.
    - **Rental Mode:** Choose **Self Drive** (client drives) or **With Driver** (company provides chauffeur).
-   - **Billing Cycle:** Choose **Daily Rental** or **Monthly Rental**.
-   - **Start & End Date/Time:** Select the requested departure and return date/time.
-   - **Currency:** Select the agreed currency (e.g., `LKR`, `USD`).
-   - **Estimated Rent Amount:** Enter the quoted estimate (e.g., `75,000.00`).
-   - **Estimated Deposit Amount:** Enter the required refundable deposit (e.g., `50,000.00`).
-   - **Inquiry Source:** Select how the lead came in (**Phone Inquiry**, **Walk-in**, **Email**, or **Website Booking**).
-   - **Remarks & Notes:** Add any special customer requests (e.g., "Airport pickup required", "Child safety seat requested").
-4. Click **Create Reservation**.
+   - **Billing Basis:** Choose **Daily** or **Monthly**.
+   - **Dates & Times:** Select the planned departure and return dates.
+   - **Estimated Rent & Deposit:** Enter the quoted price and required security deposit.
+   - **Inquiry Source:** Select Walk-in, Phone Inquiry, Email, or Website.
+   - **Remarks:** Add customer requests (e.g. "English-speaking driver requested", "Airport pickup").
+3. Click **Create Reservation**.
 
-### Managing Reservation Statuses
-
-From the reservations table, click on any booking to update its status:
-- **Pending:** Mark as pending while waiting for the client to confirm their schedule.
-- **Confirmed:** Mark as confirmed once the client agrees and a vehicle is secured.
-- **Convert to Agreement:** When the client arrives to sign the contract, click **Convert to Agreement**. The system will automatically create an active `CustomerAgreement` copying over the customer, currency, dates, and driver mode.
+### Reservation Lifecycle:
+- **Pending:** The inquiry is logged while waiting for the client to confirm their schedule.
+- **Confirmed:** The client confirmed their booking and fleet logistics are locked in.
+- **Convert to Agreement:** When the client arrives to sign the contract, click **Convert to Agreement**. AutoERP instantly generates an active customer agreement pre-filled with the customer, dates, and pricing, saving you from re-typing data.
+- **Cancelled:** If the client cancels, click **Cancel** and enter a brief reason (e.g. "Flight rescheduled").
 
 ---
 
-## 4. Creating & Managing Customer Agreements
+## 5. Customer Agreements (Client Contracts & Pricing Terms)
 
-A **Customer Agreement** is the official commercial contract defining what you charge the customer.
+A **Customer Agreement** (`/vehicle-rental/customer/agreements`) is the legal commercial contract defining what you charge the client.
 
-### How to Create a Customer Agreement
+### Step-by-Step: Setting Up a Customer Agreement
 
-1. Navigate to **Vehicle Rental > Customer Agreements** (`/vehicle-rental/customer/agreements`).
-2. Click **New agreement**.
-3. Complete the agreement details:
-   - **Agreement reference:** Enter your contract reference code (e.g., `AGR-2026-0045`).
+1. Go to **Vehicle Rental > Customer Agreements** and click **New agreement**.
+2. **Contract Essentials:**
+   - **Agreement Reference:** Enter your contract reference (e.g. `LAG7000012`). If omitted, the system generates one automatically.
    - **Customer:** Search and select the client.
-   - **Currency:** Select contract currency (e.g., `LKR`).
-   - **Agreement date:** Defaults to today's date.
-   - **Start date:** The date rental coverage begins.
-   - **End date (Optional):** The agreed end date. Leave blank if open-ended / long-term.
-   - **Rental basis:** Select **Daily** or **Monthly**.
-   - **Driver arrangement:** Select **Self-drive** or **With driver**.
-4. Expand **Agreed rates and allowances** to specify pricing terms:
-   - *Base rental rate:* The fixed charge per day or per month.
-   - *Included distance (km):* Free kilometers allowed per cycle (e.g., `100 km/day` or `3,000 km/month`).
-   - *Excess distance rate per km:* Amount charged for every kilometer driven over the free allowance.
-   - *Agreed driver amount:* Fixed chauffeur allowance per cycle.
-   - *Normal / Double / Triple overtime hourly rates:* Rates for extra hours.
-   - *Night-out rate:* Daily charge when the vehicle/driver stays overnight away from the home depot.
-   - *Agreed security deposit:* Required refundable deposit amount.
-5. Click **Save draft**.
+   - **Rental Basis:** Choose **Monthly** (standard corporate lease) or **Daily** (short-term hire).
+   - **Driver Arrangement:** Choose **With driver** or **Self-drive**.
+   - **Start Date & End Date:** Enter the contract dates. (Leave End Date blank if open-ended).
+3. **Agreed Rates & Allowances (Expandable Section):**
+   - **Base Rental Rate:** The fixed charge per cycle (e.g. `327,500.00` per month).
+   - **Included Distance (KM):** Free kilometers allowed per month (e.g. `2,500 KM`).
+   - **Excess Distance Rate per KM:** Charge for every extra kilometer (e.g. `100.00` per KM).
+   - **Driver Overtime Rates:** Hourly rates for Normal OT (e.g. `1,500.00/hr`), Double OT (Sunday/Off-day), and Triple OT (Public Holiday).
+   - **Night-Out Rate:** Daily allowance if the chauffeur sleeps away from home depot.
+   - **Agreed Security Deposit:** Required refundable deposit amount.
+4. Click **Save draft**.
 
-### Activating the Agreement
-While in `Draft` status, you can freely edit contract terms. Once verified against the physical paper contract:
-1. Click **Review [Reference]**.
-2. Click **Activate**.
-3. Confirm activation. The agreement is now **Active** and ready for vehicle dispatch and billing.
+### Reviewing and Activating:
+- In `Draft` status, you can freely edit terms and review rate calculations.
+- Once verified, click **Review** &rarr; **Activate**.
+- **Important:** Once **Active**, contract terms are permanently locked to ensure past invoices remain 100% auditable and tamper-proof.
 
-### Mid-Contract Rate Changes (Creating a Successor)
-> [!IMPORTANT]
-> Never attempt to change terms on an active agreement retroactively. This would corrupt past billing records.
-
-If a client negotiates a new monthly rate after 6 months:
-1. Open the active agreement review screen.
-2. Click **Create successor**.
-3. Enter the new reference (e.g., `AGR-2026-0045-REV1`), effective start date, and revision reason.
-4. Update the newly agreed rates in the draft.
-5. On the effective date, click **Activate**. The system will atomically close the predecessor agreement and activate the successor without interrupting vehicle custody.
+### How to Change Rates on an Active Contract (Successor Agreement):
+If a client renegotiates their monthly rate after a few months, **never attempt to edit the active contract**. Instead:
+1. Open the active agreement and click **Create successor**.
+2. Enter the new reference, effective cutover date, and update the new rates in the draft.
+3. On the effective date, click **Activate**. The system seamlessly closes the old agreement and activates the new rates without disrupting active vehicle custody or duplicating security deposits.
 
 ---
 
-## 5. Managing Third-Party Vehicle Owner Agreements
+## 6. Vehicle Owner Agreements (Leased Fleet Management)
 
-When your company leases vehicles from private owners or fleet investors to rent out to your clients, use **Owner Agreements** (`/vehicle-rental/owner/agreements`).
+When your company leases vehicles from private owners or fleet investors to supply your clients, manage them in **Owner Agreements** (`/vehicle-rental/owner/agreements`).
 
-### Step-by-Step: Setting Up an Owner Agreement
+```text
++----------------------------------------------------------------------------------------------------+
+|                                    OWNER AGREEMENT (SUPPLIER)                                      |
+| Lessor / Owner: GUNATHILAKE H M S K GUNATHILAKE                     Vehicle: CBC-9180              |
+| Monthly Base Lease Entitlement: LKR 327,500.00                      Free Allowance: 2,500 KM       |
+| Driver Overtime Payout Rate: LKR 1,500.00/hr                        Excess KM Payout: LKR 100.00   |
++----------------------------------------------------------------------------------------------------+
+```
 
-1. Navigate to **Vehicle Rental > Owner Agreements**.
-2. Click **New agreement**.
-3. Fill in the lessor details:
-   - **Agreement reference:** Contract reference with the owner (e.g., `OWN-2026-012`).
-   - **Owner / supplier:** Search and select the vehicle owner from your supplier directory.
-   - **Vehicle:** Select the specific vehicle supplied by this owner.
-   - **Start date & End date:** The period the owner has placed the vehicle in your fleet.
-4. In **Agreed rates and allowances**, enter what you owe the owner:
-   - *Owner base rental payable:* Guaranteed monthly or daily payout to the owner.
-   - *Owner included distance (km):* Free distance covered under the base payout.
-   - *Owner excess distance payable per km:* What you pay the owner if your client exceeds mileage.
-   - *Driver / Overtime reimbursements:* Reimbursements owed if the owner provided their own driver.
-5. Save as draft and click **Activate**.
+### Key Differences from Customer Agreements:
+- **Mandatory Vehicle Assignment:** An owner agreement always references the specific vehicle supplied by that owner.
+- **Supplier Directory:** The owner is selected from your verified Supplier master list, complete with bank account details for monthly cheque disbursements.
+- **Independent Payout Rates:** You define what you owe the owner (base monthly lease, overtime reimbursement, and excess mileage payout), completely separate from what you charge your client.
 
 ---
 
-## 6. Checking Vehicle Availability
+## 7. Fleet Availability & Checking Vehicle Status
 
-Before promising a car to a customer, verify that it is physically and commercially available.
+Before promising a car to a client, always check its real-time availability in **Fleet Availability** (`/vehicle-rental/vehicles/available`):
 
-1. Navigate to **Vehicle Rental > Fleet Availability** (`/vehicle-rental/vehicles/available`).
-2. Enter your desired **Start Date & Time** and **End Date & Time**.
-3. Optionally filter by **Vehicle Category** (e.g., Sedan, SUV, Van).
-4. Click **Check Availability**.
-5. The system lists all fleet vehicles with real-time status badges:
-   - <span style="color:green;font-weight:bold;">Available:</span> Free for dispatch.
-   - <span style="color:blue;font-weight:bold;">In Custody:</span> Currently out with another customer.
-   - <span style="color:orange;font-weight:bold;">Workshop / Maintenance:</span> Booked for mechanical service in the workshop.
-   - <span style="color:purple;font-weight:bold;">Reserved:</span> Reserved under an active booking.
+1. Select your planned **Start Date & Time** and **End Date & Time**.
+2. Filter by vehicle category (e.g. Van, SUV, Premium Sedan) if desired.
+3. Click **Check Availability**.
+4. The system scans all fleet records and displays color-coded badges:
+   - <span style="color:#16a34a;font-weight:bold;">Available:</span> The car is idle in the depot, mechanically fit, and ready for dispatch.
+   - <span style="color:#2563eb;font-weight:bold;">In Custody:</span> Currently out on the road with another customer.
+   - <span style="color:#d97706;font-weight:bold;">Workshop / Maintenance:</span> Admitted to the repair workshop in `VehicleService`. The system **automatically blocks dispatches** until the workshop job card is formally signed off!
+   - <span style="color:#9333ea;font-weight:bold;">Reserved:</span> Held under a confirmed booking inquiry.
 
 ---
 
-## 7. Assigning Vehicles & Physical Dispatch (Handover & Return)
+## 8. Vehicle Dispatches: Handover & Return Procedures
 
-Once a Customer Agreement is **Active**, you can assign a vehicle and record physical dispatch.
+Vehicle dispatches are managed inside the active Customer Agreement under the **Assigned Vehicles & Handover** tab.
+
+```text
+[ Step 1: Assign Vehicle ]         [ Step 2: Depot Handover ]         [ Step 3: Depot Return ]
+Select vehicle & planned dates  ->  Inspect car & enter start ODO  ->  Inspect car & enter end ODO
+(Status: Planned)                  (Status: In Custody)               (Status: Returned / Available)
+```
 
 ### Step 1: Assigning a Vehicle to the Contract
-1. Go to **Customer Agreements**, find the active agreement, and click **Review**.
-2. Switch to the **Assigned Vehicles & Handover** tab.
-3. Click **Assign vehicle**.
-4. In the form:
-   - **Vehicle:** Select the vehicle from the dropdown.
-   - **Planned handover:** Enter intended departure date and time.
-   - **Planned return:** Enter intended return date and time (leave blank if open-ended).
-   - **Supply Source:**
-     - If company-owned: Check **Company-owned vehicle**.
-     - If leased from an owner: Leave unchecked and select the active **Owner agreement**.
-   - **Notes:** Add any dispatch notes.
-5. Click **Save assignment**.
+1. Open the active Customer Agreement and click the **Assigned Vehicles & Handover** tab.
+2. Click **Assign vehicle**.
+3. Select the vehicle and enter the planned handover and return dates.
+4. **Supply Source:**
+   - If company-owned: Check **Company-owned vehicle**.
+   - If leased from an owner: Select the covering **Owner Agreement**.
+5. Click **Save assignment**. The vehicle is now `Planned`.
 
 ### Step 2: Handover (Vehicle Leaves Depot)
-When the client arrives to take the vehicle:
-1. In the **Assigned Vehicles** list, find the planned vehicle and click **Handover**.
-2. Enter:
-   - **Handover Date & Time:** Exact moment the keys are handed over.
-   - **Starting Odometer:** Current speedometer reading (e.g., `45,210 km`).
-   - *(Note: The system will reject any odometer reading lower than the vehicle's last recorded mileage).*
-3. Click **Confirm Handover**. The vehicle status changes to **In Custody**.
-
-```text
-[ Depot Dispatch Desk ]
-1. Inspect vehicle exterior with client.
-2. Read speedometer: 45,210 km.
-3. Click Handover -> Enter 45,210 km -> Confirm.
-Vehicle is now officially dispatched!
-```
+When the driver/client arrives to collect the vehicle:
+1. Inspect the vehicle exterior and fuel level with the client.
+2. Read the current speedometer (odometer).
+3. Click **Handover** on the vehicle row.
+4. Enter the **Handover Date & Time** and the **Starting Odometer** (e.g. `190,491 KM`).
+5. Click **Confirm Handover**. The vehicle is now officially **In Custody**.
 
 ### Step 3: Return (Vehicle Comes Back to Depot)
-When the rental concludes and the client returns the vehicle:
-1. Open the agreement, go to **Assigned Vehicles & Handover**, and click **Return vehicle**.
-2. Enter:
-   - **Return Date & Time:** Exact moment the car returned.
-   - **Return Odometer:** Speedometer reading upon return (e.g., `46,850 km`).
-   - *(Note: Must be greater than or equal to the starting odometer).*
-3. Click **Confirm Return**.
-4. The vehicle status updates to **Returned** and the asset becomes instantly available for future dispatches.
+When the rental concludes and the vehicle returns to the depot:
+1. Inspect the car for any new damage or fuel discrepancies.
+2. Click **Return vehicle**.
+3. Enter the **Return Date & Time** and the verified **Return Odometer** (e.g. `192,316 KM`).
+4. Click **Confirm Return**.
+5. The vehicle status becomes **Returned**, the asset's master odometer updates automatically, and the car is immediately freed up for future bookings.
+
+> [!NOTE]
+> The system enforces strict **Odometer Continuity**. You can never enter a return odometer lower than the handover odometer.
 
 ---
 
-## 8. Handling Vehicle Breakdowns & Swaps (Atomic Replacement)
+## 9. Vehicle Breakdowns & Emergency Swaps (Atomic Replacement)
 
-If a car breaks down, experiences a flat tire, or requires urgent depot maintenance during an active rental, use the **Replace vehicle** function.
+If an assigned vehicle experiences engine trouble, AC failure, or an accident mid-rental, you must deploy a replacement car immediately.
 
-> [!TIP]
-> **Why use Replace Vehicle instead of Return + New Assignment?**
-> `Replace vehicle` handles the return of the disabled car and the dispatch of the fresh car in a **single step**. Crucially, the replacement car shares the customer's existing monthly free mileage allowance—preventing accidental double base rent charges!
-
-### How to Perform a Vehicle Replacement
-
-1. Open the Customer Agreement and navigate to the **Assigned Vehicles & Handover** tab.
-2. Locate the active vehicle and click **Replace vehicle**.
-3. In the replacement form:
-   - **Old vehicle return odometer:** Enter the final mileage on the vehicle being brought back.
-   - **Replacement vehicle:** Select the replacement car from the available fleet.
-   - **Replacement handover odometer:** Enter the starting mileage of the new vehicle.
-   - **Replacement time:** Exact date and time of the swap.
-   - **Supply source:** Select company-owned or choose the owner agreement covering the new car.
-   - **Replacement reason:** Enter a mandatory explanation (e.g., "Air conditioner failure on vehicle WP-PX-2020; swapped for WP-CA-1122").
-4. Click **Confirm replacement**.
-5. Both vehicles' records update atomically in the database without disrupting the customer's billing cycle.
-
----
-
-## 9. Recording Daily Running Charts (Trip Sheets)
-
-The **Running Chart** is the official daily log of where the vehicle traveled, what distances were driven, which driver operated the vehicle, and any extra overtime or toll charges incurred.
+**Never manually return the car and create a new contract!** Doing so would split the client's monthly mileage allowance across two contracts and result in incorrect excess mileage charges. Instead, use the **Replace Vehicle** feature.
 
 ```text
-+-----------------------------------------------------------------------------------------+
-|                                DAILY RUNNING CHART FORM                                 |
-+-----------------------------------------------------------------------------------------+
-| Chart Ref: RC-2026-11-04-01       Date: 2026-11-04 08:00 to 2026-11-04 19:30            |
-| Start Odo: 45,210 km              End Odo: 45,460 km              Total: 250 km         |
-| Commercial KM: 230 km             Garage KM: 20 km                AC Mode: Dual AC      |
-| Driver: D-104 (Sunil Perera)      Normal OT: 90 mins              Night Outs: 0         |
-+-----------------------------------------------------------------------------------------+
++----------------------------------------------------------------------------------------------------+
+|                                    ATOMIC VEHICLE REPLACEMENT                                      |
++----------------------------------------------------------------------------------------------------+
+| Disabled Vehicle: CAP-1302        Return Odometer: 139,166 KM       Swap Time: 26/07/2026 08:00 AM |
+| Replacement Car:  CBC-9180        Handover Odo:    192,020 KM       Supply:    Owner Agreement     |
+| Reason: Engine overheating on CAP-1302; swapped for CBC-9180                                      |
++----------------------------------------------------------------------------------------------------+
+                                                  |
+                                                  v
+                      [ Both Vehicles Share the Single 2,500 KM Allowance ]
+                      [ Trips on CBC-9180 Show Amber Badge: "For Repl. CAP-1302" ]
 ```
 
-### How to Record a Daily Running Chart
+### How to Execute a Vehicle Replacement:
+1. Open the agreement's **Assigned Vehicles & Handover** tab.
+2. On the disabled vehicle, click **Replace vehicle**.
+3. Enter the disabled vehicle's final **Return Odometer**.
+4. Select the **Replacement Vehicle** from the available fleet.
+5. Enter the replacement vehicle's starting **Handover Odometer**.
+6. Set the **Replacement Date & Time** and enter a mandatory reason.
+7. Click **Confirm replacement**.
 
-1. Open **Vehicle Rental > Running Charts** (`/vehicle-rental/running-charts`) or access it directly from the vehicle assignment panel.
-2. Click **Record Running Chart**.
-3. Enter primary trip facts:
-   - **Chart reference:** Enter driver trip sheet voucher number (e.g., `RC-2026-11-04-01`).
-   - **Usage start & Usage end:** Date and time the journey started and ended.
-   - **Start odometer & End odometer:** Speedometer readings at start and finish.
-4. Expand **Additional usage observations**:
-   - **Commercial distance (km):** Distance driven for the customer.
-   - **Garage distance (km):** Deadhead travel between depot and pickup site.
-   - **Air conditioning mode:** Select **Non-AC**, **Front AC**, or **Dual AC**.
-   - **Driver arrangement:**
-     - Select **Employee driver** and choose your company driver from the dropdown.
-     - OR select **External driver** and type the outsourced chauffeur's name and ID.
-   - **Overtime minutes:** Enter any billable overtime (Normal, Double, or Triple OT in minutes).
-   - **Night outs:** Enter count of overnight stays (e.g., `1` if the driver stayed out overnight).
-   - **Notes:** Add details such as expressway toll pass usage, fuel stops, or client route remarks.
-5. Click **Save Running Chart**.
-
-### Finalizing Trip Sheets
-When all daily logs are verified against the driver's signed log sheet:
-1. Open the running chart.
-2. Click **Finalize**.
-3. The operational facts are permanently locked and immediately ready for automated billing.
+**What the system does behind the scenes:**
+- Returns the old car and hands over the new car in a single atomic transaction.
+- Combines commercial mileage across both vehicles under the client's single monthly allowance.
+- Automatically places a visual amber badge and note (`For Repl. <old_car>`) on all subsequent trip sheets and official printouts.
 
 ---
 
-## 10. Customer Billing: Base Rent & Usage Invoicing
+## 10. Daily Running Charts (Official Trip Sheets)
 
-AutoERP's billing engine automatically turns finalized contracts and running charts into commercial invoices in the [`Invoice`](file:///d:/project-new/AutoERP/app/Modules/Invoice) module.
+The **Running Chart** (`/vehicle-rental/running-charts`) is the official daily log sheet replicating Sri Lankan transport industry standards (`pmdeblogsheet2.frx` and `pmcre1logsheet2.frx`).
 
-### Part 1: Invoicing Base Rent (Monthly or Daily)
-1. Open the Customer Agreement and go to the **Billing & Rate Estimates** tab.
-2. Review the **Base Rent Billing** panel:
-   - Click **Preview base rent** to see an exact preview of the calculation.
-   - The system shows the covered cycle (e.g., `2026-11-01` to `2026-11-30`) and exact proration if partial.
-3. To generate the invoice:
-   - **Invoice Date:** Defaults to today.
-   - **Due Date (Optional):** Enter client payment deadline.
-   - **Exchange Rate:** Defaults to `1.00` for base currency.
-   - Check the confirmation box: *"Apply this calendar-cycle policy..."*
-   - Click **Create base rent invoice**.
-4. The system posts an official customer invoice. You can click the invoice reference link (e.g., `INV-2026-0089`) to view, print, or email it to the client.
+```text
++----------------------------------------------------------------------------------------------------+
+| RUNNING CHART: RC-2026-07-01-01               Date: 01/07/2026               Client: Unilever      |
+| Vehicle: CBC-9180                             Duty: 05:00 AM to 10:00 PM     Driver: M. Perera     |
++----------------------------------------------------------------------------------------------------+
+| Start Odo: 190,491 KM   Finish Odo: 190,698 KM   Comparative: 207 KM         Cumulative: 207 KM    |
+| Normal OT: 5.00 Hrs     Double OT:  0.00 Hrs     Triple OT:   0.00 Hrs       Pass / Toll: 850.00   |
+| Remarks: For Repl. CAP-1302 [Amber Replacement Badge]                                              |
++----------------------------------------------------------------------------------------------------+
+```
 
-### Part 2: Assessing Commercial Mileage & Free Allowances
-At the end of a trip or monthly cycle, assess whether the client exceeded their free kilometer allowance:
-1. In the agreement's Running Charts panel, click **Mileage assessment** on a finalized chart.
-2. The system displays a live mileage breakdown:
-   - *Cycle allowance:* E.g., `3,000 km`.
-   - *Commercial distance:* E.g., `3,450 km`.
-   - *Included applied:* `3,000 km` (consumed free allowance).
-   - *Excess distance:* `450 km`.
-   - *Rate per KM:* `LKR 120.00`.
-   - *Amount before tax:* `LKR 54,000.00`.
-3. Check the confirmation box and click **Record mileage assessment**.
-4. If excess kilometers exist, the system generates an official customer invoice for the extra distance. If within the free limit, it logs zero cost and consumes the allowance.
+### How to Record a Daily Running Chart:
+1. Open the agreement's **Running Charts** tab (or go to **Vehicle Rental > Running Charts**).
+2. Click **Record Running Chart**.
+3. Fill in the daily operational facts:
+   - **Trip Date:** The civil calendar date of travel.
+   - **Duty ON & Duty OFF:** Chauffeur shift start and finish times (e.g. `06:30 AM` to `08:00 PM`).
+   - **Start & End Odometer:** Speedometer readings. The system automatically computes the **Comparative Mileage** (distance driven today) and the running **Cumulative Mileage** for the month.
+   - **Commercial vs. Garage KM:** Billable client distance vs. deadhead depot travel.
+   - **Driver Assignment:** Select an employee driver from the HR directory or record external contractor details.
+   - **Overtime Hours & Tier:** Enter overtime hours and specify tier: **Normal OT** (`N`), **Double/Sunday OT** (`D`), or **Triple/Holiday OT** (`T`).
+   - **Night Out:** Check if the driver stayed overnight outside depot base.
+   - **Pass (Highway Tolls):** Enter expressway toll charges paid out of pocket (e.g. `850.00`).
+4. Click **Save Running Chart**.
 
-### Part 3: Invoicing Overtime, Night-Outs & Auxiliary Usage
-1. On any finalized running chart, navigate to the **Usage Charges** panel.
-2. Select the component you wish to bill: **Overtime (Normal/Double/Triple)** or **Night-Out**.
-3. The system calculates the charge based on the exact minutes/counts logged on the chart multiplied by agreed agreement rates.
+### Finalizing the Trip Sheet:
+Once verified against the driver's signed paper sheet, click **Finalize**. Finalizing freezes the facts as permanent evidence, enabling automated commercial billing.
+
+---
+
+## 11. Customer Billing: Base Rent, Mileage & Usage Invoicing
+
+AutoERP eliminates manual invoice preparation by automatically calculating charges directly from your contracts and finalized running charts.
+
+### 11.1 Base Rent Invoicing (Monthly Calendar Proration)
+1. In the Customer Agreement, switch to the **Billing & Invoices** tab.
+2. Click **Preview base rent** to inspect the calculation.
+   - The system checks the cycle (e.g. 1st to 30th) and calculates exact proration using actual calendar days (`actual_calendar_days_v1`):
+     $$\text{Charge} = \frac{\text{Actual Days in Period}}{\text{Total Days in Month}} \times \text{Monthly Base Rate}$$
+3. Click **Create base rent invoice**.
+4. The system posts a formal commercial invoice in [`Invoice`](file:///d:/project-new/AutoERP/app/Modules/Invoice) with revenue credited to General Ledger accounts.
+
+### 11.2 Commercial Mileage Assessment (Excess KM)
+At month end, assess whether the client exceeded their free mileage allowance:
+1. In the Running Charts panel, click **Mileage Assessment**.
+2. The system automatically aggregates all finalized trip kilometers across the month (including replacement cars):
+   - *Total Commercial KM:* e.g. `2,850 KM`.
+   - *Monthly Free Allowance:* e.g. `2,500 KM`.
+   - *Billable Excess KM:* `350 KM`.
+   - *Excess Rate:* `LKR 100.00 / KM`.
+   - *Total Excess Charge:* `LKR 35,000.00`.
+3. Click **Record mileage assessment**. If excess kilometers exist, the system generates an official customer invoice for the difference.
+
+### 11.3 Invoicing Driver Overtime & Toll Passes
+1. On any finalized running chart, open the **Usage Charges** panel.
+2. Select **Overtime** or **Toll Pass Outlays**.
+3. Overtime hours automatically multiply by agreed hourly rates. Toll receipts transfer at exact cost.
 4. Click **Create usage charge invoice** to post the bill.
 
 ---
 
-## 11. Collecting & Refunding Security Deposits
+## 12. Vehicle Owner Settlements & Withholding Tax (WHT :3305-000)
 
-To protect against vehicle damage or unpaid invoices, security deposits are recorded and tracked through the [`Payment`](file:///d:/project-new/AutoERP/app/Modules/Payment) module.
+If you lease vehicles from third-party owners, AutoERP provides a closed-loop settlement engine that calculates monthly payouts with zero guesswork.
 
-### How to Collect a Customer Deposit
+```text
+======================================================================================================
+               STATEMENT OF ACCOUNTS - VEHICLE WISE (DETAIL I) [A4 PORTRAIT]
+Lessor: GUNATHILAKE H M S K GUNATHILAKE                               Vehicle: CBC-9180
+Period: 01/08/2026 To 31/08/2026
+======================================================================================================
+Balance Brought Forward (Balance B/F as at 01/08/2026)............................. LKR (82,445.00)
 
+Rental & Other Payable:
+  One Month Base Hire (01/08/2026 To 31/08/2026).................. LKR 327,500.00
+  Driver's Overtime Normal (11.75 Hrs @ 1,500.00)................. LKR  17,625.00
+  Other Charges / Expressway Toll Passes Reimbursed............... LKR   2,070.00
+  ---------------------------------------------------------------------------------
+  Total Rental & Other Payable.................................... LKR 347,195.00    LKR 347,195.00
+
+Settlements (Bank Vouchers & Cheques Issued):
+  31/08/2026 PRB7001084 (Cheque No: 552350)....................................... LKR (334,095.00)
+
+Deductions for Repair (Chargebacks):
+  31/08/2026 CDN7000294 DAY 01 CBC-9180 Maintenance Deduction.................... LKR  (13,100.00)
+------------------------------------------------------------------------------------------------------
+Closing Balance: Balance Over Paid as at 31/08/2026................................ LKR (82,445.00)
+======================================================================================================
+```
+
+### Accessing Owner Settlement Statements:
+Navigate to **Vehicle Rental > Reports > Owner Disbursements**:
+1. **Statement of Accounts (Detail I) [A4 Portrait]:** A clean vertical summary showing opening balance, earnings, cheque disbursements, repair deductions, and closing balance.
+2. **Statement of Accounts (Detail II) [A4 Landscape]:** An 18-column operational matrix showing hire dates, agreed KM, rate, hire amount, normal/double/triple overtime hours split, driver salary/bata, other charges, VAT, net settlements, and closing balance.
+3. **Statutory Withholding Tax Ledger (`:3305-000 WHT`):** Automatically audits 10% statutory tax withheld from gross lessor earnings, tracking credit note references (`CDN7000248` to `CDN7000273`).
+
+---
+
+## 13. Customer Security Deposits & Payment Management
+
+Security deposits protect against vehicle damage or unpaid bills. AutoERP manages deposits through the dedicated [`Payment`](file:///d:/project-new/AutoERP/app/Modules/Payment) module.
+
+### How to Collect a Deposit:
 1. Open the Customer Agreement and switch to the **Security Deposit** tab.
-2. The summary panel displays:
-   - *Agreed requirement:* E.g., `LKR 50,000.00`.
-   - *Net receipts:* Currently collected cash.
-   - *Remaining collection capacity:* Remaining amount to collect.
-3. In the deposit receipt form:
-   - **Date:** Defaults to today.
-   - **Exchange rate:** Defaults to `1.00`.
-   - **Payment Lines:** Select payment method (**Cash**, **Bank Transfer**, **Cheque**, or **Credit Card**), enter the amount, and add transaction/cheque references.
-4. Click **Create deposit receipt**.
-5. The receipt is recorded. You can click the payment number to view the receipt voucher.
+2. The summary displays:
+   - *Agreed Deposit Requirement:* e.g. `LKR 50,000.00`.
+   - *Net Collected Receipts:* Cash already in hand.
+   - *Remaining Capacity:* Balance left to collect.
+3. Enter receipt details (Payment Method: Cash, Bank Transfer, or Cheque; Reference Number; Amount).
+4. Click **Create deposit receipt**. The system records the payment and links it to the contract.
 
-### Applying or Refunding Deposits
-- **Apply to Final Invoice:** When the rental concludes, open the final invoice and click **Apply Payment / Deposit**. The unapplied deposit balance will settle the invoice.
-- **Refund to Customer:** If the car is returned with no damages and all bills are settled, open the original deposit receipt in the Payment module and click **Refund Deposit**.
+### Applying or Refunding Deposits:
+- **Settling Final Invoices:** When the lease terminates, open the customer's final invoice and click **Apply Payment / Deposit** to settle open balances with the deposit.
+- **Refunding Clean Returns:** If the car is returned undamaged with all bills paid, open the deposit receipt in the Payment module and click **Refund Deposit**.
 
 ---
 
-## 12. Recording Fleet Operating Expenses (Fuel, Tolls, Repairs)
+## 14. Fleet Operating Expenses & Cost Allocation Matrix
 
-When drivers or depot staff purchase petrol, pay highway tolls, or incur emergency puncture repairs, record them in **Fleet Expenses** (`/vehicle-rental/expenses`).
-
-### How to Record an Expense
-1. Go to **Vehicle Rental > Fleet Expenses**.
-2. Click **Record Rental Fleet Expense**.
-3. Fill in the details:
-   - **Vehicle:** Select the vehicle that incurred the cost.
-   - **Expense Type:** Select **Fuel**, **Highway Toll**, **Maintenance & Repairs**, **Traffic Fine**, or **Other Operational Cost**.
-   - **Expense Date:** Date on the receipt.
-   - **Net Amount & Tax Amount:** Enter the monetary values.
-   - **Supplier / Station (Optional):** Select petrol station or garage from your supplier list.
-   - **Bill / Receipt Reference:** Enter receipt number (e.g., `PET-88992`).
-   - **Description:** Enter notes (e.g., "Full tank diesel refill at Southern Expressway exit").
-4. Click **Save Expense Record**.
-
-### Approving & Allocating Who Pays for the Expense
-Once recorded, the rental manager approves the bill and decides who absorbs the cost:
-1. Open the expense and click **Approve & Allocate**.
-2. Choose one of four allocation destinations:
-   - **Company Cost:** Your company absorbs the cost as operating overhead.
-   - **Customer Recovery:** The cost is billed to the customer on their next invoice.
-   - **Owner Deduction:** The cost was paid on behalf of a leased vehicle; it will be deducted from the vehicle owner's monthly lease disbursement.
-   - **Employee Reimbursement:** The driver paid out of pocket; it will be reimbursed to the employee via HR/Payroll.
-3. Click **Confirm Allocation**.
-
----
-
-## 13. Logging Incidents, Accidents & Traffic Fines
-
-When a vehicle suffers body damage, is involved in an accident, or incurs a police traffic fine, record it in the **Incident Register** (`/vehicle-rental/incidents`).
+When drivers buy fuel, pay highway tolls, or perform emergency repairs on the road, log them in **Fleet Expenses** (`/vehicle-rental/expenses`).
 
 ```text
-[ Step 1: Record Facts ]       [ Step 2: Attach Proofs ]      [ Step 3: Factual Review ]
-  Select Vehicle Use      -->    Upload Photos / Police   -->   Manager Reviews Evidence
-  Describe Incident              Reports (PDF/JPG/PNG)          (Confirm or Reject)
+[ Record Expense ]  -->  [ Manager Review ]  -->  [ Choose 1 of 4 Allocation Destinations ]
+Petrol, Tolls, Maint.     Inspect Receipt         1. Company Cost (Absorbed by business)
+                                                  2. Customer Recovery (Billed to client)
+                                                  3. Owner Deduction (Deducted from lessor payout)
+                                                  4. Driver Reimbursement (Paid via HR/Payroll)
 ```
 
-### How to Record an Incident
-1. Go to **Vehicle Rental > Incident Evidence** (`/vehicle-rental/incidents`).
-2. In the **Record new incident** box:
-   - **Find a vehicle use:** Type the vehicle registration or customer name and click **Find assignments**.
-   - **Vehicle assignment:** Select the specific trip assignment from the dropdown list.
-   - **Running Chart (Optional):** Link the specific daily trip sheet if known.
-   - **Incident category:** Select **Accident / Damage**, **Traffic Fine / Penalty**, **Highway Toll Violation**, **Repair**, etc.
-   - **Business date of incident:** Date the event occurred.
-   - **Evidence / document reference:** Police report number, insurance claim number, or traffic citation number.
-   - **Description:** Provide a factual narrative of what occurred.
-3. Click **Record evidence**.
-
-### Attaching Proof Files (Photos & Police Reports)
-1. In the incident list, locate the recorded incident and click to expand **File proofs**.
-2. Click **Choose File** and select your photo or PDF document (up to 10 MB).
-3. Click **Attach file**.
-4. The file is uploaded to secure private storage with a tamper-evident SHA-256 digital fingerprint.
-
-### Factual Review
-A rental manager reviews the incident and clicks **Confirm Evidence** (verifies that the event took place as described) or **Reject Evidence** (invalid report).
-*(Note: Reviewing an incident records verified physical evidence; any financial deduction or damage recovery requires an explicit, separate billing action).*
+### How to Record and Allocate an Expense:
+1. Go to **Vehicle Rental > Fleet Expenses** and click **Record Rental Fleet Expense**.
+2. Select the vehicle, expense date, category (Fuel, Toll, Repair, Fine), and amount.
+3. Once saved, click **Approve & Allocate**.
+4. Select who absorbs the cost:
+   - **Company Cost:** Absorbed as fleet operating overhead.
+   - **Customer Recovery:** Automatically added as a billable item on the customer's next invoice.
+   - **Owner Deduction:** Deducted as a `CDN` debit note on the vehicle owner's monthly payout.
+   - **Driver Reimbursement:** Sent to HR/Payroll to reimburse the employee driver.
 
 ---
 
-## 14. Managing Vehicle Bank Leases & Financing
+## 15. Incident Evidence Register & Private Proof Uploads
 
-If your company finances fleet vehicles through commercial banks or leasing companies (e.g., Commercial Bank, HNB, LOLC), manage their amortization schedules in **Vehicle Finance** (`/vehicle-rental/finance-agreements`).
+When an accident, body scratch, or police traffic citation occurs, record it in the **Incident Register** (`/vehicle-rental/incidents`).
 
-### Setting Up a Bank Lease
-1. Navigate to **Vehicle Rental > Vehicle Finance**.
-2. Click **New Vehicle Finance Agreement**.
-3. Fill in the financing terms:
-   - **Financing Company / Supplier:** Select the bank from your supplier directory.
-   - **Financed Vehicle:** Select the vehicle being financed.
-   - **Principal Financed Amount:** Total loan or lease value (e.g., `LKR 5,000,000.00`).
-   - **Initial Deposit Paid:** Down payment paid at signing.
-   - **Residual / Balloon Value:** Final lump sum payment due at lease end (if any).
-   - **Annual Interest Rate (%):** E.g., `14.5%`.
-   - **Interest Method:** Select **Flat Interest Rate** or **Reducing Balance**.
-   - **Installment Frequency & Count:** E.g., **Monthly** with `36` installments.
-4. Click **Create Agreement**, then review and click **Activate**.
+### Key Invariant: Factual Evidence vs. Financial Charges
+Logging an incident records verified physical evidence. It **never automatically creates financial charges** against a client or driver without an authorized commercial decision.
 
-### Managing Monthly Bank Installments
-- The system automatically generates a complete 36-month amortization schedule.
-- Click **Refresh Due Statuses** anytime to automatically identify installments maturing this month.
-- When an installment becomes due, click **Create Payable Invoice**. AutoERP posts an inbound supplier invoice in the [`Invoice`](file:///d:/project-new/AutoERP/app/Modules/Invoice) module so your accounts team can schedule bank payment.
+### How to Log an Incident:
+1. Go to **Vehicle Rental > Incident Evidence** and click **Record new incident**.
+2. Select the vehicle assignment, date, incident category (Accident/Damage, Traffic Fine, Toll Violation), and description.
+3. **Upload Proof Files:** Click **Attach file** to upload photos or scanned police vouchers (up to 10 MB PDF/JPEG/PNG). Files are stored in secure private tenant storage with SHA-256 digital integrity fingerprints.
+4. **Manager Review:** The rental manager reviews the evidence and clicks **Confirm Evidence** or **Reject Evidence**. Once confirmed, records are locked permanently for audit compliance.
 
 ---
 
-## 15. Official Reports & Exporting A4 Trip Sheets
+## 16. Vehicle Finance & Commercial Bank Leasing
 
-Vehicle Rental includes a complete reporting suite accessible from **Vehicle Rental > Reports** (`/vehicle-rental/reports`).
+If your company finances fleet vehicles through commercial banks or leasing institutions, track their amortization schedules in **Vehicle Finance** (`/vehicle-rental/finance-agreements`).
 
-### How to Print the Official 31-Day Running Chart Matrix Sheet
-The 31-day Running Chart matrix sheet is the standard legal trip sheet format used across Sri Lankan fleet operations (replicating historical `pmdeblogsheet2.frx` and `pmcre1logsheet2.frx` layouts).
+- **Setup Financing Terms:** Enter the financing bank, financed vehicle, loan amount, down payment, balloon value, interest rate (%), and payment tenor (months).
+- **Automated Amortization:** The system instantly generates a 36- or 48-month installment schedule with principal and interest breakdowns.
+- **Due Status Sync:** Click **Refresh Due Statuses** to automatically flag installments maturing in the current business month.
+- **One-Click Invoicing:** Click **Create Payable Invoice** on any due installment to post an inbound supplier invoice in [`Invoice`](file:///d:/project-new/AutoERP/app/Modules/Invoice) so accounts can disburse payment.
 
-```text
-+-----------------------------------------------------------------------------------------------+
-|                      RUNNING CHART 31-DAY MATRIX SHEET (LANDSCAPE A4)                         |
-| Client: John Keells Logistics               Vehicle: WP-PX-2020 (Toyota KDH)                 |
-| Month: November 2026                        Mode: Customer / Lessee View                      |
-+-----+------------+-----------+---------+------------+----------+-----------+------------------+
-| Day | Start Time | End Time  | Start KM| End KM     | Total KM | Normal OT | Night Out | Toll |
-+-----+------------+-----------+---------+------------+----------+-----------+------------------+
-|  1  | 08:00      | 18:30     | 45,210  | 45,350     | 140 km   | 90 mins   |     -     |  Yes |
-|  2  | 08:30      | 17:00     | 45,350  | 45,430     |  80 km   |    -      |     -     |   -  |
-| ... | ...        | ...       | ...     | ...        | ...      | ...       |    ...    |  ... |
-+-----+------------+-----------+---------+------------+----------+-----------+------------------+
-| Signatures: Driver: Sunil Perera __________     Customer Signature: _________________________ |
-+-----------------------------------------------------------------------------------------------+
+---
+
+## 17. Official Reports Hub & Exporting A4 Printouts
+
+Access the complete reporting suite at **Vehicle Rental > Reports** (`/vehicle-rental/reports`):
+
+```mermaid
+flowchart TD
+    HUB["Vehicle Rental Reports Hub"]
+    HUB --> R1["1. Running Chart 31-Day Matrix Sheet (Landscape A4)"]
+    HUB --> R2["2. Statement of Accounts Detail I (Portrait A4)"]
+    HUB --> R3["3. Statement of Accounts Detail II (Landscape A4)"]
+    HUB --> R4["4. Statutory 10% WHT Ledger (Landscape A4)"]
+    HUB --> R5["5. Lessee Outstanding Age Analysis (Portrait A4)"]
+    HUB --> R6["6. Lessee All Invoice Listing (Portrait A4)"]
+    HUB --> R7["7. Vehicle Revenue Licence Expiration (Portrait A4)"]
+    HUB --> R8["8. Fleet Utilization & Profitability (Landscape A4)"]
 ```
 
-1. Navigate to **Vehicle Rental > Reports > Running Chart 31-Day Matrix Sheet** (or click **Print Sheet** on any running chart).
-2. Select:
-   - **Vehicle Assignment:** Choose the customer trip assignment.
-   - **Month & Year:** E.g., `November 2026`.
-   - **Mode:** Select **Lessee Mode** (shows client commercial mileage) or **Owner Mode** (shows lessor settlement mileage).
+### How to Print the Official 31-Day Running Chart Matrix Sheet:
+1. Open **Reports > Running Chart 31-Day Matrix Sheet**.
+2. Select the vehicle assignment, month, and view mode (**Lessee Mode** for clients or **Owner Mode** for lessors).
 3. Click **Generate Report**.
-4. The complete 31-day calendar matrix displays on your screen.
-5. In the top action bar:
-   - Click **Print Preview** for instant browser printing.
-   - Click **Download PDF** to generate an official downloadable Landscape A4 PDF with company header and driver signature blocks.
-
-### Summary of Other Available Reports
-
-- **Fleet Utilization Report:** Check which vehicles are active, idle, or in the workshop, and see overall fleet utilization percentages.
-- **Revenue Licence Expiry Report:** Displays a countdown of vehicle revenue licence expiry dates with color-coded warnings (Red = Expired, Yellow = Expiring in 30 days).
-- **Rental Revenue Summary:** Total income earned per customer contract broken down by base rent, excess KM, and overtime.
-- **Lessee Outstanding Aging:** Accounts receivable aging report showing client debt across 30, 60, 90, and 120+ day buckets.
-- **Owner Disbursement Ledger:** Full payout breakdown for third-party vehicle owners, including base lease entitlements, expense deductions, and Withholding Tax (WHT) statements.
-- **Fleet Vehicle Profitability:** Vehicle-level profit & loss report showing total income generated minus operating costs (fuel, repairs, owner payouts) to reveal the true net profit per vehicle.
+4. The full calendar matrix displays on your screen showing daily odometers, duty times, overtime tiers, toll passes, and replacement vehicle amber badges.
+5. Click **Download PDF** for an official legal A4 Landscape printout complete with driver and client signature blocks.
 
 ---
 
-## 16. Frequently Asked Questions & Troubleshooting
+## 18. Troubleshooting & Frequently Asked Questions (FAQ)
 
-### Q1: Why does the system say "Conflict: The record has been modified by another user"?
-**Answer:** AutoERP uses optimistic concurrency protection. If another staff member updated the agreement, vehicle use, or running chart while you had it open on your screen, the system stops you from overwriting their changes. Simply refresh your browser tab to see the latest version, then reapply your edit.
+### Q1: The system gave an error: "Conflict: The record has been modified by another user." What does this mean?
+**Answer:** AutoERP uses optimistic concurrency protection. If another team member updated the agreement, vehicle use, or running chart while you had it open on your screen, the system prevents you from accidentally overwriting their changes. Simply refresh your browser page to load the latest data, then reapply your edit.
 
-### Q2: Why is a vehicle not appearing in the vehicle assignment dropdown?
-**Answer:** The vehicle may already be booked or unavailable. Check the following:
-1. Is the vehicle currently dispatched to another customer? (Check **Fleet Availability**).
-2. Is the vehicle currently admitted to the workshop in **Vehicle Service**?
-3. If it is an owner-leased vehicle, does the owner agreement cover the dates you selected?
+### Q2: Why is a vehicle missing from the dispatch dropdown?
+**Answer:** Check three things:
+1. Is the vehicle currently dispatched to another client? (Check **Fleet Availability**).
+2. Is the vehicle admitted to the workshop in **Vehicle Service**? (Workshop admissions block rental dispatches).
+3. If it is an owner-leased car, does the owner agreement cover the dates you selected?
 
 ### Q3: Can I delete an invoice or running chart if I made a mistake?
-**Answer:** No. In commercial accounting and fleet management, deleting records creates financial audit discrepancies. Instead:
-- To correct a trip sheet: Open the running chart and click **Correct**. The system reverses the old chart and creates an editable copy.
+**Answer:** No. Deleting records destroys financial audit trails. Instead:
+- To correct a trip sheet: Open the chart and click **Correct**. The system reverses the old chart and creates an editable revision.
 - To cancel an unposted billing item: Click **Void**.
 
-### Q4: What happens if a client returns a car with less mileage than when it left?
-**Answer:** The system strictly validates odometer continuity. If you try to enter a return odometer lower than the handover odometer, the form displays a validation error: *"Return odometer cannot be less than handover odometer."* Re-check the vehicle's speedometer reading.
+### Q4: Why did the system reject my return odometer?
+**Answer:** The system strictly enforces odometer continuity. Your return odometer must be equal to or greater than the handover odometer. Double-check the vehicle's speedometer reading.
 
 ### Q5: Can I give a customer a discount on their monthly base rent?
-**Answer:** Yes. When setting up or reviewing a `Draft` customer agreement, you can enter any agreed monthly or daily rate. If the agreement is already active, click **Create successor** to negotiate and activate the discounted rate starting from the next billing cycle.
+**Answer:** Yes. In a `Draft` customer agreement, you can enter any agreed rate. If the contract is already active, click **Create successor** to negotiate and activate the discounted rate starting from the next billing cycle.
 
 ---
 
-## Summary & Best Practices Checklist
+## 19. Daily Operational Best Practices Checklist
 
-- [x] **Verify Before Dispath:** Always check fleet availability before promising cars to clients.
-- [x] **Record Immediate Odometer Readings:** Inspect the speedometer at handover and return; record readings immediately.
-- [x] **Finalize Daily Charts Promptly:** Ensure drivers submit signed trip sheets daily so billing clerks can invoice without delays.
-- [x] **Use Replace Vehicle for Breakdowns:** Never manually return and re-assign a breakdown car; use atomic replacement so free mileage allowances remain shared.
-- [x] **Review Before Activation:** Confirm customer rates carefully before clicking Activate.
-- [x] **Attach Clear Incident Proofs:** When accidents occur, upload clear photos and police vouchers immediately to protect company liability.
+- [x] **Check Availability First:** Always verify vehicle availability in the system before promising dates to a customer.
+- [x] **Verify Speedometers at the Curb:** Check the actual odometer at handover and return; record readings immediately.
+- [x] **Prompt Daily Finalization:** Ensure chauffeurs submit trip sheets daily and finalize them promptly so monthly billing is never delayed.
+- [x] **Always Use "Replace Vehicle" for Swaps:** Never manually check-in and re-assign a breakdown car; use atomic replacement so the client's monthly mileage allowance remains shared.
+- [x] **Attach Photos for Damage:** Always upload clear photographs and police vouchers when logging incidents to protect company liability.
+- [x] **Reconcile Owner Statements Monthly:** Cross-check owner settlement statements against repair deductions and 10% statutory WHT before releasing settlement cheques.
