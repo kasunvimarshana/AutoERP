@@ -200,11 +200,7 @@ export function VehicleUsePanel({
                                     type="button"
                                     variant="secondary"
                                     onClick={() => {
-                                        try {
-                                            setAt(businessDateTimeInputValueWithSeconds());
-                                        } catch {
-                                            setAt(actionPlannedStartLocal ?? '');
-                                        }
+                                        setAt(businessDateTimeInputValueWithSeconds());
                                     }}
                                 >
                                     Use current time

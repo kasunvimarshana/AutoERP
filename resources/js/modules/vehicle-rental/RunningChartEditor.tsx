@@ -323,13 +323,9 @@ export function RunningChartEditor({
                             type="button"
                             variant="secondary"
                             onClick={() => {
-                                try {
-                                    const now = freshLocalNow();
-                                    const target = end && end < now ? end : now;
-                                    setStart(target);
-                                } catch {
-                                    setStart(freshLocalNow());
-                                }
+                                const now = freshLocalNow();
+                                const target = end && end < now ? end : now;
+                                setStart(target);
                             }}
                         >
                             Use current time
@@ -361,13 +357,9 @@ export function RunningChartEditor({
                             type="button"
                             variant="secondary"
                             onClick={() => {
-                                try {
-                                    const now = freshLocalNow();
-                                    const target = custodyEnd && custodyEnd < now ? custodyEnd : now;
-                                    setEnd(target);
-                                } catch {
-                                    setEnd(freshLocalNow());
-                                }
+                                const now = freshLocalNow();
+                                const target = custodyEnd && custodyEnd < now ? custodyEnd : now;
+                                setEnd(target);
                             }}
                         >
                             Use current time
