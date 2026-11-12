@@ -19,6 +19,7 @@ use Modules\Promotion\Enums\PromotionCountScope;
 use Modules\Promotion\Enums\PromotionDiscountType;
 use Modules\Promotion\Enums\PromotionStatus;
 use Modules\Promotion\Http\Requests\PromotionRequest;
+use Modules\Promotion\Services\PromotionCardActivityService;
 use Modules\Promotion\Services\PromotionCardService;
 use Modules\Promotion\Services\PromotionOfferService;
 use Modules\Promotion\Services\PromotionRuntimeService;
@@ -145,6 +146,21 @@ final class PromotionController extends Controller
             isset($filter['customer_id']) ? (int) $filter['customer_id'] : null,
             isset($filter['vehicle_id']) ? (int) $filter['vehicle_id'] : null,
         )]);
+    }
+
+    public function cardActivity(PromotionRequest $request, PromotionCardActivityService $service): JsonResponse
+    {
+        $filter = $request->validate(['customer_id' => ['nullable', 'integer', 'min:1']]);
+
+        return response()->json(['data' => $service->list(
+            $request->tenantId(), $request->organizationUnitId(),
+            isset($filter['customer_id']) ? (int) $filter['customer_id'] : null,
+        )]);
+    }
+
+    public function cardInvoices(PromotionRequest $request, int $card, PromotionCardActivityService $service): JsonResponse
+    {
+        return response()->json(['data' => $service->invoices($request->tenantId(), $request->organizationUnitId(), $card)]);
     }
 
     public function issueCard(PromotionRequest $request, PromotionCardService $service): JsonResponse

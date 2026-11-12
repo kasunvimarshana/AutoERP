@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import { ApiError, toApiError, type ApiError as ApiErrorShape } from '@/shared/api/apiError';
 import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -15,13 +16,15 @@ import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
+import { lineValueWithItem } from '../components/line-editor/LineItemFields';
+import { emptyLineForm, lineFormToPayload } from '../components/line-editor/lineForm';
 import { VehicleServiceJobDiscountValue } from '../components/VehicleServiceJobDiscountValue';
 import { PromotionJobStrip } from '@/modules/promotion/components/PromotionJobStrip';
 import { VehicleServiceCancellationDialog } from '../components/VehicleServiceCancellationDialog';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
-import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus, VehicleServiceJobTotals } from '../vehicleServiceTypes';
-import { completeAndBillVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
+import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus, VehicleServiceJobTotals, VehicleServiceLinePayload } from '../vehicleServiceTypes';
+import { completeAndBillVehicleServiceJob, createVehicleServiceLine, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, listVehicleServiceLines, startVehicleServiceJob } from '../vehicleServiceApi';
 import { vehicleServicePermissions } from '../vehicleServicePermissions';
 import { createVehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 
@@ -44,11 +47,15 @@ export default function VehicleServiceJobDetailPage() {
     const [cancelOpen, setCancelOpen] = useState(false);
     const jobStore = useMemo(() => createVehicleServiceJobStore(id), [id]);
     const result = useApi((signal) => getVehicleServiceJob(id, signal), [id], true, false);
+    const canManageJobLines = hasPermission(auth, vehicleServicePermissions.linesView)
+        && hasPermission(auth, vehicleServicePermissions.linesManage);
+    const jobLinesResult = useApi((signal) => listVehicleServiceLines(id, signal), [id], canManageJobLines, false);
     const job = result.data;
     const setJob = result.setData;
     const tabs = useOnDemandTab<Tab>('summary');
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiErrorShape | null>(null);
+    const [pendingPromotionChoices, setPendingPromotionChoices] = useState<Array<NonNullable<VehicleServiceLinePayload['promotion']>>>([]);
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
     const bumpHistory = useCallback(() => {
@@ -159,10 +166,45 @@ export default function VehicleServiceJobDetailPage() {
     const canInspect = canTransition && job.status === 'draft';
     const canStart = canTransition && ['draft', 'inspected'].includes(job.status);
     const canComplete = canCompleteAndBill && ['draft', 'inspected', 'in_progress'].includes(job.status);
+    const canAddPromotionLine = canManageJobLines && jobLinesResult.data !== null
+        && ['draft', 'inspected', 'in_progress'].includes(job.status);
+    const addPromotionLine = async (item: ItemLookupResource, promotion: NonNullable<VehicleServiceLinePayload['promotion']>) => {
+        const value = lineValueWithItem(emptyLineForm(), item);
+        const mutation = await createVehicleServiceLine(job.id, {
+            ...lineFormToPayload(value), expected_version: expectedVersion, promotion,
+        });
+        jobStore.getState().replaceWorkforceLines({
+            lines: mutation.workforceLines, rowVersion: mutation.rowVersion,
+        });
+        jobLinesResult.setData((current) => [...(current ?? []), mutation.line]);
+        setPendingPromotionChoices((current) => [...current, promotion]);
+        await refreshJobSilently();
+        setContentVersion((current) => current + 1);
+        tabs.openTab('lines');
+    };
     return (
         <>
             <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
-            <PromotionJobStrip customerId={job.customer_id} vehicleId={job.vehicle_id} />
+            <PromotionJobStrip customerId={job.customer_id} vehicleId={job.vehicle_id}
+                pendingChoices={pendingPromotionChoices}
+                existingPaidItemIds={(jobLinesResult.data ?? []).filter((line) => line.status !== 'cancelled'
+                    && typeof line.item_id === 'number')
+                    .map((line) => line.item_id!)}
+                onAddPaidItem={canAddPromotionLine ? async (item) => {
+                        const value = lineValueWithItem(emptyLineForm(), item);
+                        const mutation = await createVehicleServiceLine(job.id, {
+                            ...lineFormToPayload(value), expected_version: expectedVersion,
+                        });
+                        jobStore.getState().replaceWorkforceLines({
+                            lines: mutation.workforceLines, rowVersion: mutation.rowVersion,
+                        });
+                        jobLinesResult.setData((current) => [...(current ?? []), mutation.line]);
+                        await refreshJobSilently();
+                        setContentVersion((current) => current + 1);
+                        tabs.openTab('lines');
+                    } : undefined}
+                onAddOfferReward={canAddPromotionLine ? addPromotionLine : undefined}
+                onAddCardBenefit={canAddPromotionLine ? addPromotionLine : undefined} />
             <WorkflowHeader
                 status={<>
                     <VehicleServiceStatusBadge status={job.status} />
@@ -187,7 +229,7 @@ export default function VehicleServiceJobDetailPage() {
                 </>}
                 blockedReason={job.status === 'cancelled' ? 'No further actions are available for a cancelled job.' : undefined}
             />
-            <ErrorAlert error={actionError ?? result.error} />
+            <ErrorAlert error={actionError ?? result.error ?? jobLinesResult.error} />
             {needsBillingReversal && <section className="mb-5 space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" aria-label="Job cancellation steps">
                 <p><strong>Need to cancel this job?</strong> Resolve linked payments first, then reverse or void the invoices using their own actions. Those actions require their respective permissions.</p>
                 <p>After all linked billing documents are reversed or voided, return here: the job will be Completed and an authorized administrator can cancel it. A cancelled job stays Cancelled.</p>

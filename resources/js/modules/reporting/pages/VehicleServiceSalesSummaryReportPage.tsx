@@ -91,6 +91,7 @@ export default function VehicleServiceSalesSummaryReportPage() {
                 </Panel>
 
                 {loading ? <LoadingState label="Loading service job sales summary..." /> : result ? <>
+                    <JobTypeRevenueChart result={result} />
                     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Sales and profit totals">
                         <Metric label="Revenue" value={formatMoney(result.summary.revenue)} tone="blue" />
                         <Metric label="Stock cost" value={formatMoney(result.summary.stock_cost)} tone="sky" />
@@ -158,6 +159,36 @@ export default function VehicleServiceSalesSummaryReportPage() {
                 </> : null}
             </div>
         </>
+    );
+}
+
+const jobTypeColors = ['#2563eb', '#f97316', '#10b981', '#a855f7', '#eab308'];
+const percentageScale = 100;
+
+function JobTypeRevenueChart({ result }: { result: VehicleServiceSalesSummaryResult }) {
+    const total = Number(result.summary.revenue);
+    const types = result.summary.by_job_type.filter((type) => Number(type.revenue) > 0);
+    const slices = types.map((type, index) => {
+        const precedingRevenue = types.slice(0, index).reduce((sum, entry) => sum + Number(entry.revenue), 0);
+        const start = precedingRevenue / total * percentageScale;
+        const end = (precedingRevenue + Number(type.revenue)) / total * percentageScale;
+        return `${jobTypeColors[index % jobTypeColors.length]} ${start}% ${end}%`;
+    });
+
+    return (
+        <Panel title="Revenue by job type">
+            <p className="-mt-2 mb-4 text-sm text-slate-500">Share of invoiced service sales in the selected period.</p>
+            {types.length === 0 ? <p className="text-sm text-slate-500">No invoiced service sales in this period.</p> :
+                <div className="flex flex-col items-center gap-6 md:flex-row md:justify-center md:gap-10">
+                    <div role="img" aria-label={`Revenue by job type: ${types.map((type) => `${type.label} ${formatMoney(type.revenue)}`).join(', ')}`} className="h-48 w-48 shrink-0 rounded-full border border-white shadow-sm" style={{ background: `conic-gradient(${slices.join(', ')})` }} />
+                    <ul className="grid gap-3 text-sm sm:grid-cols-2" aria-label="Job type revenue breakdown">
+                        {types.map((type, index) => <li key={type.type} className="flex items-start gap-2">
+                            <span className="mt-1 h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: jobTypeColors[index % jobTypeColors.length] }} aria-hidden="true" />
+                            <span><strong className="font-semibold text-slate-900">{type.label}</strong><span className="ml-2 text-slate-600">{(Number(type.revenue) / total * percentageScale).toFixed(1)}%</span><span className="block text-slate-600">{formatMoney(type.revenue)} · {formatQuantity(type.job_count)} jobs</span></span>
+                        </li>)}
+                    </ul>
+                </div>}
+        </Panel>
     );
 }
 

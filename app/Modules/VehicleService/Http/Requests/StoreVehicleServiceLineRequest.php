@@ -45,6 +45,10 @@ final class StoreVehicleServiceLineRequest extends TenantScopedRequest
             'is_customer_supplied' => ['nullable', 'boolean'],
             'is_billable' => ['nullable', 'boolean'],
             'expand_combo' => ['nullable', 'boolean'],
+            'promotion' => [$this->isMethod('post') ? 'sometimes' : 'prohibited', 'array:card_id,card_benefit_id,offer_assignment_id'],
+            'promotion.card_id' => ['nullable', 'integer', 'min:1'],
+            'promotion.card_benefit_id' => ['nullable', 'integer', 'min:1'],
+            'promotion.offer_assignment_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 

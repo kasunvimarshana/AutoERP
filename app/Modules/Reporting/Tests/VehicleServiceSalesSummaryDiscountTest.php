@@ -34,6 +34,7 @@ final class VehicleServiceSalesSummaryDiscountTest extends TestCase
         $componentId = $this->item($tenantId, 'COMPONENT', 'service', false);
         $jobId = (int) DB::table('vehicle_service_jobs')->insertGetId([
             'tenant_id' => $tenantId, 'job_number' => 'VSJ-DISCOUNT', 'job_date' => '2026-11-03',
+            'type' => 'body_wash',
             'customer_id' => $customerId, 'vehicle_id' => $vehicleId, 'status' => 'invoiced',
             'grand_total' => '423.000000', 'created_at' => $now, 'updated_at' => $now,
         ]);
@@ -77,6 +78,9 @@ final class VehicleServiceSalesSummaryDiscountTest extends TestCase
         self::assertSame('131.000000', $stock['profit']);
         self::assertSame('242.000000', $combo['profit']);
         self::assertSame('77.000000', $report['summary']['discount_amount']);
+        self::assertSame([[
+            'type' => 'body_wash', 'label' => 'Body Wash', 'job_count' => 1, 'revenue' => '423.000000',
+        ]], $report['summary']['by_job_type']);
         self::assertSame([], app(VehicleServiceSalesSummaryReportService::class)->run([
             'tenant_id' => $tenantId, 'date_from' => '2026-11-03', 'date_to' => '2026-11-03',
         ])['summary']['stock']['items']);

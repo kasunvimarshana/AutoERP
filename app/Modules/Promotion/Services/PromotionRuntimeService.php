@@ -138,7 +138,39 @@ final class PromotionRuntimeService
             ->orderBy('offer.name')->get(['offer.id', 'offer.name', 'offer.count_scope',
                 'qualifying.code as paid_item_code', 'qualifying.name as paid_item_name']);
 
-        return ['cards' => $cardRows, 'offers' => $offerRows, 'unassigned_offers' => $unassignedOffers];
+        $cardDesigns = DB::table('promotion_card_templates as template')
+            ->where('template.tenant_id', $tenantId)
+            ->where('template.status', PromotionStatus::Active->value)
+            ->where('template.starts_on', '<=', $today)->where('template.ends_on', '>=', $today)
+            ->where(fn ($query) => $query->whereNull('template.organization_unit_id')->orWhere('template.organization_unit_id', $organizationUnitId))
+            ->whereExists(fn ($query) => $query->selectRaw('1')->from('promotion_card_benefits as benefit')
+                ->whereColumn('benefit.template_id', 'template.id')->where('benefit.tenant_id', $tenantId))
+            ->orderBy('template.name')
+            ->get(['template.id', 'template.name', 'template.ends_on'])
+            ->filter(function ($template) use ($tenantId, $organizationUnitId, $vehicleId, $today): bool {
+                $earnedOffers = DB::table('promotion_card_benefits as benefit')
+                    ->join('promotion_offers as offer', 'offer.id', '=', 'benefit.offer_id')
+                    ->where('benefit.tenant_id', $tenantId)->where('benefit.template_id', $template->id)
+                    ->where('benefit.kind', PromotionBenefitKind::Earned->value)
+                    ->get(['offer.id', 'offer.status', 'offer.starts_on', 'offer.ends_on', 'offer.organization_unit_id']);
+                foreach ($earnedOffers as $offer) {
+                    if ($offer->status !== PromotionStatus::Active->value || $offer->starts_on > $today
+                        || ($offer->ends_on !== null && $offer->ends_on < $today)
+                        || ($offer->organization_unit_id !== null && (int) $offer->organization_unit_id !== $organizationUnitId)
+                        || DB::table('promotion_offer_assignments')->where('tenant_id', $tenantId)
+                            ->where('offer_id', $offer->id)->where('vehicle_id', $vehicleId)
+                            ->whereIn('status', [PromotionStatus::Active->value, PromotionStatus::Paused->value])
+                            ->where(fn ($query) => $query->whereNull('ends_on')->orWhere('ends_on', '>=', $today))
+                            ->exists()) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })->values()->all();
+
+        return ['cards' => $cardRows, 'offers' => $offerRows, 'unassigned_offers' => $unassignedOffers,
+            'card_designs' => $cardDesigns];
     }
 
     public function choose(int $tenantId, ?int $organizationUnitId, int $actorId, int $jobId, int $lineId, int $expectedVersion, array $input): array
@@ -312,6 +344,7 @@ final class PromotionRuntimeService
     {
         $tenantId = (int) $job->tenant_id;
         $redeemedCardIds = [];
+        $redeemedAssignments = [];
         $invoiceLines = $invoice->lines()->where('source_line_type', self::SOURCE_LINE_TYPE)->get();
         $serviceBase = $this->math->sum($invoiceLines->map(fn ($line): string => $this->math->sub(
             $this->math->mul((string) $line->quantity, (string) $line->unit_price),
@@ -338,6 +371,10 @@ final class PromotionRuntimeService
                 if ($choice->card_benefit_id !== null) {
                     $redeemedCardIds[(int) $choice->card_id] = true;
                 }
+                if ($choice->offer_assignment_id !== null && $choice->card_id !== null) {
+                    $redeemedAssignments[(int) $choice->offer_assignment_id] = true;
+                    $redeemedCardIds[(int) $choice->card_id] = true;
+                }
             }
             $chargedServiceAmount = $this->math->sub(
                 $this->math->mul((string) $invoiceLine->quantity, (string) $invoiceLine->unit_price),
@@ -357,8 +394,24 @@ final class PromotionRuntimeService
                 ->where(fn ($query) => $query->whereNull('assignment.ends_on')->orWhere('assignment.ends_on', '>=', now()->toDateString()))
                 ->where(function ($query) use ($job): void {
                     $query->whereNull('assignment.vehicle_id')->orWhere('assignment.vehicle_id', $job->vehicle_id);
-                })->get(['assignment.*']);
+                })->orderBy('assignment.id')->lockForUpdate()->get(['assignment.*']);
             foreach ($assignments as $assignment) {
+                $qualifiedQuantity = (string) $invoiceLine->quantity;
+                $qualifiedAmount = $chargedServiceAmount;
+                if ($assignment->card_id !== null) {
+                    $offer = DB::table('promotion_offers')->where('tenant_id', $tenantId)->find($assignment->offer_id);
+                    $counted = $this->progress($tenantId, (object) array_merge((array) $assignment,
+                        ['paid_quantity' => $offer->paid_quantity, 'reward_quantity' => $offer->reward_quantity]))['qualifying_quantity'];
+                    $remaining = $this->math->sub((string) $offer->paid_quantity, $counted);
+                    if ($this->math->compare($remaining, self::ZERO) <= 0) {
+                        continue;
+                    }
+                    if ($this->math->compare($qualifiedQuantity, $remaining) > 0) {
+                        $qualifiedQuantity = $remaining;
+                        $qualifiedAmount = $this->math->mul($chargedServiceAmount,
+                            $this->math->div($remaining, (string) $invoiceLine->quantity, 12));
+                    }
+                }
                 if (DB::table('promotion_qualification_events')->where('tenant_id', $tenantId)
                     ->where('offer_assignment_id', $assignment->id)
                     ->where('invoice_line_id', $invoiceLine->id)
@@ -368,10 +421,13 @@ final class PromotionRuntimeService
                 DB::table('promotion_qualification_events')->insert([
                     'tenant_id' => $tenantId, 'offer_assignment_id' => $assignment->id,
                     'invoice_line_id' => $invoiceLine->id, 'event_type' => PromotionEventType::Qualification->value,
-                    'quantity' => $invoiceLine->quantity, 'charged_amount_snapshot' => $chargedServiceAmount,
+                    'quantity' => $qualifiedQuantity, 'charged_amount_snapshot' => $qualifiedAmount,
                     'reverses_event_id' => null, 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
+        }
+        foreach (array_keys($redeemedAssignments) as $assignmentId) {
+            $this->syncCardAssignment($tenantId, $assignmentId);
         }
         foreach (array_keys($redeemedCardIds) as $cardId) {
             $this->cards->syncExhausted($tenantId, $cardId);
@@ -380,6 +436,8 @@ final class PromotionRuntimeService
 
     public function reverseInvoice(int $tenantId, int $invoiceId, ?int $actorId): void
     {
+        $affectedAssignments = [];
+        $affectedCards = [];
         $qualifications = DB::table('promotion_qualification_events as event')
             ->join('invoice_lines as line', 'line.id', '=', 'event.invoice_line_id')
             ->where('event.tenant_id', $tenantId)->where('line.invoice_id', $invoiceId)
@@ -395,6 +453,7 @@ final class PromotionRuntimeService
                 'charged_amount_snapshot' => $this->math->sub(self::ZERO, (string) $event->charged_amount_snapshot),
                 'reverses_event_id' => $event->id, 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
+            $affectedAssignments[(int) $event->offer_assignment_id] = true;
         }
         $redemptions = DB::table('promotion_redemption_events as event')
             ->join('invoice_lines as line', 'line.id', '=', 'event.invoice_line_id')
@@ -414,9 +473,22 @@ final class PromotionRuntimeService
                 'reverses_event_id' => $event->id, 'actor_id' => $actorId,
                 'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
+            if ($event->offer_assignment_id !== null) {
+                $affectedAssignments[(int) $event->offer_assignment_id] = true;
+            }
+            if ($event->card_id !== null) {
+                $affectedCards[(int) $event->card_id] = true;
+            }
         }
-        foreach ($redemptions->pluck('card_id')->filter()->unique() as $cardId) {
-            $this->cards->syncExhausted($tenantId, (int) $cardId);
+        foreach (array_keys($affectedAssignments) as $assignmentId) {
+            $assignment = DB::table('promotion_offer_assignments')->where('tenant_id', $tenantId)->find($assignmentId);
+            if ($assignment?->card_id !== null) {
+                $this->syncCardAssignment($tenantId, $assignmentId);
+                $affectedCards[(int) $assignment->card_id] = true;
+            }
+        }
+        foreach (array_keys($affectedCards) as $cardId) {
+            $this->cards->syncExhausted($tenantId, $cardId);
         }
     }
 
@@ -493,18 +565,65 @@ final class PromotionRuntimeService
             'card_benefit_id' => null, 'offer_assignment_id' => $assignment->id];
     }
 
-    private function progress(int $tenantId, object $assignment): array
+    public function progress(int $tenantId, object $assignment): array
     {
         $qualifying = $this->math->sum(DB::table('promotion_qualification_events')
             ->where('tenant_id', $tenantId)->where('offer_assignment_id', $assignment->id)->pluck('quantity'));
         $redeemed = $this->redemptionQuantity($tenantId, null, null, (int) $assignment->id);
+        if ($assignment->card_id !== null) {
+            $threshold = $this->math->normalize((string) $assignment->paid_quantity);
+            $earned = $this->math->compare($qualifying, $threshold) >= 0
+                ? $this->math->normalize((string) $assignment->reward_quantity) : self::ZERO;
+            $progress = $this->math->compare($qualifying, $threshold) >= 0 ? $threshold : $qualifying;
+
+            return ['qualifying_quantity' => $qualifying, 'progress_quantity' => $progress,
+                'remaining_to_next' => $this->math->sub($threshold, $progress),
+                'available_rewards' => $this->math->sub($earned, $redeemed),
+                'redeemed_rewards' => $redeemed];
+        }
         $earnedCycles = bcdiv($qualifying, (string) $assignment->paid_quantity, 0);
         $earned = $this->math->mul($earnedCycles, (string) $assignment->reward_quantity);
         $progress = $this->math->sub($qualifying, $this->math->mul($earnedCycles, (string) $assignment->paid_quantity));
 
         return ['qualifying_quantity' => $qualifying, 'progress_quantity' => $progress,
             'remaining_to_next' => $this->math->sub((string) $assignment->paid_quantity, $progress),
-            'available_rewards' => $this->math->sub($earned, $redeemed)];
+            'available_rewards' => $this->math->sub($earned, $redeemed),
+            'redeemed_rewards' => $redeemed];
+    }
+
+    private function syncCardAssignment(int $tenantId, int $assignmentId): void
+    {
+        $assignment = DB::table('promotion_offer_assignments')->where('tenant_id', $tenantId)
+            ->where('id', $assignmentId)->lockForUpdate()->first();
+        if ($assignment === null || $assignment->card_id === null
+            || ! in_array($assignment->status, [PromotionStatus::Active->value, PromotionStatus::Exhausted->value], true)) {
+            return;
+        }
+        $offer = DB::table('promotion_offers')->where('tenant_id', $tenantId)->find($assignment->offer_id);
+        $progress = $this->progress($tenantId, (object) array_merge((array) $assignment,
+            ['paid_quantity' => $offer->paid_quantity, 'reward_quantity' => $offer->reward_quantity]));
+        $completed = $this->math->compare($progress['qualifying_quantity'], (string) $offer->paid_quantity) >= 0
+            && $this->math->compare($progress['redeemed_rewards'], (string) $offer->reward_quantity) >= 0;
+        $nextStatus = $completed ? PromotionStatus::Exhausted->value : PromotionStatus::Active->value;
+        if ($nextStatus === PromotionStatus::Active->value && $assignment->status === PromotionStatus::Exhausted->value) {
+            $successorExists = DB::table('promotion_offer_assignments')->where('tenant_id', $tenantId)
+                ->where('offer_id', $assignment->offer_id)
+                ->where('customer_id', $assignment->customer_id)
+                ->where('vehicle_id', $assignment->vehicle_id)
+                ->where('id', '!=', $assignmentId)
+                ->where('status', PromotionStatus::Active->value)
+                ->where(fn ($query) => $query->whereNull('ends_on')->orWhere('ends_on', '>=', now()->toDateString()))
+                ->exists();
+            if ($successorExists) {
+                return;
+            }
+        }
+        if ($assignment->status !== $nextStatus) {
+            DB::table('promotion_offer_assignments')->where('id', $assignmentId)->update([
+                'status' => $nextStatus, 'row_version' => (int) $assignment->row_version + 1,
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function redemptionQuantity(int $tenantId, ?int $cardId, ?int $benefitId, ?int $assignmentId): string

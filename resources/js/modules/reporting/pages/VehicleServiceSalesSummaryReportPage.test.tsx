@@ -29,6 +29,10 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
             jobs: [], receipts: [],
             summary: {
                 job_count: 2, revenue: '450', stock_cost: '40', commission: '0', profit: '400', margin: '88.88', collected: '0',
+                by_job_type: [
+                    { type: 'full_service', label: 'Full Service', job_count: 1, revenue: '300' },
+                    { type: 'body_wash', label: 'Body Wash', job_count: 1, revenue: '150' },
+                ],
                 stock: { item_count: 1, quantity: '2', discount_amount: '30', revenue: '170', cost: '40', profit: '130', items: [stock] },
                 combo: { combo_count: 1, item_count: 1, quantity: '1', discount_amount: '20', component_stock_quantity: '1', revenue: '280', stock_cost: '0', component_cost: '10', profit: '270', items: [combo] },
                 other_service_revenue: '0',
@@ -37,6 +41,9 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
 
         render(<TestRouter><VehicleServiceSalesSummaryReportPage /></TestRouter>);
         expect(await screen.findByRole('button', { name: 'Show jobs for Engine oil' })).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: /Full Service LKR 300.*Body Wash LKR 150/ })).toBeInTheDocument();
+        expect(screen.getByText('66.7%')).toBeInTheDocument();
+        expect(screen.getByText('33.3%')).toBeInTheDocument();
         expect(screen.getAllByRole('columnheader', { name: 'Discount' })).toHaveLength(2);
         await user.click(screen.getByRole('button', { name: 'Show jobs for Engine oil' }));
         expect(screen.getByRole('link', { name: 'VSJ-000019' })).toHaveAttribute('href', '/vehicle-service/jobs/19');
@@ -56,6 +63,7 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
             }],
             summary: {
                 job_count: 0, revenue: '0', discount_amount: '0', stock_cost: '0', commission: '0', profit: '0', margin: '0', collected: '1900',
+                by_job_type: [],
                 stock: empty, combo: { ...empty, component_stock_quantity: '0', component_cost: '0' }, other_service_revenue: '0',
             },
         });
@@ -66,12 +74,14 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
         expect(screen.getByText('VSJ-000009')).toBeInTheDocument();
         expect(screen.getByText('SERVICE-2026-000007')).toBeInTheDocument();
         expect(screen.getByText(/Payments received in period:/)).toBeInTheDocument();
+        expect(screen.getByText('No invoiced service sales in this period.')).toBeInTheDocument();
     });
 
     it('exports only applied date and item filters and hides export while loading', async () => {
         const empty = { item_count: 0, quantity: '0', discount_amount: '0', revenue: '0', cost: '0', profit: '0', items: [] };
         mocks.run.mockResolvedValue({ jobs: [], receipts: [], summary: {
             job_count: 0, revenue: '0', discount_amount: '0', stock_cost: '0', commission: '0', profit: '0', margin: '0', collected: '0',
+            by_job_type: [],
             stock: empty, combo: { ...empty, component_stock_quantity: '0', component_cost: '0' }, other_service_revenue: '0',
         } });
         const user = userEvent.setup();

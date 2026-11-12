@@ -230,6 +230,7 @@ final class PromotionOfferService
         ?int $vehicleId,
         string $startsOn,
         ?string $endsOn,
+        ?int $excludeAssignmentId = null,
     ): void {
         $existing = DB::table('promotion_offer_assignments')
             ->where('tenant_id', $tenantId)
@@ -237,7 +238,8 @@ final class PromotionOfferService
             ->when($vehicleId === null,
                 fn ($query) => $query->where('customer_id', $customerId)->whereNull('vehicle_id'),
                 fn ($query) => $query->where('vehicle_id', $vehicleId))
-            ->where('status', PromotionStatus::Active->value)
+            ->whereIn('status', [PromotionStatus::Active->value, PromotionStatus::Paused->value])
+            ->when($excludeAssignmentId !== null, fn ($query) => $query->where('id', '!=', $excludeAssignmentId))
             ->when($endsOn !== null, fn ($query) => $query->where('starts_on', '<=', $endsOn))
             ->where(fn ($query) => $query->whereNull('ends_on')->orWhere('ends_on', '>=', $startsOn))
             ->lockForUpdate()

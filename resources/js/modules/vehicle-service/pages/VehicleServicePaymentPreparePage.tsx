@@ -245,12 +245,13 @@ export default function VehicleServicePaymentPreparePage() {
         return () => { cancelled = true; };
     }, [eligibleInvoices, invoiceId, paymentMethods]);
     const invoice = eligibleInvoices.find((link) => link.invoice_id === Number(invoiceId));
-    const outstanding = invoice?.balance_due ?? ZERO_AMOUNT;
+    const paymentInvoice = createdPayment && settledInvoice ? settledInvoice : invoice;
+    const outstanding = paymentInvoice?.balance_due ?? ZERO_AMOUNT;
     const completedInvoice = settledInvoice ?? creditedInvoice;
     const displayedInvoice = completedInvoice ?? invoice;
     const submissionLocked = busy || Boolean(createdPayment || creditedInvoice);
     const paymentEntryDisabled = submissionLocked || !invoice;
-    const appliedAmounts = invoice
+    const appliedAmounts = paymentInvoice
         ? calculateAppliedAmounts(rows, paymentMethods, outstanding)
         : rows.map(() => ZERO_AMOUNT);
     const paymentTotal = sumDecimals(appliedAmounts);
@@ -262,6 +263,9 @@ export default function VehicleServicePaymentPreparePage() {
             createdPayment.allocated_amount ?? paymentTotal,
         ))
         : null;
+    const displayedOutstandingBalance = postedBalanceAfterPayment
+        ?? displayedInvoice?.balance_due
+        ?? displayedInvoice?.invoice_total;
 
     const updateRow = (kind: DirectPaymentKind, update: Partial<PaymentRow>) => {
         setRows((current) => current.map((row) => row.kind === kind ? { ...row, ...update } : row));
@@ -425,7 +429,7 @@ export default function VehicleServicePaymentPreparePage() {
                             </div>
                             <div className="rounded-lg bg-amber-50 px-4 py-4 text-amber-900 sm:px-5">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Outstanding balance</p>
-                                <p className="mt-3 text-2xl font-bold tabular-nums sm:text-3xl">{displayedInvoice ? formatMoney(displayedInvoice.balance_due ?? displayedInvoice.invoice_total) : '—'}</p>
+                                <p className="mt-3 text-2xl font-bold tabular-nums sm:text-3xl">{displayedOutstandingBalance !== undefined ? formatMoney(displayedOutstandingBalance) : '—'}</p>
                             </div>
                         </div>
 
@@ -606,7 +610,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                     </div>
                                                     <div className="rounded-md bg-white/70 px-4 py-2">
                                                         <p className="text-xs text-slate-600">Change to return</p>
-                                                        <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(invoice ? nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)) : ZERO_AMOUNT)}</p>
+                                                        <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(paymentInvoice ? nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)) : ZERO_AMOUNT)}</p>
                                                     </div>
                                                 </div>
                                             )}
@@ -669,7 +673,7 @@ export default function VehicleServicePaymentPreparePage() {
                         <h2 className="text-lg font-semibold text-slate-950">Payment summary</h2>
                         <div className="mt-4 border-t border-blue-200 pt-4">
                             <p className="text-sm text-slate-700">Outstanding balance</p>
-                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{displayedInvoice ? formatMoney(displayedInvoice.balance_due ?? displayedInvoice.invoice_total) : '—'}</p>
+                            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-950">{displayedOutstandingBalance !== undefined ? formatMoney(displayedOutstandingBalance) : '—'}</p>
                         </div>
                         <div className="mt-5 border-t border-blue-200 pt-4">
                             <p className="text-sm text-slate-700">Payment total</p>
@@ -690,8 +694,8 @@ export default function VehicleServicePaymentPreparePage() {
                             <p className="mt-1 text-xs">{paymentMode === 'credit'
                                 ? 'Remains due on the customer account'
                                 : compareDecimalStrings(postedBalanceAfterPayment ?? remainingAfterPayment, ZERO_AMOUNT) === 0
-                                    ? 'Fully settled after finalizing'
-                                    : 'Remaining balance after finalizing'}</p>
+                                    ? createdPayment ? 'Fully settled' : 'Fully settled after finalizing'
+                                    : createdPayment ? 'Remaining balance' : 'Remaining balance after finalizing'}</p>
                         </div>
                         {paymentMode === 'direct' && invoice && !createdPayment && compareDecimalStrings(paymentTotal, outstanding) > 0 && (
                             <p className="mt-2 text-sm text-rose-600">Payment total exceeds the outstanding balance.</p>

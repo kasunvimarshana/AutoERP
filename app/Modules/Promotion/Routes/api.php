@@ -25,6 +25,8 @@ Route::prefix('api/v1/promotions')->middleware($middleware)->name('api.v1.promot
         Route::get('offers', [PromotionController::class, 'offers'])->name('offers.index');
         Route::get('card-templates', [PromotionController::class, 'templates'])->name('templates.index');
         Route::get('cards', [PromotionController::class, 'cards'])->name('cards.index');
+        Route::get('cards/activity', [PromotionController::class, 'cardActivity'])->name('cards.activity');
+        Route::get('cards/{card}/invoices', [PromotionController::class, 'cardInvoices'])->whereNumber('card')->name('cards.invoices');
     });
     Route::middleware($requires(PromotionPermission::MANAGE))->group(function (): void {
         Route::post('offers', [PromotionController::class, 'createOffer'])->name('offers.store');

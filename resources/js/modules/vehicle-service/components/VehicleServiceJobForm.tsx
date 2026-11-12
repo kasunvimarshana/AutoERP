@@ -239,6 +239,16 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                     </div>
                 )}
                 <PromotionJobStrip customerId={customer?.id ?? null} vehicleId={vehicle?.id ?? null}
+                    existingPaidItemIds={draftLines.flatMap(({ value }) => {
+                        const itemId = lineFormToPayload(value).item_id;
+                        return itemId == null ? [] : [itemId];
+                    })}
+                    onAddPaidItem={isCreating ? (item) => {
+                        const value = lineValueWithItem(emptyLineForm(), item);
+                        setDraftLines((current) => [...current, { key: nextDraftLineKey--, value }]);
+                        setActiveTab('lines');
+                        formGuard.markDirty();
+                    } : undefined}
                     pendingChoices={draftLines.flatMap((line) => line.promotion ? [{ ...line.promotion, quantity: line.value.quantity }] : [])}
                     onAdd={isCreating ? (item, promotion) => {
                         const value = lineValueWithItem(emptyLineForm(), item);

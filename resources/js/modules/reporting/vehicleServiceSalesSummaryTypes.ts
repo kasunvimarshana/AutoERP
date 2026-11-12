@@ -95,6 +95,7 @@ export interface VehicleServiceSalesSummaryResult {
         commission: string;
         profit: string;
         margin: string;
+        by_job_type: { type: string; label: string; job_count: number; revenue: string }[];
         stock: {
             item_count: number;
             quantity: string;

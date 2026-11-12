@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Http\Controllers;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Item\Services\ItemQueryService;
+use Modules\Promotion\Constants\PromotionPermission;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceLineRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
@@ -50,9 +53,18 @@ final class VehicleServiceLineController extends VehicleServiceController
         int $job,
         VehicleServiceLineService $service,
         VehicleServiceAssignableLineService $assignableLines,
+        PermissionCheckerInterface $permissions,
     ): JsonResponse {
         $jobModel = $this->job($request, $job);
-        $line = $service->create($jobModel, $request->toData(), $request->expectedVersion(), $request->currentUserId());
+        $promotion = $request->validated('promotion');
+        if ($promotion !== null && ! $permissions->allows(
+            (int) $request->currentUserId(),
+            $request->tenantId(),
+            PromotionPermission::REDEEM,
+        )) {
+            throw new AuthorizationException('You do not have permission to redeem service offers.');
+        }
+        $line = $service->create($jobModel, $request->toData(), $request->expectedVersion(), $request->currentUserId(), $promotion);
 
         return $this->mutationResponse($request, $jobModel, $line, $assignableLines, 201);
     }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi, type ItemLookupResource, type VehicleLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
@@ -13,7 +14,7 @@ import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
-import { promotionApi, searchPromotionJobItems, type PromotionCard, type PromotionOffer, type PromotionTemplate } from '../promotionApi';
+import { promotionApi, searchPromotionJobItems, type PromotionCard, type PromotionCardInvoices, type PromotionOffer, type PromotionTemplate } from '../promotionApi';
 
 type BenefitDraft = {
     kind: 'direct' | 'earned';
@@ -49,13 +50,14 @@ export default function PromotionWorkspacePage() {
     const [vehicle, setVehicle] = useState<VehicleLookupResource | null>(null);
     const [assignmentOfferId, setAssignmentOfferId] = useState('');
     const [managedCardId, setManagedCardId] = useState<number | null>(null);
+    const [cardInvoices, setCardInvoices] = useState<PromotionCardInvoices | null>(null);
     const [transferVehicle, setTransferVehicle] = useState<VehicleLookupResource | null>(null);
     const [changeReason, setChangeReason] = useState('');
     const managedCard = cards.find((entry) => entry.id === managedCardId);
 
     const refresh = useCallback(async () => {
         const [nextOffers, nextTemplates, nextCards] = await Promise.all([
-            promotionApi.offers(), promotionApi.templates(), promotionApi.cards(customer?.id),
+            promotionApi.offers(), promotionApi.templates(), promotionApi.cardActivity(customer?.id),
         ]);
         setOffers(nextOffers);
         setTemplates(nextTemplates);
@@ -63,7 +65,7 @@ export default function PromotionWorkspacePage() {
     }, [customer?.id]);
     useEffect(() => {
         let active = true;
-        Promise.all([promotionApi.offers(), promotionApi.templates(), promotionApi.cards(customer?.id)])
+        Promise.all([promotionApi.offers(), promotionApi.templates(), promotionApi.cardActivity(customer?.id)])
             .then(([nextOffers, nextTemplates, nextCards]) => {
                 if (!active) return;
                 setOffers(nextOffers); setTemplates(nextTemplates); setCards(nextCards);
@@ -77,6 +79,12 @@ export default function PromotionWorkspacePage() {
         try { await action(); await refresh(); setMessage(success); }
         catch (reason) { setError(toApiError(reason)); }
         finally { setSaving(false); }
+    };
+
+    const showCard = async (cardId: number) => {
+        setManagedCardId(cardId); setTransferVehicle(null); setChangeReason(''); setCardInvoices(null);
+        try { setCardInvoices(await promotionApi.cardInvoices(cardId)); }
+        catch (reason) { setError(toApiError(reason)); }
     };
 
     return <>
@@ -182,17 +190,26 @@ export default function PromotionWorkspacePage() {
                 <Select label="Offer" value={assignmentOfferId} options={offers.filter((entry) => entry.status === 'active').map((entry) => ({ value: String(entry.id), label: `${entry.name} · ${entry.count_scope}` }))} required onChange={(event) => setAssignmentOfferId(event.target.value)} />
                 <div className="flex justify-end"><Button type="submit" loading={saving} disabled={!customer || !assignmentOfferId}>Assign offer</Button></div>
             </form></Panel></>}</div>
-            <Panel title="Recent issued cards"><div className="space-y-3">{cards.length === 0 ? <p className="text-sm text-slate-500">No cards issued yet.</p> : cards.map((entry) =>
-                <div key={entry.id} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between gap-3"><p className="font-semibold">{entry.template_name}</p><span className="text-xs text-slate-500">{entry.status}</span></div>
+            <Panel title="Recent card assignments"><div className="space-y-3">{cards.length === 0 ? <p className="text-sm text-slate-500">No cards issued yet.</p> : cards.map((entry) =>
+                <div key={entry.id} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between gap-3"><p className="font-semibold">{entry.template_name}</p><span className="text-xs font-medium capitalize text-slate-600">{entry.status_label ?? entry.status}</span></div>
                     <p className="mt-1 text-sm text-slate-700">{entry.customer_name} · {entry.vehicle_registration_number}</p>
                     <p className="mt-1 text-xs text-slate-500">Card {entry.card_number} · Expires {entry.expires_on}</p>
-                    {canManage && <Button type="button" variant="ghost" onClick={() => { setManagedCardId(entry.id); setTransferVehicle(null); setChangeReason(''); }}>Manage card</Button>}
+                    {entry.assignments?.map((assignment) => <p key={assignment.id} className="mt-2 text-sm text-slate-700">
+                        {assignment.offer_name}: {Number(assignment.progress_quantity)}/{assignment.paid_quantity} invoiced · {Number(assignment.available_rewards)} free ready · {Number(assignment.redeemed_rewards)} redeemed · <span className="capitalize">{assignment.status_label.replaceAll('_', ' ')}</span>
+                    </p>)}
+                    <Button type="button" variant="ghost" onClick={() => void showCard(entry.id)}>View card and invoices</Button>
                 </div>)}</div></Panel>
-            {canManage && managedCard && <Panel title={`Manage ${managedCard.template_name}`}>
+            {managedCard && <Panel title={`${managedCard.template_name} activity`}>
                 <p className="mb-3 text-sm text-slate-600">{managedCard.customer_name} · {managedCard.vehicle_registration_number}.</p>
-                {managedCard.status === 'ended' || managedCard.status === 'exhausted' ?
-                    <p className="text-sm text-slate-600">{managedCard.status === 'ended' ? 'This card ended when vehicle ownership changed.' : 'All available card uses have been redeemed.'}</p> :
-                <div className="space-y-3">
+                {cardInvoices && <div className="mb-4 space-y-2 text-sm text-slate-700">
+                    <p className="font-medium">Posted invoice history</p>
+                    {cardInvoices.qualifications.map((entry, index) => <p key={`paid-${index}`}><Link className="font-medium text-blue-700 hover:underline" to={`/invoices/${entry.invoice_id}`}>{entry.invoice_number}</Link> · {entry.invoice_date} · {entry.quantity} counted {entry.event_type === 'correction' ? '(reversed)' : ''}</p>)}
+                    {cardInvoices.redemptions.map((entry, index) => <p key={`free-${index}`}><Link className="font-medium text-blue-700 hover:underline" to={`/invoices/${entry.invoice_id}`}>{entry.invoice_number}</Link> · {entry.invoice_date} · {entry.quantity} free · customer saving {entry.amount} {entry.event_type === 'correction' ? '(reversed)' : ''}</p>)}
+                    {cardInvoices.qualifications.length === 0 && cardInvoices.redemptions.length === 0 && <p>No posted invoices for this card yet.</p>}
+                </div>}
+                {canManage && (managedCard.status === 'ended' || managedCard.status === 'exhausted' || managedCard.status_label === 'expired') ?
+                    <p className="text-sm text-slate-600">{managedCard.status_label === 'review_required' ? 'An invoice was reversed after this card completed. Review the invoice history; this assignment will not reopen while a newer one is active.' : managedCard.status_label === 'ended' ? 'This card ended when vehicle ownership changed.' : managedCard.status_label === 'expired' ? 'This card has expired.' : 'All available card uses have been redeemed.'}</p> :
+                canManage && <div className="space-y-3">
                     <p className="text-xs text-slate-600">Changes require a reason and are recorded in card history.</p>
                     <Input label="Reason for change" value={changeReason} required onChange={(event) => setChangeReason(event.target.value)} />
                     <div className="flex justify-end"><Button type="button" variant="secondary" disabled={saving || !changeReason.trim()} onClick={() => void run(() => promotionApi.setCardStatus(managedCard.id, {

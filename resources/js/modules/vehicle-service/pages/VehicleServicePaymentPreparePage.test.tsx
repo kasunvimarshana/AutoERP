@@ -169,6 +169,32 @@ describe('VehicleServicePaymentPreparePage', () => {
         expect(navigationMocks.openSameOriginUrl).toHaveBeenCalledWith('/signed/invoices/11/print');
     });
 
+    it('shows the remaining balance and payment methods after a full payment posts', async () => {
+        const paidJob = job('1550.000000');
+        paidJob.invoice_links[0].balance_due = '0.000000';
+        paidJob.invoice_links[0].can_receive_payment = false;
+        apiMocks.getVehicleServiceJob.mockResolvedValueOnce(job('1550.000000')).mockResolvedValueOnce(paidJob);
+        apiMocks.createVehicleServicePayment.mockResolvedValue({
+            id: 99, payment_number: 'PAY-99', posting_status: 'posted', allocated_amount: '1550.000000',
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.type(await screen.findByLabelText('Cash received'), '2000');
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
+        await screen.findByText('Payment created and allocated successfully');
+
+        expect(screen.getAllByText('Outstanding balance')).toHaveLength(2);
+        screen.getAllByText('Outstanding balance').forEach((label) => {
+            expect(label.parentElement).toHaveTextContent(/0\.00/);
+        });
+        expect(screen.getByText('Payment total').parentElement).toHaveTextContent(/1,550\.00/);
+        expect(screen.getByText('Across 1 method')).toBeInTheDocument();
+        expect(screen.getByText('Cash amount applied').parentElement).toHaveTextContent(/1,550\.00/);
+        expect(screen.getByText('Change to return').parentElement).toHaveTextContent(/450\.00/);
+        expect(screen.getByText('Fully settled')).toBeInTheDocument();
+    });
+
     it('calculates cash change in the UI and submits only the amount applied to the invoice', async () => {
         apiMocks.getVehicleServiceJob.mockResolvedValue(job('1000'));
         const user = userEvent.setup();
