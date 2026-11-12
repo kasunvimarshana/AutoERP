@@ -6,6 +6,7 @@ import type {
     VehicleServiceInspection,
     VehicleServiceInspectionPayload,
     VehicleServiceJob,
+    VehicleServiceJobBoardResult,
     VehicleServiceJobDiscount,
     VehicleServiceJobDiscountPayload,
     VehicleServiceJobPayload,
@@ -15,6 +16,10 @@ import { vehicleServiceJobsEndpoint as jobs } from './endpoint';
 
 export const listVehicleServiceJobs = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleServiceJob>>(jobs, { params, signal })
+        .then((response) => response.data);
+
+export const getVehicleServiceJobBoard = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<VehicleServiceJobBoardResult>(`${jobs}/board`, { params, signal })
         .then((response) => response.data);
 
 export const getVehicleServiceJob = (id: number, signal?: AbortSignal) =>

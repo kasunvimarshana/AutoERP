@@ -43,6 +43,7 @@ final class DashboardSummaryService
         private readonly ReportBrandingResolver $branding,
         private readonly SummaryReportService $summaryReports,
         private readonly EmployeeCommissionReportService $commissions,
+        private readonly ServiceSalesDashboardService $serviceSales,
     ) {}
 
     /** @return array<string, mixed> */
@@ -70,6 +71,7 @@ final class DashboardSummaryService
             ],
             'revenue_trend' => $this->revenueTrend($tenantId, $organizationUnitId, $dateFrom, $dateTo),
             'service_jobs' => $this->serviceJobStatus($tenantId, $organizationUnitId, $dateFrom, $dateTo),
+            'service_sales' => $this->serviceSales->run($tenantId, $organizationUnitId, $dateFrom, $dateTo),
             'cash_flow' => $this->cashFlow($tenantId, $organizationUnitId, $dateFrom, $dateTo),
             'inventory_health' => $inventory,
             'aging' => [

@@ -26,6 +26,7 @@ import type {
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
 const sectionExportFormats: ReportFormat[] = ['xlsx', 'pdf', 'csv'];
+const topSellingItemLimit = 5;
 
 export default function VehicleServiceSalesSummaryReportPage() {
     const [draftItem, setDraftItem] = useState<ItemSummary | null>(null);
@@ -91,7 +92,10 @@ export default function VehicleServiceSalesSummaryReportPage() {
                 </Panel>
 
                 {loading ? <LoadingState label="Loading service job sales summary..." /> : result ? <>
-                    <JobTypeRevenueChart result={result} />
+                    <section className="grid gap-4 lg:grid-cols-2" aria-label="Service sales charts">
+                        <JobTypeRevenueChart result={result} />
+                        <TopSellingStockItemsChart result={result} />
+                    </section>
                     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Sales and profit totals">
                         <Metric label="Revenue" value={formatMoney(result.summary.revenue)} tone="blue" />
                         <Metric label="Stock cost" value={formatMoney(result.summary.stock_cost)} tone="sky" />
@@ -179,15 +183,36 @@ function JobTypeRevenueChart({ result }: { result: VehicleServiceSalesSummaryRes
         <Panel title="Revenue by job type">
             <p className="-mt-2 mb-4 text-sm text-slate-500">Share of invoiced service sales in the selected period.</p>
             {types.length === 0 ? <p className="text-sm text-slate-500">No invoiced service sales in this period.</p> :
-                <div className="flex flex-col items-center gap-6 md:flex-row md:justify-center md:gap-10">
-                    <div role="img" aria-label={`Revenue by job type: ${types.map((type) => `${type.label} ${formatMoney(type.revenue)}`).join(', ')}`} className="h-48 w-48 shrink-0 rounded-full border border-white shadow-sm" style={{ background: `conic-gradient(${slices.join(', ')})` }} />
-                    <ul className="grid gap-3 text-sm sm:grid-cols-2" aria-label="Job type revenue breakdown">
+                <div className="flex flex-col items-center gap-4">
+                    <div role="img" aria-label={`Revenue by job type: ${types.map((type) => `${type.label} ${formatMoney(type.revenue)}`).join(', ')}`} className="h-40 w-40 shrink-0 rounded-full border border-white shadow-sm" style={{ background: `conic-gradient(${slices.join(', ')})` }} />
+                    <ul className="grid w-full gap-3 text-sm sm:grid-cols-2" aria-label="Job type revenue breakdown">
                         {types.map((type, index) => <li key={type.type} className="flex items-start gap-2">
                             <span className="mt-1 h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: jobTypeColors[index % jobTypeColors.length] }} aria-hidden="true" />
                             <span><strong className="font-semibold text-slate-900">{type.label}</strong><span className="ml-2 text-slate-600">{(Number(type.revenue) / total * percentageScale).toFixed(1)}%</span><span className="block text-slate-600">{formatMoney(type.revenue)} · {formatQuantity(type.job_count)} jobs</span></span>
                         </li>)}
                     </ul>
                 </div>}
+        </Panel>
+    );
+}
+
+function TopSellingStockItemsChart({ result }: { result: VehicleServiceSalesSummaryResult }) {
+    const items = result.summary.stock.items.filter((item) => Number(item.quantity) > 0).slice(0, topSellingItemLimit);
+    const highestQuantity = Number(items[0]?.quantity ?? 0);
+
+    return (
+        <Panel title="Top selling stock items">
+            <p className="-mt-2 mb-4 text-sm text-slate-500">Most units invoiced in the selected period. Revenue is after discounts.</p>
+            {items.length === 0 ? <p className="text-sm text-slate-500">No stock items were invoiced in this period.</p> :
+                <ol className="space-y-4">
+                    {items.map((item) => <li key={item.item.id ?? item.item.code} className="grid gap-1 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+                        <span className="truncate text-sm font-medium text-slate-900" title={item.item.name}>{item.item.name}</span>
+                        <div className="h-5 overflow-hidden rounded bg-slate-100" role="img" aria-label={`${item.item.name}: ${formatQuantity(item.quantity)} units invoiced`}>
+                            <div className="h-full rounded bg-blue-600" style={{ width: `${Number(item.quantity) / highestQuantity * percentageScale}%` }} />
+                        </div>
+                        <span className="whitespace-nowrap text-right text-sm tabular-nums text-slate-700"><strong className="font-semibold text-slate-900">{formatQuantity(item.quantity)} units</strong><span className="block text-xs text-slate-500">{formatMoney(item.sales_amount)}</span></span>
+                    </li>)}
+                </ol>}
         </Panel>
     );
 }

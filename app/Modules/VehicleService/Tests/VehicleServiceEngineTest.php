@@ -2269,6 +2269,44 @@ final class VehicleServiceEngineTest extends TestCase
             ->assertJsonValidationErrors('file');
     }
 
+    public function test_job_board_groups_filtered_jobs_and_returns_current_job_totals(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $draft = $this->createJob($context);
+        $inProgress = $this->createJob($context);
+        DB::table('vehicle_service_jobs')->where('id', $inProgress->getKey())->update([
+            'status' => VehicleServiceJobStatus::InProgress->value,
+            'grand_total' => '125.000000',
+        ]);
+
+        $url = '/api/v1/vehicle-service/jobs/board?'.http_build_query([
+            'tenant_id' => $context['tenant_id'],
+            'date_from' => '2026-06-07',
+            'date_to' => '2026-06-07',
+        ]);
+        $this->tenantGetJson($context['tenant_id'], $url)
+            ->assertOk()
+            ->assertJsonPath('lanes.pending.total', 1)
+            ->assertJsonPath('lanes.pending.data.0.id', $draft->getKey())
+            ->assertJsonPath('lanes.in_progress.total', 1)
+            ->assertJsonPath('lanes.in_progress.data.0.grand_total', '125.000000')
+            ->assertJsonPath('lanes.completed.total', 0)
+            ->assertJsonPath('lanes.billing_closed.total', 0);
+
+        $this->tenantGetJson($context['tenant_id'], $url.'&status=draft')
+            ->assertOk()
+            ->assertJsonPath('lanes.pending.total', 1)
+            ->assertJsonPath('lanes.in_progress.total', 0);
+
+        DB::table('customers')->where('id', $context['customer_id'])->update(['display_name' => 'Board Customer']);
+        $this->tenantGetJson($context['tenant_id'], $url.'&search=Board%20Customer')
+            ->assertOk()
+            ->assertJsonPath('lanes.pending.total', 1)
+            ->assertJsonPath('lanes.in_progress.total', 1);
+    }
+
     public function test_open_ended_availability_includes_future_workshop_jobs(): void
     {
         $context = $this->context();

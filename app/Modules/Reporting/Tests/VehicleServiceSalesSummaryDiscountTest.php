@@ -7,6 +7,7 @@ namespace Modules\Reporting\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Reporting\Services\ServiceSalesDashboardService;
 use Modules\Reporting\Services\VehicleServiceSalesSummaryReportService;
 use Tests\TestCase;
 
@@ -30,6 +31,7 @@ final class VehicleServiceSalesSummaryDiscountTest extends TestCase
             'tenant_id' => $tenantId, 'vehicle_number' => 'VEH-DISCOUNT', 'created_at' => $now, 'updated_at' => $now,
         ]);
         $stockId = $this->item($tenantId, 'STOCK', 'stock', true);
+        DB::table('items')->where('id', $stockId)->update(['reorder_level' => '5.000000']);
         $comboId = $this->item($tenantId, 'COMBO', 'combo', false);
         $componentId = $this->item($tenantId, 'COMPONENT', 'service', false);
         $jobId = (int) DB::table('vehicle_service_jobs')->insertGetId([
@@ -79,8 +81,18 @@ final class VehicleServiceSalesSummaryDiscountTest extends TestCase
         self::assertSame('242.000000', $combo['profit']);
         self::assertSame('77.000000', $report['summary']['discount_amount']);
         self::assertSame([[
-            'type' => 'body_wash', 'label' => 'Body Wash', 'job_count' => 1, 'revenue' => '423.000000',
+            'type' => 'body_wash', 'label' => 'Body Wash', 'job_count' => 1, 'revenue' => '423.000000', 'profit' => '373.000000',
         ]], $report['summary']['by_job_type']);
+        self::assertSame([[
+            'week_start' => '2026-11-02', 'job_count' => 1, 'revenue' => '423.000000',
+        ]], $report['by_week']);
+        $dashboard = app(ServiceSalesDashboardService::class)->run($tenantId, null, '2026-11-07', '2026-11-14');
+        self::assertSame('0', $dashboard['by_week'][1]['revenue']);
+        self::assertSame(0, $dashboard['by_week'][1]['job_count']);
+        self::assertSame('STOCK', $dashboard['top_stock_items'][0]['item']['name']);
+        self::assertSame('2.000000', $dashboard['top_stock_items'][0]['quantity_sold']);
+        self::assertSame('0', $dashboard['top_stock_items'][0]['quantity_available']);
+        self::assertTrue($dashboard['top_stock_items'][0]['needs_reorder']);
         self::assertSame([], app(VehicleServiceSalesSummaryReportService::class)->run([
             'tenant_id' => $tenantId, 'date_from' => '2026-11-03', 'date_to' => '2026-11-03',
         ])['summary']['stock']['items']);

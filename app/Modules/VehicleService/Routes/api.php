@@ -29,6 +29,7 @@ $requires = static fn (string $permission): string => $permissionMiddleware.':'.
 Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.vehicle-service.')->group(function () use ($requires): void {
     Route::middleware($requires(VehicleServicePermission::JOBS_VIEW))->group(function (): void {
         Route::get('jobs/lookup', [VehicleServiceJobController::class, 'lookup'])->name('jobs.lookup');
+        Route::get('jobs/board', [VehicleServiceJobController::class, 'board'])->name('jobs.board');
         Route::get('jobs', [VehicleServiceJobController::class, 'index'])->name('jobs.index');
         Route::get('jobs/{job}', [VehicleServiceJobController::class, 'show'])->whereNumber('job')->name('jobs.show');
         Route::get('jobs/{job}/inspection', [VehicleServiceJobController::class, 'inspection'])->whereNumber('job')->name('inspection.show');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Services\DecimalMath;
@@ -128,6 +129,7 @@ final class VehicleServiceSalesSummaryReportService
             ->get();
 
         $jobs = [];
+        $weeks = [];
         $lineQuantities = [];
         $lineBaseQuantities = [];
 
@@ -144,6 +146,10 @@ final class VehicleServiceSalesSummaryReportService
                     $jobs[$jobId] = $this->emptyJob($row);
                 }
                 $jobs[$jobId]['revenue'] = $this->math->add($jobs[$jobId]['revenue'], $invoiceSales);
+                $weekStart = CarbonImmutable::parse((string) $row->invoice_date)->startOfWeek()->toDateString();
+                $weeks[$weekStart] ??= ['week_start' => $weekStart, 'job_ids' => [], 'revenue' => self::ZERO];
+                $weeks[$weekStart]['job_ids'][$jobId] = true;
+                $weeks[$weekStart]['revenue'] = $this->math->add($weeks[$weekStart]['revenue'], $invoiceSales);
                 $lineQuantities[$lineId] = $this->math->add($lineQuantities[$lineId] ?? self::ZERO, (string) $row->quantity);
                 $lineBaseQuantities[$lineId] = (string) $row->line_quantity;
                 $this->addSalesLine($jobs[$jobId], $row, $invoiceSales, $invoiceDiscount, (string) $row->quantity);
@@ -151,7 +157,7 @@ final class VehicleServiceSalesSummaryReportService
         }
 
         if ($jobs === []) {
-            return $this->result([], $receipts);
+            return $this->result([], $receipts, []);
         }
 
         $jobIds = array_keys($jobs);
@@ -268,7 +274,7 @@ final class VehicleServiceSalesSummaryReportService
         }
         unset($job);
 
-        return $this->result(array_values($jobs), $receipts);
+        return $this->result(array_values($jobs), $receipts, $weeks);
     }
 
     /** @param array<string, mixed> $params @return list<array<string, mixed>> */
@@ -522,8 +528,8 @@ final class VehicleServiceSalesSummaryReportService
         unset($combo);
     }
 
-    /** @param list<array<string, mixed>> $jobs @return array<string, mixed> */
-    private function result(array $jobs, array $receipts): array
+    /** @param list<array<string, mixed>> $jobs @param array<string, array<string, mixed>> $weeks @return array<string, mixed> */
+    private function result(array $jobs, array $receipts, array $weeks): array
     {
         $summary = [
             'job_count' => count($jobs),
@@ -595,9 +601,10 @@ final class VehicleServiceSalesSummaryReportService
             $summary['stock']['item_count'] = count($stockItems);
             $summary['revenue'] = $this->math->add($summary['revenue'], $job['revenue']);
             $type = $job['job_type'];
-            $jobTypes[$type] ??= ['type' => $type, 'label' => Str::headline($type), 'job_count' => 0, 'revenue' => self::ZERO];
+            $jobTypes[$type] ??= ['type' => $type, 'label' => Str::headline($type), 'job_count' => 0, 'revenue' => self::ZERO, 'profit' => self::ZERO];
             $jobTypes[$type]['job_count']++;
             $jobTypes[$type]['revenue'] = $this->math->add($jobTypes[$type]['revenue'], $job['revenue']);
+            $jobTypes[$type]['profit'] = $this->math->add($jobTypes[$type]['profit'], $job['profit']);
             $summary['discount_amount'] = $this->math->add($summary['discount_amount'], $job['discount_amount']);
             $summary['direct_cost'] = $this->math->add($summary['direct_cost'], $job['direct_cost']);
             $summary['stock_cost'] = $this->math->add($summary['stock_cost'], $job['used_stock_cost']);
@@ -620,6 +627,12 @@ final class VehicleServiceSalesSummaryReportService
         $summary['by_job_type'] = array_values($jobTypes);
         usort($summary['by_job_type'], fn (array $left, array $right): int =>
             $this->math->compare($right['revenue'], $left['revenue']) ?: strcmp($left['label'], $right['label']));
+        ksort($weeks);
+        $salesByWeek = array_values(array_map(static fn (array $week): array => [
+            'week_start' => $week['week_start'],
+            'job_count' => count($week['job_ids']),
+            'revenue' => $week['revenue'],
+        ], $weeks));
         $summary['margin'] = $this->math->compare($summary['revenue'], self::ZERO) > 0
             ? $this->math->mul($this->math->div($summary['profit'], $summary['revenue']), '100')
             : self::ZERO;
@@ -630,6 +643,7 @@ final class VehicleServiceSalesSummaryReportService
             'jobs' => $jobs,
             'receipts' => $receipts,
             'summary' => $summary,
+            'by_week' => $salesByWeek,
             'date_basis' => ['sales' => 'invoice_date', 'collected' => 'payment_date'],
         ];
     }

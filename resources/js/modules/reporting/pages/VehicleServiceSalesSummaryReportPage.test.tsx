@@ -44,6 +44,8 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
         expect(screen.getByRole('img', { name: /Full Service LKR 300.*Body Wash LKR 150/ })).toBeInTheDocument();
         expect(screen.getByText('66.7%')).toBeInTheDocument();
         expect(screen.getByText('33.3%')).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: 'Engine oil: 2 units invoiced' })).toBeInTheDocument();
+        expect(screen.getByText('2 units')).toBeInTheDocument();
         expect(screen.getAllByRole('columnheader', { name: 'Discount' })).toHaveLength(2);
         await user.click(screen.getByRole('button', { name: 'Show jobs for Engine oil' }));
         expect(screen.getByRole('link', { name: 'VSJ-000019' })).toHaveAttribute('href', '/vehicle-service/jobs/19');
@@ -75,6 +77,7 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
         expect(screen.getByText('SERVICE-2026-000007')).toBeInTheDocument();
         expect(screen.getByText(/Payments received in period:/)).toBeInTheDocument();
         expect(screen.getByText('No invoiced service sales in this period.')).toBeInTheDocument();
+        expect(screen.getByText('No stock items were invoiced in this period.')).toBeInTheDocument();
     });
 
     it('exports only applied date and item filters and hides export while loading', async () => {

@@ -95,7 +95,7 @@ export interface VehicleServiceSalesSummaryResult {
         commission: string;
         profit: string;
         margin: string;
-        by_job_type: { type: string; label: string; job_count: number; revenue: string }[];
+        by_job_type: { type: string; label: string; job_count: number; revenue: string; profit: string }[];
         stock: {
             item_count: number;
             quantity: string;
@@ -120,4 +120,5 @@ export interface VehicleServiceSalesSummaryResult {
         other_service_revenue: string;
     };
     date_basis: { sales: 'invoice_date'; collected: 'payment_date' };
+    by_week: { week_start: string; job_count: number; revenue: string }[];
 }
