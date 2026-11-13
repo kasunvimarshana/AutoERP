@@ -99,10 +99,10 @@ final class VehicleProfitabilityReportService
             ->groupBy('vehicle_id');
 
         $rows = [];
-        $fleetTotalRevenue = 0.0;
-        $fleetTotalDirectCosts = 0.0;
-        $fleetTotalMargin = 0.0;
-        $fleetTotalDistance = 0.0;
+        $fleetTotalRevenue = '0.00';
+        $fleetTotalDirectCosts = '0.00';
+        $fleetTotalMargin = '0.00';
+        $fleetTotalDistance = '0.000';
 
         foreach ($vehicles as $vehicle) {
             $isOwnerLeased = $ownerAgreements->has($vehicle->id);
@@ -118,7 +118,7 @@ final class VehicleProfitabilityReportService
             $customerAgreementIds = $uses->pluck('customer_agreement_id')->unique()->filter()->all();
 
             // Customer Revenue
-            $vehicleCustomerBase = empty($customerAgreementIds) ? 0.0 : (float) CustomerBaseCharge::query()
+            $vehicleCustomerBase = empty($customerAgreementIds) ? '0.00' : (string) CustomerBaseCharge::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->whereIn('agreement_id', $customerAgreementIds)
                 ->whereNull('voided_at')
@@ -126,7 +126,7 @@ final class VehicleProfitabilityReportService
                 ->where('period_until', '>=', $startDate)
                 ->sum('amount');
 
-            $vehicleCustomerUsage = empty($customerAgreementIds) ? 0.0 : (float) CustomerUsageCharge::query()
+            $vehicleCustomerUsage = empty($customerAgreementIds) ? '0.00' : (string) CustomerUsageCharge::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->whereIn('agreement_id', $customerAgreementIds)
                 ->whereNull('voided_at')
@@ -135,28 +135,28 @@ final class VehicleProfitabilityReportService
                 ->sum('amount');
 
             $vehicleExpenses = $expenses->get($vehicle->id) ?? collect();
-            $customerRecoveries = 0.0;
-            $ownerDeductions = 0.0;
+            $customerRecoveries = '0.00';
+            $ownerDeductions = '0.00';
             foreach ($vehicleExpenses as $exp) {
                 foreach ($exp->allocations as $alloc) {
                     if ($alloc->status === RentalExpenseAllocationStatus::Confirmed) {
                         if ($alloc->allocation_type === RentalExpenseAllocationType::CustomerRecovery) {
-                            $customerRecoveries += (float) $alloc->total_amount;
+                            $customerRecoveries = $this->math->add($customerRecoveries, (string) $alloc->total_amount, 2);
                         } elseif ($alloc->allocation_type === RentalExpenseAllocationType::OwnerDeduction) {
-                            $ownerDeductions += (float) $alloc->total_amount;
+                            $ownerDeductions = $this->math->add($ownerDeductions, (string) $alloc->total_amount, 2);
                         }
                     }
                 }
             }
 
             // Customer Revenue includes base, usage, and recovered charges
-            $vehicleRevenue = $vehicleCustomerBase + $vehicleCustomerUsage + $customerRecoveries;
+            $vehicleRevenue = $this->math->sum([$vehicleCustomerBase, $vehicleCustomerUsage, $customerRecoveries], 2);
 
             // Direct Costs
             $ownerAgreementIds = $ownerAgreements->get($vehicle->id)?->pluck('id')->all() ?? [];
-            $ownerLeaseCost = 0.0;
+            $ownerLeaseCost = '0.00';
             if (! empty($ownerAgreementIds)) {
-                $ownerBase = (float) OwnerBaseCharge::query()
+                $ownerBase = (string) OwnerBaseCharge::query()
                     ->forContext($context->tenantId, $context->organizationUnitId)
                     ->whereIn('agreement_id', $ownerAgreementIds)
                     ->whereNull('voided_at')
@@ -164,7 +164,7 @@ final class VehicleProfitabilityReportService
                     ->where('period_until', '>=', $startDate)
                     ->sum('amount');
 
-                $ownerUsage = (float) OwnerUsageCharge::query()
+                $ownerUsage = (string) OwnerUsageCharge::query()
                     ->forContext($context->tenantId, $context->organizationUnitId)
                     ->whereIn('agreement_id', $ownerAgreementIds)
                     ->whereNull('voided_at')
@@ -173,60 +173,74 @@ final class VehicleProfitabilityReportService
                     ->sum('amount');
 
                 // Net of owner deductions (maintenance, tyre, fuel chargebacks)
-                $ownerLeaseCost = max(0.0, ($ownerBase + $ownerUsage) - $ownerDeductions);
+                $grossOwner = $this->math->add($ownerBase, $ownerUsage, 2);
+                $ownerLeaseCost = bccomp($grossOwner, $ownerDeductions, 2) > 0
+                    ? $this->math->sub($grossOwner, $ownerDeductions, 2)
+                    : '0.00';
             }
 
-            $fuelCost = (float) $vehicleExpenses->where('expense_type', RentalExpenseType::Fuel)->sum('gross_amount');
-            $maintenanceCost = (float) $vehicleExpenses->where('expense_type', RentalExpenseType::Maintenance)->sum('gross_amount');
-            $tollCost = (float) $vehicleExpenses->where('expense_type', RentalExpenseType::Toll)->sum('gross_amount');
-            $otherCost = (float) $vehicleExpenses->whereIn('expense_type', [RentalExpenseType::Fine, RentalExpenseType::Other])->sum('gross_amount');
+            $fuelCost = (string) $vehicleExpenses->where('expense_type', RentalExpenseType::Fuel)->sum('gross_amount');
+            $maintenanceCost = (string) $vehicleExpenses->where('expense_type', RentalExpenseType::Maintenance)->sum('gross_amount');
+            $tollCost = (string) $vehicleExpenses->where('expense_type', RentalExpenseType::Toll)->sum('gross_amount');
+            $otherCost = (string) $vehicleExpenses->whereIn('expense_type', [RentalExpenseType::Fine, RentalExpenseType::Other])->sum('gross_amount');
 
-            $totalDirectCosts = $ownerLeaseCost + $fuelCost + $maintenanceCost + $tollCost + $otherCost;
-            $grossMargin = $vehicleRevenue - $totalDirectCosts;
-            $marginPercentage = $vehicleRevenue > 0 ? round(($grossMargin / $vehicleRevenue) * 100, 1) : 0.0;
+            $totalDirectCosts = $this->math->sum([$ownerLeaseCost, $fuelCost, $maintenanceCost, $tollCost, $otherCost], 2);
+            $grossMargin = $this->math->sub($vehicleRevenue, $totalDirectCosts, 2);
+            $marginPercentage = bccomp($vehicleRevenue, '0', 2) > 0
+                ? round((float) $this->math->div($this->math->mul($grossMargin, '100', 4), $vehicleRevenue, 4), 1)
+                : 0.0;
 
             // Distance
             $vehicleCharts = $charts->get($vehicle->id) ?? collect();
-            $distanceKm = 0.0;
+            $distanceKm = '0.000';
             foreach ($vehicleCharts as $c) {
                 if ($c->commercial_km !== null) {
-                    $distanceKm += (float) $c->commercial_km;
+                    $distanceKm = $this->math->add($distanceKm, (string) $c->commercial_km, 3);
                 } elseif ($c->start_odometer !== null && $c->end_odometer !== null) {
-                    $distanceKm += max(0.0, (float) $c->end_odometer - (float) $c->start_odometer);
+                    $diff = $this->math->sub((string) $c->end_odometer, (string) $c->start_odometer, 3);
+                    if (bccomp($diff, '0', 3) > 0) {
+                        $distanceKm = $this->math->add($distanceKm, $diff, 3);
+                    }
                 }
             }
 
-            $revenuePerKm = $distanceKm > 0 ? round($vehicleRevenue / $distanceKm, 2) : 0.0;
-            $costPerKm = $distanceKm > 0 ? round($totalDirectCosts / $distanceKm, 2) : 0.0;
+            $revenuePerKm = bccomp($distanceKm, '0', 3) > 0 ? $this->math->div($vehicleRevenue, $distanceKm, 2) : '0.00';
+            $costPerKm = bccomp($distanceKm, '0', 3) > 0 ? $this->math->div($totalDirectCosts, $distanceKm, 2) : '0.00';
 
-            $fleetTotalRevenue += $vehicleRevenue;
-            $fleetTotalDirectCosts += $totalDirectCosts;
-            $fleetTotalMargin += $grossMargin;
-            $fleetTotalDistance += $distanceKm;
+            $fleetTotalRevenue = $this->math->add($fleetTotalRevenue, $vehicleRevenue, 2);
+            $fleetTotalDirectCosts = $this->math->add($fleetTotalDirectCosts, $totalDirectCosts, 2);
+            $fleetTotalMargin = $this->math->add($fleetTotalMargin, $grossMargin, 2);
+            $fleetTotalDistance = $this->math->add($fleetTotalDistance, $distanceKm, 3);
 
             $rows[] = [
                 'vehicle_id' => $vehicle->id,
                 'registration_number' => $vehicle->registration_number ?? $vehicle->vehicle_number,
                 'vehicle_make_model' => trim(($vehicle->make ?? '').' '.($vehicle->model ?? '')) ?: 'N/A',
                 'ownership_type' => $isOwnerLeased ? 'Owner Leased' : 'Company Owned',
-                'customer_revenue' => number_format($vehicleRevenue, 2, '.', ''),
-                'owner_lease_cost' => number_format($ownerLeaseCost, 2, '.', ''),
-                'fuel_cost' => number_format($fuelCost, 2, '.', ''),
-                'maintenance_cost' => number_format($maintenanceCost, 2, '.', ''),
-                'toll_cost' => number_format($tollCost, 2, '.', ''),
-                'other_cost' => number_format($otherCost, 2, '.', ''),
-                'total_direct_costs' => number_format($totalDirectCosts, 2, '.', ''),
-                'gross_margin' => number_format($grossMargin, 2, '.', ''),
+                'customer_revenue' => number_format((float) $vehicleRevenue, 2, '.', ''),
+                'owner_lease_cost' => number_format((float) $ownerLeaseCost, 2, '.', ''),
+                'fuel_cost' => number_format((float) $fuelCost, 2, '.', ''),
+                'maintenance_cost' => number_format((float) $maintenanceCost, 2, '.', ''),
+                'toll_cost' => number_format((float) $tollCost, 2, '.', ''),
+                'other_cost' => number_format((float) $otherCost, 2, '.', ''),
+                'total_direct_costs' => number_format((float) $totalDirectCosts, 2, '.', ''),
+                'gross_margin' => number_format((float) $grossMargin, 2, '.', ''),
                 'margin_percentage' => $marginPercentage,
-                'distance_km' => (int) round($distanceKm),
-                'revenue_per_km' => number_format($revenuePerKm, 2, '.', ''),
-                'cost_per_km' => number_format($costPerKm, 2, '.', ''),
+                'distance_km' => (int) round((float) $distanceKm),
+                'revenue_per_km' => $revenuePerKm,
+                'cost_per_km' => $costPerKm,
             ];
         }
 
-        $fleetMarginPercentage = $fleetTotalRevenue > 0 ? round(($fleetTotalMargin / $fleetTotalRevenue) * 100, 1) : 0.0;
-        $fleetAvgRevenuePerKm = $fleetTotalDistance > 0 ? round($fleetTotalRevenue / $fleetTotalDistance, 2) : 0.0;
-        $fleetAvgCostPerKm = $fleetTotalDistance > 0 ? round($fleetTotalDirectCosts / $fleetTotalDistance, 2) : 0.0;
+        $fleetMarginPercentage = bccomp($fleetTotalRevenue, '0', 2) > 0
+            ? round((float) $this->math->div($this->math->mul($fleetTotalMargin, '100', 4), $fleetTotalRevenue, 4), 1)
+            : 0.0;
+        $fleetAvgRevenuePerKm = bccomp($fleetTotalDistance, '0', 3) > 0
+            ? $this->math->div($fleetTotalRevenue, $fleetTotalDistance, 2)
+            : '0.00';
+        $fleetAvgCostPerKm = bccomp($fleetTotalDistance, '0', 3) > 0
+            ? $this->math->div($fleetTotalDirectCosts, $fleetTotalDistance, 2)
+            : '0.00';
 
         $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
 
@@ -244,13 +258,13 @@ final class VehicleProfitabilityReportService
             ],
             'summary' => [
                 'total_vehicles_evaluated' => count($rows),
-                'fleet_total_revenue' => number_format($fleetTotalRevenue, 2, '.', ''),
-                'fleet_total_direct_costs' => number_format($fleetTotalDirectCosts, 2, '.', ''),
-                'fleet_gross_margin' => number_format($fleetTotalMargin, 2, '.', ''),
+                'fleet_total_revenue' => number_format((float) $fleetTotalRevenue, 2, '.', ''),
+                'fleet_total_direct_costs' => number_format((float) $fleetTotalDirectCosts, 2, '.', ''),
+                'fleet_gross_margin' => number_format((float) $fleetTotalMargin, 2, '.', ''),
                 'fleet_margin_percentage' => $fleetMarginPercentage,
-                'fleet_total_distance_km' => (int) round($fleetTotalDistance),
-                'fleet_avg_revenue_per_km' => number_format($fleetAvgRevenuePerKm, 2, '.', ''),
-                'fleet_avg_cost_per_km' => number_format($fleetAvgCostPerKm, 2, '.', ''),
+                'fleet_total_distance_km' => (int) round((float) $fleetTotalDistance),
+                'fleet_avg_revenue_per_km' => number_format((float) $fleetAvgRevenuePerKm, 2, '.', ''),
+                'fleet_avg_cost_per_km' => number_format((float) $fleetAvgCostPerKm, 2, '.', ''),
             ],
             'rows' => $rows,
             'footer' => [

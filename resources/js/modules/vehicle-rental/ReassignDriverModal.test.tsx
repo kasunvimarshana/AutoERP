@@ -18,19 +18,22 @@ vi.mock('@/shared/api/lookupRequest', () => ({
 const mockChart: RunningChart = {
     id: 105,
     reference: 'RC-202609-0105',
-    vehicle_use_id: 12,
     row_version: 2,
     status: RunningChartStatus.Draft,
     starts_at: '2026-09-10T08:00:00+00:00',
     ends_at: '2026-09-10T17:00:00+00:00',
     start_odometer: '10000.000',
     end_odometer: '10150.000',
+    garage_km: null,
+    commercial_km: '150.000',
     total_km: '150.000',
-    air_conditioning: AirConditioningMode.Dual,
+    ac_mode: AirConditioningMode.Dual,
     normal_ot_minutes: 60,
     double_ot_minutes: 0,
+    triple_ot_minutes: 0,
     night_outs: 0,
-    tolls_amount: '250.000000',
+    driver_observation: null,
+    notes: null,
     driver_identity_source: DriverIdentitySource.Employee,
     driver: {
         source: DriverIdentitySource.Employee,
@@ -40,7 +43,6 @@ const mockChart: RunningChart = {
     },
     corrects_chart: null,
     corrected_by_chart: null,
-    charges: [],
 };
 
 describe('ReassignDriverModal', () => {

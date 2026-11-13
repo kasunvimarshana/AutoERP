@@ -69,22 +69,22 @@ final class RentalRevenueReportService
             ->get();
 
         $rows = [];
-        $grandTotalBaseRent = 0.0;
-        $grandTotalExcessMileage = 0.0;
-        $grandTotalOvertime = 0.0;
-        $grandTotalNightOut = 0.0;
-        $grandTotalTollPass = 0.0;
-        $grandTotalRevenue = 0.0;
+        $grandTotalBaseRent = '0.00';
+        $grandTotalExcessMileage = '0.00';
+        $grandTotalOvertime = '0.00';
+        $grandTotalNightOut = '0.00';
+        $grandTotalTollPass = '0.00';
+        $grandTotalRevenue = '0.00';
 
         foreach ($agreements as $agreement) {
-            $baseCharges = CustomerBaseCharge::query()
+            $baseChargesSum = (string) CustomerBaseCharge::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->where('agreement_id', $agreement->id)
                 ->whereNull('voided_at')
                 ->where('period_from', '<=', $endDate)
                 ->where('period_until', '>=', $startDate)
-                ->get();
-            $baseRent = (float) $baseCharges->sum('amount');
+                ->sum('amount');
+            $baseRent = $baseChargesSum !== '' ? $baseChargesSum : '0.00';
 
             $usageCharges = CustomerUsageCharge::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
@@ -94,14 +94,14 @@ final class RentalRevenueReportService
                 ->where('period_until', '>=', $startDate)
                 ->get();
 
-            $excessMileage = (float) $usageCharges->where('component', 'excess_mileage')->sum('amount');
-            $normalOt = (float) $usageCharges->where('component', UsageChargeComponent::NormalOvertime->value)->sum('amount');
-            $doubleOt = (float) $usageCharges->where('component', UsageChargeComponent::DoubleOvertime->value)->sum('amount');
-            $tripleOt = (float) $usageCharges->where('component', UsageChargeComponent::TripleOvertime->value)->sum('amount');
-            $nightOut = (float) $usageCharges->where('component', UsageChargeComponent::NightOut->value)->sum('amount');
-            $totalOvertime = $normalOt + $doubleOt + $tripleOt;
+            $excessMileage = (string) ($usageCharges->where('component', 'excess_mileage')->sum('amount') ?: '0.00');
+            $normalOt = (string) ($usageCharges->where('component', UsageChargeComponent::NormalOvertime->value)->sum('amount') ?: '0.00');
+            $doubleOt = (string) ($usageCharges->where('component', UsageChargeComponent::DoubleOvertime->value)->sum('amount') ?: '0.00');
+            $tripleOt = (string) ($usageCharges->where('component', UsageChargeComponent::TripleOvertime->value)->sum('amount') ?: '0.00');
+            $nightOut = (string) ($usageCharges->where('component', UsageChargeComponent::NightOut->value)->sum('amount') ?: '0.00');
+            $totalOvertime = $this->math->sum([$normalOt, $doubleOt, $tripleOt], 2);
 
-            $allocatedCustomerRecoveries = (float) RentalExpenseAllocation::query()
+            $allocatedCustomerRecoveries = (string) (RentalExpenseAllocation::query()
                 ->where('target_customer_agreement_id', $agreement->id)
                 ->where('allocation_type', RentalExpenseAllocationType::CustomerRecovery->value)
                 ->where('status', RentalExpenseAllocationStatus::Confirmed->value)
@@ -110,9 +110,9 @@ final class RentalRevenueReportService
                     ->where('expense_date', '<=', $endDate)
                     ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
                 )
-                ->sum('total_amount');
+                ->sum('total_amount') ?: '0.00');
 
-            $directTollPass = (float) RentalExpense::query()
+            $directTollPass = (string) (RentalExpense::query()
                 ->forTenant($context->tenantId)
                 ->where('customer_agreement_id', $agreement->id)
                 ->where('expense_type', RentalExpenseType::Toll)
@@ -120,11 +120,11 @@ final class RentalRevenueReportService
                 ->where('expense_date', '<=', $endDate)
                 ->whereNotIn('status', [RentalExpenseStatus::Rejected->value, RentalExpenseStatus::Reversed->value])
                 ->whereDoesntHave('allocations')
-                ->sum('gross_amount');
+                ->sum('gross_amount') ?: '0.00');
 
-            $tollPass = $allocatedCustomerRecoveries + $directTollPass;
+            $tollPass = $this->math->add($allocatedCustomerRecoveries, $directTollPass, 2);
 
-            $totalAgreementRevenue = $baseRent + $excessMileage + $totalOvertime + $nightOut + $tollPass;
+            $totalAgreementRevenue = $this->math->sum([$baseRent, $excessMileage, $totalOvertime, $nightOut, $tollPass], 2);
 
             $primaryUse = $agreement->vehicleUses->firstWhere('replaces_use_id', null) ?? $agreement->vehicleUses->first();
             $vehicleNo = $primaryUse?->vehicle_label_snapshot
@@ -132,12 +132,12 @@ final class RentalRevenueReportService
                 ?? $primaryUse?->vehicle?->vehicle_number
                 ?? 'N/A';
 
-            $grandTotalBaseRent += $baseRent;
-            $grandTotalExcessMileage += $excessMileage;
-            $grandTotalOvertime += $totalOvertime;
-            $grandTotalNightOut += $nightOut;
-            $grandTotalTollPass += $tollPass;
-            $grandTotalRevenue += $totalAgreementRevenue;
+            $grandTotalBaseRent = $this->math->add($grandTotalBaseRent, $baseRent, 2);
+            $grandTotalExcessMileage = $this->math->add($grandTotalExcessMileage, $excessMileage, 2);
+            $grandTotalOvertime = $this->math->add($grandTotalOvertime, $totalOvertime, 2);
+            $grandTotalNightOut = $this->math->add($grandTotalNightOut, $nightOut, 2);
+            $grandTotalTollPass = $this->math->add($grandTotalTollPass, $tollPass, 2);
+            $grandTotalRevenue = $this->math->add($grandTotalRevenue, $totalAgreementRevenue, 2);
 
             $rows[] = [
                 'agreement_id' => $agreement->id,
@@ -151,12 +151,12 @@ final class RentalRevenueReportService
                 'status' => $agreement->status->value,
                 'period_start' => $agreement->starts_on->toDateString(),
                 'period_end' => $agreement->ends_on?->toDateString() ?? 'Open-ended',
-                'base_rent' => number_format($baseRent, 2, '.', ''),
-                'excess_mileage' => number_format($excessMileage, 2, '.', ''),
-                'overtime' => number_format($totalOvertime, 2, '.', ''),
-                'night_out' => number_format($nightOut, 2, '.', ''),
-                'toll_pass' => number_format($tollPass, 2, '.', ''),
-                'total_revenue' => number_format($totalAgreementRevenue, 2, '.', ''),
+                'base_rent' => number_format((float) $baseRent, 2, '.', ''),
+                'excess_mileage' => number_format((float) $excessMileage, 2, '.', ''),
+                'overtime' => number_format((float) $totalOvertime, 2, '.', ''),
+                'night_out' => number_format((float) $nightOut, 2, '.', ''),
+                'toll_pass' => number_format((float) $tollPass, 2, '.', ''),
+                'total_revenue' => number_format((float) $totalAgreementRevenue, 2, '.', ''),
             ];
         }
 
@@ -193,12 +193,12 @@ final class RentalRevenueReportService
             ],
             'summary' => [
                 'total_agreements' => count($rows),
-                'total_base_rent' => number_format($grandTotalBaseRent, 2, '.', ''),
-                'total_excess_mileage' => number_format($grandTotalExcessMileage, 2, '.', ''),
-                'total_overtime' => number_format($grandTotalOvertime, 2, '.', ''),
-                'total_night_out' => number_format($grandTotalNightOut, 2, '.', ''),
-                'total_toll_pass' => number_format($grandTotalTollPass, 2, '.', ''),
-                'grand_total_revenue' => number_format($grandTotalRevenue, 2, '.', ''),
+                'total_base_rent' => number_format((float) $grandTotalBaseRent, 2, '.', ''),
+                'total_excess_mileage' => number_format((float) $grandTotalExcessMileage, 2, '.', ''),
+                'total_overtime' => number_format((float) $grandTotalOvertime, 2, '.', ''),
+                'total_night_out' => number_format((float) $grandTotalNightOut, 2, '.', ''),
+                'total_toll_pass' => number_format((float) $grandTotalTollPass, 2, '.', ''),
+                'grand_total_revenue' => number_format((float) $grandTotalRevenue, 2, '.', ''),
                 'total_invoices_count' => count($invoices),
                 'invoice_total_rental_charge' => number_format((float) array_sum(array_column($invoices, 'rental_charge_raw')), 2, '.', ''),
                 'invoice_total_excess_km' => number_format((float) array_sum(array_column($invoices, 'excess_km_charge_raw')), 2, '.', ''),
@@ -301,16 +301,65 @@ final class RentalRevenueReportService
             }
         }
 
-        // If no formal posted invoices in invoices table, synthesize from agreement charges
+        // 2. Check if billing cycles exist in vehicle_rental_billing_cycles
+        if (empty($invoices) && Schema::hasTable('vehicle_rental_billing_cycles')) {
+            $cycles = DB::table('vehicle_rental_billing_cycles')
+                ->where('tenant_id', $context->tenantId)
+                ->where('period_from', '<=', $endDate)
+                ->where('period_until', '>=', $startDate)
+                ->when($customerId !== null, function ($q) use ($customerId) {
+                    $agrIds = CustomerAgreement::query()->where('customer_id', $customerId)->pluck('id');
+                    $q->whereIn('agreement_id', $agrIds);
+                })
+                ->get();
+
+            if ($cycles->isNotEmpty()) {
+                $agreementsById = $agreements->keyBy('id');
+                foreach ($cycles as $cycle) {
+                    $matchedAgreement = $agreementsById->get($cycle->agreement_id);
+                    $vehicleNo = '-';
+                    if ($matchedAgreement !== null && $matchedAgreement->vehicleUses->isNotEmpty()) {
+                        $primaryUse = $matchedAgreement->vehicleUses->firstWhere('replaces_use_id', null) ?? $matchedAgreement->vehicleUses->first();
+                        $vehicleNo = $primaryUse?->vehicle_label_snapshot
+                            ?? $primaryUse?->vehicle?->registration_number
+                            ?? $primaryUse?->vehicle?->vehicle_number
+                            ?? '-';
+                    }
+
+                    $customerDetails = ($matchedAgreement?->customer?->name ?? 'Customer')
+                        .' '.($matchedAgreement?->customer?->customer_number ? '('.$matchedAgreement->customer->customer_number.')' : '')
+                        .' '.$start->format('d/m/y').' To '.$end->format('d/m/y');
+
+                    $invoices[] = [
+                        'invoice_id' => $cycle->invoice_id ?? $cycle->id,
+                        'invoice_number' => $cycle->invoice_number ?? $cycle->cycle_reference,
+                        'invoice_date' => CarbonImmutable::parse($cycle->period_until)->format('d/m/y'),
+                        'raw_invoice_date' => $cycle->period_until,
+                        'customer_details' => $customerDetails,
+                        'vehicle_number' => $vehicleNo,
+                        'rental_charge' => number_format((float) $cycle->base_rent_amount, 2, '.', ''),
+                        'rental_charge_raw' => (float) $cycle->base_rent_amount,
+                        'excess_km_charge' => number_format((float) $cycle->total_usage_charges, 2, '.', ''),
+                        'excess_km_charge_raw' => (float) $cycle->total_usage_charges,
+                        'vat_amount' => number_format((float) $cycle->tax_amount, 2, '.', ''),
+                        'vat_amount_raw' => (float) $cycle->tax_amount,
+                        'total_amount' => number_format((float) $cycle->total_billed_amount, 2, '.', ''),
+                        'total_amount_raw' => (float) $cycle->total_billed_amount,
+                    ];
+                }
+            }
+        }
+
+        // 3. Fallback: synthesize from agreement charges
         if (empty($invoices) && ! empty($agreementRows)) {
             foreach ($agreementRows as $index => $row) {
-                $baseAmt = (float) $row['base_rent'];
-                $excessAmt = (float) $row['excess_mileage'];
-                $totalAmt = (float) $row['total_revenue'];
-                $vatAmt = round(($totalAmt * 0.18), 2); // 18% standard VAT
-                $grossWithVat = $totalAmt + $vatAmt;
+                $baseAmt = (string) $row['base_rent'];
+                $excessAmt = (string) $row['excess_mileage'];
+                $totalAmt = (string) $row['total_revenue'];
+                $vatAmt = '0.00';
+                $grossWithVat = $totalAmt;
 
-                $invNo = 'DIN'.str_pad((string) (7000100 + $index), 7, '0', STR_PAD_LEFT);
+                $invNo = 'EST-'.($row['agreement_reference'] ?? str_pad((string) ($index + 1), 5, '0', STR_PAD_LEFT));
                 $customerDetails = $row['customer_name']
                     .($row['customer_code'] !== '-' ? ' ('.$row['customer_code'].')' : '')
                     .' '.$start->format('d/m/y').' To '.$end->format('d/m/y');
@@ -322,14 +371,14 @@ final class RentalRevenueReportService
                     'raw_invoice_date' => $endDate,
                     'customer_details' => $customerDetails,
                     'vehicle_number' => $row['vehicle_number'],
-                    'rental_charge' => number_format($baseAmt, 2, '.', ''),
-                    'rental_charge_raw' => $baseAmt,
-                    'excess_km_charge' => number_format($excessAmt, 2, '.', ''),
-                    'excess_km_charge_raw' => $excessAmt,
-                    'vat_amount' => number_format($vatAmt, 2, '.', ''),
-                    'vat_amount_raw' => $vatAmt,
-                    'total_amount' => number_format($grossWithVat, 2, '.', ''),
-                    'total_amount_raw' => $grossWithVat,
+                    'rental_charge' => number_format((float) $baseAmt, 2, '.', ''),
+                    'rental_charge_raw' => (float) $baseAmt,
+                    'excess_km_charge' => number_format((float) $excessAmt, 2, '.', ''),
+                    'excess_km_charge_raw' => (float) $excessAmt,
+                    'vat_amount' => number_format((float) $vatAmt, 2, '.', ''),
+                    'vat_amount_raw' => (float) $vatAmt,
+                    'total_amount' => number_format((float) $grossWithVat, 2, '.', ''),
+                    'total_amount_raw' => (float) $grossWithVat,
                 ];
             }
         }

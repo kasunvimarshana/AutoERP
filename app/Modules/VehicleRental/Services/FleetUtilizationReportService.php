@@ -91,12 +91,12 @@ final class FleetUtilizationReportService
             ->groupBy(fn (RunningChart $c): int => (int) $c->vehicleUse?->vehicle_id);
 
         $rows = [];
-        $totalDistance = 0.0;
+        $totalDistance = '0.000';
         $totalInCustody = 0;
         $totalAvailable = 0;
         $totalCompanyOwned = 0;
         $totalOwnerLeased = 0;
-        $utilizationSum = 0.0;
+        $utilizationSum = '0.000';
 
         foreach ($vehicles as $vehicle) {
             $vehicleOwnerAgreements = $ownerAgreements->get($vehicle->id) ?? collect();
@@ -147,23 +147,26 @@ final class FleetUtilizationReportService
                 }
             }
             $daysInCustody = min($periodDays, $daysInCustody);
-            $utilizationRate = round(($daysInCustody / $periodDays) * 100, 1);
+            $utilizationRate = $periodDays > 0 ? round(((float) $daysInCustody / (float) $periodDays) * 100, 1) : 0.0;
 
             // Compute distance from charts
             $vehicleCharts = $charts->get($vehicle->id) ?? collect();
-            $vehicleDistance = 0.0;
+            $vehicleDistance = '0.000';
             foreach ($vehicleCharts as $c) {
                 if ($c->commercial_km !== null) {
-                    $vehicleDistance += (float) $c->commercial_km;
+                    $vehicleDistance = $this->math->add($vehicleDistance, (string) $c->commercial_km, 3);
                 } elseif ($c->start_odometer !== null && $c->end_odometer !== null) {
-                    $vehicleDistance += max(0.0, (float) $c->end_odometer - (float) $c->start_odometer);
+                    $diff = $this->math->sub((string) $c->end_odometer, (string) $c->start_odometer, 3);
+                    if ($this->math->compare($diff, '0', 3) > 0) {
+                        $vehicleDistance = $this->math->add($vehicleDistance, $diff, 3);
+                    }
                 }
             }
             $lastOdometer = $vehicleCharts->last()?->end_odometer
                 ?? $activeUse?->return_odometer
                 ?? $activeUse?->handover_odometer
                 ?? $vehicle->current_odometer
-                ?? 0.0;
+                ?? '0';
 
             $customerName = $activeUse?->customerAgreement?->customer?->name
                 ?? $activeUse?->customerAgreement?->party_name_snapshot
@@ -183,8 +186,8 @@ final class FleetUtilizationReportService
                 $totalAvailable++;
             }
 
-            $totalDistance += $vehicleDistance;
-            $utilizationSum += $utilizationRate;
+            $totalDistance = $this->math->add($totalDistance, $vehicleDistance, 3);
+            $utilizationSum = $this->math->add($utilizationSum, (string) $utilizationRate, 4);
 
             $rows[] = [
                 'vehicle_id' => $vehicle->id,
@@ -199,14 +202,16 @@ final class FleetUtilizationReportService
                 'current_agreement' => $agreementRef,
                 'current_driver' => $driverName,
                 'current_odometer' => number_format((float) $lastOdometer, 0, '.', ''),
-                'period_distance_km' => (int) round($vehicleDistance),
+                'period_distance_km' => (int) round((float) $vehicleDistance),
                 'days_in_custody' => $daysInCustody,
                 'utilization_rate' => $utilizationRate,
             ];
         }
 
         $totalEvaluated = count($rows);
-        $averageUtilization = $totalEvaluated > 0 ? round($utilizationSum / $totalEvaluated, 1) : 0.0;
+        $averageUtilization = $totalEvaluated > 0
+            ? round((float) $this->math->div($utilizationSum, (string) $totalEvaluated, 2), 1)
+            : 0.0;
         $tenantName = TenantModel::query()->find($context->tenantId)?->name ?? (config('app.name') ?: 'AutoERP');
 
         return [
@@ -229,7 +234,7 @@ final class FleetUtilizationReportService
                 'in_custody_count' => $totalInCustody,
                 'available_count' => $totalAvailable,
                 'average_utilization_rate' => $averageUtilization,
-                'total_distance_km' => (int) round($totalDistance),
+                'total_distance_km' => (int) round((float) $totalDistance),
             ],
             'rows' => $rows,
             'footer' => [

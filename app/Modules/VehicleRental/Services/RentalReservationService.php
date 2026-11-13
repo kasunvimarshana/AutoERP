@@ -10,8 +10,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use RuntimeException;
 use Modules\Customer\Models\Customer;
 use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -36,9 +38,20 @@ final class RentalReservationService
         RentalReservationStatus::Expired->value => [],
     ];
 
+    private const RESERVATION_DOCUMENT_TYPE = 'vehicle_rental_reservation';
+
+    private const RESERVATION_PREFIX = 'RR-{PERIOD}-';
+
+    private const PERIOD_TYPE = 'yearly';
+
+    private const PADDING = 5;
+
+    private const MAX_GENERATION_ATTEMPTS = 5;
+
     public function __construct(
         private readonly VehicleUseAvailabilityBlocker $availability,
         private readonly AgreementService $agreements,
+        private readonly GenerateSequenceNumberService $sequences,
     ) {}
 
     public function create(array $data, int $tenantId, ?int $organizationUnitId, ?int $userId): RentalReservation
@@ -63,7 +76,9 @@ final class RentalReservationService
             $customer = Customer::query()->forTenant($tenantId)->findOrFail((int) $data['customer_id']);
             $currency = CurrencyModel::query()->findOrFail((int) $data['currency_id']);
 
-            $reservationNumber = $data['reservation_number'] ?? 'RR-'.strtoupper(bin2hex(random_bytes(4)));
+            $reservationNumber = ! empty($data['reservation_number'])
+                ? (string) $data['reservation_number']
+                : $this->nextReservationNumber($tenantId, $start->toDateString());
 
             $reservation = RentalReservation::query()->create([
                 'tenant_id' => $tenantId,
@@ -367,5 +382,36 @@ final class RentalReservationService
             'changed_by' => $userId,
             'changed_at' => now(),
         ]);
+    }
+
+    private function nextReservationNumber(int $tenantId, string $date): string
+    {
+        for ($attempt = 0; $attempt < self::MAX_GENERATION_ATTEMPTS; $attempt++) {
+            $result = $this->sequences->execute([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'document_type' => self::RESERVATION_DOCUMENT_TYPE,
+                'period_type' => self::PERIOD_TYPE,
+                'at_date' => $date,
+                'prefix' => self::RESERVATION_PREFIX,
+                'padding' => self::PADDING,
+            ]);
+
+            if ($result->isFailure()) {
+                throw new RuntimeException($result->errorOrFail()->message);
+            }
+
+            $candidate = (string) $result->valueOrFail()['generated_number'];
+            $exists = RentalReservation::query()
+                ->where('tenant_id', $tenantId)
+                ->where('reservation_number', $candidate)
+                ->exists();
+
+            if (! $exists) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException('Failed to allocate unique reservation number after 5 attempts.');
     }
 }
