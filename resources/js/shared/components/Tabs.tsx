@@ -3,6 +3,7 @@ import { useId, useRef, type ReactNode } from 'react';
 export interface TabItem<T extends string> {
     id: T;
     label: ReactNode;
+    badge?: number | ReactNode;
 }
 
 export function Tabs<T extends string>({ tabs, active, onChange, id }: {
@@ -48,9 +49,14 @@ export function Tabs<T extends string>({ tabs, active, onChange, id }: {
                                     : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
                             selectTab(next.id, true);
                         }}
-                        className={`min-h-11 border-b-2 px-4 py-3 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${active === tab.id ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'}`}
+                        className={`inline-flex min-h-11 items-center border-b-2 px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${active === tab.id ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'}`}
                     >
-                        {tab.label}
+                        <span>{tab.label}</span>
+                        {tab.badge !== undefined && tab.badge !== null && (
+                            <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${active === tab.id ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>
+                                {tab.badge}
+                            </span>
+                        )}
                     </button>
                 ))}
             </div>

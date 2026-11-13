@@ -2,6 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Link, type LinkProps } from 'react-router-dom';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const variants: Record<ButtonVariant, string> = {
     primary: 'bg-blue-600 text-white shadow-xs hover:bg-blue-700 active:bg-blue-800 focus-visible:ring-blue-500',
@@ -10,23 +11,30 @@ const variants: Record<ButtonVariant, string> = {
     ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200 focus-visible:ring-slate-400',
 };
 
+const sizes: Record<ButtonSize, string> = {
+    sm: 'min-h-8 px-3 py-1.5 text-xs',
+    md: 'min-h-10 px-4 py-2 text-sm',
+    lg: 'min-h-12 px-5 py-2.5 text-base',
+};
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: ButtonVariant;
+    size?: ButtonSize;
     loading?: boolean;
     loadingLabel?: ReactNode;
     children: ReactNode;
 }
 
-export function buttonClassName(variant: ButtonVariant = 'primary', className = ''): string {
-    return `inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`;
+export function buttonClassName(variant: ButtonVariant = 'primary', className = '', size: ButtonSize = 'md'): string {
+    return `inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:pointer-events-none ${sizes[size]} ${variants[variant]} ${className}`;
 }
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = 'primary', loading, loadingLabel, className = '', children, disabled, type = 'button', ...props }, ref) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = 'primary', size = 'md', loading, loadingLabel, className = '', children, disabled, type = 'button', ...props }, ref) {
     return (
         <button
             ref={ref}
             type={type}
-            className={buttonClassName(variant, className)}
+            className={buttonClassName(variant, className, size)}
             disabled={disabled || loading}
             aria-busy={loading || undefined}
             {...props}
@@ -46,11 +54,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
 export function LinkButton({
     variant = 'primary',
+    size = 'md',
     className = '',
     children,
     ...props
-}: LinkProps & { variant?: ButtonVariant; className?: string; children: ReactNode }) {
-    return <Link className={buttonClassName(variant, className)} {...props}>{children}</Link>;
+}: LinkProps & { variant?: ButtonVariant; size?: ButtonSize; className?: string; children: ReactNode }) {
+    return <Link className={buttonClassName(variant, className, size)} {...props}>{children}</Link>;
 }
 
 function loadingText(children: ReactNode): ReactNode {

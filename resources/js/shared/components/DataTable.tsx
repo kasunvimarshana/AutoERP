@@ -27,11 +27,12 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
     const navigate = useNavigate();
     const openRow = (event: MouseEvent | KeyboardEvent, row: T) => {
         const clickEnabled = Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true);
-        if ((!rowHref && !clickEnabled) || event.defaultPrevented) return;
+        const isClickable = Boolean(rowHref) || clickEnabled;
+        if (!isClickable || event.defaultPrevented) return;
         const target = event.target;
         if (target instanceof Element && target.closest('a, button, input, select, textarea, summary')) return;
         if ('key' in event) {
-            if (!rowHref || (event.key !== 'Enter' && event.key !== ' ')) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
         }
         if (clickEnabled) {
@@ -58,12 +59,13 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
         <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
             <div className="grid gap-3 p-3 md:hidden">
                 {rows.map((row, index) => {
-                    const isClickable = Boolean(rowHref) || (Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true));
+                    const clickEnabled = Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true);
+                    const isClickable = Boolean(rowHref) || clickEnabled;
                     return <article
                         key={rowKey(row, index)}
-                        className={`rounded-xl border border-slate-200 bg-white p-4 shadow-2xs ${rowClassName?.(row) ?? ''} ${isClickable ? 'cursor-pointer' : ''} ${rowHref ? 'focus:outline-hidden focus:ring-2 focus:ring-blue-500' : ''}`}
-                        tabIndex={rowHref ? 0 : undefined}
-                        role={rowHref ? 'link' : undefined}
+                        className={`rounded-xl border border-slate-200 bg-white p-4 shadow-2xs ${rowClassName?.(row) ?? ''} ${isClickable ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500' : ''}`}
+                        tabIndex={isClickable ? 0 : undefined}
+                        role={rowHref ? 'link' : isClickable ? 'button' : undefined}
                         onClick={(event) => openRow(event, row)}
                         onKeyDown={(event) => openRow(event, row)}
                     >
@@ -90,15 +92,17 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {rows.map((row, index) => {
-                            const isClickable = Boolean(rowHref) || (Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true));
+                            const clickEnabled = Boolean(onRowClick) && (rowClickEnabled?.(row) ?? true);
+                            const isClickable = Boolean(rowHref) || clickEnabled;
                             return <tr
                                 key={rowKey(row, index)}
-                                className={`transition-colors hover:bg-blue-50/40 ${rowClassName?.(row) ?? ''} ${isClickable ? 'cursor-pointer' : ''} ${rowHref ? 'focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-500' : ''}`}
-                                tabIndex={rowHref ? 0 : undefined}
+                                className={`transition-colors hover:bg-blue-50/40 ${rowClassName?.(row) ?? ''} ${isClickable ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500' : ''}`}
+                                tabIndex={isClickable ? 0 : undefined}
+                                role={rowHref ? 'link' : isClickable ? 'button' : undefined}
                                 onClick={(event) => openRow(event, row)}
                                 onKeyDown={(event) => openRow(event, row)}
                             >
-                                {columns.map((column) => <td key={column.key} className={`px-4 py-3 text-slate-700 ${column.className ?? ''}`}>{column.render(row)}</td>)}
+                                {columns.map((column) => <td key={column.key} className={`px-4 py-3 text-slate-700 align-middle ${column.className ?? ''}`}>{column.render(row)}</td>)}
                             </tr>;
                         })}
                     </tbody>

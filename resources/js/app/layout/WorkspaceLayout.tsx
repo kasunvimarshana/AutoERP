@@ -109,7 +109,7 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
     }
 
     return (
-        <div className="min-h-screen bg-slate-100 text-slate-900">
+        <div className="min-h-screen bg-slate-50 text-slate-900">
             <Sidebar
                 sections={visibleSections}
                 badges={{ 'purchase-orders': pendingApprovalCount.error ? undefined : pendingApprovalCount.data?.count }}
@@ -135,6 +135,8 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
                     collapsed={collapsed}
                     match={match}
                     mode={mode}
+                    homePath={homePath}
+                    homeLabel={mode === 'platform' ? 'Platform' : 'Dashboard'}
                     onToggleCollapsed={() => updateCollapsed(!collapsed)}
                     onOpenMobile={() => setMobileOpenLocationKey(location.key)}
                 />

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from '@/app/routePaths';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { Button } from '@/shared/components/Button';
 import type { NavigationMatch } from '@/app/navigation/navigationTypes';
@@ -10,18 +11,47 @@ export function AppHeader({
     collapsed,
     match,
     mode,
+    homePath = mode === 'platform' ? PLATFORM_HOME_PATH : DASHBOARD_PATH,
+    homeLabel = mode === 'platform' ? 'Platform' : 'Dashboard',
     onToggleCollapsed,
     onOpenMobile,
 }: {
     collapsed: boolean;
     match: NavigationMatch | null;
     mode: 'tenant' | 'platform';
+    homePath?: string;
+    homeLabel?: string;
     onToggleCollapsed: () => void;
     onOpenMobile: () => void;
 }) {
     const auth = useAuth();
     const navigate = useNavigate();
     const [loggingOut, setLoggingOut] = useState(false);
+    const profileRef = useRef<HTMLDetailsElement>(null);
+
+    useEffect(() => {
+        const handlePointerDown = (event: PointerEvent) => {
+            const menu = profileRef.current;
+            if (!menu?.open) return;
+            if (event.target instanceof Node && !menu.contains(event.target)) {
+                menu.removeAttribute('open');
+            }
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && profileRef.current?.open) {
+                profileRef.current.removeAttribute('open');
+                profileRef.current.querySelector('summary')?.focus();
+            }
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
 
     return (
         <header className="app-header sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur-md shadow-2xs sm:px-6">
@@ -46,7 +76,11 @@ export function AppHeader({
             </button>
 
             <div className="min-w-0 flex-1">
-                <Breadcrumbs match={match} />
+                <Breadcrumbs
+                    match={match}
+                    homePath={homePath}
+                    homeLabel={homeLabel}
+                />
             </div>
 
             {mode === 'tenant' && <OrganizationUnitSwitcher />}
@@ -63,8 +97,17 @@ export function AppHeader({
                 <span className="h-8 w-px bg-slate-200" aria-hidden="true" />
             </div>
 
-            <details className="group relative">
-                <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500">
+            <details
+                ref={profileRef}
+                className="group relative"
+                onClick={(event) => {
+                    const target = event.target;
+                    if (target instanceof Element && target.closest('button, a')) {
+                        profileRef.current?.removeAttribute('open');
+                    }
+                }}
+            >
+                <summary className="flex min-h-10 cursor-pointer list-none [&::-webkit-details-marker]:hidden items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="User account menu" aria-haspopup="true">
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-2xs" aria-hidden="true">
                         {userInitials(auth.user?.name ?? auth.user?.email)}
                     </span>

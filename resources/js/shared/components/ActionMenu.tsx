@@ -17,8 +17,19 @@ export function ActionMenu({ children, label = 'More actions', className = '', t
             }
         };
 
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && detailsRef.current?.open) {
+                detailsRef.current.removeAttribute('open');
+                detailsRef.current.querySelector('summary')?.focus();
+            }
+        };
+
         document.addEventListener('pointerdown', handlePointerDown);
-        return () => document.removeEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
     }, []);
 
     return (
@@ -32,7 +43,7 @@ export function ActionMenu({ children, label = 'More actions', className = '', t
                 }
             }}
         >
-            <summary className={`flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 ${triggerClassName}`}>
+            <summary className={`flex min-h-10 cursor-pointer list-none [&::-webkit-details-marker]:hidden items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${triggerClassName}`}>
                 <span>{label}</span>
                 <svg className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />

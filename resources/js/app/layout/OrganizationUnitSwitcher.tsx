@@ -5,7 +5,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 
-export function OrganizationUnitSwitcher() {
+export function OrganizationUnitSwitcher({ className = 'hidden min-w-56 max-w-72 lg:block' }: { className?: string }) {
     const auth = useAuth();
     const [switchError, setSwitchError] = useState<ApiError | null>(null);
     const [switching, setSwitching] = useState(false);
@@ -30,7 +30,7 @@ export function OrganizationUnitSwitcher() {
     if (auth.authMode !== 'tenant' || !auth.isAuthenticated) return null;
 
     return (
-        <div className="hidden min-w-56 max-w-72 lg:block">
+        <div className={className}>
             <Select
                 aria-label="Current organization unit"
                 value={currentId}

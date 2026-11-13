@@ -1,10 +1,21 @@
 import type { ReactNode } from 'react';
 import { humanize } from '@/shared/utils/object';
 
-const positive = new Set(['active', 'approved', 'posted', 'paid', 'received', 'available', 'completed']);
-const negative = new Set(['inactive', 'cancelled', 'void', 'voided', 'reversed', 'blacklisted', 'closed', 'rejected', 'failed']);
-const informational = new Set(['submitted', 'processing', 'in_progress', 'open']);
-const neutral = new Set(['draft', 'pending', 'pending_approval']);
+const positive = new Set([
+    'active', 'approved', 'posted', 'paid', 'received', 'available', 'completed',
+    'settled', 'disbursed', 'verified', 'fully_paid', 'success',
+]);
+const negative = new Set([
+    'inactive', 'cancelled', 'void', 'voided', 'reversed', 'blacklisted', 'closed',
+    'rejected', 'failed', 'overdue', 'expired',
+]);
+const informational = new Set([
+    'submitted', 'processing', 'in_progress', 'open', 'inspected', 'in_custody',
+    'reserved', 'invoiced', 'dispatched',
+]);
+const neutral = new Set([
+    'draft', 'pending', 'pending_approval', 'unverified',
+]);
 
 export function StatusBadge({ status, label }: { status?: string | null; label?: ReactNode }) {
     return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold shadow-2xs ${statusBadgeClassName(status)}`}>{label ?? humanize(status)}</span>;
