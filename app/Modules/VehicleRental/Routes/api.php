@@ -9,10 +9,13 @@ use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\IncidentReviewAction;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\VehicleUseAction;
+use Modules\VehicleRental\Http\Controllers\AgreementAdjustmentController;
 use Modules\VehicleRental\Http\Controllers\AgreementController;
 use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
+use Modules\VehicleRental\Http\Controllers\BillingCycleController;
 use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
 use Modules\VehicleRental\Http\Controllers\DriverDirectoryController;
+use Modules\VehicleRental\Http\Controllers\OwnerSettlementBillController;
 use Modules\VehicleRental\Http\Controllers\RentalDashboardController;
 use Modules\VehicleRental\Http\Controllers\RentalExpenseController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentAttachmentController;
@@ -22,6 +25,7 @@ use Modules\VehicleRental\Http\Controllers\RentalReservationController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
 use Modules\VehicleRental\Http\Controllers\RunningChartReportController;
 use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
+use Modules\VehicleRental\Http\Controllers\VehicleDriverReassignmentController;
 use Modules\VehicleRental\Http\Controllers\VehicleFinanceController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
 
@@ -161,4 +165,32 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('incidents-summary', [RentalReportsController::class, 'incidentsSummary']);
         Route::get('incidents-summary/export/{format}', [RentalReportsController::class, 'exportIncidentsSummary'])->whereIn('format', ['pdf', 'print', 'html']);
     });
+
+    Route::prefix('billing-cycles')->group(function (): void {
+        Route::get('/', [BillingCycleController::class, 'index']);
+        Route::get('{cycle}', [BillingCycleController::class, 'show'])->whereNumber('cycle');
+        Route::post('{cycle}/charts', [BillingCycleController::class, 'attachCharts'])->whereNumber('cycle');
+        Route::post('{cycle}/items', [BillingCycleController::class, 'addItem'])->whereNumber('cycle');
+        Route::delete('{cycle}/items/{item}', [BillingCycleController::class, 'removeItem'])->whereNumber(['cycle', 'item']);
+        Route::get('{cycle}/preview', [BillingCycleController::class, 'preview'])->whereNumber('cycle');
+        Route::post('{cycle}/finalize', [BillingCycleController::class, 'finalize'])->whereNumber('cycle');
+    });
+    Route::post('{kind}/agreements/{agreement}/billing-cycles', [BillingCycleController::class, 'store'])
+        ->whereIn('kind', array_column(AgreementKind::cases(), 'value'))
+        ->whereNumber('agreement');
+
+    Route::prefix('adjustments')->group(function (): void {
+        Route::get('/', [AgreementAdjustmentController::class, 'index']);
+        Route::post('/', [AgreementAdjustmentController::class, 'store']);
+        Route::get('{adjustment}', [AgreementAdjustmentController::class, 'show'])->whereNumber('adjustment');
+    });
+
+    Route::prefix('reassignments')->group(function (): void {
+        Route::get('/', [VehicleDriverReassignmentController::class, 'index']);
+    });
+    Route::post('running-charts/{chart}/reassign-driver', [VehicleDriverReassignmentController::class, 'reassignDriver'])->whereNumber('chart');
+    Route::post('vehicle-uses/{use}/replace-vehicle', [VehicleDriverReassignmentController::class, 'replaceVehicle'])->whereNumber('use');
+
+    Route::post('owner-settlement-bill', [OwnerSettlementBillController::class, 'store'])
+        ->middleware('tenant.feature:'.TenantFeature::INVOICE);
 });

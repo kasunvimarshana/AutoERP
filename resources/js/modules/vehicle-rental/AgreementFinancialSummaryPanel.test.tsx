@@ -19,6 +19,8 @@ import {
 vi.mock('./agreementApi', () => ({
     getAgreementFinancialSummary: vi.fn(),
     createAgreementFinancialAdjustment: vi.fn(),
+    listBillingCycles: vi.fn().mockResolvedValue({ data: [] }),
+    listReassignments: vi.fn().mockResolvedValue([]),
 }));
 
 const mockAgreement: Agreement = {

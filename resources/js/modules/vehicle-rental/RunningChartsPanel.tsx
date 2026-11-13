@@ -17,6 +17,7 @@ import { exportRunningChartReport, listCharts, transitionChart } from './running
 import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartEditor } from './RunningChartEditor';
 import { RunningChartHistoryPanel } from './RunningChartHistoryPanel';
+import { ReassignDriverModal } from './ReassignDriverModal';
 export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     const auth = useAuth(); const canManage = hasPermission(auth, CHART_PERMISSION.manage);
     const [rows, setRows] = useState<RunningChart[]>([]); const [page, setPage] = useState(1); const [meta, setMeta] = useState<PaginationMeta>(); const [revision, setRevision] = useState(0);
@@ -24,6 +25,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     const [printing, setPrinting] = useState<'lessee' | 'owner' | null>(null);
     const [editor, setEditor] = useState<{ chart?: RunningChart; correction?: boolean } | null>(null); const [history, setHistory] = useState<number | null>(null);
     const [action, setAction] = useState<{ chart: RunningChart; type: RunningChartAction } | null>(null); const [reason, setReason] = useState('');
+    const [reassignChart, setReassignChart] = useState<RunningChart | null>(null);
     const [currentTime] = useState(() => Date.now());
 
     const latestDriverChart = rows.find(r => r.driver_identity_source !== null);
@@ -204,6 +206,9 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
                             )}
                             {hasPermission(auth, CHART_PERMISSION.reverse) && chart.status === RunningChartStatus.Finalized && <Button variant="danger" onClick={() => choose(chart, RunningChartAction.Reverse)}>Reverse usage</Button>}
                             {canManage && chart.status === RunningChartStatus.Reversed && !chart.corrected_by_chart && <Button onClick={() => setEditor({ chart, correction: true })}>Create correction</Button>}
+                            {canManage && chart.status !== RunningChartStatus.Reversed && (
+                                <Button variant="secondary" onClick={() => setReassignChart(chart)}>Reassign driver</Button>
+                            )}
                         </>}
                     </div>
                     {history === chart.id && <RunningChartHistoryPanel key={chart.id} id={chart.id} />}
@@ -213,5 +218,13 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
         })}
         {!loading && !error && !rows.length && <p className="text-sm text-slate-500">No Running Charts recorded.</p>}<Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setAction(null); }} />
         {action && <form onSubmit={submit} aria-label="Confirm chart action" className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-sm text-slate-700">{action.type === RunningChartAction.Finalize ? 'Finalize physical evidence. This does not create charges.' : 'Reverse physical evidence and retain its original history.'} · {action.chart.reference}</p>{action.type === RunningChartAction.Reverse && <Textarea label="Reversal reason" required value={reason} onChange={e => setReason(e.target.value)} error={error?.fields.reason?.[0]} />}<div className="flex flex-wrap gap-2"><Button type="submit" variant={action.type === RunningChartAction.Reverse ? 'danger' : 'primary'} loading={saving} disabled={action.type === RunningChartAction.Reverse && !reason.trim()}>{CHART_ACTION_CONFIRM_LABELS[action.type]}</Button><Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button></div></form>}
+        {reassignChart && (
+            <ReassignDriverModal
+                open={Boolean(reassignChart)}
+                chart={reassignChart}
+                onClose={() => setReassignChart(null)}
+                onSaved={reload}
+            />
+        )}
     </section>;
 }

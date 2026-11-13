@@ -17,8 +17,12 @@ import {
 import {
     getAgreementFinancialSummary,
     createAgreementFinancialAdjustment,
+    listBillingCycles,
     type AgreementFinancialSummary,
+    type BillingCycle,
 } from './agreementApi';
+import { BillingCycleWizardModal } from './BillingCycleWizardModal';
+import { ReassignmentHistoryPanel } from './ReassignmentHistoryPanel';
 
 interface Props {
     kind: AgreementKind;
@@ -43,6 +47,11 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
     const [dueDate, setDueDate] = useState('');
     const [exchangeRate, setExchangeRate] = useState('1.000000');
 
+    // Billing Cycle state
+    const [billingCycles, setBillingCycles] = useState<BillingCycle[]>([]);
+    const [selectedCycle, setSelectedCycle] = useState<BillingCycle | 'new' | null>(null);
+    const [showCycleModal, setShowCycleModal] = useState(false);
+
     useEffect(() => {
         const controller = new AbortController();
         getAgreementFinancialSummary(kind, agreement.id, controller.signal)
@@ -62,6 +71,15 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                     setLoading(false);
                 }
             });
+
+        listBillingCycles(agreement.id, kind)
+            .then(res => {
+                if (!controller.signal.aborted) {
+                    setBillingCycles(res.data);
+                }
+            })
+            .catch(() => {});
+
         return () => controller.abort();
     }, [kind, agreement.id, agreement.row_version, revision]);
 
@@ -394,7 +412,126 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                             </div>
                         </div>
                     )}
+                    {/* Billing Cycles Section */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900">
+                                    Billing Cycles & Two-Stage Invoicing
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    Manage flexible periodic billing: Stage 1 base rent invoicing, running chart attachment, ad-hoc additions/deductions, and Stage 2 finalization.
+                                </p>
+                            </div>
+                            {canManageAdjustments && agreement.status === AgreementStatus.Active && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setSelectedCycle('new');
+                                        setShowCycleModal(true);
+                                    }}
+                                >
+                                    + New Billing Cycle
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
+                                        <th className="px-4 py-3">Cycle #</th>
+                                        <th className="px-4 py-3">Period</th>
+                                        <th className="px-4 py-3">Mode</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Initial Invoice</th>
+                                        <th className="px-4 py-3">Final Invoice</th>
+                                        <th className="px-4 py-3 text-right">Net Total</th>
+                                        <th className="px-4 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {billingCycles.map(cycle => (
+                                        <tr key={cycle.id} className="transition-colors hover:bg-blue-50/30">
+                                            <td className="px-4 py-3 font-semibold text-slate-900">{cycle.cycle_number}</td>
+                                            <td className="px-4 py-3 text-slate-600">
+                                                {formatBusinessDate(cycle.period_from)} – {formatBusinessDate(cycle.period_until)}
+                                            </td>
+                                            <td className="px-4 py-3 capitalize text-slate-700">{cycle.billing_mode}</td>
+                                            <td className="px-4 py-3"><StatusBadge status={cycle.status} /></td>
+                                            <td className="px-4 py-3">
+                                                {cycle.initial_invoice ? (
+                                                    <span className="font-semibold text-blue-700">{cycle.initial_invoice.invoice_number}</span>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {cycle.final_invoice ? (
+                                                    <span className="font-semibold text-emerald-700">{cycle.final_invoice.invoice_number}</span>
+                                                ) : cycle.supplementary_invoice ? (
+                                                    <span className="font-semibold text-indigo-700">{cycle.supplementary_invoice.invoice_number}</span>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Pending</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-bold text-slate-900">
+                                                <MoneyDisplay value={cycle.total_billed_amount || cycle.base_rent_amount} currency={cur} />
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => {
+                                                        setSelectedCycle(cycle);
+                                                        setShowCycleModal(true);
+                                                    }}
+                                                >
+                                                    Manage Cycle
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {billingCycles.length === 0 && (
+                                        <tr>
+                                            <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                                                No billing cycles created yet for this agreement.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Reassignments History (Customer Agreements) */}
+                    {isCustomer && (
+                        <div className="space-y-3">
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900">
+                                    Vehicle Replacements & Driver Reassignments
+                                </h3>
+                                <p className="text-xs text-slate-500">
+                                    Timeline of fleet substitutions, cutover timestamps, driver handovers, and lessor pro-rata financial adjustments.
+                                </p>
+                            </div>
+                            <ReassignmentHistoryPanel customerAgreementId={agreement.id} currencyCode={cur} />
+                        </div>
+                    )}
                 </>
+            )}
+
+            {showCycleModal && (
+                <BillingCycleWizardModal
+                    open={showCycleModal}
+                    onClose={() => {
+                        setShowCycleModal(false);
+                        setSelectedCycle(null);
+                    }}
+                    kind={kind}
+                    agreement={agreement}
+                    cycle={selectedCycle === 'new' ? null : selectedCycle}
+                    onCycleUpdated={() => reloadSummary()}
+                />
             )}
         </div>
     );

@@ -23,9 +23,14 @@ use Modules\Invoice\Services\InvoiceSourceService;
 use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\AgreementAdjustmentCategory;
+use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
+use Modules\VehicleRental\Enums\AgreementAdjustmentType;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Models\Agreement;
+use Modules\VehicleRental\Models\AgreementAdjustment;
+use Modules\VehicleRental\Models\AgreementAdjustmentHistory;
 use Modules\VehicleRental\Models\RentalCharge;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -82,7 +87,29 @@ final class RentalChargeDocuments
         $partyType = $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value;
         $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
         $sourceType = 'vehicle_rental_agreement_adjustment';
-        $adjustmentSourceId = (int) (now()->timestamp * 100000 + random_int(1000, 99999));
+
+        $adjustment = new AgreementAdjustment();
+        $adjustment->tenant_id = $context->tenantId;
+        $adjustment->organization_unit_id = $context->organizationUnitId;
+        if ($customer) {
+            $adjustment->customer_agreement_id = $agreement->id;
+        } else {
+            $adjustment->owner_agreement_id = $agreement->id;
+        }
+        $adjustment->adjustment_type = AgreementAdjustmentType::from($adjustmentType);
+        $adjustment->category = isset($data['category']) ? AgreementAdjustmentCategory::tryFrom($data['category']) ?? AgreementAdjustmentCategory::Other : AgreementAdjustmentCategory::Other;
+        $adjustment->status = AgreementAdjustmentStatus::Draft;
+        $adjustment->amount = $amount;
+        $adjustment->original_amount = $amount;
+        $adjustment->tax_amount = '0.000000';
+        $adjustment->reason = trim($reason);
+        $adjustment->actor_id = $context->actorId;
+        $adjustment->authorized_by_user_id = $context->actorId;
+        $adjustment->authorized_at = now();
+        $adjustment->row_version = AgreementFields::INITIAL_VERSION;
+        $adjustment->save();
+
+        $adjustmentSourceId = (int) $adjustment->id;
         $description = ($isCredit ? 'Credit Note' : 'Debit Note').' · '.$agreement->reference.' · '.trim($reason);
 
         $source = new CreateInvoiceData(
@@ -138,13 +165,28 @@ final class RentalChargeDocuments
             ],
         );
 
-        return $this->invoices->create(
+        $invoice = $this->invoices->create(
             $this->factory->prepare(
                 $source,
                 $customer ? FinancePostingProfileCode::CustomerRentalInvoice : FinancePostingProfileCode::SupplierRentalInvoice,
                 $customer ? FinanceAccountRoleCode::RentalRevenue : FinanceAccountRoleCode::RentalExpense,
             ),
         );
+
+        $adjustment->invoice_id = $invoice->id;
+        $adjustment->status = AgreementAdjustmentStatus::Applied;
+        $adjustment->save();
+
+        $history = new AgreementAdjustmentHistory();
+        $history->tenant_id = $context->tenantId;
+        $history->adjustment_id = $adjustment->id;
+        $history->from_status = AgreementAdjustmentStatus::Draft;
+        $history->to_status = AgreementAdjustmentStatus::Applied;
+        $history->reason = 'Invoice generated: ' . $invoice->invoice_number;
+        $history->user_id = $context->actorId;
+        $history->save();
+
+        return $invoice;
     }
 
     public function adjustmentInput(array $input): array

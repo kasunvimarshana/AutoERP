@@ -142,7 +142,9 @@ final class OwnerDisbursementReportService
 
             $deductions = $allocatedDeductions + $directDeductions;
 
-            $whtAmount = $whtRate > 0 ? round(($grossPayable * $whtRate) / 100.0, 2) : 0.0;
+            $whtAmount = $whtRate > 0
+                ? (float) $this->math->div($this->math->mul((string) $grossPayable, (string) $whtRate, 6), '100', 2)
+                : 0.0;
             $netPayable = max(0.0, ($grossPayable - $deductions) - $whtAmount);
 
             $vehicleNo = $agreement->vehicle?->registration_number
@@ -324,7 +326,10 @@ final class OwnerDisbursementReportService
                 ->sum('total_amount');
         }
 
-        $priorWht = $whtRate > 0 ? round((($priorBase + $priorUsage) * $whtRate) / 100.0, 2) : 0.0;
+        $priorGross = $this->math->add((string) $priorBase, (string) $priorUsage, 6);
+        $priorWht = $whtRate > 0
+            ? (float) $this->math->div($this->math->mul($priorGross, (string) $whtRate, 6), '100', 2)
+            : 0.0;
         $balanceBfRaw = ($priorBase + $priorUsage) - $priorSettlements - $priorDeductions - $priorWht;
 
         // 2. Rental & Other Payables during current period
@@ -362,11 +367,15 @@ final class OwnerDisbursementReportService
         $basePayable = (float) $baseCharges->sum('amount');
         $normalOtAmount = (float) $normalOtCharges->sum('amount');
         $normalOtHours = (float) $normalOtCharges->sum('quantity');
-        $normalOtRate = $normalOtHours > 0 ? round($normalOtAmount / $normalOtHours, 2) : 1500.0;
+        $normalOtRate = $normalOtHours > 0
+            ? (float) $this->math->div((string) $normalOtAmount, (string) $normalOtHours, 2)
+            : 1500.0;
 
         $doubleOtAmount = (float) $doubleOtCharges->sum('amount');
         $doubleOtHours = (float) $doubleOtCharges->sum('quantity');
-        $doubleOtRate = $doubleOtHours > 0 ? round($doubleOtAmount / $doubleOtHours, 2) : 0.0;
+        $doubleOtRate = $doubleOtHours > 0
+            ? (float) $this->math->div((string) $doubleOtAmount, (string) $doubleOtHours, 2)
+            : 0.0;
 
         $tripleOtHours = (float) $tripleOtCharges->sum('quantity');
         $tripleOtAmount = (float) $tripleOtCharges->sum('amount');
@@ -503,7 +512,9 @@ final class OwnerDisbursementReportService
         }
 
         // 6. Balance Over Paid / Balance Payable Closing Calculation
-        $periodWht = $whtRate > 0 ? round(($totalPayablesRaw * $whtRate) / 100.0, 2) : 0.0;
+        $periodWht = $whtRate > 0
+            ? (float) $this->math->div($this->math->mul((string) $totalPayablesRaw, (string) $whtRate, 6), '100', 2)
+            : 0.0;
         $closingBalanceRaw = $balanceBfRaw + $totalPayablesRaw - $totalSettlementsRaw - $totalRepairDeductionsRaw - $periodWht;
 
         $balanceBfFormatted = $balanceBfRaw < 0

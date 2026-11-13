@@ -10,6 +10,7 @@ import {
     OwnerDisbursementReportData,
     OwnerDisbursementReportParams,
 } from '../rentalReportsApi';
+import { OwnerSettlementModal } from '../OwnerSettlementModal';
 
 type OwnerReportTab = 'summary' | 'statement_detail_1' | 'statement_detail_2' | 'wht_ledger';
 
@@ -29,6 +30,7 @@ export default function OwnerDisbursementReportPage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [busyExport, setBusyExport] = useState<'print' | 'pdf' | null>(null);
+    const [showSettlementModal, setShowSettlementModal] = useState<boolean>(false);
 
     const handleExport = async (format: 'print' | 'pdf') => {
         setBusyExport(format);
@@ -131,6 +133,15 @@ export default function OwnerDisbursementReportPage() {
                                 >
                                     Download PDF
                                 </Button>
+                                {statement?.owner_agreement_id && (
+                                    <Button
+                                        type="button"
+                                        variant="primary"
+                                        onClick={() => setShowSettlementModal(true)}
+                                    >
+                                        Generate Inbound AP Bill
+                                    </Button>
+                                )}
                             </>
                         )}
                     </div>
@@ -679,6 +690,20 @@ export default function OwnerDisbursementReportPage() {
                         </Panel>
                     )}
                 </>
+            )}
+
+            {showSettlementModal && statement && (
+                <OwnerSettlementModal
+                    open={showSettlementModal}
+                    onClose={() => setShowSettlementModal(false)}
+                    ownerAgreementId={statement.owner_agreement_id}
+                    ownerAgreementReference={statement.agreement_reference}
+                    defaultStartDate={params.start_date}
+                    defaultEndDate={params.end_date}
+                    onBillGenerated={() => {
+                        executeFetch({ ...params, report_type: activeTab });
+                    }}
+                />
             )}
         </div>
     );
