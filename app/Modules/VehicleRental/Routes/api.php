@@ -20,6 +20,7 @@ use Modules\VehicleRental\Http\Controllers\RentalDashboardController;
 use Modules\VehicleRental\Http\Controllers\RentalExpenseController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentAttachmentController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentController;
+use Modules\VehicleRental\Http\Controllers\RentalPaymentController;
 use Modules\VehicleRental\Http\Controllers\RentalReportsController;
 use Modules\VehicleRental\Http\Controllers\RentalReservationController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
@@ -103,9 +104,21 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::post('{agreement}/{action}', [AgreementController::class, 'transition'])->whereNumber('agreement')->whereIn('action', [AgreementAction::Activate->value, AgreementAction::Close->value]);
     });
 
+    Route::prefix('{kind}/agreements/{agreement}/payments')
+        ->whereIn('kind', array_column(AgreementKind::cases(), 'value'))
+        ->whereNumber('agreement')
+        ->middleware('tenant.feature:'.TenantFeature::PAYMENT)
+        ->group(function (): void {
+            Route::get('/', [RentalPaymentController::class, 'index']);
+            Route::post('/', [RentalPaymentController::class, 'store']);
+            Route::post('{payment}/allocate', [RentalPaymentController::class, 'allocate'])->whereNumber('payment');
+            Route::post('{payment}/reverse', [RentalPaymentController::class, 'reverse'])->whereNumber('payment');
+        });
+
     Route::prefix('customer/agreements/{agreement}/deposits')->whereNumber('agreement')->middleware('tenant.feature:'.TenantFeature::PAYMENT)->group(function (): void {
         Route::get('/', [DepositReceiptController::class, 'index']);
         Route::post('/', [DepositReceiptController::class, 'store']);
+        Route::post('/allocate', [DepositReceiptController::class, 'allocate']);
     });
 
     Route::get('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'index'])->whereNumber('agreement');

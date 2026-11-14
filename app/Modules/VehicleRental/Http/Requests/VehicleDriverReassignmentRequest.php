@@ -12,14 +12,24 @@ final class VehicleDriverReassignmentRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
+        if ($this->isMethod('GET')) {
+            return [
+                'customer_agreement_id' => ['nullable', 'integer'],
+            ];
+        }
+
         return [
             'expected_version' => ['sometimes', 'required', 'integer', 'min:1'],
             'driver_employee_id' => ['sometimes', 'required', 'integer', 'min:1'],
-            'new_vehicle_id' => ['sometimes', 'required', 'integer', 'min:1'],
+            'new_vehicle_id' => ['sometimes', 'required_without:vehicle_id', 'integer', 'min:1'],
+            'vehicle_id' => ['sometimes', 'required_without:new_vehicle_id', 'integer', 'min:1'],
             'new_owner_agreement_id' => ['nullable', 'integer'],
+            'owner_agreement_id' => ['nullable', 'integer'],
             'new_handover_odometer' => ['nullable', 'numeric'],
+            'handover_odometer' => ['nullable', 'numeric'],
             'return_odometer' => ['nullable', 'numeric'],
-            'cutover_at' => ['sometimes', 'required', 'date'],
+            'cutover_at' => ['sometimes', 'required_without:starts_at', 'date'],
+            'starts_at' => ['sometimes', 'required_without:cutover_at', 'date'],
             'effective_at' => ['sometimes', 'nullable', 'date'],
             'reason' => ['required', 'string', 'max:1000'],
             'customer_agreement_id' => ['nullable', 'integer'],

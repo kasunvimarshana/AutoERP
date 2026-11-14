@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Services;
 
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\DTOs\CreateInvoiceData;
@@ -18,8 +19,10 @@ use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceBalanceUpdater;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceSourceService;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -44,6 +47,9 @@ final class RentalChargeDocuments
         private readonly TaxedSourceInvoiceFactory $factory,
         private readonly InvoiceCreationService $invoices,
         private readonly InvoiceSourceService $sources,
+        private readonly InvoiceStatusService $invoiceStatusService,
+        private readonly InvoiceBalanceUpdater $balanceUpdater,
+        private readonly DecimalMath $math,
         private readonly RentalCalendar $calendar,
     ) {}
 
@@ -88,6 +94,22 @@ final class RentalChargeDocuments
         $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
         $sourceType = 'vehicle_rental_agreement_adjustment';
 
+        $targetInvoiceId = isset($data['target_invoice_id']) && is_numeric($data['target_invoice_id'])
+            ? (int) $data['target_invoice_id']
+            : null;
+
+        $targetInvoice = null;
+        if ($targetInvoiceId !== null) {
+            $targetInvoice = Invoice::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('organization_unit_id', $context->organizationUnitId)
+                ->findOrFail($targetInvoiceId);
+
+            if ((int) $targetInvoice->party_id !== (int) $partyId) {
+                throw ValidationException::withMessages(['target_invoice_id' => ['The selected target invoice does not belong to this agreement party.']]);
+            }
+        }
+
         $adjustment = new AgreementAdjustment();
         $adjustment->tenant_id = $context->tenantId;
         $adjustment->organization_unit_id = $context->organizationUnitId;
@@ -110,7 +132,8 @@ final class RentalChargeDocuments
         $adjustment->save();
 
         $adjustmentSourceId = (int) $adjustment->id;
-        $description = ($isCredit ? 'Credit Note' : 'Debit Note').' · '.$agreement->reference.' · '.trim($reason);
+        $description = ($isCredit ? 'Credit Note' : 'Debit Note').' · '.$agreement->reference.($targetInvoice ? ' · (Against '.$targetInvoice->invoice_number.')' : '').' · '.trim($reason);
+        $notes = trim($reason).($targetInvoice ? ' · Target Invoice: '.$targetInvoice->invoice_number : '');
 
         $source = new CreateInvoiceData(
             tenantId: $context->tenantId,
@@ -124,7 +147,7 @@ final class RentalChargeDocuments
             partyType: $partyType,
             partyId: $partyId,
             createdBy: $context->actorId,
-            notes: trim($reason),
+            notes: $notes,
             lines: [
                 new InvoiceLineData(
                     lineNumber: self::FIRST_LINE,
@@ -173,7 +196,31 @@ final class RentalChargeDocuments
             ),
         );
 
-        $adjustment->invoice_id = $invoice->id;
+        if ($isCredit && $targetInvoice !== null) {
+            if ($invoice->status === InvoiceStatus::Draft) {
+                try {
+                    $invoice = $this->invoiceStatusService->transition($invoice, InvoiceStatus::Approved, $context->actorId, 'Credit note auto-approved');
+                } catch (\Throwable) {
+                }
+            }
+            if ($invoice->status === InvoiceStatus::Approved) {
+                try {
+                    $invoice = $this->invoiceStatusService->transition($invoice, InvoiceStatus::Posted, $context->actorId, 'Credit note auto-posted');
+                } catch (\Throwable) {
+                }
+            }
+
+            $targetRemaining = (string) ($targetInvoice->balance?->remaining_amount ?? $targetInvoice->balance_due ?? '0.000000');
+            if ($this->math->compare($targetRemaining, '0.000000') > 0) {
+                $allocAmount = $this->math->compare($amount, $targetRemaining) > 0 ? $targetRemaining : $amount;
+                $this->balanceUpdater->allocateCredit($targetInvoice, 'invoice', $invoice->id, $allocAmount);
+            }
+
+            $adjustment->invoice_id = $targetInvoice->id;
+        } else {
+            $adjustment->invoice_id = $invoice->id;
+        }
+
         $adjustment->status = AgreementAdjustmentStatus::Applied;
         $adjustment->save();
 
@@ -203,6 +250,7 @@ final class RentalChargeDocuments
             'invoice_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
             'due_date' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:invoice_date'],
             'exchange_rate' => ['required', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'numeric', 'gt:0'],
+            'target_invoice_id' => ['nullable', 'integer', 'min:1'],
         ])->validate();
     }
 

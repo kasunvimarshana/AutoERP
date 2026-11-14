@@ -307,16 +307,17 @@ final class RentalRevenueReportService
                 ->where('tenant_id', $context->tenantId)
                 ->where('period_from', '<=', $endDate)
                 ->where('period_until', '>=', $startDate)
+                ->whereNotNull('customer_agreement_id')
                 ->when($customerId !== null, function ($q) use ($customerId) {
                     $agrIds = CustomerAgreement::query()->where('customer_id', $customerId)->pluck('id');
-                    $q->whereIn('agreement_id', $agrIds);
+                    $q->whereIn('customer_agreement_id', $agrIds);
                 })
                 ->get();
 
             if ($cycles->isNotEmpty()) {
                 $agreementsById = $agreements->keyBy('id');
                 foreach ($cycles as $cycle) {
-                    $matchedAgreement = $agreementsById->get($cycle->agreement_id);
+                    $matchedAgreement = $agreementsById->get($cycle->customer_agreement_id);
                     $vehicleNo = '-';
                     if ($matchedAgreement !== null && $matchedAgreement->vehicleUses->isNotEmpty()) {
                         $primaryUse = $matchedAgreement->vehicleUses->firstWhere('replaces_use_id', null) ?? $matchedAgreement->vehicleUses->first();
@@ -330,17 +331,27 @@ final class RentalRevenueReportService
                         .' '.($matchedAgreement?->customer?->customer_number ? '('.$matchedAgreement->customer->customer_number.')' : '')
                         .' '.$start->format('d/m/y').' To '.$end->format('d/m/y');
 
+                    $usageCharges = (float) $cycle->excess_km_amount + (float) $cycle->overtime_amount + (float) $cycle->night_out_amount + (float) $cycle->tolls_amount + (float) $cycle->additions_amount - (float) $cycle->deductions_amount;
+                    if ($usageCharges < 0) {
+                        $usageCharges = 0;
+                    }
+
+                    $cycle->loadMissing(['finalInvoice', 'supplementaryInvoice', 'initialInvoice']);
+                    $realInvoice = $cycle->finalInvoice ?? $cycle->supplementaryInvoice ?? $cycle->initialInvoice;
+                    $invoiceId = $realInvoice?->id ?? $cycle->id;
+                    $invoiceNumber = $realInvoice?->invoice_number ?? $cycle->cycle_number;
+
                     $invoices[] = [
-                        'invoice_id' => $cycle->invoice_id ?? $cycle->id,
-                        'invoice_number' => $cycle->invoice_number ?? $cycle->cycle_reference,
+                        'invoice_id' => $invoiceId,
+                        'invoice_number' => $invoiceNumber,
                         'invoice_date' => CarbonImmutable::parse($cycle->period_until)->format('d/m/y'),
                         'raw_invoice_date' => $cycle->period_until,
                         'customer_details' => $customerDetails,
                         'vehicle_number' => $vehicleNo,
                         'rental_charge' => number_format((float) $cycle->base_rent_amount, 2, '.', ''),
                         'rental_charge_raw' => (float) $cycle->base_rent_amount,
-                        'excess_km_charge' => number_format((float) $cycle->total_usage_charges, 2, '.', ''),
-                        'excess_km_charge_raw' => (float) $cycle->total_usage_charges,
+                        'excess_km_charge' => number_format((float) $usageCharges, 2, '.', ''),
+                        'excess_km_charge_raw' => (float) $usageCharges,
                         'vat_amount' => number_format((float) $cycle->tax_amount, 2, '.', ''),
                         'vat_amount_raw' => (float) $cycle->tax_amount,
                         'total_amount' => number_format((float) $cycle->total_billed_amount, 2, '.', ''),

@@ -21,11 +21,13 @@ use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceBalanceUpdater;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\AllocationStatus;
+use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Services\PaymentAllocationReversalService;
 use Modules\Payment\Services\PaymentAllocationService;
@@ -43,6 +45,7 @@ use Modules\VehicleRental\Enums\BillingCycleMode;
 use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\BillingFinalizationMode;
 use Modules\VehicleRental\Enums\RunningChartStatus;
+use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\AgreementAdjustment;
 use Modules\VehicleRental\Models\AgreementAdjustmentHistory;
 use Modules\VehicleRental\Models\BillingCycle;
@@ -66,6 +69,7 @@ final class TwoStageInvoicingService
         private readonly TaxedSourceInvoiceFactory $invoiceFactory,
         private readonly InvoiceCreationService $invoiceService,
         private readonly InvoiceStatusService $invoiceStatusService,
+        private readonly InvoiceBalanceUpdater $balanceUpdater,
         private readonly PaymentAllocationService $allocationService,
         private readonly PaymentAllocationReversalService $allocationReversalService,
         private readonly BillingCycleNumberService $cycleNumberService,
@@ -96,6 +100,19 @@ final class TwoStageInvoicingService
             $agreement = $customer
                 ? CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($agreementId)
                 : OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($agreementId);
+
+            $foreignCol = $customer ? 'customer_agreement_id' : 'owner_agreement_id';
+            $overlapExists = BillingCycle::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->where($foreignCol, $agreement->id)
+                ->where('status', '!=', BillingCycleStatus::Cancelled)
+                ->where('period_from', '<=', $periodUntil)
+                ->where('period_until', '>=', $periodFrom)
+                ->exists();
+
+            if ($overlapExists) {
+                throw ValidationException::withMessages(['period' => ['A billing cycle already covers an overlapping period for this agreement.']]);
+            }
 
             $rawBillingMode = (string) ($input['billing_mode'] ?? 'without_running_chart');
             $billingMode = match ($rawBillingMode) {
@@ -179,6 +196,7 @@ final class TwoStageInvoicingService
 
         $query = RunningChart::query()
             ->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('status', RunningChartStatus::Finalized)
             ->whereHas('vehicleUse', fn ($q) => $q->where($foreignKey, $agreementId))
             ->where('starts_at', '<=', $cycle->period_until->endOfDay())
             ->where('ends_at', '>=', $cycle->period_from->startOfDay())
@@ -263,10 +281,13 @@ final class TwoStageInvoicingService
                 throw ValidationException::withMessages(['chart_ids' => ['One or more running charts could not be found.']]);
             }
 
-            // Verify agreement ownership
+            // Verify agreement ownership and finalized status
             foreach ($charts as $chart) {
                 if ((int) ($chart->vehicleUse?->$foreignKey ?? 0) !== (int) $agreementId) {
                     throw ValidationException::withMessages(['chart_ids' => ['One or more running charts do not belong to this agreement.']]);
+                }
+                if ($chart->status !== RunningChartStatus::Finalized) {
+                    throw ValidationException::withMessages(['chart_ids' => ["Running chart {$chart->reference} must be finalized before attaching to a billing cycle."]]);
                 }
             }
 
@@ -470,9 +491,55 @@ final class TwoStageInvoicingService
         $tripleOtRate = (string) ($terms['triple_ot_rate'] ?? '0.000000');
         $nightOutRate = (string) ($terms['night_out_rate'] ?? '0.000000');
 
+        // Physical custody calculation derived from VehicleUse handover/return boundaries
+        $foreignKey = $cycle->customer_agreement_id !== null ? 'customer_agreement_id' : 'owner_agreement_id';
+        $agreementId = $cycle->customer_agreement_id ?? $cycle->owner_agreement_id;
+
+        $uses = VehicleUse::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->where($foreignKey, $agreementId)
+            ->where('starts_at', '<=', $cycle->period_until->endOfDay())
+            ->where(function ($q) use ($cycle) {
+                $q->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $cycle->period_from->startOfDay())
+                    ->orWhere('returned_at', '>=', $cycle->period_from->startOfDay());
+            })
+            ->where('status', '!=', VehicleUseStatus::Cancelled->value)
+            ->with('vehicle')
+            ->orderBy('starts_at')
+            ->get();
+
+        $totalCustodyDays = 0;
+        $custodyMap = [];
+        foreach ($uses as $use) {
+            $handoverTime = $use->handover_at ?? $use->starts_at;
+            $returnTime = $use->returned_at ?? $use->ends_at;
+
+            $startStr = $handoverTime?->toDateString() ?? $cycle->period_from->toDateString();
+            $endStr = $returnTime?->toDateString() ?? $cycle->period_until->toDateString();
+
+            $uStartDay = CarbonImmutable::parse(max($startStr, $cycle->period_from->toDateString()))->startOfDay();
+            $uEndDay = CarbonImmutable::parse(min($endStr, $cycle->period_until->toDateString()))->startOfDay();
+
+            if ($uStartDay->greaterThan($uEndDay)) {
+                $days = 0;
+            } else {
+                $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay) + 1);
+            }
+
+            if ($days > 0) {
+                $custodyMap[$use->vehicle_id] = ($custodyMap[$use->vehicle_id] ?? 0) + $days;
+                $totalCustodyDays += $days;
+            }
+        }
+
         // 1. Vehicle Attributions (handles both with and without running charts)
         $vehicleAttributions = [];
         $chartsByVehicle = $cycle->charts->groupBy('vehicle_id');
+        $totalCycleCommercialKm = '0.000000';
+        foreach ($cycle->charts as $c) {
+            $totalCycleCommercialKm = $this->math->add($totalCycleCommercialKm, (string) ($c->commercial_km ?? '0.000000'), 6);
+        }
 
         if ($chartsByVehicle->isNotEmpty()) {
             foreach ($chartsByVehicle as $vehicleId => $vCharts) {
@@ -494,20 +561,30 @@ final class TwoStageInvoicingService
                     $vNightOuts += (int) $vc->night_outs;
                 }
 
-                $custodyDays = $cycleDays;
-                if ($chartsByVehicle->count() > 1) {
-                    $firstStart = $vCharts->min('starts_at');
-                    $lastEnd = $vCharts->max('ends_at');
-                    if ($firstStart && $lastEnd) {
-                        $startDay = CarbonImmutable::parse($firstStart)->startOfDay();
-                        $endDay = CarbonImmutable::parse($lastEnd)->endOfDay();
-                        $custodyDays = max(1, min($cycleDays, $startDay->diffInDays($endDay) + 1));
-                    }
-                }
+                // Custody days derived from VehicleUse handover/return boundaries
+                $custodyDays = $custodyMap[$vehicleId] ?? $cycleDays;
 
-                $vBaseRent = $chartsByVehicle->count() > 1
-                    ? $this->math->div($this->math->mul((string) $cycle->base_rent_amount, (string) $custodyDays, 6), (string) $cycleDays, 6)
+                $vBaseRent = ($chartsByVehicle->count() > 1 && $totalCustodyDays > 0)
+                    ? $this->math->div($this->math->mul((string) $cycle->base_rent_amount, (string) $custodyDays, 6), (string) $totalCustodyDays, 6)
                     : (string) $cycle->base_rent_amount;
+
+                // Excess KM and Tolls attribution
+                $vExcessKm = '0.000000';
+                $vTolls = '0.000000';
+                if ($this->math->compare($totalCycleCommercialKm, '0.000000') > 0) {
+                    if ($this->math->compare((string) $cycle->excess_km_amount, '0.000000') > 0) {
+                        $vExcessKm = $this->math->div($this->math->mul((string) $cycle->excess_km_amount, $vKm, 6), $totalCycleCommercialKm, 6);
+                    }
+                    if ($this->math->compare((string) $cycle->tolls_amount, '0.000000') > 0) {
+                        $vTolls = $this->math->div($this->math->mul((string) $cycle->tolls_amount, $vKm, 6), $totalCycleCommercialKm, 6);
+                    }
+                } elseif ($chartsByVehicle->count() === 1) {
+                    $vExcessKm = (string) $cycle->excess_km_amount;
+                    $vTolls = (string) $cycle->tolls_amount;
+                } elseif ($chartsByVehicle->count() > 1 && $totalCustodyDays > 0) {
+                    $vExcessKm = $this->math->div($this->math->mul((string) $cycle->excess_km_amount, (string) $custodyDays, 6), (string) $totalCustodyDays, 6);
+                    $vTolls = $this->math->div($this->math->mul((string) $cycle->tolls_amount, (string) $custodyDays, 6), (string) $totalCustodyDays, 6);
+                }
 
                 $vNormalOtHours = $this->math->div((string) $vNormalOt, '60', 6);
                 $vDoubleOtHours = $this->math->div((string) $vDoubleOt, '60', 6);
@@ -524,7 +601,9 @@ final class TwoStageInvoicingService
                 $vAdditions = '0.000000';
                 $vDeductions = '0.000000';
                 foreach ($cycle->items as $item) {
-                    if ((int) $item->vehicle_id === (int) $vehicleId) {
+                    $matches = ((int) $item->vehicle_id === (int) $vehicleId)
+                        || ($item->vehicle_id === null && $item->driver_employee_id === null && $chartsByVehicle->count() === 1);
+                    if ($matches) {
                         if ($item->item_type === BillingCycleItemType::Addition) {
                             $vAdditions = $this->math->add($vAdditions, (string) $item->amount, 6);
                         } else {
@@ -533,8 +612,10 @@ final class TwoStageInvoicingService
                     }
                 }
 
-                $vSubtotal = $this->math->add($vBaseRent, $vOtAmt, 6);
+                $vSubtotal = $this->math->add($vBaseRent, $vExcessKm, 6);
+                $vSubtotal = $this->math->add($vSubtotal, $vOtAmt, 6);
                 $vSubtotal = $this->math->add($vSubtotal, $vNightOutAmt, 6);
+                $vSubtotal = $this->math->add($vSubtotal, $vTolls, 6);
                 $vSubtotal = $this->math->add($vSubtotal, $vAdditions, 6);
                 $vSubtotal = $this->math->compare($vSubtotal, $vDeductions) > 0
                     ? $this->math->sub($vSubtotal, $vDeductions, 6)
@@ -556,6 +637,8 @@ final class TwoStageInvoicingService
                     'triple_ot_hours' => $vTripleOtHours,
                     'night_outs' => $vNightOuts,
                     'allocated_base_rent' => $vBaseRent,
+                    'allocated_excess_km_amount' => $vExcessKm,
+                    'allocated_tolls_amount' => $vTolls,
                     'allocated_ot_amount' => $vOtAmt,
                     'allocated_night_out_amount' => $vNightOutAmt,
                     'attributed_additions' => $vAdditions,
@@ -564,50 +647,43 @@ final class TwoStageInvoicingService
                 ];
             }
         } else {
-            // Non-Running Chart mode: derive vehicle attributions from VehicleUse custody periods
-            $foreignKey = $cycle->customer_agreement_id !== null ? 'customer_agreement_id' : 'owner_agreement_id';
-            $agreementId = $cycle->customer_agreement_id ?? $cycle->owner_agreement_id;
-
-            $uses = VehicleUse::query()
-                ->forContext($context->tenantId, $context->organizationUnitId)
-                ->where($foreignKey, $agreementId)
-                ->where('starts_at', '<=', $cycle->period_until->endOfDay())
-                ->where(function ($q) use ($cycle) {
-                    $q->whereNull('ends_at')
-                        ->orWhere('ends_at', '>=', $cycle->period_from->startOfDay())
-                        ->orWhere('returned_at', '>=', $cycle->period_from->startOfDay());
-                })
-                ->where('status', '!=', \Modules\VehicleRental\Enums\VehicleUseStatus::Cancelled->value)
-                ->with('vehicle')
-                ->orderBy('starts_at')
-                ->get();
-
-            $totalCustodyDays = 0;
-            $custodyMap = [];
-            foreach ($uses as $use) {
-                $uStartDay = CarbonImmutable::parse(max($use->starts_at?->toDateString() ?? $cycle->period_from->toDateString(), $cycle->period_from->toDateString()))->startOfDay();
-                $uEndStr = $use->returned_at?->toDateString() ?? $use->ends_at?->toDateString() ?? $cycle->period_until->toDateString();
-                $uEndDay = CarbonImmutable::parse(min($uEndStr, $cycle->period_until->toDateString()))->startOfDay();
-                $days = (int) max(1, min($cycleDays, $uStartDay->diffInDays($uEndDay) + 1));
-                $custodyMap[$use->id] = $days;
-                $totalCustodyDays += $days;
-            }
-
-            foreach ($uses as $use) {
-                $vehicle = $use->vehicle;
-                $vehicleId = (int) $use->vehicle_id;
+            // Non-Running Chart mode: derive vehicle attributions from VehicleUse custody periods grouped by vehicle
+            $usesByVehicle = $uses->groupBy('vehicle_id');
+            foreach ($usesByVehicle as $vehicleId => $vUses) {
+                $firstUse = $vUses->first();
+                $vehicle = $firstUse->vehicle ?? Vehicle::query()->find($vehicleId);
+                $vehicleId = (int) $vehicleId;
                 $regNo = $vehicle?->registration_number ?? $vehicle?->vehicle_number ?? "Vehicle #{$vehicleId}";
                 $label = $vehicle ? trim("{$regNo} · {$vehicle->make} {$vehicle->model}") : $regNo;
-                $days = $custodyMap[$use->id] ?? $cycleDays;
+                $days = $custodyMap[$vehicleId] ?? 0;
+                if ($days === 0 && $usesByVehicle->count() > 1 && $totalCustodyDays > 0) {
+                    continue;
+                }
+                if ($days === 0) {
+                    $days = $cycleDays;
+                }
 
-                $vBaseRent = $uses->count() > 1 && $totalCustodyDays > 0
+                $vBaseRent = ($usesByVehicle->count() > 1 && $totalCustodyDays > 0)
                     ? $this->math->div($this->math->mul((string) $cycle->base_rent_amount, (string) $days, 6), (string) $totalCustodyDays, 6)
                     : (string) $cycle->base_rent_amount;
+
+                // Excess KM and Tolls attribution in Non-Running Chart mode
+                $vExcessKm = '0.000000';
+                $vTolls = '0.000000';
+                if ($usesByVehicle->count() > 1 && $totalCustodyDays > 0) {
+                    $vExcessKm = $this->math->div($this->math->mul((string) $cycle->excess_km_amount, (string) $days, 6), (string) $totalCustodyDays, 6);
+                    $vTolls = $this->math->div($this->math->mul((string) $cycle->tolls_amount, (string) $days, 6), (string) $totalCustodyDays, 6);
+                } else {
+                    $vExcessKm = (string) $cycle->excess_km_amount;
+                    $vTolls = (string) $cycle->tolls_amount;
+                }
 
                 $vAdditions = '0.000000';
                 $vDeductions = '0.000000';
                 foreach ($cycle->items as $item) {
-                    if ((int) $item->vehicle_id === $vehicleId) {
+                    $matches = ((int) $item->vehicle_id === $vehicleId)
+                        || ($item->vehicle_id === null && $item->driver_employee_id === null && $usesByVehicle->count() === 1);
+                    if ($matches) {
                         if ($item->item_type === BillingCycleItemType::Addition) {
                             $vAdditions = $this->math->add($vAdditions, (string) $item->amount, 6);
                         } else {
@@ -616,7 +692,9 @@ final class TwoStageInvoicingService
                     }
                 }
 
-                $vSubtotal = $this->math->add($vBaseRent, $vAdditions, 6);
+                $vSubtotal = $this->math->add($vBaseRent, $vExcessKm, 6);
+                $vSubtotal = $this->math->add($vSubtotal, $vTolls, 6);
+                $vSubtotal = $this->math->add($vSubtotal, $vAdditions, 6);
                 $vSubtotal = $this->math->compare($vSubtotal, $vDeductions) > 0
                     ? $this->math->sub($vSubtotal, $vDeductions, 6)
                     : '0.000000';
@@ -625,7 +703,7 @@ final class TwoStageInvoicingService
                     'vehicle_id' => $vehicleId,
                     'vehicle_number' => $regNo,
                     'vehicle_label' => $label,
-                    'is_replacement' => $use->replaces_use_id !== null,
+                    'is_replacement' => $vUses->contains(fn ($u) => $u->replaces_use_id !== null),
                     'charts_count' => 0,
                     'custody_days' => $days,
                     'total_km' => '0.000000',
@@ -637,6 +715,8 @@ final class TwoStageInvoicingService
                     'triple_ot_hours' => '0.000000',
                     'night_outs' => 0,
                     'allocated_base_rent' => $vBaseRent,
+                    'allocated_excess_km_amount' => $vExcessKm,
+                    'allocated_tolls_amount' => $vTolls,
                     'allocated_ot_amount' => '0.000000',
                     'allocated_night_out_amount' => '0.000000',
                     'attributed_additions' => $vAdditions,
@@ -854,7 +934,7 @@ final class TwoStageInvoicingService
                 'balance_due' => (string) $cycle->initialInvoice->balance_due,
             ] : null,
             'gross_delta_amount' => $grossDelta,
-            'has_running_charts' => ! empty($chartIds),
+            'has_running_charts' => $cycle->charts->isNotEmpty(),
             'charts_count' => $cycle->charts->count(),
             'items_count' => $cycle->items->count(),
             'vehicle_attributions' => $vehicleAttributions,
@@ -894,16 +974,75 @@ final class TwoStageInvoicingService
             $agreement = $cycle->customerAgreement ?? $cycle->ownerAgreement;
 
             if ($finalizationMode === BillingFinalizationMode::SupplementaryInvoice) {
-                // Mode A: Supplementary usage invoice for the delta
-                $deltaAmount = $this->math->sub((string) $cycle->net_subtotal, (string) $cycle->base_rent_amount, 6);
-                if ($this->math->compare($deltaAmount, '0.000000') > 0) {
-                    $suppInvoice = $this->issueSupplementaryInvoice($kind, $context, $agreement, $cycle, $deltaAmount, $data);
-                    $cycle->supplementary_invoice_id = $suppInvoice->id;
+                // If initial_invoice_id is null (issue_initial_invoice was false), base rent was never billed.
+                // Mode A must bill the full net_subtotal.
+                if ($cycle->initial_invoice_id === null) {
+                    $amountToBill = (string) $cycle->net_subtotal;
+                    if ($this->math->compare($amountToBill, '0.000000') > 0) {
+                        $suppInvoice = $this->issueSupplementaryInvoice($kind, $context, $agreement, $cycle, $amountToBill, $data);
+                        $cycle->supplementary_invoice_id = $suppInvoice->id;
+                        $cycle->tax_amount = (string) $suppInvoice->tax_total;
+                        $cycle->total_billed_amount = (string) $suppInvoice->grand_total;
+                    }
+                } else {
+                    $deltaAmount = $this->math->sub((string) $cycle->net_subtotal, (string) $cycle->base_rent_amount, 6);
+                    if ($this->math->compare($deltaAmount, '0.000000') > 0) {
+                        $suppInvoice = $this->issueSupplementaryInvoice($kind, $context, $agreement, $cycle, $deltaAmount, $data);
+                        $cycle->supplementary_invoice_id = $suppInvoice->id;
+                        $totalTax = (string) $suppInvoice->tax_total;
+                        $totalBilled = (string) $suppInvoice->grand_total;
+                        if ($cycle->initialInvoice) {
+                            $totalTax = $this->math->add($totalTax, (string) $cycle->initialInvoice->tax_total, 6);
+                            $totalBilled = $this->math->add($totalBilled, (string) $cycle->initialInvoice->grand_total, 6);
+                        }
+                        $cycle->tax_amount = $totalTax;
+                        $cycle->total_billed_amount = $totalBilled;
+                    } elseif ($this->math->compare($deltaAmount, '0.000000') < 0) {
+                        // Mode A Negative Delta (Downtime Rebates / Discounts):
+                        // Issue an authentic Credit Note Invoice for abs($deltaAmount)
+                        $absDelta = substr($deltaAmount, 1);
+                        $creditNote = $this->issueCreditNoteInvoice($kind, $context, $agreement, $cycle, $absDelta, $data);
+                        $cycle->supplementary_invoice_id = $creditNote->id;
+                        $initTotal = $cycle->initialInvoice ? (string) $cycle->initialInvoice->grand_total : '0.000000';
+                        $netBilled = $this->math->sub($initTotal, (string) $creditNote->grand_total, 6);
+                        if ($this->math->compare($netBilled, '0.000000') < 0) {
+                            $netBilled = '0.000000';
+                        }
+                        $cycle->tax_amount = $cycle->initialInvoice ? (string) $cycle->initialInvoice->tax_total : '0.000000';
+                        $cycle->total_billed_amount = $netBilled;
+
+                        // Allocate credit note against initial invoice if initial invoice is posted and has open balance
+                        if ($cycle->initialInvoice && in_array($cycle->initialInvoice->status, [InvoiceStatus::Posted, InvoiceStatus::PartiallyPaid], true)) {
+                            $cycle->initialInvoice->refresh();
+                            $initRemaining = (string) ($cycle->initialInvoice->balance?->remaining_amount ?? $cycle->initialInvoice->balance_due ?? '0.000000');
+                            if ($this->math->compare($initRemaining, '0.000000') > 0) {
+                                $allocAmount = $this->math->compare($absDelta, $initRemaining) > 0 ? $initRemaining : $absDelta;
+                                $this->balanceUpdater->allocateCredit($cycle->initialInvoice, 'invoice', $creditNote->id, $allocAmount);
+                            }
+                        }
+                    } else {
+                        $cycle->tax_amount = $cycle->initialInvoice ? (string) $cycle->initialInvoice->tax_total : '0.000000';
+                        $cycle->total_billed_amount = $cycle->initialInvoice ? (string) $cycle->initialInvoice->grand_total : '0.000000';
+                    }
                 }
             } else {
                 // Mode B: Consolidated revision
                 $finalInvoice = $this->issueConsolidatedInvoice($kind, $context, $agreement, $cycle, (string) $cycle->net_subtotal, $data);
                 $cycle->final_invoice_id = $finalInvoice->id;
+                $cycle->tax_amount = (string) $finalInvoice->tax_total;
+                $cycle->total_billed_amount = (string) $finalInvoice->grand_total;
+
+                // Ensure new consolidated invoice is approved and posted even when Stage 1 had no payments
+                if ($finalInvoice->status === InvoiceStatus::Draft) {
+                    $finalInvoice = $this->invoiceStatusService->transition($finalInvoice, InvoiceStatus::Approved, $context->actorId, 'Consolidated invoice auto-approved');
+                }
+                if ($finalInvoice->status === InvoiceStatus::Approved) {
+                    try {
+                        $finalInvoice = $this->invoiceStatusService->transition($finalInvoice, InvoiceStatus::Posted, $context->actorId, 'Consolidated invoice auto-posted');
+                    } catch (\Throwable) {
+                        // Keep Approved if posting profile is not configured in this scope
+                    }
+                }
 
                 if ($cycle->initial_invoice_id !== null) {
                     $this->voidInitialInvoiceAndReallocate($context, $agreement, $cycle, $finalInvoice);
@@ -1317,15 +1456,23 @@ final class TwoStageInvoicingService
             ->with('payment')
             ->get();
 
+        $finalInvoice->refresh();
         if ($initialAllocations->isNotEmpty()) {
-            $this->invoiceStatusService->transition($finalInvoice, InvoiceStatus::Approved, $context->actorId, 'Auto-approved for payment reallocation');
-            $finalInvoice = $this->invoiceStatusService->transition($finalInvoice, InvoiceStatus::Posted, $context->actorId, 'Auto-posted for payment reallocation');
+            if ($finalInvoice->status === InvoiceStatus::Draft) {
+                $finalInvoice = $this->invoiceStatusService->transition($finalInvoice, InvoiceStatus::Approved, $context->actorId, 'Auto-approved for payment reallocation');
+            }
+            if ($finalInvoice->status === InvoiceStatus::Approved) {
+                try {
+                    $finalInvoice = $this->invoiceStatusService->transition($finalInvoice, InvoiceStatus::Posted, $context->actorId, 'Auto-posted for payment reallocation');
+                } catch (\Throwable) {
+                }
+            }
         }
 
         $transferredPaymentTotal = '0.000000';
 
         foreach ($initialAllocations as $alloc) {
-            $payment = $alloc->payment;
+            $payment = Payment::query()->where('tenant_id', $context->tenantId)->lockForUpdate()->find($alloc->payment_id);
             if ($payment) {
                 $reversalDate = now()->toDateString();
                 if ($alloc->allocation_date && $reversalDate < $alloc->allocation_date->toDateString()) {
@@ -1404,7 +1551,7 @@ final class TwoStageInvoicingService
         $history->user_id = $context->actorId;
         $history->save();
 
-        if ($initialInvoice->status === InvoiceStatus::Draft) {
+        if (in_array($initialInvoice->status, [InvoiceStatus::Draft, InvoiceStatus::Approved], true)) {
             try {
                 $this->invoiceStatusService->transition(
                     $initialInvoice,
@@ -1414,7 +1561,120 @@ final class TwoStageInvoicingService
                 );
             } catch (\Throwable) {
             }
+        } else {
+            // Stage 1 invoice was approved/posted.
+            // Create and post an authentic Credit Note Invoice and call
+            // InvoiceBalanceUpdater::allocateCredit() to legally extinguish the balance in AR.
+            $initialInvoice->refresh();
+            $remaining = (string) ($initialInvoice->balance?->remaining_amount ?? $initialInvoice->balance_due ?? '0.000000');
+            if ($this->math->compare($remaining, '0.000000') > 0) {
+                $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
+                $creditNote = $this->issueCreditNoteInvoice(
+                    $kind,
+                    $context,
+                    $agreement,
+                    $cycle,
+                    $remaining,
+                    [],
+                    'Credit Note to extinguish provisional invoice '.$initialInvoice->invoice_number.' superseded by consolidated revision invoice '.$finalInvoice->invoice_number
+                );
+                $this->balanceUpdater->allocateCredit($initialInvoice, 'invoice', $creditNote->id, $remaining);
+            }
         }
+    }
+
+    private function issueCreditNoteInvoice(
+        AgreementKind $kind,
+        AgreementContext $context,
+        $agreement,
+        BillingCycle $cycle,
+        string $amount,
+        array $input,
+        string $notes = ''
+    ): Invoice {
+        $customer = $kind === AgreementKind::Customer;
+        $direction = $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound;
+        $partyType = $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value;
+        $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
+        $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
+        $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+
+        $sourceType = 'vehicle_rental_billing_cycle_credit_note';
+        $sourceId = (int) $cycle->id;
+        $description = 'Credit Note · '.$agreement->reference.' · ('.$cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d').')';
+
+        $source = new CreateInvoiceData(
+            tenantId: $context->tenantId,
+            organizationUnitId: $context->organizationUnitId,
+            invoiceType: InvoiceType::Credit,
+            direction: $direction,
+            invoiceDate: $invoiceDate,
+            dueDate: $dueDate,
+            currencyId: $agreement->currency_id,
+            exchangeRate: (string) $cycle->exchange_rate,
+            partyType: $partyType,
+            partyId: $partyId,
+            createdBy: $context->actorId,
+            notes: $notes ?: 'Credit Note for Billing Cycle: '.$cycle->cycle_number,
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: $description,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $amount,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $sourceId,
+                ),
+            ],
+            sources: [
+                new InvoiceSourceData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceDocumentNumber: $agreement->reference,
+                    sourceDocumentDate: $invoiceDate,
+                    sourceSubtotal: $amount,
+                    sourceGrandTotal: $amount,
+                ),
+            ],
+            sourceLines: [
+                new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $sourceId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $amount,
+                    sourceLineTotal: $amount,
+                    invoicedLineTotal: $amount,
+                ),
+            ],
+        );
+
+        $creditNote = $this->invoiceService->create(
+            $this->invoiceFactory->prepare(
+                $source,
+                $customer ? FinancePostingProfileCode::CustomerRentalInvoice : FinancePostingProfileCode::SupplierRentalInvoice,
+                $customer ? FinanceAccountRoleCode::RentalRevenue : FinanceAccountRoleCode::RentalExpense,
+            )
+        );
+
+        if ($creditNote->status === InvoiceStatus::Draft) {
+            $creditNote = $this->invoiceStatusService->transition($creditNote, InvoiceStatus::Approved, $context->actorId, 'Credit note auto-approved');
+        }
+        if ($creditNote->status === InvoiceStatus::Approved) {
+            try {
+                $creditNote = $this->invoiceStatusService->transition($creditNote, InvoiceStatus::Posted, $context->actorId, 'Credit note auto-posted');
+            } catch (\Throwable) {
+            }
+        }
+
+        return $creditNote;
     }
 
     private function assertCycleVersion(BillingCycle $cycle, int $expectedVersion): void

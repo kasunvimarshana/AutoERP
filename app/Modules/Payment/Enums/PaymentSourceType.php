@@ -8,6 +8,9 @@ enum PaymentSourceType: string
 {
     case RentalDepositRequirement = 'rental_deposit_requirement';
     case RentalAgreementDeposit = 'vehicle_rental_customer_agreement_deposit';
+    case RentalCustomerPayment = 'vehicle_rental_customer_payment';
+    case RentalOwnerPayment = 'vehicle_rental_owner_payment';
+    case RentalAgreementAdvance = 'vehicle_rental_agreement_advance';
     case PaymentRefund = 'payment_refund';
     case PaymentRefundFx = 'payment_refund_fx';
     case PaymentAllocation = 'payment_allocation';

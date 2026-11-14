@@ -134,6 +134,56 @@ final class VehicleProfitabilityReportService
                 ->where('period_until', '>=', $startDate)
                 ->sum('amount');
 
+            // Include BillingCycle revenue for customer agreements
+            if (! empty($customerAgreementIds)) {
+                $cycles = \Modules\VehicleRental\Models\BillingCycle::query()
+                    ->forContext($context->tenantId, $context->organizationUnitId)
+                    ->whereIn('customer_agreement_id', $customerAgreementIds)
+                    ->where('status', '!=', \Modules\VehicleRental\Enums\BillingCycleStatus::Cancelled)
+                    ->where('period_from', '<=', $endDate)
+                    ->where('period_until', '>=', $startDate)
+                    ->get();
+
+                foreach ($cycles as $c) {
+                    $totalChartsInCycle = $c->charts()->count();
+                    $vehicleCharts = $c->charts()->where('vehicle_id', $vehicle->id)->count();
+
+                    $vehicleCustodyUse = $uses->first(function ($u) use ($c) {
+                        $start = $u->handover_at ?? $u->starts_at;
+                        $end = $u->returned_at ?? $u->ends_at;
+                        $uStart = $start ? CarbonImmutable::parse($start) : null;
+                        $uEnd = $end ? CarbonImmutable::parse($end) : null;
+
+                        return ($uStart === null || $uStart->lessThanOrEqualTo($c->period_until->endOfDay()))
+                            && ($uEnd === null || $uEnd->greaterThanOrEqualTo($c->period_from->startOfDay()));
+                    });
+
+                    $applies = $totalChartsInCycle > 0 ? ($vehicleCharts > 0) : ($vehicleCustodyUse !== null);
+
+                    if ($applies) {
+                        $totalVehiclesInCycle = $totalChartsInCycle > 0
+                            ? max(1, $c->charts()->distinct('vehicle_id')->count('vehicle_id'))
+                            : 1;
+
+                        $baseShare = $totalVehiclesInCycle > 1
+                            ? $this->math->div((string) $c->base_rent_amount, (string) $totalVehiclesInCycle, 2)
+                            : (string) $c->base_rent_amount;
+
+                        if ($c->customer_base_charge_id === null) {
+                            $vehicleCustomerBase = $this->math->add($vehicleCustomerBase, $baseShare, 2);
+                        }
+
+                        $cUsage = (float) $c->excess_km_amount + (float) $c->overtime_amount + (float) $c->night_out_amount + (float) $c->tolls_amount + (float) $c->additions_amount - (float) $c->deductions_amount;
+                        if ($cUsage > 0) {
+                            $usageShare = $totalVehiclesInCycle > 1
+                                ? $this->math->div((string) $cUsage, (string) $totalVehiclesInCycle, 2)
+                                : (string) $cUsage;
+                            $vehicleCustomerUsage = $this->math->add($vehicleCustomerUsage, $usageShare, 2);
+                        }
+                    }
+                }
+            }
+
             $vehicleExpenses = $expenses->get($vehicle->id) ?? collect();
             $customerRecoveries = '0.00';
             $ownerDeductions = '0.00';
@@ -171,6 +221,25 @@ final class VehicleProfitabilityReportService
                     ->where('period_from', '<=', $endDate)
                     ->where('period_until', '>=', $startDate)
                     ->sum('amount');
+
+                // Include Owner BillingCycle disbursements
+                $ownerCycles = \Modules\VehicleRental\Models\BillingCycle::query()
+                    ->forContext($context->tenantId, $context->organizationUnitId)
+                    ->whereIn('owner_agreement_id', $ownerAgreementIds)
+                    ->where('status', '!=', \Modules\VehicleRental\Enums\BillingCycleStatus::Cancelled)
+                    ->where('period_from', '<=', $endDate)
+                    ->where('period_until', '>=', $startDate)
+                    ->get();
+
+                foreach ($ownerCycles as $oc) {
+                    if ($oc->owner_base_charge_id === null) {
+                        $ownerBase = $this->math->add($ownerBase, (string) $oc->base_rent_amount, 2);
+                    }
+                    $ocUsage = (float) $oc->excess_km_amount + (float) $oc->overtime_amount + (float) $oc->night_out_amount + (float) $oc->tolls_amount + (float) $oc->additions_amount - (float) $oc->deductions_amount;
+                    if ($ocUsage > 0) {
+                        $ownerUsage = $this->math->add($ownerUsage, (string) $ocUsage, 2);
+                    }
+                }
 
                 // Net of owner deductions (maintenance, tyre, fuel chargebacks)
                 $grossOwner = $this->math->add($ownerBase, $ownerUsage, 2);

@@ -21,6 +21,7 @@ use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\RentalChargeDocuments;
 use Modules\VehicleRental\Services\RentalExpenseService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class AgreementFinancialAdjustmentsTest extends TestCase
@@ -200,5 +201,255 @@ final class AgreementFinancialAdjustmentsTest extends TestCase
             ->assertOk();
 
         $this->assertNull($unlinkResp->json('invoice_id'));
+    }
+
+    public function test_financial_adjustment_with_target_invoice_extinguishes_target_invoice_balance(): void
+    {
+        [$context, $customerData] = $this->fixture();
+        $this->grant($context, array_keys(\Modules\VehicleRental\Services\RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData): void {
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms']['base_rate'] = '30000.000000';
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            // Create and post an invoice with 10,000 balance
+            $documents = app(RentalChargeDocuments::class);
+            $invService = app(\Modules\Invoice\Services\InvoiceCreationService::class);
+            $invFactory = app(\Modules\Invoice\Services\TaxedSourceInvoiceFactory::class);
+            $statusService = app(InvoiceStatusService::class);
+
+            $source = new \Modules\Invoice\DTOs\CreateInvoiceData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                invoiceType: InvoiceType::Sales,
+                direction: \Modules\Invoice\Enums\InvoiceDirection::Outbound,
+                invoiceDate: '2026-09-01',
+                currencyId: $customerAg->currency_id,
+                exchangeRate: '1.000000',
+                partyType: \Modules\Invoice\Enums\InvoicePartyType::Customer->value,
+                partyId: $customerAg->customer_id,
+                createdBy: $context->actorId,
+                notes: 'Target test invoice',
+                lines: [
+                    new \Modules\Invoice\DTOs\InvoiceLineData(
+                        lineNumber: 1,
+                        description: 'Rental Line',
+                        quantity: '1.000000',
+                        unitPrice: '10000.000000',
+                        lineType: \Modules\Invoice\Enums\InvoiceLineType::Charge,
+                        sourceLineType: 'test',
+                        sourceLineId: 1,
+                    ),
+                ],
+                sources: [
+                    new \Modules\Invoice\DTOs\InvoiceSourceData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: 'test',
+                        sourceId: 1,
+                        sourceDocumentNumber: $customerAg->reference,
+                        sourceDocumentDate: '2026-09-01',
+                        sourceSubtotal: '10000.000000',
+                        sourceGrandTotal: '10000.000000',
+                    ),
+                ],
+                sourceLines: [
+                    new \Modules\Invoice\DTOs\InvoiceSourceLineData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: 'test',
+                        sourceId: 1,
+                        sourceLineType: 'test',
+                        sourceLineId: 1,
+                        sourceQuantity: '1.000000',
+                        invoicedQuantity: '1.000000',
+                        sourceUnitPrice: '10000.000000',
+                        sourceLineTotal: '10000.000000',
+                        invoicedLineTotal: '10000.000000',
+                    ),
+                ],
+            );
+
+            $targetInv = $invService->create($invFactory->prepare(
+                $source,
+                \Modules\Finance\Enums\FinancePostingProfileCode::CustomerRentalInvoice,
+                \Modules\Finance\Enums\FinanceAccountRoleCode::RentalRevenue,
+            ));
+            $targetInv = $statusService->transition($targetInv, InvoiceStatus::Approved, $context->actorId);
+            $targetInv = $statusService->transition($targetInv, InvoiceStatus::Posted, $context->actorId);
+
+            $this->assertEqualsWithDelta(10000.0, (float) $targetInv->balance->remaining_amount, 0.01);
+
+            // Issue credit note adjustment of 4,000 targeting targetInv
+            $creditNote = $documents->issueAdjustment(
+                AgreementKind::Customer,
+                $context,
+                $customerAg,
+                'credit_note',
+                '4000.000000',
+                'Goodwill discount against invoice',
+                [
+                    'invoice_date' => '2026-09-15',
+                    'exchange_rate' => '1.000000',
+                    'expected_version' => $customerAg->row_version,
+                    'target_invoice_id' => $targetInv->id,
+                ],
+            );
+
+            // Verify target invoice balance extinguished by 4,000 (now 6,000)
+            $targetInv->refresh();
+            $this->assertEqualsWithDelta(6000.0, (float) $targetInv->balance->remaining_amount, 0.01);
+
+            // Verify adjustment references the target invoice
+            $adj = \Modules\VehicleRental\Models\AgreementAdjustment::query()->where('customer_agreement_id', $customerAg->id)->first();
+            $this->assertSame($targetInv->id, (int) $adj->invoice_id);
+        });
+    }
+
+    public function test_security_deposit_allocation_against_outstanding_invoice(): void
+    {
+        $perms = array_merge(
+            array_keys(\Modules\VehicleRental\Services\RentalAuthorization::descriptions()),
+            [
+                \Modules\Payment\Constants\PaymentPermission::PAYMENTS_CREATE,
+                \Modules\Payment\Constants\PaymentPermission::PAYMENTS_VIEW,
+                \Modules\Payment\Constants\PaymentPermission::PAYMENTS_BACKDATE_CASH,
+            ]
+        );
+        [$context, $customerData, $ownerData] = $this->loginFixture($perms, [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE, TenantFeature::PAYMENT]);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData): void {
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedRentalDepositProfile($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedCustomerPaymentProfiles($context->tenantId, $context->organizationUnitId);
+
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms']['base_rate'] = '30000.000000';
+            $customerData['terms']['deposit_requirement'] = '20000.000000';
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            // 1. Receive deposit of 20,000
+            $method = \Modules\Payment\Models\PaymentMethod::query()->create([
+                'tenant_id' => $context->tenantId,
+                'code' => 'CASH',
+                'name' => 'Cash Payment',
+                'method_type' => \Modules\Payment\Enums\PaymentMethodType::Cash,
+                'direction_allowed' => 'both',
+                'requires_reference' => false,
+                'requires_instrument_details' => false,
+                'is_active' => true,
+            ]);
+
+            $depositService = app(\Modules\VehicleRental\Services\DepositReceipts::class);
+            $payment = $depositService->receive($context, $customerAg->id, (int) $customerAg->row_version, 'DEP-IDEM-01', [
+                'payment_date' => '2026-09-01',
+                'exchange_rate' => '1.000000',
+                'notes' => 'Initial deposit',
+            ], [
+                new \Modules\Payment\DTOs\PaymentLineData(
+                    amount: '20000.000000',
+                    paymentMethodId: $method->id,
+                ),
+            ]);
+
+            // 2. Create and post invoice with 15,000 balance
+            $invService = app(\Modules\Invoice\Services\InvoiceCreationService::class);
+            $invFactory = app(\Modules\Invoice\Services\TaxedSourceInvoiceFactory::class);
+            $statusService = app(InvoiceStatusService::class);
+
+            $source = new \Modules\Invoice\DTOs\CreateInvoiceData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                invoiceType: InvoiceType::Sales,
+                direction: \Modules\Invoice\Enums\InvoiceDirection::Outbound,
+                invoiceDate: '2026-09-01',
+                currencyId: $customerAg->currency_id,
+                exchangeRate: '1.000000',
+                partyType: \Modules\Invoice\Enums\InvoicePartyType::Customer->value,
+                partyId: $customerAg->customer_id,
+                createdBy: $context->actorId,
+                notes: 'Rental invoice for deposit application',
+                lines: [
+                    new \Modules\Invoice\DTOs\InvoiceLineData(
+                        lineNumber: 1,
+                        description: 'Rental Charge',
+                        quantity: '1.000000',
+                        unitPrice: '15000.000000',
+                        lineType: \Modules\Invoice\Enums\InvoiceLineType::Charge,
+                        sourceLineType: 'test',
+                        sourceLineId: 2,
+                    ),
+                ],
+                sources: [
+                    new \Modules\Invoice\DTOs\InvoiceSourceData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: 'test',
+                        sourceId: 2,
+                        sourceDocumentNumber: $customerAg->reference,
+                        sourceDocumentDate: '2026-09-01',
+                        sourceSubtotal: '15000.000000',
+                        sourceGrandTotal: '15000.000000',
+                    ),
+                ],
+                sourceLines: [
+                    new \Modules\Invoice\DTOs\InvoiceSourceLineData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: 'test',
+                        sourceId: 2,
+                        sourceLineType: 'test',
+                        sourceLineId: 2,
+                        sourceQuantity: '1.000000',
+                        invoicedQuantity: '1.000000',
+                        sourceUnitPrice: '15000.000000',
+                        sourceLineTotal: '15000.000000',
+                        invoicedLineTotal: '15000.000000',
+                    ),
+                ],
+            );
+
+            $inv = $invService->create($invFactory->prepare(
+                $source,
+                \Modules\Finance\Enums\FinancePostingProfileCode::CustomerRentalInvoice,
+                \Modules\Finance\Enums\FinanceAccountRoleCode::RentalRevenue,
+            ));
+            $inv = $statusService->transition($inv, InvoiceStatus::Approved, $context->actorId);
+            $inv = $statusService->transition($inv, InvoiceStatus::Posted, $context->actorId);
+
+            // 3. Allocate 10,000 of deposit against the invoice
+            $allocatedPayment = $depositService->allocateDeposit(
+                $context,
+                $customerAg->id,
+                $payment->id,
+                $inv->id,
+                '10000.000000',
+                '2026-09-02'
+            );
+
+            $this->assertEqualsWithDelta(10000.0, (float) $allocatedPayment->allocated_amount, 0.01);
+            $inv->refresh();
+            $this->assertEqualsWithDelta(5000.0, (float) $inv->balance->remaining_amount, 0.01);
+
+            // 4. Over-allocation attempt (e.g. 15,000 when invoice balance is 5,000) must fail
+            $this->expectException(\Illuminate\Validation\ValidationException::class);
+            $depositService->allocateDeposit(
+                $context,
+                $customerAg->id,
+                $payment->id,
+                $inv->id,
+                '15000.000000',
+                '2026-09-02'
+            );
+        });
     }
 }

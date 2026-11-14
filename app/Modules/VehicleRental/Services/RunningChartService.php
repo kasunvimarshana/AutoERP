@@ -160,6 +160,16 @@ final class RunningChartService
                 if (trim($reason ?? '') === '') {
                     throw ValidationException::withMessages(['reason' => ['Explain the reversal.']]);
                 }
+                $isAttachedToFinalizedCycle = \Modules\VehicleRental\Models\BillingCycleChart::query()
+                    ->where('tenant_id', $context->tenantId)
+                    ->where('running_chart_id', $chart->id)
+                    ->whereHas('billingCycle', fn ($q) => $q->where('status', \Modules\VehicleRental\Enums\BillingCycleStatus::Finalized))
+                    ->exists();
+
+                if ($isAttachedToFinalizedCycle) {
+                    throw new ConflictHttpException('Cannot reverse a running chart that has been billed in a finalized billing cycle.');
+                }
+
                 foreach ([CustomerUsageCharge::class, OwnerUsageCharge::class] as $charges) {
                     if ($charges::query()->forTenant($context->tenantId)->where('running_chart_id', $chart->id)->whereNull('voided_at')->lockForUpdate()->exists()) {
                         throw new ConflictHttpException('Release the invoices and void all customer and owner usage charges before reversing this chart.');

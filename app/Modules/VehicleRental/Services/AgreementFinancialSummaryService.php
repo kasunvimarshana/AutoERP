@@ -32,6 +32,7 @@ final class AgreementFinancialSummaryService
         private readonly DecimalMath $math,
         private readonly InvoiceSourceService $invoiceSources,
         private readonly PaymentSourceService $paymentSources,
+        private readonly RentalPaymentService $rentalPaymentService,
     ) {}
 
     public function generate(AgreementKind $kind, AgreementContext $context, int $agreementId): array
@@ -104,8 +105,11 @@ final class AgreementFinancialSummaryService
             ->where('party_type', $partyType)
             ->where('party_id', $partyId)
             ->where(function ($q) use ($agreement, $cycleInvoiceIds) {
-                $q->whereHas('sources', fn ($sq) => $sq->where('source_document_number', $agreement->reference))
-                    ->orWhereIn('id', $cycleInvoiceIds);
+                $q->whereHas('sources', fn ($sq) => $sq
+                    ->where('source_document_number', $agreement->reference)
+                    ->orWhere('source_document_number', 'like', $agreement->reference.'-%')
+                    ->orWhere(fn ($ssq) => $ssq->where('source_type', 'vehicle_rental_owner_settlement')->where('source_id', $agreement->id))
+                )->orWhereIn('id', $cycleInvoiceIds);
             })
             ->with(['balance', 'sources', 'lines'])
             ->orderByDesc('invoice_date')
@@ -128,17 +132,19 @@ final class AgreementFinancialSummaryService
             $credit = (string) ($inv->credit_total ?? $inv->balance?->credit_allocated_amount ?? '0.000000');
             $rem = (string) ($inv->balance_due ?? $inv->balance?->remaining_amount ?? '0.000000');
 
-            if ($type === InvoiceType::Credit->value) {
-                $totalCreditNotes = $this->math->add($totalCreditNotes, $grand);
-            } elseif ($type === InvoiceType::Debit->value) {
-                $totalDebitNotes = $this->math->add($totalDebitNotes, $grand);
-                $totalInvoiced = $this->math->add($totalInvoiced, $grand);
-            } else {
-                $totalInvoiced = $this->math->add($totalInvoiced, $grand);
-            }
-
             $invStatus = $inv->status instanceof InvoiceStatus ? $inv->status : InvoiceStatus::tryFrom((string) $inv->status);
-            if (! in_array($invStatus, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true)) {
+            $isActive = ! in_array($invStatus, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true);
+
+            if ($isActive) {
+                if ($type === InvoiceType::Credit->value) {
+                    $totalCreditNotes = $this->math->add($totalCreditNotes, $grand);
+                } elseif ($type === InvoiceType::Debit->value) {
+                    $totalDebitNotes = $this->math->add($totalDebitNotes, $grand);
+                    $totalInvoiced = $this->math->add($totalInvoiced, $grand);
+                } else {
+                    $totalInvoiced = $this->math->add($totalInvoiced, $grand);
+                }
+
                 $totalPaid = $this->math->add($totalPaid, $paid);
                 $totalCreditAllocated = $this->math->add($totalCreditAllocated, $credit);
                 if ($type === InvoiceType::Credit->value) {
@@ -181,7 +187,21 @@ final class AgreementFinancialSummaryService
                 'net_receipts' => $netDeposit,
                 'remaining' => $requiredDeposit !== null ? $this->math->sub((string) $requiredDeposit, $netDeposit) : null,
                 'receipts_count' => $paymentDocs->count(),
+                'payments' => $paymentDocs->map(fn ($p) => [
+                    'id' => $p->id,
+                    'payment_number' => $p->payment_number,
+                    'unapplied_amount' => (string) ($p->unapplied_amount ?? $p->unappliedBalance?->unapplied_amount ?? '0.000000'),
+                    'total_amount' => (string) $p->total_amount,
+                ])->all(),
             ];
+        }
+
+        // 6. Payments & Disbursements
+        $payments = [];
+        try {
+            $payments = $this->rentalPaymentService->listAgreementPayments($context, $agreement->id, $kind);
+        } catch (\Throwable) {
+            // Graceful fallback if user lacks payment view permission
         }
 
         return [
@@ -252,6 +272,7 @@ final class AgreementFinancialSummaryService
             ]),
             'documents' => $documents,
             'deposit' => $depositSummary,
+            'payments' => $payments,
         ];
     }
 }

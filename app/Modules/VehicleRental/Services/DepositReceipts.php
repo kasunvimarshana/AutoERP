@@ -8,13 +8,23 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\Constants\PaymentPermission;
 use Modules\Payment\DTOs\CreatePaymentData;
+use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
+use Modules\Payment\Services\PaymentDocumentLifecycleService;
+use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Services\PaymentSourceService;
 use Modules\User\Services\UserAccessResolver;
 use Modules\VehicleRental\Constants\AgreementFields;
@@ -31,6 +41,10 @@ final class DepositReceipts
         private readonly UserAccessResolver $access,
         private readonly PaymentCreationService $payments,
         private readonly PaymentSourceService $sources,
+        private readonly PaymentAllocationService $allocationService,
+        private readonly PaymentDocumentLifecycleService $documentLifecycleService,
+        private readonly PaymentPostingService $postingService,
+        private readonly InvoiceStatusService $invoiceStatusService,
         private readonly DecimalMath $math,
     ) {}
 
@@ -76,6 +90,92 @@ final class DepositReceipts
             if ($this->math->compare($this->sources->netReceipts($documents), $required) > 0) {
                 throw new ConflictHttpException('This receipt exceeds the remaining agreed deposit. Review existing payments, including drafts.');
             }
+
+            return $payment;
+        });
+    }
+
+    public function allocateDeposit(
+        AgreementContext $context,
+        int $agreementId,
+        int $paymentId,
+        int $invoiceId,
+        string $amount,
+        string $allocationDate
+    ): Payment {
+        $this->authorize($context, PaymentPermission::PAYMENTS_CREATE);
+
+        return DB::transaction(function () use ($context, $agreementId, $paymentId, $invoiceId, $amount, $allocationDate): Payment {
+            $agreement = CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($agreementId);
+
+            $payment = Payment::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('organization_unit_id', $context->organizationUnitId)
+                ->where('source_type', PaymentSourceType::RentalAgreementDeposit->value)
+                ->where('source_id', $agreement->id)
+                ->lockForUpdate()
+                ->findOrFail($paymentId);
+
+            $invoice = Invoice::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('organization_unit_id', $context->organizationUnitId)
+                ->lockForUpdate()
+                ->findOrFail($invoiceId);
+
+            if ($invoice->party_type !== InvoicePartyType::Customer->value || (int) $invoice->party_id !== (int) $agreement->customer_id) {
+                throw ValidationException::withMessages(['invoice_id' => ['The selected invoice does not belong to the agreement customer.']]);
+            }
+
+            if ($payment->document_status !== PaymentDocumentStatus::Approved || $payment->posting_status !== PaymentPostingStatus::Posted) {
+                if ($payment->document_status === PaymentDocumentStatus::Draft) {
+                    $payment = $this->documentLifecycleService->submit($payment, (int) $payment->row_version, $context->actorId);
+                }
+                if ($payment->document_status === PaymentDocumentStatus::Submitted) {
+                    $payment = $this->documentLifecycleService->approve($payment, (int) $payment->row_version, $context->actorId);
+                }
+                if ($payment->posting_status !== PaymentPostingStatus::Posted) {
+                    $payment = $this->postingService->post($payment, (int) $payment->row_version, $context->actorId);
+                }
+                $payment = $payment->refresh()->load('unappliedBalance');
+            }
+
+            if ($invoice->status === InvoiceStatus::Approved) {
+                try {
+                    $invoice = $this->invoiceStatusService->transition($invoice, InvoiceStatus::Posted, $context->actorId, 'Auto-posted for security deposit allocation');
+                } catch (\Throwable) {
+                }
+            }
+
+            if ($invoice->status === InvoiceStatus::Draft) {
+                throw ValidationException::withMessages(['invoice_id' => ['The selected invoice must be approved and posted before payments can be allocated.']]);
+            }
+
+            $unappliedPayment = (string) ($payment->unapplied_amount ?? $payment->unappliedBalance?->unapplied_amount ?? '0.000000');
+            if ($this->math->compare($amount, $unappliedPayment) > 0) {
+                throw ValidationException::withMessages(['amount' => ['Allocation amount cannot exceed the unapplied security deposit balance ('.$unappliedPayment.').']]);
+            }
+
+            $invoiceRemaining = (string) ($invoice->balance?->remaining_amount ?? $invoice->balance_due ?? '0.000000');
+            if ($this->math->compare($amount, $invoiceRemaining) > 0) {
+                throw ValidationException::withMessages(['amount' => ['Allocation amount cannot exceed the open invoice balance ('.$invoiceRemaining.').']]);
+            }
+
+            $payment = $this->allocationService->allocate(
+                $payment,
+                [
+                    new PaymentAllocationData(
+                        invoiceId: $invoice->id,
+                        allocatedAmount: $amount,
+                        allocationDate: $allocationDate,
+                        metadata: [
+                            'source' => 'security_deposit_allocation',
+                            'agreement_reference' => $agreement->reference,
+                        ],
+                    ),
+                ],
+                (int) $payment->row_version,
+                $context->actorId,
+            );
 
             return $payment;
         });

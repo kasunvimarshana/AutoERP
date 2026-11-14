@@ -181,7 +181,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
             if (replacement) {
                 await replaceVehicleUse(replacement, {
                     ...input,
-                    reason: notes.trim(),
+                    reason: notes.trim() || 'Operational vehicle replacement',
                     return_odometer: oldOdometer.trim() || null,
                     handover_odometer: newOdometer.trim() || null,
                 });

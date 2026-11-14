@@ -730,12 +730,15 @@ export function BillingCycleWizardModal({
                                                 onChange={e => setCategory(e.target.value)}
                                                 options={[
                                                     { value: 'driver_salary', label: 'Driver Salary' },
+                                                    { value: 'driver_allowance', label: 'Driver Allowance' },
                                                     { value: 'overtime', label: 'Overtime' },
                                                     { value: 'excess_km', label: 'Excess Kilometres' },
-                                                    { value: 'fuel', label: 'Fuel Expense / Surcharge' },
-                                                    { value: 'toll', label: 'Highway Toll Reimbursement' },
+                                                    { value: 'fuel_charge', label: 'Fuel Expense / Surcharge' },
+                                                    { value: 'toll_charge', label: 'Highway Toll Reimbursement' },
                                                     { value: 'night_out', label: 'Night-Out Allowance' },
-                                                    { value: 'deduction', label: 'Vehicle Breakdown Rebate / Downtime' },
+                                                    { value: 'downtime_rebate', label: 'Vehicle Breakdown Rebate / Downtime' },
+                                                    { value: 'damage_recharge', label: 'Damage Recharge' },
+                                                    { value: 'goodwill_discount', label: 'Goodwill Discount' },
                                                     { value: 'other', label: 'Other Operational Item' },
                                                 ]}
                                                 required

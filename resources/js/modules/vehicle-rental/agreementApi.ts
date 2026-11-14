@@ -119,8 +119,100 @@ export interface AgreementFinancialSummary {
         net_receipts: string;
         remaining: string | null;
         receipts_count: number;
+        payments?: Array<{
+            id: number;
+            payment_number: string;
+            unapplied_amount: string;
+            total_amount: string;
+        }>;
     } | null;
+    payments?: AgreementPayment[];
 }
+
+export interface AgreementPaymentMethod {
+    id: number;
+    method_name: string;
+    method_type: string;
+    amount: string;
+    reference?: string | null;
+}
+
+export interface AgreementPaymentAllocation {
+    id: number;
+    invoice_id: number;
+    invoice_number: string;
+    allocated_amount: string;
+    status: string;
+}
+
+export interface AgreementPayment {
+    id: number;
+    payment_number: string;
+    payment_date: string;
+    payment_type: string;
+    direction: string;
+    document_status: string;
+    posting_status: string;
+    total_amount: string;
+    allocated_amount: string;
+    unapplied_amount: string;
+    reference_number?: string | null;
+    notes?: string | null;
+    methods: AgreementPaymentMethod[];
+    allocations: AgreementPaymentAllocation[];
+}
+
+export interface RecordRentalPaymentPayload {
+    expected_version: number;
+    payment_date: string;
+    exchange_rate?: string;
+    reference_number?: string | null;
+    notes?: string | null;
+    lines: Array<{
+        payment_method_id: number;
+        amount: string;
+        reference_number?: string | null;
+        cash_received_amount?: string | null;
+        card_brand?: string | null;
+        instrument_direction?: 'received' | 'issued' | null;
+        external_bank_name?: string | null;
+        external_bank_branch?: string | null;
+        instrument_number?: string | null;
+        instrument_date?: string | null;
+        notes?: string | null;
+    }>;
+    allocations?: Array<{
+        invoice_id: number;
+        amount: string;
+    }>;
+}
+
+export interface AllocateRentalPaymentPayload {
+    allocations: Array<{
+        invoice_id: number;
+        amount: string;
+    }>;
+    allocation_date?: string;
+}
+
+export interface ReverseRentalPaymentPayload {
+    reason: string;
+    reversal_date?: string;
+}
+
+export const listAgreementPayments = (kind: AgreementKind, agreementId: number) =>
+    apiClient.get<{ data: AgreementPayment[] }>(`${url(kind)}/${agreementId}/payments`).then(r => r.data.data);
+
+export const recordAgreementPayment = (kind: AgreementKind, agreementId: number, payload: RecordRentalPaymentPayload) =>
+    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments`, payload).then(r => r.data.data);
+
+export const allocateAgreementPayment = (kind: AgreementKind, agreementId: number, paymentId: number, payload: AllocateRentalPaymentPayload) =>
+    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments/${paymentId}/allocate`, payload).then(r => r.data.data);
+
+export const reverseAgreementPayment = (kind: AgreementKind, agreementId: number, paymentId: number, payload: ReverseRentalPaymentPayload) =>
+    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments/${paymentId}/reverse`, payload).then(r => r.data.data);
+
+export const getPaymentReceiptPrintUrl = (paymentId: number) => `/api/v1/payments/${paymentId}/receipt`;
 
 export interface FinancialAdjustmentPayload {
     expected_version: number;
@@ -130,6 +222,7 @@ export interface FinancialAdjustmentPayload {
     invoice_date: string;
     due_date?: string | null;
     exchange_rate: string;
+    target_invoice_id?: number | null;
 }
 
 export const getAgreementFinancialSummary = (kind: AgreementKind, id: number, signal?: AbortSignal) =>

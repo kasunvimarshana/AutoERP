@@ -28,4 +28,25 @@ final class DepositReceiptController
             $request->validated(PaymentIdempotency::REQUEST_ATTRIBUTE), $request->validated(), $request->paymentLineData())))
             ->response()->setStatusCode(Response::HTTP_CREATED);
     }
+
+    public function allocate(AgreementRequest $request, int $agreement, DepositReceipts $service): JsonResponse
+    {
+        $validated = $request->validate([
+            'payment_id' => ['required', 'integer', 'min:1'],
+            'invoice_id' => ['required', 'integer', 'min:1'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'allocation_date' => ['sometimes', 'date'],
+        ]);
+
+        $payment = $service->allocateDeposit(
+            $request->context(),
+            $agreement,
+            (int) $validated['payment_id'],
+            (int) $validated['invoice_id'],
+            (string) $validated['amount'],
+            (string) ($validated['allocation_date'] ?? now()->toDateString())
+        );
+
+        return (new PaymentResource($payment))->response();
+    }
 }

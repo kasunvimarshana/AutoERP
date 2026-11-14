@@ -363,4 +363,118 @@ final class VehicleDriverReassignmentTest extends TestCase
             $this->assertSame('Replacement Driver', $chart2->driver_name_snapshot);
         });
     }
+
+    public function test_reassignments_index_http_endpoint_returns_audit_list_without_reason_validation_error(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture(null, [\Modules\Core\Tenancy\TenantFeature::VEHICLE_RENTAL]);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $customerAg->id, $customerAg->row_version, [
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '5000.000000',
+                'reason' => 'Handover',
+            ]);
+
+            $reassignment = new VehicleRentalReassignment();
+            $reassignment->tenant_id = $context->tenantId;
+            $reassignment->reassignment_type = ReassignmentType::VehicleReplacement;
+            $reassignment->customer_agreement_id = $customerAg->id;
+            $reassignment->vehicle_use_id = $use->id;
+            $reassignment->reason = 'Operational vehicle swap';
+            $reassignment->occurred_at = now();
+            $reassignment->save();
+        });
+
+        // Query reassignments via GET without reason input - must return 200 OK
+        $resp = $this->getJson('/api/v1/vehicle-rental/reassignments')->assertOk();
+        $this->assertNotEmpty($resp->json('data'));
+    }
+
+    public function test_vehicle_replacement_records_adjustment_history_for_unearned_owner_rent(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = ['base_rate' => '30000.000000'];
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerData['ends_on'] = '2026-09-30';
+            $ownerData['terms'] = ['base_rate' => '20000.000000'];
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $vehicle2Id = DB::table('vehicles')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'vehicle_number' => 'V-REP-02',
+                'registration_number' => 'WP-REP-2222',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $ownerData2 = $ownerData;
+            $ownerData2['reference'] = 'AG-OWN-REP-02';
+            $ownerData2['vehicle_id'] = $vehicle2Id;
+            $ownerAg2 = $agreements->create(AgreementKind::Owner, $context, $ownerData2);
+            $ownerAg2 = $agreements->change(AgreementKind::Owner, $context, $ownerAg2->id, $ownerAg2->row_version, AgreementAction::Activate);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $customerAg->id, $customerAg->row_version, [
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '5000.000000',
+                'reason' => 'Handover',
+            ]);
+
+            $reassignmentService = app(VehicleDriverReassignmentService::class);
+            $reassignment = $reassignmentService->replaceVehicle($context, $use->id, [
+                'cutover_at' => '2026-09-15T12:00:00+00:00',
+                'return_odometer' => '6500.000000',
+                'new_vehicle_id' => $vehicle2Id,
+                'new_owner_agreement_id' => $ownerAg2->id,
+                'new_handover_odometer' => '1000.000000',
+                'reason' => 'Mid-month replacement',
+            ], (int) $use->row_version);
+
+            $this->assertSame(ReassignmentType::VehicleReplacement, $reassignment->reassignment_type);
+
+            // Verify AgreementAdjustment and AgreementAdjustmentHistory created
+            $adj = AgreementAdjustment::query()->where('owner_agreement_id', $ownerAg->id)->first();
+            $this->assertNotNull($adj);
+            $history = \Modules\VehicleRental\Models\AgreementAdjustmentHistory::query()->where('adjustment_id', $adj->id)->first();
+            $this->assertNotNull($history);
+            $this->assertSame('draft', $history->from_status->value);
+            $this->assertSame('authorized', $history->to_status->value);
+        });
+    }
 }

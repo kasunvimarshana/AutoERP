@@ -8,3 +8,5 @@ export interface DepositReceiptInput { expected_version: number; payment_date: s
 const path = (agreement: number) => `${AGREEMENT_API}/customer/agreements/${agreement}/deposits`;
 export const getDepositSummary = (agreement: number, signal?: AbortSignal) => apiClient.get<ApiResource<DepositSummary>>(path(agreement), { signal }).then(r => r.data.data);
 export const receiveDeposit = (agreement: number, input: DepositReceiptInput, key: string) => apiClient.post<ApiResource<Payment>>(path(agreement), input, { headers: { [PAYMENT_IDEMPOTENCY_HEADER]: key } }).then(r => r.data.data);
+export const allocateDeposit = (agreement: number, payload: { payment_id: number; invoice_id: number; amount: string; allocation_date?: string }) =>
+    apiClient.post<ApiResource<Payment>>(`${path(agreement)}/allocate`, payload).then(r => r.data.data);

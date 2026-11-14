@@ -71,6 +71,15 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
         ->whereNumber(['payment', 'line'])
         ->middleware($requires(PaymentPermission::CHEQUES_PREVIEW))
         ->name('lines.cheque-print.preview');
+    Route::get('{payment}/receipt', [PaymentController::class, 'receipt'])
+        ->whereNumber('payment')
+        ->middleware($requires(PaymentPermission::PAYMENTS_VIEW))
+        ->name('receipt');
+    Route::get('{payment}/receipt/export/{format}', [PaymentController::class, 'exportReceipt'])
+        ->whereNumber('payment')
+        ->whereIn('format', ['html', 'print', 'pdf'])
+        ->middleware($requires(PaymentPermission::PAYMENTS_VIEW))
+        ->name('receipt.export');
     Route::post('{payment}/lines/{line}/cheque-print', [ChequePrintController::class, 'markPrinted'])
         ->whereNumber(['payment', 'line'])
         ->middleware($requires(PaymentPermission::CHEQUES_PRINT))

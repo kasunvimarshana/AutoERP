@@ -116,6 +116,27 @@ final class OwnerDisbursementReportService
             $tripleOt = (float) $usageCharges->where('component', UsageChargeComponent::TripleOvertime->value)->sum('amount');
             $nightOut = (float) $usageCharges->where('component', UsageChargeComponent::NightOut->value)->sum('amount');
             $overtimePayable = $normalOt + $doubleOt + $tripleOt + $nightOut;
+
+            // Include owner billing cycles in disbursements
+            $ownerCycles = \Modules\VehicleRental\Models\BillingCycle::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->where('owner_agreement_id', $agreement->id)
+                ->where('status', '!=', \Modules\VehicleRental\Enums\BillingCycleStatus::Cancelled)
+                ->where('period_from', '<=', $endDate)
+                ->where('period_until', '>=', $startDate)
+                ->get();
+
+            foreach ($ownerCycles as $oc) {
+                if ($oc->owner_base_charge_id === null) {
+                    $basePayable += (float) $oc->base_rent_amount;
+                }
+                $mileagePayable += (float) $oc->excess_km_amount;
+                $ocOther = (float) $oc->overtime_amount + (float) $oc->night_out_amount + (float) $oc->tolls_amount + (float) $oc->additions_amount - (float) $oc->deductions_amount;
+                if ($ocOther > 0) {
+                    $overtimePayable += $ocOther;
+                }
+            }
+
             $grossPayable = $basePayable + $mileagePayable + $overtimePayable;
 
             // Expenses charged to owner (fuel, fines, or maintenance chargebacks)

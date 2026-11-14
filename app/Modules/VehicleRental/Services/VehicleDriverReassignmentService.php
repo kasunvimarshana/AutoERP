@@ -19,12 +19,15 @@ use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 use Modules\VehicleRental\Enums\AgreementAdjustmentType;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
+use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\ReassignmentFinancialStatus;
 use Modules\VehicleRental\Enums\ReassignmentType;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\AgreementAdjustment;
 use Modules\VehicleRental\Models\AgreementAdjustmentHistory;
+use Modules\VehicleRental\Models\BillingCycle;
+use Modules\VehicleRental\Models\BillingCycleChart;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\RunningChart;
@@ -58,6 +61,16 @@ final class VehicleDriverReassignmentService
 
             if ((int) $chart->row_version !== $expectedVersion) {
                 throw new ConflictHttpException("Running chart version mismatch: expected {$expectedVersion}, currently {$chart->row_version}.");
+            }
+
+            $isAttachedToFinalizedCycle = BillingCycleChart::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('running_chart_id', $chart->id)
+                ->whereHas('billingCycle', fn ($q) => $q->where('status', BillingCycleStatus::Finalized))
+                ->exists();
+
+            if ($isAttachedToFinalizedCycle) {
+                throw ValidationException::withMessages(['running_chart' => ['Cannot reassign driver on a running chart that has been billed in a finalized billing cycle.']]);
             }
 
             $driver = HrEmployee::query()
@@ -98,7 +111,7 @@ final class VehicleDriverReassignmentService
             $reassignment->financial_status = ReassignmentFinancialStatus::None;
             $reassignment->financial_delta_amount = '0.000000';
             $reassignment->reason = trim($reason);
-            $reassignment->occurred_at = now();
+            $reassignment->occurred_at = $chart->starts_at ?? now();
             $reassignment->user_id = $context->actorId;
             $reassignment->save();
 
@@ -124,11 +137,12 @@ final class VehicleDriverReassignmentService
                 throw new ConflictHttpException("Vehicle use version mismatch: expected {$expectedVersion}, currently {$currentUse->row_version}.");
             }
 
-            $cutoverAt = (string) ($input['cutover_at'] ?? now()->toDateTimeString());
+            $cutoverAt = (string) ($input['cutover_at'] ?? $input['starts_at'] ?? now()->toDateTimeString());
             $returnOdometer = (string) ($input['return_odometer'] ?? $currentUse->handover_odometer ?? '0');
             $reason = (string) ($input['reason'] ?? 'Vehicle breakdown or operational swap');
-            $newVehicleId = (int) $input['new_vehicle_id'];
-            $newOwnerAgreementId = ! empty($input['new_owner_agreement_id']) ? (int) $input['new_owner_agreement_id'] : null;
+            $newVehicleId = (int) ($input['new_vehicle_id'] ?? $input['vehicle_id']);
+            $newOwnerAgreementId = ! empty($input['new_owner_agreement_id'] ?? $input['owner_agreement_id']) ? (int) ($input['new_owner_agreement_id'] ?? $input['owner_agreement_id']) : null;
+            $newHandoverOdometer = (string) ($input['new_handover_odometer'] ?? $input['handover_odometer'] ?? '0');
 
             // 1. Transition previous use to Returned
             if ($currentUse->status === VehicleUseStatus::InCustody) {
@@ -155,7 +169,7 @@ final class VehicleDriverReassignmentService
             // 3. Automatically Handover the replacement vehicle use
             $this->vehicleUses->transition($context, $replacementUse->id, (int) $replacementUse->row_version, VehicleUseAction::Handover, [
                 'occurred_at' => $cutoverAt,
-                'odometer' => (string) ($input['new_handover_odometer'] ?? '0'),
+                'odometer' => $newHandoverOdometer,
                 'reason' => 'Replacement handover · '.$reason,
             ]);
 
@@ -174,40 +188,68 @@ final class VehicleDriverReassignmentService
                     $startsOn = $ownerAgreement->starts_on?->toDateString() ?? $cutoverDate;
 
                     if ($ownerAgreement->ends_on !== null && CarbonImmutable::parse($cutoverDate)->lessThan($ownerAgreement->ends_on)) {
-                        $unearnedPreview = $this->baseRentPreview->calculate(
-                            AgreementKind::Owner,
-                            $context,
-                            $ownerAgreement->id,
-                            [
-                                'policy' => BaseRentPolicy::ActualCalendarDays->value,
-                                'expected_version' => (int) $ownerAgreement->row_version,
-                                'from' => $cutoverDate,
-                                'until' => $ownerAgreement->ends_on->toDateString(),
-                            ]
-                        );
-                        $unearnedAmount = (string) ($unearnedPreview['base_rent'] ?? $unearnedPreview['amount'] ?? '0.000000');
+                        // Bound unearned rent calculation to the active billing cycle or use period, not multi-year contract end
+                        $activeCycle = BillingCycle::query()
+                            ->forContext($context->tenantId, $context->organizationUnitId)
+                            ->where('owner_agreement_id', $ownerAgreement->id)
+                            ->where('period_from', '<=', $cutoverDate)
+                            ->where('period_until', '>=', $cutoverDate)
+                            ->where('status', '!=', BillingCycleStatus::Cancelled)
+                            ->first();
 
-                        if ($this->math->compare($unearnedAmount, '0.000000') > 0) {
-                            $financialDelta = $unearnedAmount;
-                            $financialStatus = ReassignmentFinancialStatus::Pending;
+                        $boundUntilDate = $activeCycle?->period_until?->toDateString()
+                            ?? $currentUse->ends_at?->toDateString()
+                            ?? CarbonImmutable::parse($cutoverDate)->endOfMonth()->toDateString();
 
-                            // Create an Agreement Adjustment for unearned owner compensation
-                            $adjustment = new AgreementAdjustment();
-                            $adjustment->tenant_id = $context->tenantId;
-                            $adjustment->organization_unit_id = $context->organizationUnitId;
-                            $adjustment->owner_agreement_id = $ownerAgreement->id;
-                            $adjustment->adjustment_type = AgreementAdjustmentType::CreditNote;
-                            $adjustment->category = AgreementAdjustmentCategory::DowntimeCompensation;
-                            $adjustment->status = AgreementAdjustmentStatus::Authorized;
-                            $adjustment->amount = $unearnedAmount;
-                            $adjustment->original_amount = $unearnedAmount;
-                            $adjustment->tax_amount = '0.000000';
-                            $adjustment->reason = 'Pro-rata lessor unearned rent deduction due to vehicle replacement at '.$cutoverAt;
-                            $adjustment->actor_id = $context->actorId;
-                            $adjustment->authorized_by_user_id = $context->actorId;
-                            $adjustment->authorized_at = now();
-                            $adjustment->row_version = AgreementFields::INITIAL_VERSION;
-                            $adjustment->save();
+                        if ($ownerAgreement->ends_on !== null && CarbonImmutable::parse($boundUntilDate)->greaterThan($ownerAgreement->ends_on)) {
+                            $boundUntilDate = $ownerAgreement->ends_on->toDateString();
+                        }
+
+                        if (CarbonImmutable::parse($cutoverDate)->lessThan($boundUntilDate)) {
+                            $unearnedPreview = $this->baseRentPreview->calculate(
+                                AgreementKind::Owner,
+                                $context,
+                                $ownerAgreement->id,
+                                [
+                                    'policy' => BaseRentPolicy::ActualCalendarDays->value,
+                                    'expected_version' => (int) $ownerAgreement->row_version,
+                                    'from' => $cutoverDate,
+                                    'until' => $boundUntilDate,
+                                ]
+                            );
+                            $unearnedAmount = (string) ($unearnedPreview['base_rent'] ?? $unearnedPreview['amount'] ?? '0.000000');
+
+                            if ($this->math->compare($unearnedAmount, '0.000000') > 0) {
+                                $financialDelta = $unearnedAmount;
+                                $financialStatus = ReassignmentFinancialStatus::Pending;
+
+                                // Create an Agreement Adjustment for unearned owner compensation
+                                $adjustment = new AgreementAdjustment();
+                                $adjustment->tenant_id = $context->tenantId;
+                                $adjustment->organization_unit_id = $context->organizationUnitId;
+                                $adjustment->owner_agreement_id = $ownerAgreement->id;
+                                $adjustment->adjustment_type = AgreementAdjustmentType::CreditNote;
+                                $adjustment->category = AgreementAdjustmentCategory::DowntimeCompensation;
+                                $adjustment->status = AgreementAdjustmentStatus::Authorized;
+                                $adjustment->amount = $unearnedAmount;
+                                $adjustment->original_amount = $unearnedAmount;
+                                $adjustment->tax_amount = '0.000000';
+                                $adjustment->reason = 'Pro-rata lessor unearned rent deduction due to vehicle replacement at '.$cutoverAt;
+                                $adjustment->actor_id = $context->actorId;
+                                $adjustment->authorized_by_user_id = $context->actorId;
+                                $adjustment->authorized_at = now();
+                                $adjustment->row_version = AgreementFields::INITIAL_VERSION;
+                                $adjustment->save();
+
+                                $history = new AgreementAdjustmentHistory();
+                                $history->tenant_id = $context->tenantId;
+                                $history->adjustment_id = $adjustment->id;
+                                $history->from_status = AgreementAdjustmentStatus::Draft;
+                                $history->to_status = AgreementAdjustmentStatus::Authorized;
+                                $history->reason = 'Lessor unearned rent adjustment authorized upon vehicle replacement at '.$cutoverAt;
+                                $history->user_id = $context->actorId;
+                                $history->save();
+                            }
                         }
                     }
                 }

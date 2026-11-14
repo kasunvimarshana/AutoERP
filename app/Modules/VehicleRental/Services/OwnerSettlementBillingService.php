@@ -17,6 +17,7 @@ use Modules\Invoice\DTOs\InvoiceSourceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
@@ -65,6 +66,36 @@ final class OwnerSettlementBillingService
                 ->with(['party', 'vehicle'])
                 ->lockForUpdate()
                 ->findOrFail($ownerAgreementId);
+
+            // Guard against duplicate overlapping owner settlements
+            $existingSettlements = Invoice::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('organization_unit_id', $context->organizationUnitId)
+                ->whereNotIn('status', [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value, InvoiceStatus::Reversed->value])
+                ->whereHas('sources', fn ($sq) => $sq
+                    ->where('source_type', 'vehicle_rental_owner_settlement')
+                    ->where('source_id', $agreement->id)
+                )
+                ->with(['sources', 'lines'])
+                ->get();
+
+            $targetSettleKey = $agreement->reference.'-SETTLE-'.CarbonImmutable::parse($startDate)->format('Ym');
+            foreach ($existingSettlements as $existingInv) {
+                foreach ($existingInv->sources as $src) {
+                    if ($src->source_document_number === $targetSettleKey) {
+                        throw ValidationException::withMessages(['settlement' => ['An active owner settlement bill already exists for this settlement month ('.$existingInv->invoice_number.').']]);
+                    }
+                }
+                foreach ($existingInv->lines as $line) {
+                    if (preg_match('/\((\d{2}\/\d{2}\/\d{4})\s+To\s+(\d{2}\/\d{2}\/\d{4})\)/', $line->description ?? '', $m)) {
+                        $exStart = CarbonImmutable::createFromFormat('d/m/Y', $m[1])->startOfDay();
+                        $exEnd = CarbonImmutable::createFromFormat('d/m/Y', $m[2])->endOfDay();
+                        if ($exStart->lessThanOrEqualTo($end) && $exEnd->greaterThanOrEqualTo($start)) {
+                            throw ValidationException::withMessages(['settlement' => ['An active owner settlement bill already covers an overlapping period ('.$m[1].' to '.$m[2].' on invoice '.$existingInv->invoice_number.').']]);
+                        }
+                    }
+                }
+            }
 
             $whtRate = isset($input['wht_rate']) && is_numeric($input['wht_rate'])
                 ? (string) $input['wht_rate']

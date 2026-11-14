@@ -24,9 +24,11 @@ use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
 use Modules\Payment\Services\PaymentPostingService;
+use Modules\Payment\Services\PaymentReceiptService;
 use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\Payment\Services\PaymentSettlementService;
+use Symfony\Component\HttpFoundation\Response;
 
 final class PaymentController
 {
@@ -196,6 +198,51 @@ final class PaymentController
         $this->find($request, $payment);
 
         return response()->json(['data' => $service->refund($request->toData($payment))], 201);
+    }
+
+    public function receipt(
+        ListPaymentRequest $request,
+        int $payment,
+        PaymentReceiptService $service,
+    ): Response {
+        $model = $this->find($request, $payment);
+        $data = $service->getReceiptData($model);
+
+        return response()->view(
+            'payment.receipt',
+            array_merge($data, ['mode' => 'html']),
+            200,
+            ['Content-Type' => 'text/html; charset=UTF-8'],
+        );
+    }
+
+    public function exportReceipt(
+        ListPaymentRequest $request,
+        int $payment,
+        string $format,
+        PaymentReceiptService $service,
+    ): Response {
+        $model = $this->find($request, $payment);
+        $data = $service->getReceiptData($model);
+        $viewName = 'payment.receipt';
+        $filename = "payment-receipt-{$data['payment_number']}.pdf";
+
+        if ($format === 'pdf') {
+            return \Spatie\LaravelPdf\Facades\Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
+                ->format('A4')
+                ->orientation('portrait')
+                ->margins(10, 12, 10, 12)
+                ->name($filename)
+                ->download()
+                ->toResponse($request);
+        }
+
+        return response()->view(
+            $viewName,
+            array_merge($data, ['mode' => $format === 'print' ? 'print' : 'html']),
+            200,
+            ['Content-Type' => 'text/html; charset=UTF-8'],
+        );
     }
 
     private function find(

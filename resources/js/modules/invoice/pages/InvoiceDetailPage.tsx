@@ -52,6 +52,11 @@ const freshRentalSourceTypes = new Set([
     'vehicle_rental_owner_base_charge',
     'vehicle_rental_customer_usage_charge',
     'vehicle_rental_owner_usage_charge',
+    'vehicle_rental_billing_cycle',
+    'vehicle_rental_billing_cycle_supplementary',
+    'vehicle_rental_billing_cycle_consolidated',
+    'vehicle_rental_billing_cycle_credit_note',
+    'vehicle_rental_owner_settlement',
 ]);
 
 export default function InvoiceDetailPage() {
