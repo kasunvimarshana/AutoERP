@@ -137,4 +137,51 @@ final class BillingCycleController
 
         return response()->json(['data' => $record]);
     }
+
+    public function eligibleCharts(BillingCycleRequest $request, int $cycle): JsonResponse
+    {
+        $charts = $this->invoicingService->getCandidateRunningCharts(
+            $request->context(),
+            $cycle
+        );
+
+        return response()->json(['data' => $charts]);
+    }
+
+    public function export(BillingCycleRequest $request, int $cycle, string $format): Response
+    {
+        $data = $this->invoicingService->getCycleStatementData(
+            $request->context(),
+            $cycle
+        );
+
+        $viewName = 'reports.vehicle-rental.billing-cycle-statement';
+        $filename = "billing-cycle-statement-{$data['header']['cycle_number']}.pdf";
+
+        if ($format === 'pdf') {
+            return \Spatie\LaravelPdf\Facades\Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
+                ->format('A4')
+                ->orientation('portrait')
+                ->margins(8, 10, 8, 10)
+                ->name($filename)
+                ->download()
+                ->toResponse($request);
+        }
+
+        if ($format === 'print') {
+            return response()->view(
+                $viewName,
+                array_merge($data, ['mode' => 'print']),
+                200,
+                ['Content-Type' => 'text/html; charset=UTF-8'],
+            );
+        }
+
+        return response()->view(
+            $viewName,
+            array_merge($data, ['mode' => 'html']),
+            200,
+            ['Content-Type' => 'text/html; charset=UTF-8'],
+        );
+    }
 }

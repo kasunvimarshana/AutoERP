@@ -18,6 +18,7 @@ import {
     getAgreementFinancialSummary,
     createAgreementFinancialAdjustment,
     listBillingCycles,
+    getBillingCycleExportUrl,
     type AgreementFinancialSummary,
     type BillingCycle,
 } from './agreementApi';
@@ -479,15 +480,23 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                                                 <MoneyDisplay value={cycle.total_billed_amount || cycle.base_rent_amount} currency={cur} />
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                <Button
-                                                    variant="secondary"
-                                                    onClick={() => {
-                                                        setSelectedCycle(cycle);
-                                                        setShowCycleModal(true);
-                                                    }}
-                                                >
-                                                    Manage Cycle
-                                                </Button>
+                                                <div className="flex justify-end gap-1.5">
+                                                    <Button
+                                                        variant="ghost"
+                                                        onClick={() => window.open(getBillingCycleExportUrl(cycle.id, 'pdf'), '_blank')}
+                                                    >
+                                                        Statement
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={() => {
+                                                            setSelectedCycle(cycle);
+                                                            setShowCycleModal(true);
+                                                        }}
+                                                    >
+                                                        Manage
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

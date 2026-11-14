@@ -234,6 +234,88 @@ final class VehicleDriverReassignmentService
         });
     }
 
+    public function reassignVehicleUseDriver(
+        AgreementContext $context,
+        int $useId,
+        int $newDriverEmployeeId,
+        string $effectiveAt,
+        string $reason,
+        int $expectedVersion
+    ): VehicleRentalReassignment {
+        $this->authorization->assertUse($context, true);
+
+        return DB::transaction(function () use ($context, $useId, $newDriverEmployeeId, $effectiveAt, $reason, $expectedVersion): VehicleRentalReassignment {
+            $currentUse = VehicleUse::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->lockForUpdate()
+                ->findOrFail($useId);
+
+            if ((int) $currentUse->row_version !== $expectedVersion) {
+                throw new ConflictHttpException("Vehicle use version mismatch: expected {$expectedVersion}, currently {$currentUse->row_version}.");
+            }
+
+            $driver = HrEmployee::query()
+                ->where('tenant_id', $context->tenantId)
+                ->findOrFail($newDriverEmployeeId);
+
+            $effective = CarbonImmutable::parse($effectiveAt);
+
+            // Assert driver has no overlapping running chart after effective cutover
+            $hasOverlap = RunningChart::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->where('driver_employee_id', $driver->id)
+                ->where('starts_at', '<=', $effective->addHours(12))
+                ->where('ends_at', '>=', $effective)
+                ->exists();
+
+            if ($hasOverlap) {
+                throw ValidationException::withMessages(['driver_employee_id' => ['The selected driver is already assigned to an overlapping running chart.']]);
+            }
+
+            // Update unfinalized running charts for this vehicle use starting on or after effectiveAt
+            $unfinalizedCharts = RunningChart::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->where('vehicle_use_id', $currentUse->id)
+                ->where('ends_at', '>=', $effective)
+                ->where('status', '!=', \Modules\VehicleRental\Enums\RunningChartStatus::Finalized->value)
+                ->lockForUpdate()
+                ->get();
+
+            $prevDriverId = null;
+            foreach ($unfinalizedCharts as $chart) {
+                if ($prevDriverId === null && $chart->driver_employee_id !== null) {
+                    $prevDriverId = $chart->driver_employee_id;
+                }
+                $chart->driver_identity_source = \Modules\VehicleRental\Enums\DriverIdentitySource::Employee;
+                $chart->driver_employee_id = $driver->id;
+                $chart->driver_name_snapshot = $driver->display_name;
+                $chart->driver_reference_snapshot = $driver->employee_number ?? $driver->code;
+                $chart->driver_observation = trim($reason);
+                $chart->row_version += 1;
+                $chart->save();
+            }
+
+            $reassignment = new VehicleRentalReassignment();
+            $reassignment->tenant_id = $context->tenantId;
+            $reassignment->reassignment_type = ReassignmentType::DriverReassignment;
+            $reassignment->customer_agreement_id = $currentUse->customer_agreement_id;
+            $reassignment->vehicle_use_id = $currentUse->id;
+            $reassignment->previous_driver_employee_id = $prevDriverId;
+            $reassignment->new_driver_employee_id = $driver->id;
+            $reassignment->financial_status = ReassignmentFinancialStatus::None;
+            $reassignment->financial_delta_amount = '0.000000';
+            $reassignment->reason = trim($reason);
+            $reassignment->occurred_at = $effective;
+            $reassignment->user_id = $context->actorId;
+            $reassignment->save();
+
+            $currentUse->row_version += 1;
+            $currentUse->save();
+
+            return $reassignment->load(['previousDriver', 'newDriver', 'vehicleUse']);
+        });
+    }
+
     public function listReassignments(AgreementContext $context, ?int $customerAgreementId = null): Collection
     {
         $this->authorization->assertUse($context, false);

@@ -169,6 +169,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::prefix('billing-cycles')->group(function (): void {
         Route::get('/', [BillingCycleController::class, 'index']);
         Route::get('{cycle}', [BillingCycleController::class, 'show'])->whereNumber('cycle');
+        Route::get('{cycle}/eligible-charts', [BillingCycleController::class, 'eligibleCharts'])->whereNumber('cycle');
+        Route::get('{cycle}/export/{format}', [BillingCycleController::class, 'export'])->whereNumber('cycle')->whereIn('format', ['pdf', 'print', 'html']);
         Route::post('{cycle}/charts', [BillingCycleController::class, 'attachCharts'])->whereNumber('cycle');
         Route::post('{cycle}/items', [BillingCycleController::class, 'addItem'])->whereNumber('cycle');
         Route::delete('{cycle}/items/{item}', [BillingCycleController::class, 'removeItem'])->whereNumber(['cycle', 'item']);
@@ -190,6 +192,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     });
     Route::post('running-charts/{chart}/reassign-driver', [VehicleDriverReassignmentController::class, 'reassignDriver'])->whereNumber('chart');
     Route::post('vehicle-uses/{use}/replace-vehicle', [VehicleDriverReassignmentController::class, 'replaceVehicle'])->whereNumber('use');
+    Route::post('vehicle-uses/{use}/reassign-driver', [VehicleDriverReassignmentController::class, 'reassignUseDriver'])->whereNumber('use');
 
     Route::post('owner-settlement-bill', [OwnerSettlementBillController::class, 'store'])
         ->middleware('tenant.feature:'.TenantFeature::INVOICE);

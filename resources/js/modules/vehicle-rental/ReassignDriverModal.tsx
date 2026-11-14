@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '@/shared/components/Modal';
 import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
 import { Textarea } from '@/shared/components/Textarea';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -8,13 +9,15 @@ import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { DRIVER_EMPLOYEE_API, type RunningChart } from './runningCharts';
-import { reassignRunningChartDriver } from './agreementApi';
+import { reassignRunningChartDriver, reassignVehicleUseDriver } from './agreementApi';
 
 interface Props {
     open: boolean;
     onClose: () => void;
-    chart: RunningChart;
+    chart?: RunningChart | null;
+    vehicleUse?: { id: number; vehicle_label?: string; row_version: number; driver_name?: string } | null;
     onSaved?: () => void;
 }
 
@@ -28,8 +31,9 @@ const employeeLoader = (params: LookupLoadParams) =>
         })),
     }));
 
-export function ReassignDriverModal({ open, onClose, chart, onSaved }: Props) {
+export function ReassignDriverModal({ open, onClose, chart, vehicleUse, onSaved }: Props) {
     const [selectedEmployee, setSelectedEmployee] = useState<NamedResource | null>(null);
+    const [effectiveAt, setEffectiveAt] = useState(`${businessDateInputValue()}T08:00`);
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -42,12 +46,24 @@ export function ReassignDriverModal({ open, onClose, chart, onSaved }: Props) {
         setError(null);
 
         try {
-            await reassignRunningChartDriver(
-                chart.id,
-                selectedEmployee.id,
-                reason.trim(),
-                chart.row_version,
-            );
+            if (chart) {
+                await reassignRunningChartDriver(
+                    chart.id,
+                    selectedEmployee.id,
+                    reason.trim(),
+                    chart.row_version,
+                );
+            } else if (vehicleUse) {
+                await reassignVehicleUseDriver(
+                    vehicleUse.id,
+                    {
+                        driver_employee_id: selectedEmployee.id,
+                        effective_at: effectiveAt,
+                        reason: reason.trim(),
+                    },
+                    vehicleUse.row_version,
+                );
+            }
             if (onSaved) onSaved();
             onClose();
         } catch (err) {
@@ -57,14 +73,22 @@ export function ReassignDriverModal({ open, onClose, chart, onSaved }: Props) {
         }
     }
 
-    const currentDriverLabel = chart.driver
+    const currentDriverLabel = chart?.driver
         ? `${chart.driver.name} (${chart.driver.reference ?? 'Emp ID: ' + (chart.driver.employee_id ?? '')})`
-        : 'None recorded';
+        : vehicleUse?.driver_name
+            ? vehicleUse.driver_name
+            : 'Assigned Driver';
+
+    const modalTitle = chart
+        ? `Reassign Driver for Chart ${chart.reference}`
+        : vehicleUse
+            ? `Reassign Driver for Assignment (${vehicleUse.vehicle_label ?? `Use #${vehicleUse.id}`})`
+            : 'Reassign Driver';
 
     return (
         <Modal
             open={open}
-            title={`Reassign Driver for Chart ${chart.reference}`}
+            title={modalTitle}
             onClose={onClose}
             closeDisabled={submitting}
         >
@@ -75,6 +99,16 @@ export function ReassignDriverModal({ open, onClose, chart, onSaved }: Props) {
                     <span className="text-slate-500 font-semibold uppercase tracking-wider block">Current Driver</span>
                     <span className="font-bold text-slate-800">{currentDriverLabel}</span>
                 </div>
+
+                {vehicleUse && !chart && (
+                    <Input
+                        label="Effective Cutover Date & Time"
+                        type="datetime-local"
+                        value={effectiveAt}
+                        onChange={e => setEffectiveAt(e.target.value)}
+                        required
+                    />
+                )}
 
                 <div className="space-y-2">
                     <LookupSelect

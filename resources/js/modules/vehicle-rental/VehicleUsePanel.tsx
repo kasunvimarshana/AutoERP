@@ -17,6 +17,7 @@ import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementStatus, type Agreement } from './agreements';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
+import { ReassignDriverModal } from './ReassignDriverModal';
 import { listVehicleUses, transitionVehicleUse } from './vehicleUseApi';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, localTimestampValue, VehicleUseStatus, VehicleUseAction, USE_ACTION_CONFIRM_LABELS, USE_ACTION_LABELS, USE_LABELS, type VehicleUse } from './vehicleUse';
 export function VehicleUsePanel({
@@ -32,6 +33,7 @@ export function VehicleUsePanel({
 }) {
     const auth = useAuth(); const [charts, setCharts] = useState<number | null>(null);
     const [replacement, setReplacement] = useState<VehicleUse | null>(null);
+    const [reassignDriverUse, setReassignDriverUse] = useState<VehicleUse | null>(null);
     const [rows, setRows] = useState<VehicleUse[]>([]); const [page, setPage] = useState(1); const [meta, setMeta] = useState<PaginationMeta>(); const [revision, setRevision] = useState(0);
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true);
     const [adding, setAdding] = useState(Boolean(initialVehicleId));
@@ -45,7 +47,7 @@ export function VehicleUsePanel({
         }
     })();
     useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
-    function reload() { setReplacement(null); setLoading(true); setAdding(false); setAction(null); setHistory(null); setRevision(v => v + 1); }
+    function reload() { setReplacement(null); setReassignDriverUse(null); setLoading(true); setAdding(false); setAction(null); setHistory(null); setRevision(v => v + 1); }
     function choose(row: VehicleUse, type: VehicleUseAction) {
         setAction({ row, type });
         setAt('');
@@ -131,6 +133,18 @@ export function VehicleUsePanel({
                 }}
             />
         )}
+        {reassignDriverUse && (
+            <ReassignDriverModal
+                open={!!reassignDriverUse}
+                onClose={() => setReassignDriverUse(null)}
+                vehicleUse={{
+                    id: reassignDriverUse.id,
+                    vehicle_label: reassignDriverUse.vehicle.label,
+                    row_version: reassignDriverUse.row_version,
+                }}
+                onSaved={reload}
+            />
+        )}
         {loading ? <LoadingState label="Loading assigned vehicles…" /> : error ? null : rows.map(row => <article key={row.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-slate-900">{row.vehicle.label}</p>
@@ -161,6 +175,7 @@ export function VehicleUsePanel({
                     <>
                         <Button onClick={() => choose(row, VehicleUseAction.Return)}>Record return</Button>
                         <Button variant="secondary" onClick={() => setReplacement(row)}>Replace vehicle</Button>
+                        <Button variant="ghost" onClick={() => setReassignDriverUse(row)}>Reassign driver</Button>
                     </>
                 )}
             </div>

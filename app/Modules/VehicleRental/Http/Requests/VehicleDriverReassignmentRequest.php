@@ -20,6 +20,7 @@ final class VehicleDriverReassignmentRequest extends TenantScopedRequest
             'new_handover_odometer' => ['nullable', 'numeric'],
             'return_odometer' => ['nullable', 'numeric'],
             'cutover_at' => ['sometimes', 'required', 'date'],
+            'effective_at' => ['sometimes', 'nullable', 'date'],
             'reason' => ['required', 'string', 'max:1000'],
             'customer_agreement_id' => ['nullable', 'integer'],
         ];

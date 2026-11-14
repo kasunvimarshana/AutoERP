@@ -204,6 +204,56 @@ export interface BillingCycle {
     owner_agreement?: { id: number; reference: string; party_name_snapshot: string };
 }
 
+export interface VehicleAttribution {
+    vehicle_id: number;
+    vehicle_number: string;
+    vehicle_label: string;
+    is_replacement: boolean;
+    charts_count: number;
+    custody_days: number;
+    total_km: string;
+    normal_ot_hours: string;
+    double_ot_hours: string;
+    night_outs: number;
+    allocated_base_rent: string;
+    allocated_ot_amount: string;
+    allocated_night_out_amount: string;
+    subtotal: string;
+}
+
+export interface DriverAttribution {
+    driver_name: string;
+    driver_reference: string;
+    charts_count: number;
+    total_km: string;
+    normal_ot_hours: string;
+    normal_ot_amount: string;
+    double_ot_hours: string;
+    double_ot_amount: string;
+    night_outs: number;
+    night_out_amount: string;
+    total_earnings: string;
+}
+
+export interface EligibleRunningChart {
+    id: number;
+    reference: string;
+    starts_at: string;
+    ends_at: string;
+    commercial_km: string;
+    normal_ot_minutes: number;
+    double_ot_minutes: number;
+    night_outs: number;
+    driver_name: string;
+    driver_reference: string;
+    vehicle_id?: number | null;
+    vehicle_number: string;
+    vehicle_label: string;
+    is_replacement: boolean;
+    is_attached: boolean;
+    is_already_finalized: boolean;
+}
+
 export interface BillingCyclePreview {
     cycle_id: number;
     cycle_number: string;
@@ -226,6 +276,29 @@ export interface BillingCyclePreview {
     gross_delta_amount: string;
     charts_count: number;
     items_count: number;
+    vehicle_attributions?: VehicleAttribution[];
+    driver_attributions?: DriverAttribution[];
+    line_items?: Array<{
+        id: number;
+        item_type: string;
+        category: string;
+        description: string;
+        quantity: string;
+        unit_rate: string;
+        amount: string;
+    }>;
+    reassignments?: Array<{
+        id: number;
+        type: string;
+        occurred_at: string;
+        reason: string;
+        previous_vehicle?: string | null;
+        new_vehicle?: string | null;
+        previous_driver?: string | null;
+        new_driver?: string | null;
+        financial_status: string;
+        financial_delta: string;
+    }>;
 }
 
 export interface ReassignmentRecord {
@@ -275,6 +348,12 @@ export const attachCycleCharts = (cycleId: number, chartIds: number[], expectedV
         expected_version: expectedVersion,
     }).then(r => r.data.data);
 
+export const getEligibleCycleCharts = (cycleId: number) =>
+    apiClient.get<{ data: EligibleRunningChart[] }>(`${AGREEMENT_API}/billing-cycles/${cycleId}/eligible-charts`).then(r => r.data.data);
+
+export const getBillingCycleExportUrl = (cycleId: number, format: 'pdf' | 'print' | 'html') =>
+    `${AGREEMENT_API}/billing-cycles/${cycleId}/export/${format}`;
+
 export const addCycleItem = (cycleId: number, payload: {
     item_type: 'addition' | 'deduction';
     category: string;
@@ -309,6 +388,16 @@ export const reassignRunningChartDriver = (chartId: number, driverEmployeeId: nu
     apiClient.post<ApiResource<ReassignmentRecord>>(`${AGREEMENT_API}/running-charts/${chartId}/reassign-driver`, {
         driver_employee_id: driverEmployeeId,
         reason,
+        expected_version: expectedVersion,
+    }).then(r => r.data.data);
+
+export const reassignVehicleUseDriver = (useId: number, payload: {
+    driver_employee_id: number;
+    effective_at?: string;
+    reason: string;
+}, expectedVersion: number) =>
+    apiClient.post<ApiResource<ReassignmentRecord>>(`${AGREEMENT_API}/vehicle-uses/${useId}/reassign-driver`, {
+        ...payload,
         expected_version: expectedVersion,
     }).then(r => r.data.data);
 

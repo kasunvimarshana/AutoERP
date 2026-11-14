@@ -41,6 +41,25 @@ final class VehicleDriverReassignmentController
         return response()->json(['data' => $reassignment], Response::HTTP_CREATED);
     }
 
+    public function reassignUseDriver(VehicleDriverReassignmentRequest $request, int $use): JsonResponse
+    {
+        $driverId = (int) $request->input('driver_employee_id');
+        $effectiveAt = (string) ($request->input('effective_at') ?? now()->toDateTimeString());
+        $reason = (string) $request->input('reason');
+        $expectedVersion = $request->expectedVersion();
+
+        $reassignment = $this->service->reassignVehicleUseDriver(
+            $request->context(),
+            $use,
+            $driverId,
+            $effectiveAt,
+            $reason,
+            $expectedVersion
+        );
+
+        return response()->json(['data' => $reassignment], Response::HTTP_CREATED);
+    }
+
     public function replaceVehicle(VehicleDriverReassignmentRequest $request, int $use): JsonResponse
     {
         $reassignment = $this->service->replaceVehicle(

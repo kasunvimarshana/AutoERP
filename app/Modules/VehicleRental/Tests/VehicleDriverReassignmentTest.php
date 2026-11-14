@@ -261,4 +261,106 @@ final class VehicleDriverReassignmentTest extends TestCase
             $this->assertGreaterThan(0, (float) $adj->amount);
         });
     }
+
+    public function test_reassign_vehicle_use_driver_updates_future_charts_and_records_audit(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = ['base_rate' => '30000.000000'];
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $driver1Id = DB::table('hr_employees')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'employee_number' => 'DRV-USE-01',
+                'first_name' => 'Original',
+                'display_name' => 'Original Driver',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $driver2Id = DB::table('hr_employees')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'employee_number' => 'DRV-USE-02',
+                'first_name' => 'Replacement',
+                'display_name' => 'Replacement Driver',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $customerAg->id, $customerAg->row_version, [
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '10000.000000',
+                'reason' => 'Handover',
+            ]);
+
+            $charts = app(RunningChartService::class);
+            // Chart 1: past trip on Sept 5
+            $chart1 = $charts->create($context, $use->id, (int) $use->row_version, [
+                'reference' => 'RC-USE-01',
+                'starts_at' => '2026-09-05T08:00:00+00:00',
+                'ends_at' => '2026-09-05T18:00:00+00:00',
+                'start_odometer' => '10000.000000',
+                'end_odometer' => '10100.000000',
+                'driver_identity_source' => 'employee',
+                'driver_employee_id' => $driver1Id,
+                'driver_name_snapshot' => 'Original Driver',
+            ]);
+
+            // Chart 2: future trip on Sept 16
+            $chart2 = $charts->create($context, $use->id, (int) $use->row_version, [
+                'reference' => 'RC-USE-02',
+                'starts_at' => '2026-09-16T08:00:00+00:00',
+                'ends_at' => '2026-09-16T18:00:00+00:00',
+                'start_odometer' => '10100.000000',
+                'end_odometer' => '10250.000000',
+                'driver_identity_source' => 'employee',
+                'driver_employee_id' => $driver1Id,
+                'driver_name_snapshot' => 'Original Driver',
+            ]);
+
+            $reassignmentService = app(VehicleDriverReassignmentService::class);
+            $reassignment = $reassignmentService->reassignVehicleUseDriver(
+                $context,
+                $use->id,
+                $driver2Id,
+                '2026-09-15T00:00:00+00:00',
+                'Driver shift change starting Sept 15',
+                (int) $use->row_version,
+            );
+
+            $this->assertSame(ReassignmentType::DriverReassignment, $reassignment->reassignment_type);
+            $this->assertSame($driver2Id, (int) $reassignment->new_driver_employee_id);
+            $this->assertSame($use->id, (int) $reassignment->vehicle_use_id);
+
+            // Chart 1 (prior to cutover) remains with original driver
+            $chart1->refresh();
+            $this->assertSame($driver1Id, (int) $chart1->driver_employee_id);
+            $this->assertSame('Original Driver', $chart1->driver_name_snapshot);
+
+            // Chart 2 (at/after cutover) updated to replacement driver
+            $chart2->refresh();
+            $this->assertSame($driver2Id, (int) $chart2->driver_employee_id);
+            $this->assertSame('Replacement Driver', $chart2->driver_name_snapshot);
+        });
+    }
 }

@@ -19,9 +19,12 @@ import {
     removeCycleItem,
     previewCycleFinal,
     finalizeBillingCycle,
+    getEligibleCycleCharts,
+    getBillingCycleExportUrl,
     type BillingCycle,
     type BillingCycleItem,
     type BillingCyclePreview,
+    type EligibleRunningChart,
 } from './agreementApi';
 
 interface Props {
@@ -41,7 +44,6 @@ export function BillingCycleWizardModal({
     cycle: initialCycle,
     onCycleUpdated,
 }: Props) {
-    const isNew = !initialCycle;
     const [currentCycle, setCurrentCycle] = useState<BillingCycle | null>(initialCycle ?? null);
     const [activeTab, setActiveTab] = useState<'overview' | 'charts' | 'items' | 'finalize'>('overview');
     const [loading, setLoading] = useState(false);
@@ -61,7 +63,11 @@ export function BillingCycleWizardModal({
     const [notes, setNotes] = useState('');
 
     // Attach Charts State
+    const [candidateCharts, setCandidateCharts] = useState<EligibleRunningChart[]>([]);
+    const [candidateLoading, setCandidateLoading] = useState(false);
+    const [selectedChartIds, setSelectedChartIds] = useState<Set<number>>(new Set());
     const [chartIdsInput, setChartIdsInput] = useState('');
+    const [showManualInput, setShowManualInput] = useState(false);
 
     // Add Item State
     const [itemType, setItemType] = useState<'addition' | 'deduction'>('addition');
@@ -82,6 +88,9 @@ export function BillingCycleWizardModal({
         if (initialCycle) {
             setActiveTab('overview');
             setFinalizeMode((initialCycle.finalization_mode as 'supplementary' | 'consolidated') || 'supplementary');
+            if (initialCycle.charts) {
+                setSelectedChartIds(new Set(initialCycle.charts.map(c => c.running_chart_id)));
+            }
         } else {
             setPeriodFrom(agreement.starts_on ?? today);
             setPeriodUntil(agreement.ends_on ?? today);
@@ -89,6 +98,22 @@ export function BillingCycleWizardModal({
     }, [initialCycle, agreement, today]);
 
     const cur = agreement.currency.code;
+
+    async function loadCandidates(cycleId: number) {
+        setCandidateLoading(true);
+        try {
+            const list = await getEligibleCycleCharts(cycleId);
+            setCandidateCharts(list);
+            const attached = new Set(list.filter(c => c.is_attached).map(c => c.id));
+            if (attached.size > 0) {
+                setSelectedChartIds(attached);
+            }
+        } catch {
+            // graceful fallback
+        } finally {
+            setCandidateLoading(false);
+        }
+    }
 
     async function reloadCycle(cycleId: number) {
         setLoading(true);
@@ -134,16 +159,22 @@ export function BillingCycleWizardModal({
         }
     }
 
-    async function handleAttachCharts(e: React.FormEvent) {
-        e.preventDefault();
+    async function handleAttachCharts(e?: React.FormEvent) {
+        if (e) e.preventDefault();
         if (!currentCycle) return;
-        const ids = chartIdsInput
-            .split(',')
-            .map(s => parseInt(s.trim(), 10))
-            .filter(n => !isNaN(n) && n > 0);
+
+        let ids: number[] = [];
+        if (chartIdsInput.trim()) {
+            ids = chartIdsInput
+                .split(',')
+                .map(s => parseInt(s.trim(), 10))
+                .filter(n => !isNaN(n) && n > 0);
+        } else {
+            ids = Array.from(selectedChartIds);
+        }
 
         if (ids.length === 0) {
-            setError(toApiError(new Error('Please enter at least one valid Running Chart ID.')));
+            setError(toApiError(new Error('Please select at least one Running Chart to attach.')));
             return;
         }
 
@@ -155,6 +186,7 @@ export function BillingCycleWizardModal({
             setChartIdsInput('');
             setFeedback('Running charts attached successfully.');
             if (onCycleUpdated) onCycleUpdated(updated);
+            await loadCandidates(currentCycle.id);
         } catch (err) {
             setError(toApiError(err));
         } finally {
@@ -363,7 +395,12 @@ export function BillingCycleWizardModal({
                                     type="button"
                                     onClick={() => {
                                         setActiveTab(tab);
-                                        if (tab === 'finalize') loadFinalPreview();
+                                        if (tab === 'charts') {
+                                            loadCandidates(currentCycle.id);
+                                        }
+                                        if (tab === 'finalize') {
+                                            loadFinalPreview();
+                                        }
                                     }}
                                     className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors capitalize ${
                                         activeTab === tab
@@ -405,7 +442,24 @@ export function BillingCycleWizardModal({
                                 </div>
 
                                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
-                                    <h4 className="text-sm font-bold text-slate-900">Generated Financial Invoices</h4>
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-bold text-slate-900">Generated Financial Invoices</h4>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => window.open(getBillingCycleExportUrl(currentCycle.id, 'pdf'), '_blank')}
+                                            >
+                                                Statement (PDF)
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => window.open(getBillingCycleExportUrl(currentCycle.id, 'print'), '_blank')}
+                                            >
+                                                Print
+                                            </Button>
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                         <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
                                             <span className="text-xs font-semibold text-slate-500 block">Stage 1 Initial Invoice</span>
@@ -461,11 +515,125 @@ export function BillingCycleWizardModal({
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <h4 className="text-sm font-bold text-slate-900">
-                                        Attached Running Charts ({currentCycle.charts?.length ?? 0})
+                                        Attach Telematics Running Charts
                                     </h4>
+                                    {!isFinalized && candidateCharts.length > 0 && (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    const allAvailable = candidateCharts
+                                                        .filter(c => !c.is_already_finalized)
+                                                        .map(c => c.id);
+                                                    setSelectedChartIds(new Set(allAvailable));
+                                                }}
+                                            >
+                                                Select All Available
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => setSelectedChartIds(new Set())}
+                                            >
+                                                Deselect All
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {!isFinalized && (
+                                {!isFinalized && candidateLoading && (
+                                    <LoadingState label="Loading eligible running charts for period..." />
+                                )}
+
+                                {!isFinalized && !candidateLoading && candidateCharts.length > 0 && (
+                                    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                                        <span className="text-xs font-bold text-slate-700 block">
+                                            Select Candidate Trips to Pool into Cycle ({selectedChartIds.size} selected)
+                                        </span>
+
+                                        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white max-h-64 overflow-y-auto">
+                                            <table className="w-full text-left text-xs">
+                                                <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 font-semibold text-slate-600">
+                                                    <tr>
+                                                        <th className="px-3 py-2 w-8"></th>
+                                                        <th className="px-3 py-2">Chart #</th>
+                                                        <th className="px-3 py-2">Dates</th>
+                                                        <th className="px-3 py-2">Vehicle</th>
+                                                        <th className="px-3 py-2">Driver</th>
+                                                        <th className="px-3 py-2 text-right">KM</th>
+                                                        <th className="px-3 py-2 text-right">OT (min)</th>
+                                                        <th className="px-3 py-2">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {candidateCharts.map(c => {
+                                                        const isChecked = selectedChartIds.has(c.id);
+                                                        return (
+                                                            <tr key={c.id} className={c.is_already_finalized ? 'opacity-40 bg-slate-50' : ''}>
+                                                                <td className="px-3 py-2 text-center">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isChecked}
+                                                                        disabled={c.is_already_finalized}
+                                                                        onChange={e => {
+                                                                            const next = new Set(selectedChartIds);
+                                                                            if (e.target.checked) next.add(c.id);
+                                                                            else next.delete(c.id);
+                                                                            setSelectedChartIds(next);
+                                                                        }}
+                                                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-3 py-2 font-bold text-slate-900">{c.reference}</td>
+                                                                <td className="px-3 py-2 text-slate-600">{formatBusinessDate(c.starts_at)}</td>
+                                                                <td className="px-3 py-2">
+                                                                    <span className="font-medium text-slate-800">{c.vehicle_label}</span>
+                                                                    {c.is_replacement && (
+                                                                        <span className="ml-1 px-1 py-0.2 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">
+                                                                            Replacement
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-slate-700">{c.driver_name}</td>
+                                                                <td className="px-3 py-2 text-right font-medium">{c.commercial_km}</td>
+                                                                <td className="px-3 py-2 text-right">{c.normal_ot_minutes + c.double_ot_minutes}</td>
+                                                                <td className="px-3 py-2">
+                                                                    {c.is_already_finalized ? (
+                                                                        <span className="text-[10px] text-slate-500 italic">Billed elsewhere</span>
+                                                                    ) : c.is_attached ? (
+                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Attached</span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold">Available</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="flex justify-between items-center pt-2">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() => setShowManualInput(!showManualInput)}
+                                            >
+                                                {showManualInput ? 'Hide manual ID entry' : 'Manual ID entry...'}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="primary"
+                                                onClick={() => handleAttachCharts()}
+                                                loading={submitting}
+                                                disabled={selectedChartIds.size === 0}
+                                            >
+                                                Confirm Attached Charts ({selectedChartIds.size})
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!isFinalized && showManualInput && (
                                     <form onSubmit={handleAttachCharts} className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex gap-2 items-end">
                                         <div className="flex-1">
                                             <Input
@@ -481,39 +649,55 @@ export function BillingCycleWizardModal({
                                     </form>
                                 )}
 
-                                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                                    <table className="w-full text-left text-xs">
-                                        <thead>
-                                            <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
-                                                <th className="px-3 py-2">Chart #</th>
-                                                <th className="px-3 py-2">Commercial KM</th>
-                                                <th className="px-3 py-2">Normal OT (min)</th>
-                                                <th className="px-3 py-2">Double OT (min)</th>
-                                                <th className="px-3 py-2">Night Outs</th>
-                                                <th className="px-3 py-2">Tolls</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {currentCycle.charts && currentCycle.charts.length > 0 ? (
-                                                currentCycle.charts.map(chart => (
-                                                    <tr key={chart.id}>
-                                                        <td className="px-3 py-2 font-medium text-slate-900">{chart.running_chart?.reference ?? `Chart #${chart.running_chart_id}`}</td>
-                                                        <td className="px-3 py-2">{chart.commercial_km} km</td>
-                                                        <td className="px-3 py-2">{chart.normal_ot_minutes} m</td>
-                                                        <td className="px-3 py-2">{chart.double_ot_minutes} m</td>
-                                                        <td className="px-3 py-2">{chart.night_outs}</td>
-                                                        <td className="px-3 py-2"><MoneyDisplay value={chart.tolls_amount} currency={cur} /></td>
-                                                    </tr>
-                                                ))
-                                            ) : (
-                                                <tr>
-                                                    <td colSpan={6} className="px-3 py-4 text-center text-slate-400">
-                                                        No running charts attached to this cycle yet.
-                                                    </td>
+                                <div className="space-y-2">
+                                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                        Currently Attached Charts ({currentCycle.charts?.length ?? 0})
+                                    </h5>
+                                    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                                        <table className="w-full text-left text-xs">
+                                            <thead>
+                                                <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase tracking-wider text-slate-500">
+                                                    <th className="px-3 py-2">Chart #</th>
+                                                    <th className="px-3 py-2">Vehicle</th>
+                                                    <th className="px-3 py-2">Driver</th>
+                                                    <th className="px-3 py-2">Commercial KM</th>
+                                                    <th className="px-3 py-2">Normal OT (min)</th>
+                                                    <th className="px-3 py-2">Double OT (min)</th>
+                                                    <th className="px-3 py-2">Night Outs</th>
+                                                    <th className="px-3 py-2">Tolls</th>
                                                 </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {currentCycle.charts && currentCycle.charts.length > 0 ? (
+                                                    currentCycle.charts.map(chart => (
+                                                        <tr key={chart.id}>
+                                                            <td className="px-3 py-2 font-medium text-slate-900">{chart.running_chart?.reference ?? `Chart #${chart.running_chart_id}`}</td>
+                                                            <td className="px-3 py-2">
+                                                                {chart.vehicle?.registration_number ?? chart.vehicle?.vehicle_number ?? `Vehicle #${chart.vehicle_id}`}
+                                                                {chart.is_replacement && (
+                                                                    <span className="ml-1 px-1 py-0.2 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">
+                                                                        [R]
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-slate-700">{chart.driver_name_snapshot}</td>
+                                                            <td className="px-3 py-2 font-medium">{chart.commercial_km} km</td>
+                                                            <td className="px-3 py-2">{chart.normal_ot_minutes} m</td>
+                                                            <td className="px-3 py-2">{chart.double_ot_minutes} m</td>
+                                                            <td className="px-3 py-2">{chart.night_outs}</td>
+                                                            <td className="px-3 py-2"><MoneyDisplay value={chart.tolls_amount} currency={cur} /></td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={8} className="px-3 py-4 text-center text-slate-400">
+                                                            No running charts attached to this cycle yet.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -522,16 +706,16 @@ export function BillingCycleWizardModal({
                         {activeTab === 'items' && !loading && (
                             <div className="space-y-4">
                                 {!isFinalized && (
-                                    <form onSubmit={handleAddItem} className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
-                                        <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Add Line Item Adjustment</h5>
+                                    <form onSubmit={handleAddItem} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                                        <h4 className="text-sm font-bold text-slate-900">Add Line Item Adjustment</h4>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                             <Select
-                                                label="Type"
+                                                label="Item Type"
                                                 value={itemType}
                                                 onChange={e => setItemType(e.target.value as 'addition' | 'deduction')}
                                                 options={[
-                                                    { value: 'addition', label: '+ Addition (Chargeable)' },
-                                                    { value: 'deduction', label: '- Deduction (Rebate / Penalty)' },
+                                                    { value: 'addition', label: '+ Addition (Charge to Customer / Allowance to Owner)' },
+                                                    { value: 'deduction', label: '- Deduction (Rebate to Customer / Deduction from Owner)' },
                                                 ]}
                                                 required
                                             />
@@ -541,19 +725,19 @@ export function BillingCycleWizardModal({
                                                 onChange={e => setCategory(e.target.value)}
                                                 options={[
                                                     { value: 'driver_salary', label: 'Driver Salary' },
-                                                    { value: 'overtime', label: 'Driver Overtime (OT)' },
-                                                    { value: 'excess_km', label: 'Excess Mileage' },
-                                                    { value: 'fuel', label: 'Fuel Surcharge' },
-                                                    { value: 'toll', label: 'Highway Toll / Parking' },
-                                                    { value: 'night_out', label: 'Night Out Allowance' },
-                                                    { value: 'deduction', label: 'Breakdown / Downtime Rebate' },
-                                                    { value: 'other', label: 'Other Adjustment' },
+                                                    { value: 'overtime', label: 'Overtime' },
+                                                    { value: 'excess_km', label: 'Excess Kilometres' },
+                                                    { value: 'fuel', label: 'Fuel Expense / Surcharge' },
+                                                    { value: 'toll', label: 'Highway Toll Reimbursement' },
+                                                    { value: 'night_out', label: 'Night-Out Allowance' },
+                                                    { value: 'deduction', label: 'Vehicle Breakdown Rebate / Downtime' },
+                                                    { value: 'other', label: 'Other Operational Item' },
                                                 ]}
                                                 required
                                             />
                                             <Input
                                                 label="Description"
-                                                placeholder="e.g. Driver Sunday Overtime / Fuel recovery"
+                                                placeholder="e.g. Breakdown rebate for 2 days"
                                                 value={description}
                                                 onChange={e => setDescription(e.target.value)}
                                                 required
@@ -561,9 +745,10 @@ export function BillingCycleWizardModal({
                                         </div>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <Input
-                                                label="Quantity / Hours / Days"
+                                                label="Quantity"
                                                 type="number"
-                                                step="0.001"
+                                                step="0.000001"
+                                                min="0.000001"
                                                 value={quantity}
                                                 onChange={e => setQuantity(e.target.value)}
                                                 required
@@ -574,12 +759,11 @@ export function BillingCycleWizardModal({
                                                 step="0.000001"
                                                 value={unitRate}
                                                 onChange={e => setUnitRate(e.target.value)}
-                                                placeholder="0.00"
                                                 required
                                             />
                                         </div>
-                                        <div className="flex justify-end">
-                                            <Button type="submit" variant="primary" loading={submitting}>
+                                        <div className="flex justify-end pt-2">
+                                            <Button type="submit" variant="primary" loading={submitting} disabled={!description.trim() || !unitRate}>
                                                 Add Item
                                             </Button>
                                         </div>
@@ -595,7 +779,7 @@ export function BillingCycleWizardModal({
                                                 <th className="px-3 py-2">Description</th>
                                                 <th className="px-3 py-2 text-right">Qty</th>
                                                 <th className="px-3 py-2 text-right">Unit Rate</th>
-                                                <th className="px-3 py-2 text-right">Total</th>
+                                                <th className="px-3 py-2 text-right">Total Amount</th>
                                                 {!isFinalized && <th className="px-3 py-2 text-right">Action</th>}
                                             </tr>
                                         </thead>
@@ -608,7 +792,7 @@ export function BillingCycleWizardModal({
                                                                 item.item_type === 'addition'
                                                                     ? 'bg-emerald-100 text-emerald-800'
                                                                     : 'bg-rose-100 text-rose-800'
-                                                            }`}>
+                                                              }`}>
                                                                 {item.item_type === 'addition' ? '+ Addition' : '- Deduction'}
                                                             </span>
                                                         </td>
@@ -649,18 +833,47 @@ export function BillingCycleWizardModal({
                         {activeTab === 'finalize' && !loading && (
                             <div className="space-y-4">
                                 {isFinalized ? (
-                                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-                                        <h4 className="font-bold text-sm">Billing Cycle Finalized</h4>
-                                        <p className="text-xs mt-1">
-                                            This cycle has been finalized. Final Invoice: {currentCycle.final_invoice?.invoice_number ?? currentCycle.supplementary_invoice?.invoice_number}.
-                                        </p>
+                                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h4 className="font-bold text-sm">Billing Cycle Finalized</h4>
+                                                <p className="text-xs mt-1">
+                                                    This cycle has been finalized. Final Invoice: {currentCycle.final_invoice?.invoice_number ?? currentCycle.supplementary_invoice?.invoice_number}.
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => window.open(getBillingCycleExportUrl(currentCycle.id, 'pdf'), '_blank')}
+                                                >
+                                                    Statement (PDF)
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    onClick={() => window.open(getBillingCycleExportUrl(currentCycle.id, 'print'), '_blank')}
+                                                >
+                                                    Print
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
                                 ) : (
                                     <>
                                         {previewLoading && <LoadingState label="Calculating final invoice amounts..." />}
                                         {preview && (
-                                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                                                <h4 className="text-sm font-bold text-slate-900">Final Financial Breakdown Preview</h4>
+                                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+                                                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                                    <h4 className="text-sm font-bold text-slate-900">Final Financial Breakdown Preview</h4>
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="secondary"
+                                                            onClick={() => window.open(getBillingCycleExportUrl(currentCycle.id, 'pdf'), '_blank')}
+                                                        >
+                                                            Preview PDF
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
                                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                                     <div>
                                                         <span className="text-xs text-slate-500 font-semibold">Base Rent</span>
@@ -698,6 +911,86 @@ export function BillingCycleWizardModal({
                                                         <div className="text-lg font-bold text-blue-700"><MoneyDisplay value={preview.gross_delta_amount} currency={cur} /></div>
                                                     </div>
                                                 </div>
+
+                                                {/* Fleet Vehicle Attribution Breakdown */}
+                                                {preview.vehicle_attributions && preview.vehicle_attributions.length > 0 && (
+                                                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                                                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                                                            Fleet Vehicle Attributions ({preview.vehicle_attributions.length} Vehicles)
+                                                        </span>
+                                                        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                                            <table className="w-full text-left text-xs">
+                                                                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                                                    <tr>
+                                                                        <th className="px-3 py-1.5">Vehicle</th>
+                                                                        <th className="px-3 py-1.5">Role</th>
+                                                                        <th className="px-3 py-1.5 text-center">Days</th>
+                                                                        <th className="px-3 py-1.5 text-right">KM</th>
+                                                                        <th className="px-3 py-1.5 text-right">Norm OT</th>
+                                                                        <th className="px-3 py-1.5 text-right">Attributed Total</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-100">
+                                                                    {preview.vehicle_attributions.map(va => (
+                                                                        <tr key={va.vehicle_id}>
+                                                                            <td className="px-3 py-1.5 font-bold text-slate-900">{va.vehicle_label}</td>
+                                                                            <td className="px-3 py-1.5">
+                                                                                {va.is_replacement ? (
+                                                                                    <span className="text-amber-700 font-semibold">Replacement</span>
+                                                                                ) : (
+                                                                                    <span className="text-slate-600">Primary</span>
+                                                                                )}
+                                                                            </td>
+                                                                            <td className="px-3 py-1.5 text-center">{va.custody_days}</td>
+                                                                            <td className="px-3 py-1.5 text-right">{va.total_km}</td>
+                                                                            <td className="px-3 py-1.5 text-right">{va.normal_ot_hours} h</td>
+                                                                            <td className="px-3 py-1.5 text-right font-bold text-slate-900">
+                                                                                <MoneyDisplay value={va.subtotal} currency={cur} />
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Driver Attribution Breakdown */}
+                                                {preview.driver_attributions && preview.driver_attributions.length > 0 && (
+                                                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                                                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                                                            Driver Overtime Attributions ({preview.driver_attributions.length} Drivers)
+                                                        </span>
+                                                        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                                            <table className="w-full text-left text-xs">
+                                                                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                                                    <tr>
+                                                                        <th className="px-3 py-1.5">Driver</th>
+                                                                        <th className="px-3 py-1.5 text-center">Trips</th>
+                                                                        <th className="px-3 py-1.5 text-right">Norm OT (h)</th>
+                                                                        <th className="px-3 py-1.5 text-right">Dbl OT (h)</th>
+                                                                        <th className="px-3 py-1.5 text-right">Night Outs</th>
+                                                                        <th className="px-3 py-1.5 text-right">Driver Total</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-100">
+                                                                    {preview.driver_attributions.map((da, idx) => (
+                                                                        <tr key={idx}>
+                                                                            <td className="px-3 py-1.5 font-bold text-slate-900">{da.driver_name}</td>
+                                                                            <td className="px-3 py-1.5 text-center">{da.charts_count}</td>
+                                                                            <td className="px-3 py-1.5 text-right">{da.normal_ot_hours}</td>
+                                                                            <td className="px-3 py-1.5 text-right">{da.double_ot_hours}</td>
+                                                                            <td className="px-3 py-1.5 text-right">{da.night_outs}</td>
+                                                                            <td className="px-3 py-1.5 text-right font-bold text-slate-900">
+                                                                                <MoneyDisplay value={da.total_earnings} currency={cur} />
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 

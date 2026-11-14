@@ -49,7 +49,7 @@ final class AgreementFinancialSummaryService
             ->where('agreement_id', $agreement->id)
             ->orderByDesc('id')
             ->get();
-        $totalBaseCharges = (string) $baseCharges->whereNull('voided_at')->sum('amount');
+        $totalBaseCharges = $this->math->sum($baseCharges->whereNull('voided_at')->pluck('amount')->all());
         $baseSourceType = BaseChargeSource::forKind($kind)->value;
         $baseDocMap = $this->invoiceSources->documents($context->tenantId, $context->organizationUnitId, $baseSourceType, $baseCharges->pluck('id')->all());
 
@@ -61,7 +61,7 @@ final class AgreementFinancialSummaryService
             ->where('agreement_id', $agreement->id)
             ->orderByDesc('id')
             ->get();
-        $totalUsageCharges = (string) $usageCharges->whereNull('voided_at')->sum('amount');
+        $totalUsageCharges = $this->math->sum($usageCharges->whereNull('voided_at')->pluck('amount')->all());
         $usageSourceType = UsageChargeSource::forKind($kind)->value;
         $usageDocMap = $this->invoiceSources->documents($context->tenantId, $context->organizationUnitId, $usageSourceType, $usageCharges->pluck('id')->all());
 
@@ -78,17 +78,35 @@ final class AgreementFinancialSummaryService
                 ->where('allocation_type', RentalExpenseAllocationType::OwnerDeduction->value);
         }
         $allocations = $allocationsQuery->orderByDesc('id')->get();
-        $totalAllocations = (string) $allocations->where('status', RentalExpenseAllocationStatus::Confirmed)->sum('total_amount');
+        $totalAllocations = $this->math->sum($allocations->where('status', RentalExpenseAllocationStatus::Confirmed)->pluck('total_amount')->all());
 
         // 4. Linked Financial Invoices, Credit Notes, and Debit Notes
         $partyType = $isCustomer ? 'customer' : 'supplier';
         $partyId = $isCustomer ? $agreement->customer_id : $agreement->supplier_id;
+
+        $cycleInvoiceIds = \Modules\VehicleRental\Models\BillingCycle::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where($isCustomer ? 'customer_agreement_id' : 'owner_agreement_id', $agreement->id)
+            ->where(function ($q) {
+                $q->whereNotNull('initial_invoice_id')
+                    ->orWhereNotNull('supplementary_invoice_id')
+                    ->orWhereNotNull('final_invoice_id');
+            })
+            ->get(['initial_invoice_id', 'supplementary_invoice_id', 'final_invoice_id'])
+            ->flatMap(fn ($c) => array_filter([$c->initial_invoice_id, $c->supplementary_invoice_id, $c->final_invoice_id]))
+            ->unique()
+            ->values()
+            ->all();
+
         $invoices = Invoice::query()
             ->where('tenant_id', $context->tenantId)
             ->where('organization_unit_id', $context->organizationUnitId)
             ->where('party_type', $partyType)
             ->where('party_id', $partyId)
-            ->whereHas('sources', fn ($q) => $q->where('source_document_number', $agreement->reference))
+            ->where(function ($q) use ($agreement, $cycleInvoiceIds) {
+                $q->whereHas('sources', fn ($sq) => $sq->where('source_document_number', $agreement->reference))
+                    ->orWhereIn('id', $cycleInvoiceIds);
+            })
             ->with(['balance', 'sources', 'lines'])
             ->orderByDesc('invoice_date')
             ->orderByDesc('id')
