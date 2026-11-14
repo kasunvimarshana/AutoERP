@@ -56,4 +56,37 @@ describe('OwnerSettlementModal', () => {
             expect(screen.getByText(/BILL-2026-0088/i)).toBeInTheDocument();
         });
     });
+
+    it('preserves 0% WHT rate when explicitly entered without coercing to 10%', async () => {
+        const viGenerate = vi.mocked(agreementApi.generateOwnerSettlementBill).mockResolvedValue({
+            id: 89,
+            invoice_number: 'BILL-2026-0089',
+        });
+
+        render(
+            <OwnerSettlementModal
+                open={true}
+                onClose={vi.fn()}
+                ownerAgreementId={5}
+                ownerAgreementReference="AG-OWN-005"
+                defaultStartDate="2026-09-01"
+                defaultEndDate="2026-09-30"
+            />,
+        );
+
+        const whtInput = screen.getByLabelText(/WHT Rate/i);
+        fireEvent.change(whtInput, { target: { value: '0' } });
+
+        const submitBtn = screen.getByRole('button', { name: /Generate Inbound AP Bill/i });
+        fireEvent.click(submitBtn);
+
+        await waitFor(() => {
+            expect(viGenerate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    owner_agreement_id: 5,
+                    wht_rate: 0,
+                }),
+            );
+        });
+    });
 });

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { AgreementFinancialSummaryPanel } from './AgreementFinancialSummaryPanel';
 import {
@@ -117,11 +118,13 @@ beforeEach(() => {
 
 it('renders financial summary metrics and linked documents', async () => {
     render(
-        <AgreementFinancialSummaryPanel
-            kind={AgreementKind.Customer}
-            agreement={mockAgreement}
-            canManageAdjustments={true}
-        />,
+        <MemoryRouter>
+            <AgreementFinancialSummaryPanel
+                kind={AgreementKind.Customer}
+                agreement={mockAgreement}
+                canManageAdjustments={true}
+            />
+        </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -142,11 +145,13 @@ it('allows issuing an adjustment credit note and reloads summary', async () => {
     });
 
     render(
-        <AgreementFinancialSummaryPanel
-            kind={AgreementKind.Customer}
-            agreement={mockAgreement}
-            canManageAdjustments={true}
-        />,
+        <MemoryRouter>
+            <AgreementFinancialSummaryPanel
+                kind={AgreementKind.Customer}
+                agreement={mockAgreement}
+                canManageAdjustments={true}
+            />
+        </MemoryRouter>,
     );
 
     await waitFor(() => {
@@ -180,11 +185,13 @@ it('allows issuing an adjustment credit note and reloads summary', async () => {
 
 it('hides adjustment controls when user lacks manage permissions', async () => {
     render(
-        <AgreementFinancialSummaryPanel
-            kind={AgreementKind.Customer}
-            agreement={mockAgreement}
-            canManageAdjustments={false}
-        />,
+        <MemoryRouter>
+            <AgreementFinancialSummaryPanel
+                kind={AgreementKind.Customer}
+                agreement={mockAgreement}
+                canManageAdjustments={false}
+            />
+        </MemoryRouter>,
     );
 
     await waitFor(() => {

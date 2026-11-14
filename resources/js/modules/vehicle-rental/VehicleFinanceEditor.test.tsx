@@ -75,6 +75,10 @@ describe('VehicleFinanceEditor', () => {
         fireEvent.change(screen.getByRole('combobox', { name: 'Currency' }), { target: { value: 'LKR' } });
         fireEvent.click(await screen.findByRole('option', { name: 'LKR - Sri Lankan Rupee' }));
 
+        // Fill explicit amounts
+        fireEvent.change(screen.getByLabelText(/Principal Financed Amount/i), { target: { value: '1000000.00' } });
+        fireEvent.change(screen.getByLabelText(/Annual Interest Rate/i), { target: { value: '12.00' } });
+
         // Submit form
         const submitBtn = screen.getByRole('button', { name: 'Generate Schedule & Create Agreement' });
         expect(submitBtn).toBeEnabled();

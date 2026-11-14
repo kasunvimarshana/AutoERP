@@ -95,8 +95,8 @@ describe('BillingCycleWizardModal', () => {
                 AgreementKind.Customer,
                 10,
                 expect.objectContaining({
-                    billing_mode: 'monthly',
-                    finalization_mode: 'supplementary',
+                    billing_mode: 'without_running_chart',
+                    finalization_mode: 'supplementary_invoice',
                     issue_initial_invoice: true,
                 }),
             );

@@ -30,7 +30,7 @@ export function RentalExpenseEditor({
     const [expenseType, setExpenseType] = useState<ExpenseType>(ExpenseType.Fuel);
     const [expenseDate, setExpenseDate] = useState(businessDateInputValue());
     const [currency, setCurrency] = useState<NamedResource | null>(null);
-    const [netAmount, setNetAmount] = useState('0.00');
+    const [netAmount, setNetAmount] = useState('');
     const [taxAmount, setTaxAmount] = useState('0.00');
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [referenceNumber, setReferenceNumber] = useState('');
@@ -43,13 +43,13 @@ export function RentalExpenseEditor({
         event.preventDefault();
         if (!vehicle || !currency) return;
 
-        if (isNaN(Number(netAmount)) || Number(netAmount) < 0) {
+        if (isNaN(Number(netAmount)) || Number(netAmount) <= 0) {
             setError(new ApiError(
-                'Net amount must be a non-negative decimal.',
+                'Net amount must be a positive decimal.',
                 422,
                 'VALIDATION_FAILED',
                 'validation',
-                { net_amount: ['Net amount must be a non-negative decimal.'] },
+                { net_amount: ['Net amount must be a positive decimal.'] },
             ));
             return;
         }
@@ -141,6 +141,7 @@ export function RentalExpenseEditor({
                     label="Net Amount"
                     value={netAmount}
                     onChange={e => setNetAmount(e.target.value)}
+                    placeholder="0.00"
                     required
                     inputMode="decimal"
                     error={error?.fields.net_amount?.[0]}
@@ -198,7 +199,7 @@ export function RentalExpenseEditor({
             </details>
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                <Button type="submit" loading={saving} disabled={!vehicle || !currency || !expenseDate || !netAmount}>Save Expense Record</Button>
+                <Button type="submit" loading={saving} disabled={!vehicle || !currency || !expenseDate || !netAmount.trim() || Number(netAmount) <= 0}>Save Expense Record</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
             </div>
         </form>

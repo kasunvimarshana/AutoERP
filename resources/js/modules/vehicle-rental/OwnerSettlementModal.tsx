@@ -45,11 +45,12 @@ export function OwnerSettlementModal({
         setGeneratedBill(null);
 
         try {
+            const parsedWht = whtRate.trim() !== '' && !isNaN(Number(whtRate)) ? Number(whtRate) : 0;
             const bill = await generateOwnerSettlementBill({
                 owner_agreement_id: ownerAgreementId,
                 start_date: startDate,
                 end_date: endDate,
-                wht_rate: parseFloat(whtRate) || 10,
+                wht_rate: parsedWht,
                 invoice_date: invoiceDate,
                 due_date: dueDate || null,
             });

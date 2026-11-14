@@ -21,6 +21,7 @@ final class BillingCycleChart extends TenantOwnedModel
             'commercial_km' => 'decimal:'.AgreementFields::DECIMAL_SCALE,
             'normal_ot_minutes' => 'integer',
             'double_ot_minutes' => 'integer',
+            'triple_ot_minutes' => 'integer',
             'night_outs' => 'integer',
             'tolls_amount' => 'decimal:'.AgreementFields::DECIMAL_SCALE,
             'is_replacement' => 'boolean',

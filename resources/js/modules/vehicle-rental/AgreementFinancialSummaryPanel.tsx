@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
@@ -23,6 +24,7 @@ import {
     type BillingCycle,
 } from './agreementApi';
 import { BillingCycleWizardModal } from './BillingCycleWizardModal';
+import { OwnerSettlementModal } from './OwnerSettlementModal';
 import { ReassignmentHistoryPanel } from './ReassignmentHistoryPanel';
 
 interface Props {
@@ -52,6 +54,7 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
     const [billingCycles, setBillingCycles] = useState<BillingCycle[]>([]);
     const [selectedCycle, setSelectedCycle] = useState<BillingCycle | 'new' | null>(null);
     const [showCycleModal, setShowCycleModal] = useState(false);
+    const [showOwnerSettlementModal, setShowOwnerSettlementModal] = useState(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -217,14 +220,24 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                     {/* Actions Bar */}
                     <div className="flex items-center justify-between">
                         <h3 className="text-base font-semibold text-slate-900">Linked Financial Documents</h3>
-                        {canManageAdjustments && agreement.status === AgreementStatus.Active && (
-                            <Button
-                                variant="primary"
-                                onClick={() => setShowAdjustmentDialog(true)}
-                            >
-                                + Issue Credit / Debit Note
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {!isCustomer && canManageAdjustments && agreement.status === AgreementStatus.Active && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowOwnerSettlementModal(true)}
+                                >
+                                    Generate Owner Settlement Bill
+                                </Button>
+                            )}
+                            {canManageAdjustments && agreement.status === AgreementStatus.Active && (
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setShowAdjustmentDialog(true)}
+                                >
+                                    + Issue Credit / Debit Note
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Adjustment Dialog */}
@@ -330,7 +343,12 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                                 {summary.documents.map(doc => (
                                     <tr key={doc.id} className="transition-colors hover:bg-blue-50/30">
                                         <td className="px-4 py-3 font-medium text-slate-900">
-                                            {doc.invoice_number}
+                                            <Link
+                                                to={`/invoices/${doc.id}`}
+                                                className="font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                                            >
+                                                {doc.invoice_number}
+                                            </Link>
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
@@ -540,6 +558,21 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                     agreement={agreement}
                     cycle={selectedCycle === 'new' ? null : selectedCycle}
                     onCycleUpdated={() => reloadSummary()}
+                />
+            )}
+
+            {showOwnerSettlementModal && (
+                <OwnerSettlementModal
+                    open={showOwnerSettlementModal}
+                    onClose={() => setShowOwnerSettlementModal(false)}
+                    ownerAgreementId={agreement.id}
+                    ownerAgreementReference={agreement.reference}
+                    defaultStartDate={agreement.starts_on ?? undefined}
+                    defaultEndDate={agreement.ends_on ?? undefined}
+                    onBillGenerated={() => {
+                        setShowOwnerSettlementModal(false);
+                        reloadSummary();
+                    }}
                 />
             )}
         </div>

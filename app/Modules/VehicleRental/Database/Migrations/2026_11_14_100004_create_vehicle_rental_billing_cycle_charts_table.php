@@ -23,6 +23,7 @@ return new class extends Migration
             $table->decimal('commercial_km', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(0);
             $table->unsignedInteger('normal_ot_minutes')->default(0);
             $table->unsignedInteger('double_ot_minutes')->default(0);
+            $table->unsignedInteger('triple_ot_minutes')->default(0);
             $table->unsignedInteger('night_outs')->default(0);
             $table->decimal('tolls_amount', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(0);
             $table->boolean('is_replacement')->default(false);

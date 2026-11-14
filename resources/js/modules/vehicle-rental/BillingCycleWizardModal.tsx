@@ -55,8 +55,8 @@ export function BillingCycleWizardModal({
     const today = businessDateInputValue();
     const [periodFrom, setPeriodFrom] = useState(agreement.starts_on ?? today);
     const [periodUntil, setPeriodUntil] = useState(agreement.ends_on ?? today);
-    const [billingMode, setBillingMode] = useState('monthly');
-    const [finalizationMode, setFinalizationMode] = useState('supplementary');
+    const [billingMode, setBillingMode] = useState('without_running_chart');
+    const [finalizationMode, setFinalizationMode] = useState('supplementary_invoice');
     const [issueInitialInvoice, setIssueInitialInvoice] = useState(true);
     const [invoiceDate, setInvoiceDate] = useState(today);
     const [dueDate, setDueDate] = useState('');
@@ -66,8 +66,6 @@ export function BillingCycleWizardModal({
     const [candidateCharts, setCandidateCharts] = useState<EligibleRunningChart[]>([]);
     const [candidateLoading, setCandidateLoading] = useState(false);
     const [selectedChartIds, setSelectedChartIds] = useState<Set<number>>(new Set());
-    const [chartIdsInput, setChartIdsInput] = useState('');
-    const [showManualInput, setShowManualInput] = useState(false);
 
     // Add Item State
     const [itemType, setItemType] = useState<'addition' | 'deduction'>('addition');
@@ -75,6 +73,8 @@ export function BillingCycleWizardModal({
     const [description, setDescription] = useState('');
     const [quantity, setQuantity] = useState('1.000');
     const [unitRate, setUnitRate] = useState('');
+    const [itemVehicleId, setItemVehicleId] = useState('');
+    const [itemDriverId, setItemDriverId] = useState('');
 
     // Finalize / Preview State
     const [preview, setPreview] = useState<BillingCyclePreview | null>(null);
@@ -98,6 +98,41 @@ export function BillingCycleWizardModal({
     }, [initialCycle, agreement, today]);
 
     const cur = agreement.currency.code;
+
+    const availableVehicles = React.useMemo(() => {
+        const map = new Map<number, string>();
+        if (candidateCharts) {
+            for (const c of candidateCharts) {
+                if (c.vehicle_id) map.set(c.vehicle_id, c.vehicle_label || c.vehicle_number);
+            }
+        }
+        if (currentCycle?.charts) {
+            for (const c of currentCycle.charts) {
+                if (c.vehicle_id) {
+                    const label = c.vehicle?.registration_number || c.vehicle?.vehicle_number || `Vehicle #${c.vehicle_id}`;
+                    map.set(c.vehicle_id, label);
+                }
+            }
+        }
+        if (preview?.vehicle_attributions) {
+            for (const va of preview.vehicle_attributions) {
+                map.set(va.vehicle_id, va.vehicle_label || va.vehicle_number);
+            }
+        }
+        return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
+    }, [candidateCharts, currentCycle, preview]);
+
+    const availableDrivers = React.useMemo(() => {
+        const map = new Map<number, string>();
+        if (preview?.driver_attributions) {
+            for (const da of preview.driver_attributions) {
+                if (da.driver_employee_id) {
+                    map.set(da.driver_employee_id, `${da.driver_name}${da.driver_reference ? ` (${da.driver_reference})` : ''}`);
+                }
+            }
+        }
+        return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
+    }, [preview]);
 
     async function loadCandidates(cycleId: number) {
         setCandidateLoading(true);
@@ -163,15 +198,7 @@ export function BillingCycleWizardModal({
         if (e) e.preventDefault();
         if (!currentCycle) return;
 
-        let ids: number[] = [];
-        if (chartIdsInput.trim()) {
-            ids = chartIdsInput
-                .split(',')
-                .map(s => parseInt(s.trim(), 10))
-                .filter(n => !isNaN(n) && n > 0);
-        } else {
-            ids = Array.from(selectedChartIds);
-        }
+        const ids = Array.from(selectedChartIds);
 
         if (ids.length === 0) {
             setError(toApiError(new Error('Please select at least one Running Chart to attach.')));
@@ -183,7 +210,6 @@ export function BillingCycleWizardModal({
         try {
             const updated = await attachCycleCharts(currentCycle.id, ids, currentCycle.row_version);
             setCurrentCycle(updated);
-            setChartIdsInput('');
             setFeedback('Running charts attached successfully.');
             if (onCycleUpdated) onCycleUpdated(updated);
             await loadCandidates(currentCycle.id);
@@ -207,11 +233,15 @@ export function BillingCycleWizardModal({
                 description: description.trim(),
                 quantity: quantity || '1.000',
                 unit_rate: unitRate,
+                vehicle_id: itemVehicleId ? Number(itemVehicleId) : undefined,
+                driver_employee_id: itemDriverId ? Number(itemDriverId) : undefined,
             }, currentCycle.row_version);
 
             setDescription('');
             setUnitRate('');
             setQuantity('1.000');
+            setItemVehicleId('');
+            setItemDriverId('');
             setFeedback('Item added successfully.');
             await reloadCycle(currentCycle.id);
         } catch (err) {
@@ -316,10 +346,8 @@ export function BillingCycleWizardModal({
                                 value={billingMode}
                                 onChange={e => setBillingMode(e.target.value)}
                                 options={[
-                                    { value: 'monthly', label: 'Monthly' },
-                                    { value: 'weekly', label: 'Weekly' },
-                                    { value: 'daily', label: 'Daily' },
-                                    { value: 'custom', label: 'Custom' },
+                                    { value: 'without_running_chart', label: 'Provisional Base Rent Invoicing (Without Running Charts)' },
+                                    { value: 'with_running_chart', label: 'Direct Consolidated Invoicing (With Running Charts)' },
                                 ]}
                                 required
                             />
@@ -328,8 +356,8 @@ export function BillingCycleWizardModal({
                                 value={finalizationMode}
                                 onChange={e => setFinalizationMode(e.target.value)}
                                 options={[
-                                    { value: 'supplementary', label: 'Mode A: Supplementary Usage Invoice' },
-                                    { value: 'consolidated', label: 'Mode B: Consolidated Revision & Credit Note' },
+                                    { value: 'supplementary_invoice', label: 'Mode A: Supplementary Usage Invoice' },
+                                    { value: 'consolidated_revision', label: 'Mode B: Consolidated Revision & Credit Note' },
                                 ]}
                                 required
                             />
@@ -595,7 +623,7 @@ export function BillingCycleWizardModal({
                                                                 </td>
                                                                 <td className="px-3 py-2 text-slate-700">{c.driver_name}</td>
                                                                 <td className="px-3 py-2 text-right font-medium">{c.commercial_km}</td>
-                                                                <td className="px-3 py-2 text-right">{c.normal_ot_minutes + c.double_ot_minutes}</td>
+                                                                <td className="px-3 py-2 text-right">{c.normal_ot_minutes + c.double_ot_minutes + (c.triple_ot_minutes ?? 0)}</td>
                                                                 <td className="px-3 py-2">
                                                                     {c.is_already_finalized ? (
                                                                         <span className="text-[10px] text-slate-500 italic">Billed elsewhere</span>
@@ -612,14 +640,7 @@ export function BillingCycleWizardModal({
                                             </table>
                                         </div>
 
-                                        <div className="flex justify-between items-center pt-2">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                onClick={() => setShowManualInput(!showManualInput)}
-                                            >
-                                                {showManualInput ? 'Hide manual ID entry' : 'Manual ID entry...'}
-                                            </Button>
+                                        <div className="flex justify-end items-center pt-2">
                                             <Button
                                                 type="button"
                                                 variant="primary"
@@ -631,22 +652,6 @@ export function BillingCycleWizardModal({
                                             </Button>
                                         </div>
                                     </div>
-                                )}
-
-                                {!isFinalized && showManualInput && (
-                                    <form onSubmit={handleAttachCharts} className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex gap-2 items-end">
-                                        <div className="flex-1">
-                                            <Input
-                                                label="Attach Running Chart IDs"
-                                                placeholder="e.g. 101, 102, 105"
-                                                value={chartIdsInput}
-                                                onChange={e => setChartIdsInput(e.target.value)}
-                                            />
-                                        </div>
-                                        <Button type="submit" variant="secondary" loading={submitting} disabled={!chartIdsInput.trim()}>
-                                            Attach Charts
-                                        </Button>
-                                    </form>
                                 )}
 
                                 <div className="space-y-2">
@@ -762,6 +767,26 @@ export function BillingCycleWizardModal({
                                                 required
                                             />
                                         </div>
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <Select
+                                                label="Attributed Vehicle (Optional)"
+                                                value={itemVehicleId}
+                                                onChange={e => setItemVehicleId(e.target.value)}
+                                                options={[
+                                                    { value: '', label: 'General / No specific vehicle' },
+                                                    ...availableVehicles.map(v => ({ value: String(v.id), label: v.label })),
+                                                ]}
+                                            />
+                                            <Select
+                                                label="Attributed Driver (Optional)"
+                                                value={itemDriverId}
+                                                onChange={e => setItemDriverId(e.target.value)}
+                                                options={[
+                                                    { value: '', label: 'General / No specific driver' },
+                                                    ...availableDrivers.map(d => ({ value: String(d.id), label: d.label })),
+                                                ]}
+                                            />
+                                        </div>
                                         <div className="flex justify-end pt-2">
                                             <Button type="submit" variant="primary" loading={submitting} disabled={!description.trim() || !unitRate}>
                                                 Add Item
@@ -777,6 +802,7 @@ export function BillingCycleWizardModal({
                                                 <th className="px-3 py-2">Type</th>
                                                 <th className="px-3 py-2">Category</th>
                                                 <th className="px-3 py-2">Description</th>
+                                                <th className="px-3 py-2">Attribution</th>
                                                 <th className="px-3 py-2 text-right">Qty</th>
                                                 <th className="px-3 py-2 text-right">Unit Rate</th>
                                                 <th className="px-3 py-2 text-right">Total Amount</th>
@@ -798,6 +824,21 @@ export function BillingCycleWizardModal({
                                                         </td>
                                                         <td className="px-3 py-2 capitalize">{item.category.replace('_', ' ')}</td>
                                                         <td className="px-3 py-2 font-medium text-slate-800">{item.description}</td>
+                                                        <td className="px-3 py-2 text-slate-600">
+                                                            {item.vehicle?.registration_number || item.vehicle_number ? (
+                                                                <span className="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 text-[10px] font-semibold mr-1">
+                                                                    {item.vehicle?.registration_number || item.vehicle_number}
+                                                                </span>
+                                                            ) : null}
+                                                            {item.driver?.display_name || item.driver_name ? (
+                                                                <span className="inline-block px-1.5 py-0.5 rounded bg-purple-50 text-purple-800 text-[10px] font-semibold">
+                                                                    {item.driver?.display_name || item.driver_name}
+                                                                </span>
+                                                            ) : null}
+                                                            {!item.vehicle_id && !item.driver_employee_id && !item.vehicle_number && !item.driver_name && (
+                                                                <span className="text-slate-400">General</span>
+                                                            )}
+                                                        </td>
                                                         <td className="px-3 py-2 text-right">{item.quantity}</td>
                                                         <td className="px-3 py-2 text-right"><MoneyDisplay value={item.unit_rate} currency={cur} /></td>
                                                         <td className="px-3 py-2 text-right font-bold text-slate-900">
@@ -818,7 +859,7 @@ export function BillingCycleWizardModal({
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan={isFinalized ? 6 : 7} className="px-3 py-4 text-center text-slate-400">
+                                                    <td colSpan={isFinalized ? 7 : 8} className="px-3 py-4 text-center text-slate-400">
                                                         No addition or deduction line items added to this cycle.
                                                     </td>
                                                 </tr>
@@ -969,6 +1010,7 @@ export function BillingCycleWizardModal({
                                                                         <th className="px-3 py-1.5 text-center">Trips</th>
                                                                         <th className="px-3 py-1.5 text-right">Norm OT (h)</th>
                                                                         <th className="px-3 py-1.5 text-right">Dbl OT (h)</th>
+                                                                        <th className="px-3 py-1.5 text-right">Trpl OT (h)</th>
                                                                         <th className="px-3 py-1.5 text-right">Night Outs</th>
                                                                         <th className="px-3 py-1.5 text-right">Driver Total</th>
                                                                     </tr>
@@ -980,6 +1022,7 @@ export function BillingCycleWizardModal({
                                                                             <td className="px-3 py-1.5 text-center">{da.charts_count}</td>
                                                                             <td className="px-3 py-1.5 text-right">{da.normal_ot_hours}</td>
                                                                             <td className="px-3 py-1.5 text-right">{da.double_ot_hours}</td>
+                                                                            <td className="px-3 py-1.5 text-right">{da.triple_ot_hours ?? '0.000'}</td>
                                                                             <td className="px-3 py-1.5 text-right">{da.night_outs}</td>
                                                                             <td className="px-3 py-1.5 text-right font-bold text-slate-900">
                                                                                 <MoneyDisplay value={da.total_earnings} currency={cur} />

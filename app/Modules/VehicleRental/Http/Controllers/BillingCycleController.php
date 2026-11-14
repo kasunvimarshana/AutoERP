@@ -67,7 +67,8 @@ final class BillingCycleController
             ->with([
                 'charts.runningChart',
                 'charts.vehicle',
-                'items',
+                'items.vehicle',
+                'items.driver',
                 'initialInvoice',
                 'finalInvoice',
                 'supplementaryInvoice',

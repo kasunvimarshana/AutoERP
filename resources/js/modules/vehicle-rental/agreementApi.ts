@@ -170,6 +170,12 @@ export interface BillingCycleItem {
     quantity: string;
     unit_rate: string;
     amount: string;
+    vehicle_id?: number | null;
+    vehicle_number?: string | null;
+    driver_employee_id?: number | null;
+    driver_name?: string | null;
+    vehicle?: { id: number; vehicle_number: string; registration_number: string } | null;
+    driver?: { id: number; display_name: string; employee_number?: string } | null;
 }
 
 export interface BillingCycle {
@@ -214,14 +220,18 @@ export interface VehicleAttribution {
     total_km: string;
     normal_ot_hours: string;
     double_ot_hours: string;
+    triple_ot_hours?: string;
     night_outs: number;
     allocated_base_rent: string;
     allocated_ot_amount: string;
     allocated_night_out_amount: string;
+    attributed_additions?: string;
+    attributed_deductions?: string;
     subtotal: string;
 }
 
 export interface DriverAttribution {
+    driver_employee_id?: number | null;
     driver_name: string;
     driver_reference: string;
     charts_count: number;
@@ -230,8 +240,12 @@ export interface DriverAttribution {
     normal_ot_amount: string;
     double_ot_hours: string;
     double_ot_amount: string;
+    triple_ot_hours?: string;
+    triple_ot_amount?: string;
     night_outs: number;
     night_out_amount: string;
+    attributed_additions?: string;
+    attributed_deductions?: string;
     total_earnings: string;
 }
 
@@ -243,6 +257,7 @@ export interface EligibleRunningChart {
     commercial_km: string;
     normal_ot_minutes: number;
     double_ot_minutes: number;
+    triple_ot_minutes?: number;
     night_outs: number;
     driver_name: string;
     driver_reference: string;
@@ -360,6 +375,8 @@ export const addCycleItem = (cycleId: number, payload: {
     description: string;
     quantity: string;
     unit_rate: string;
+    vehicle_id?: number | null;
+    driver_employee_id?: number | null;
 }, expectedVersion: number) =>
     apiClient.post<ApiResource<BillingCycleItem>>(`${AGREEMENT_API}/billing-cycles/${cycleId}/items`, {
         ...payload,

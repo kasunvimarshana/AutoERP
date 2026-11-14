@@ -21,15 +21,27 @@ return new class extends Migration
             $table->decimal('quantity', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(1);
             $table->decimal('unit_rate', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(0);
             $table->decimal('amount', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(0);
+            $table->foreignId('vehicle_id')->nullable();
+            $table->foreignId('driver_employee_id')->nullable();
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'vrbci_tenant_uk');
             $table->index(['tenant_id', 'billing_cycle_id'], 'vrbci_cycle_ix');
+            $table->index(['tenant_id', 'vehicle_id'], 'vrbci_veh_ix');
+            $table->index(['tenant_id', 'driver_employee_id'], 'vrbci_drv_ix');
 
             $table->foreign(['billing_cycle_id', 'tenant_id'], 'vrbci_cycle_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_rental_billing_cycles')
                 ->cascadeOnDelete();
+            $table->foreign(['vehicle_id', 'tenant_id'], 'vrbci_veh_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicles')
+                ->nullOnDelete();
+            $table->foreign(['driver_employee_id', 'tenant_id'], 'vrbci_drv_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_employees')
+                ->nullOnDelete();
         });
     }
 

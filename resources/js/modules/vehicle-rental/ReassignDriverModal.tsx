@@ -74,7 +74,7 @@ export function ReassignDriverModal({ open, onClose, chart, vehicleUse, onSaved 
     }
 
     const currentDriverLabel = chart?.driver
-        ? `${chart.driver.name} (${chart.driver.reference ?? 'Emp ID: ' + (chart.driver.employee_id ?? '')})`
+        ? `${chart.driver.name} (${chart.driver.reference ?? 'Employee Driver'})`
         : vehicleUse?.driver_name
             ? vehicleUse.driver_name
             : 'Assigned Driver';
@@ -82,7 +82,7 @@ export function ReassignDriverModal({ open, onClose, chart, vehicleUse, onSaved 
     const modalTitle = chart
         ? `Reassign Driver for Chart ${chart.reference}`
         : vehicleUse
-            ? `Reassign Driver for Assignment (${vehicleUse.vehicle_label ?? `Use #${vehicleUse.id}`})`
+            ? `Reassign Driver for Assignment (${vehicleUse.vehicle_label ?? 'Vehicle Assignment'})`
             : 'Reassign Driver';
 
     return (

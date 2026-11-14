@@ -25,6 +25,8 @@ final class BillingCycleRequest extends TenantScopedRequest
             'quantity' => ['sometimes', 'numeric', 'gt:0'],
             'unit_rate' => ['sometimes', 'numeric'],
             'description' => ['sometimes', 'string', 'max:255'],
+            'vehicle_id' => ['nullable', 'integer', 'min:1'],
+            'driver_employee_id' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'issue_initial_invoice' => ['sometimes', 'boolean'],
             'invoice_date' => ['sometimes', 'date'],

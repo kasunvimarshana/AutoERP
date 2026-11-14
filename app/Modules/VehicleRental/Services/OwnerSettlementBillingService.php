@@ -68,7 +68,7 @@ final class OwnerSettlementBillingService
 
             $whtRate = isset($input['wht_rate']) && is_numeric($input['wht_rate'])
                 ? (string) $input['wht_rate']
-                : '10.000000';
+                : '0.000000';
 
             // 1. Fetch base charges for period
             $baseCharges = OwnerBaseCharge::query()

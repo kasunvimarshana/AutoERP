@@ -43,11 +43,11 @@ export function VehicleFinanceEditor({
     const [startsAt, setStartsAt] = useState(initialStart);
     const [maturesAt, setMaturesAt] = useState(() => computeMaturity(initialStart, 12));
     const [currency, setCurrency] = useState<NamedResource | null>(null);
-    const [principalAmount, setPrincipalAmount] = useState('1000000.00');
+    const [principalAmount, setPrincipalAmount] = useState('');
     const [depositAmount, setDepositAmount] = useState('0.00');
     const [residualValue, setResidualValue] = useState('0.00');
     const [interestMethod, setInterestMethod] = useState('flat');
-    const [annualRate, setAnnualRate] = useState('12.00');
+    const [annualRate, setAnnualRate] = useState('');
     const [frequency, setFrequency] = useState('monthly');
     const [count, setCount] = useState('12');
     const [termDays, setTermDays] = useState('30');
@@ -193,6 +193,7 @@ export function VehicleFinanceEditor({
                     label="Principal Financed Amount"
                     value={principalAmount}
                     onChange={e => setPrincipalAmount(e.target.value)}
+                    placeholder="0.00"
                     required
                     inputMode="decimal"
                     error={error?.fields.principal_amount?.[0]}
@@ -201,6 +202,7 @@ export function VehicleFinanceEditor({
                     label="Annual Interest Rate (%)"
                     value={annualRate}
                     onChange={e => setAnnualRate(e.target.value)}
+                    placeholder="e.g. 12.00"
                     required
                     inputMode="decimal"
                     error={error?.fields.annual_interest_rate?.[0]}
@@ -280,7 +282,7 @@ export function VehicleFinanceEditor({
             </details>
 
             <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                <Button type="submit" loading={saving} disabled={!supplier || !vehicle || !currency || !startsAt || !maturesAt}>Generate Schedule & Create Agreement</Button>
+                <Button type="submit" loading={saving} disabled={!supplier || !vehicle || !currency || !startsAt || !maturesAt || !principalAmount.trim() || !annualRate.trim()}>Generate Schedule & Create Agreement</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
             </div>
         </form>

@@ -150,4 +150,44 @@ final class OwnerSettlementBillingTest extends TestCase
             $this->assertSame($bill->id, $alloc->invoice_id);
         });
     }
+
+    public function test_owner_settlement_billing_defaults_to_zero_wht_when_unspecified(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $ownerData): void {
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['ends_on'] = '2026-09-30';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerData['terms'] = ['base_rate' => '50000.000000'];
+            $agreements = app(AgreementService::class);
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $baseCharge = new OwnerBaseCharge();
+            $baseCharge->tenant_id = $context->tenantId;
+            $baseCharge->organization_unit_id = $context->organizationUnitId;
+            $baseCharge->agreement_id = $ownerAg->id;
+            $baseCharge->period_from = '2026-09-01';
+            $baseCharge->period_until = '2026-09-30';
+            $baseCharge->amount = '50000.000000';
+            $baseCharge->calculation = ['rate' => '50000.000000'];
+            $baseCharge->actor_id = $context->actorId;
+            $baseCharge->save();
+
+            $settlementService = app(OwnerSettlementBillingService::class);
+            $bill = $settlementService->generateOwnerSettlementBill($context, $ownerAg->id, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                // Notice: wht_rate is intentionally omitted
+                'invoice_date' => '2026-09-30',
+            ]);
+
+            $this->assertNotNull($bill);
+            // Gross is 50,000, 0% WHT discount is 0, Net Payable is full 50,000
+            $this->assertEqualsWithDelta(50000.0, (float) $bill->grand_total, 0.01);
+            $this->assertEqualsWithDelta(0.0, (float) $bill->discount_total, 0.01);
+        });
+    }
 }

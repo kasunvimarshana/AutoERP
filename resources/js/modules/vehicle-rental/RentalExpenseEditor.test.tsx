@@ -88,4 +88,19 @@ describe('RentalExpenseEditor', () => {
             expect(onSaved).toHaveBeenCalled();
         });
     });
+
+    it('rejects zero or negative net amount', async () => {
+        render(<RentalExpenseEditor onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+        // Vehicle selection via LookupSelect
+        fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: '2020' } });
+        fireEvent.click(await screen.findByRole('option', { name: /WP-PX-2020/i }));
+
+        // Currency selection via LookupSelect
+        fireEvent.change(screen.getByRole('combobox', { name: 'Currency' }), { target: { value: 'LKR' } });
+        fireEvent.click(await screen.findByRole('option', { name: 'LKR - Sri Lankan Rupee' }));
+
+        const submitBtn = screen.getByRole('button', { name: 'Save Expense Record' });
+        expect(submitBtn).toBeDisabled();
+    });
 });

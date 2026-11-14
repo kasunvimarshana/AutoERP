@@ -60,6 +60,8 @@ final class TwoStageInvoicingTest extends TestCase
             $customerData['terms'] = [
                 'base_rate' => '30000.000000',
             ];
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
             $agreements = app(AgreementService::class);
             $agreement = $agreements->create(AgreementKind::Customer, $context, $customerData);
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
@@ -675,6 +677,389 @@ final class TwoStageInvoicingTest extends TestCase
             $consol = Invoice::query()->find($finalized->final_invoice_id);
             $this->assertNotNull($consol);
             $this->assertEqualsWithDelta(60000.0, (float) $consol->grand_total, 0.01);
+        });
+    }
+
+    public function test_billing_cycle_number_is_sequential_and_atomic(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = ['base_rate' => '30000.000000'];
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle1 = $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-15',
+            ]);
+            $cycle2 = $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-16',
+                'period_until' => '2026-09-30',
+            ]);
+
+            $this->assertStringStartsWith('VRBC-', $cycle1->cycle_number);
+            $this->assertStringStartsWith('VRBC-', $cycle2->cycle_number);
+            $this->assertNotEquals($cycle1->cycle_number, $cycle2->cycle_number);
+        });
+    }
+
+    public function test_unconfigured_ot_and_night_out_rates_default_to_zero(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            // Notice: NO normal_ot_rate, double_ot_rate, triple_ot_rate, or night_out_rate
+            $customerData['terms'] = [
+                'base_rate' => '30000.000000',
+                'included_km' => '1000.000000',
+            ];
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $customerAg->id, (int) $customerAg->row_version, [
+                'vehicle_id' => $ownerAg->vehicle_id,
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, (int) $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '10000.000000',
+                'reason' => 'Customer handover',
+            ]);
+
+            $charts = app(RunningChartService::class);
+            $chart = $charts->create($context, $use->id, (int) $use->row_version, [
+                'reference' => 'RC-TEST-UNCONFIG',
+                'starts_at' => '2026-09-02T08:00:00+00:00',
+                'ends_at' => '2026-09-02T20:00:00+00:00',
+                'start_odometer' => '10000.000000',
+                'end_odometer' => '10500.000000',
+                'commercial_km' => '500.000000',
+                'normal_ot_minutes' => 120,
+                'double_ot_minutes' => 60,
+                'triple_ot_minutes' => 30,
+                'night_outs' => 2,
+            ]);
+            $chart = $charts->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize, ['reason' => 'Trip complete']);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle = $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+            ]);
+
+            $cycle = $invoicing->attachRunningCharts($context, $cycle->id, [$chart->id], (int) $cycle->row_version);
+
+            // Undefined rates MUST resolve to 0.000000 automatic charge
+            $this->assertEqualsWithDelta(0.0, (float) $cycle->overtime_amount, 0.0001);
+            $this->assertEqualsWithDelta(0.0, (float) $cycle->night_out_amount, 0.0001);
+        });
+    }
+
+    public function test_two_stage_invoicing_computes_triple_overtime(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = [
+                'base_rate' => '30000.000000',
+                'included_km' => '1000.000000',
+                'excess_km_rate' => '100.000000',
+                'normal_ot_rate' => '1500.000000',
+                'double_ot_rate' => '2000.000000',
+                'triple_ot_rate' => '3000.000000',
+                'night_out_rate' => '1000.000000',
+            ];
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $customerAg->id, (int) $customerAg->row_version, [
+                'vehicle_id' => $ownerAg->vehicle_id,
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, (int) $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '10000.000000',
+                'reason' => 'Customer handover',
+            ]);
+
+            $charts = app(RunningChartService::class);
+            $chart = $charts->create($context, $use->id, (int) $use->row_version, [
+                'reference' => 'RC-TEST-TRIPLE-OT',
+                'starts_at' => '2026-09-02T08:00:00+00:00',
+                'ends_at' => '2026-09-02T20:00:00+00:00',
+                'start_odometer' => '10000.000000',
+                'end_odometer' => '10500.000000',
+                'commercial_km' => '500.000000',
+                'normal_ot_minutes' => 60,   // 1 hr * 1500 = 1,500
+                'double_ot_minutes' => 60,   // 1 hr * 2000 = 2,000
+                'triple_ot_minutes' => 60,   // 1 hr * 3000 = 3,000. Total OT = 6,500
+                'night_outs' => 1,
+            ]);
+            $chart = $charts->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize, ['reason' => 'Trip complete']);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle = $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+            ]);
+
+            $cycle = $invoicing->attachRunningCharts($context, $cycle->id, [$chart->id], (int) $cycle->row_version);
+
+            // Total OT = 1500 + 2000 + 3000 = 6,500
+            $this->assertEqualsWithDelta(6500.0, (float) $cycle->overtime_amount, 0.01);
+
+            // Preview attributions
+            $preview = $invoicing->previewFinalStage($context, $cycle->id);
+            $this->assertNotEmpty($preview['vehicle_attributions']);
+            $this->assertEqualsWithDelta(6500.0, (float) $preview['vehicle_attributions'][0]['allocated_ot_amount'], 0.01);
+            $this->assertSame(60, $preview['vehicle_attributions'][0]['triple_ot_minutes']);
+        });
+    }
+
+    public function test_non_running_chart_multi_vehicle_custody_proration(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = [
+                'base_rate' => '30000.000000',
+            ];
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, (int) $customerAg->row_version, AgreementAction::Activate);
+
+            // Vehicle 1
+            $ownerAg1 = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg1 = $agreements->change(AgreementKind::Owner, $context, $ownerAg1->id, (int) $ownerAg1->row_version, AgreementAction::Activate);
+
+            // Vehicle 2
+            $vehicle2Id = DB::table('vehicles')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'vehicle_number' => 'VEH-002',
+                'registration_number' => 'REG-002',
+                'status' => 'active',
+            ]);
+            $ownerData2 = array_replace($ownerData, [
+                'reference' => 'AG-OWNER-2',
+                'vehicle_id' => $vehicle2Id,
+            ]);
+            $ownerAg2 = $agreements->create(AgreementKind::Owner, $context, $ownerData2);
+            $ownerAg2 = $agreements->change(AgreementKind::Owner, $context, $ownerAg2->id, (int) $ownerAg2->row_version, AgreementAction::Activate);
+
+            $uses = app(VehicleUseService::class);
+
+            // Vehicle 1 used for 10 days: 2026-09-01 to 2026-09-10
+            $use1 = $uses->plan($context, $customerAg->id, (int) $customerAg->row_version, [
+                'vehicle_id' => $ownerAg1->vehicle_id,
+                'owner_agreement_id' => $ownerAg1->id,
+                'starts_at' => '2026-09-01T00:00:00+00:00',
+                'ends_at' => '2026-09-10T23:59:59+00:00',
+            ]);
+            $use1 = $uses->transition($context, $use1->id, (int) $use1->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T00:00:00+00:00',
+                'odometer' => '10000.000000',
+                'reason' => 'First vehicle handover',
+            ]);
+
+            // Vehicle 2 used for 20 days: 2026-09-11 to 2026-09-30
+            $customerAg = $customerAg->fresh();
+            $use2 = $uses->plan($context, $customerAg->id, (int) $customerAg->row_version, [
+                'vehicle_id' => $vehicle2Id,
+                'owner_agreement_id' => $ownerAg2->id,
+                'starts_at' => '2026-09-11T00:00:00+00:00',
+                'ends_at' => '2026-09-30T23:59:59+00:00',
+            ]);
+            $use2 = $uses->transition($context, $use2->id, (int) $use2->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-11T00:00:00+00:00',
+                'odometer' => '50000.000000',
+                'reason' => 'Second vehicle replacement handover',
+            ]);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle = $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+                'issue_initial_invoice' => false,
+            ]);
+
+            // No running charts attached -> Non-running chart mode
+            $preview = $invoicing->previewFinalStage($context, $cycle->id);
+
+            $this->assertFalse($preview['has_running_charts']);
+            $this->assertCount(2, $preview['vehicle_attributions']);
+
+            $attr1 = collect($preview['vehicle_attributions'])->firstWhere('vehicle_id', $ownerAg1->vehicle_id);
+            $attr2 = collect($preview['vehicle_attributions'])->firstWhere('vehicle_id', $vehicle2Id);
+
+            $this->assertNotNull($attr1);
+            $this->assertNotNull($attr2);
+
+            $this->assertSame(10, $attr1['custody_days']);
+            $this->assertSame(20, $attr2['custody_days']);
+
+            // 10/30 * 30000 = 10000, 20/30 * 30000 = 20000
+            $this->assertEqualsWithDelta(10000.0, (float) $attr1['allocated_base_rent'], 0.01);
+            $this->assertEqualsWithDelta(20000.0, (float) $attr2['allocated_base_rent'], 0.01);
+
+            $totalAllocatedRent = (float) $attr1['allocated_base_rent'] + (float) $attr2['allocated_base_rent'];
+            $this->assertEqualsWithDelta(30000.0, $totalAllocatedRent, 0.01);
+        });
+    }
+
+    public function test_item_attribution_to_specific_vehicle_and_driver(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = [
+                'base_rate' => '30000.000000',
+            ];
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, (int) $customerAg->row_version, AgreementAction::Activate);
+
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, (int) $ownerAg->row_version, AgreementAction::Activate);
+
+            $driverId = DB::table('hr_employees')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'employee_number' => 'DRV-ATTR-01',
+                'first_name' => 'Dwight',
+                'display_name' => 'Dwight Schrute',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $customerAg->id, (int) $customerAg->row_version, [
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, (int) $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '10000.000000',
+                'reason' => 'Handover',
+            ]);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle = $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+            ]);
+
+            // Add line items with specific vehicle and driver attribution
+            $invoicing->addItem($context, $cycle->id, [
+                'item_type' => BillingCycleItemType::Addition->value,
+                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::FuelCharge->value,
+                'description' => 'Vehicle Fuel Surcharge',
+                'quantity' => '1.000000',
+                'unit_rate' => '4500.000000',
+                'vehicle_id' => $ownerData['vehicle_id'],
+            ], (int) $cycle->row_version);
+            $cycle = $cycle->fresh();
+
+            $invoicing->addItem($context, $cycle->id, [
+                'item_type' => BillingCycleItemType::Addition->value,
+                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::DriverAllowance->value,
+                'description' => 'Driver Outstation Allowance',
+                'quantity' => '1.000000',
+                'unit_rate' => '2500.000000',
+                'driver_employee_id' => $driverId,
+            ], (int) $cycle->row_version);
+            $cycle = $cycle->fresh();
+
+            $invoicing->addItem($context, $cycle->id, [
+                'item_type' => BillingCycleItemType::Deduction->value,
+                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::Other->value,
+                'description' => 'Driver Late Penalty',
+                'quantity' => '1.000000',
+                'unit_rate' => '500.000000',
+                'driver_employee_id' => $driverId,
+            ], (int) $cycle->row_version);
+            $cycle = $cycle->fresh();
+
+            // Assert items table has stored attributes
+            $items = $cycle->fresh(['items.vehicle', 'items.driver'])->items;
+            $this->assertCount(3, $items);
+
+            $fuelItem = $items->firstWhere('description', 'Vehicle Fuel Surcharge');
+            $this->assertSame($ownerData['vehicle_id'], $fuelItem->vehicle_id);
+            $this->assertNotNull($fuelItem->vehicle);
+            $this->assertNull($fuelItem->driver_employee_id);
+
+            $allowanceItem = $items->firstWhere('description', 'Driver Outstation Allowance');
+            $this->assertSame($driverId, $allowanceItem->driver_employee_id);
+            $this->assertNotNull($allowanceItem->driver);
+            $this->assertNull($allowanceItem->vehicle_id);
+
+            // Preview final stage and check attributions
+            $preview = $invoicing->previewFinalStage($context, $cycle->id);
+
+            // Vehicle attributions
+            $vehAttr = collect($preview['vehicle_attributions'])->firstWhere('vehicle_id', $ownerData['vehicle_id']);
+            $this->assertNotNull($vehAttr);
+            $this->assertEqualsWithDelta(4500.0, (float) $vehAttr['attributed_additions'], 0.01);
+            $this->assertEqualsWithDelta(0.0, (float) $vehAttr['attributed_deductions'], 0.01);
+
+            // Driver attributions
+            $drvAttr = collect($preview['driver_attributions'])->firstWhere('driver_employee_id', $driverId);
+            $this->assertNotNull($drvAttr);
+            $this->assertSame('Dwight Schrute', $drvAttr['driver_name']);
+            $this->assertEqualsWithDelta(2500.0, (float) $drvAttr['attributed_additions'], 0.01);
+            $this->assertEqualsWithDelta(500.0, (float) $drvAttr['attributed_deductions'], 0.01);
+            $this->assertEqualsWithDelta(2000.0, (float) $drvAttr['total_earnings'], 0.01);
+
+            // Check line items in preview
+            $previewItems = collect($preview['line_items']);
+            $fuelPreview = $previewItems->firstWhere('description', 'Vehicle Fuel Surcharge');
+            $this->assertSame($ownerData['vehicle_id'], $fuelPreview['vehicle_id']);
+
+            $drvPreview = $previewItems->firstWhere('description', 'Driver Outstation Allowance');
+            $this->assertSame($driverId, $drvPreview['driver_employee_id']);
+            $this->assertSame('Dwight Schrute', $drvPreview['driver_name']);
         });
     }
 }
