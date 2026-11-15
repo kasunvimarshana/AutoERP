@@ -22,7 +22,7 @@ final class PaymentReceiptService
         $payment->loadMissing([
             'currency',
             'lines.paymentMethod',
-            'allocations.invoice',
+            'allocations',
             'unappliedBalance',
         ]);
 
@@ -35,15 +35,13 @@ final class PaymentReceiptService
 
         $agreementRef = $payment->metadata['agreement_reference'] ?? null;
         if (! $agreementRef && $payment->allocations->isNotEmpty()) {
-            foreach ($payment->allocations as $alloc) {
-                if ($alloc->invoice?->sources?->isNotEmpty()) {
-                    foreach ($alloc->invoice->sources as $src) {
-                        if (! empty($src->source_document_number)) {
-                            $agreementRef = $src->source_document_number;
-                            break 2;
-                        }
-                    }
-                }
+            $invoiceIds = $payment->allocations->pluck('invoice_id')->filter()->all();
+            if (! empty($invoiceIds)) {
+                $agreementRef = \Illuminate\Support\Facades\DB::table('invoice_sources')
+                    ->where('tenant_id', $payment->tenant_id)
+                    ->whereIn('invoice_id', $invoiceIds)
+                    ->whereNotNull('source_document_number')
+                    ->value('source_document_number');
             }
         }
 
@@ -77,10 +75,29 @@ final class PaymentReceiptService
             ];
         })->all();
 
-        $allocations = $payment->allocations->map(function (PaymentAllocation $alloc) {
-            $inv = $alloc->invoice;
-            $invNo = $alloc->invoice_number_snapshot ?? $inv?->invoice_number ?? "INV-#{$alloc->invoice_id}";
-            $invDate = $alloc->invoice_date_snapshot?->toDateString() ?? $inv?->invoice_date?->toDateString() ?? '—';
+        $missingSnapshots = $payment->allocations->filter(
+            fn (PaymentAllocation $a) => empty($a->invoice_number_snapshot) || $a->invoice_date_snapshot === null
+        );
+        $legacyInvoices = [];
+        if ($missingSnapshots->isNotEmpty()) {
+            $missingIds = $missingSnapshots->pluck('invoice_id')->filter()->all();
+            if (! empty($missingIds)) {
+                $legacyInvoices = \Illuminate\Support\Facades\DB::table('invoices')
+                    ->where('tenant_id', $payment->tenant_id)
+                    ->whereIn('id', $missingIds)
+                    ->get(['id', 'invoice_number', 'invoice_date'])
+                    ->keyBy('id')
+                    ->all();
+            }
+        }
+
+        $allocations = $payment->allocations->map(function (PaymentAllocation $alloc) use ($legacyInvoices) {
+            $legacy = $legacyInvoices[$alloc->invoice_id] ?? null;
+            $invNo = ! empty($alloc->invoice_number_snapshot)
+                ? $alloc->invoice_number_snapshot
+                : ($legacy?->invoice_number ?? "INV-#{$alloc->invoice_id}");
+            $invDate = $alloc->invoice_date_snapshot?->toDateString()
+                ?? ($legacy?->invoice_date ? \Carbon\Carbon::parse($legacy->invoice_date)->toDateString() : '—');
 
             return [
                 'id' => $alloc->id,

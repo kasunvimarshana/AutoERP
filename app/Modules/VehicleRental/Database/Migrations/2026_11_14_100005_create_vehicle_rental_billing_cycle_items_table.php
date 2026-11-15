@@ -37,11 +37,11 @@ return new class extends Migration
             $table->foreign(['vehicle_id', 'tenant_id'], 'vrbci_veh_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicles')
-                ->nullOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['driver_employee_id', 'tenant_id'], 'vrbci_drv_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('hr_employees')
-                ->nullOnDelete();
+                ->restrictOnDelete();
         });
     }
 

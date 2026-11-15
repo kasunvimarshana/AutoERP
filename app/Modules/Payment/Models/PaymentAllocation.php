@@ -45,11 +45,6 @@ final class PaymentAllocation extends TenantOwnedModel
         return $this->belongsTo(Payment::class, 'payment_id');
     }
 
-    public function invoice(): BelongsTo
-    {
-        return $this->belongsTo(\Modules\Invoice\Models\Invoice::class, 'invoice_id');
-    }
-
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(TenantModel::class, 'tenant_id');

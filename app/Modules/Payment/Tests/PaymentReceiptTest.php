@@ -71,6 +71,144 @@ final class PaymentReceiptTest extends TestCase
         });
     }
 
+    public function test_compile_receipt_with_allocations_and_source_document_resolution(): void
+    {
+        [$tenantId, $payment] = $this->paymentFixture(PaymentDirection::Inbound, PaymentType::CustomerReceipt);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $payment): void {
+            // Create an invoice
+            $invoiceId = DB::table('invoices')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $payment->organization_unit_id,
+                'invoice_number' => 'INV-2026-9999',
+                'invoice_type' => 'standard',
+                'direction' => 'outbound',
+                'party_type' => 'customer',
+                'party_id' => $payment->party_id,
+                'status' => 'posted',
+                'invoice_date' => '2026-11-10',
+                'due_date' => '2026-11-20',
+                'currency_id' => $payment->currency_id,
+                'exchange_rate' => '1.000000',
+                'subtotal' => '15000.000000',
+                'tax_total' => '0.000000',
+                'grand_total' => '15000.000000',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Create invoice source with agreement reference
+            DB::table('invoice_sources')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $payment->organization_unit_id,
+                'invoice_id' => $invoiceId,
+                'source_type' => 'vehicle_rental_agreement',
+                'source_id' => 12345,
+                'source_document_number' => 'AGR-RENTAL-2026-001',
+                'source_document_date' => '2026-11-01',
+                'source_subtotal' => '15000.000000',
+                'source_grand_total' => '15000.000000',
+                'invoiced_amount' => '15000.000000',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Create allocation with snapshot
+            DB::table('payment_allocations')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $payment->organization_unit_id,
+                'payment_id' => $payment->getKey(),
+                'invoice_id' => $invoiceId,
+                'active_identity_slot' => 1,
+                'invoice_number_snapshot' => 'INV-2026-9999',
+                'invoice_date_snapshot' => '2026-11-10',
+                'invoice_currency_code_snapshot' => 'LKR',
+                'invoice_exchange_rate_snapshot' => '1.000000',
+                'invoice_total' => '15000.000000',
+                'invoice_balance_before' => '15000.000000',
+                'previously_allocated_amount' => '0.000000',
+                'allocated_amount' => '15000.000000',
+                'invoice_balance_after' => '0.000000',
+                'allocation_date' => '2026-11-15',
+                'allocation_method' => 'specific_invoice',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $service = app(PaymentReceiptService::class);
+            $receiptData = $service->getReceiptData($payment->fresh());
+
+            self::assertSame('AGR-RENTAL-2026-001', $receiptData['agreement_reference']);
+            self::assertCount(1, $receiptData['allocations']);
+            self::assertSame('INV-2026-9999', $receiptData['allocations'][0]['invoice_number']);
+            self::assertSame('2026-11-10', $receiptData['allocations'][0]['invoice_date']);
+            self::assertSame('15000.000000', $receiptData['allocations'][0]['allocated_amount']);
+
+            $html = view('payment.receipt', $receiptData)->render();
+            self::assertStringContainsString('AGR-RENTAL-2026-001', $html);
+            self::assertStringContainsString('INV-2026-9999', $html);
+        });
+    }
+
+    public function test_compile_receipt_with_legacy_allocation_missing_snapshot(): void
+    {
+        [$tenantId, $payment] = $this->paymentFixture(PaymentDirection::Inbound, PaymentType::CustomerReceipt);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $payment): void {
+            $invoiceId = DB::table('invoices')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $payment->organization_unit_id,
+                'invoice_number' => 'INV-LEGACY-0042',
+                'invoice_type' => 'standard',
+                'direction' => 'outbound',
+                'party_type' => 'customer',
+                'party_id' => $payment->party_id,
+                'status' => 'posted',
+                'invoice_date' => '2026-10-01',
+                'due_date' => '2026-10-15',
+                'currency_id' => $payment->currency_id,
+                'exchange_rate' => '1.000000',
+                'subtotal' => '5000.000000',
+                'tax_total' => '0.000000',
+                'grand_total' => '5000.000000',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Legacy allocation where snapshot is empty/missing
+            DB::table('payment_allocations')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $payment->organization_unit_id,
+                'payment_id' => $payment->getKey(),
+                'invoice_id' => $invoiceId,
+                'active_identity_slot' => 1,
+                'invoice_number_snapshot' => '',
+                'invoice_date_snapshot' => null,
+                'invoice_currency_code_snapshot' => 'LKR',
+                'invoice_exchange_rate_snapshot' => '1.000000',
+                'invoice_total' => '5000.000000',
+                'invoice_balance_before' => '5000.000000',
+                'previously_allocated_amount' => '0.000000',
+                'allocated_amount' => '5000.000000',
+                'invoice_balance_after' => '0.000000',
+                'allocation_date' => '2026-11-15',
+                'allocation_method' => 'specific_invoice',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $service = app(PaymentReceiptService::class);
+            $receiptData = $service->getReceiptData($payment->fresh());
+
+            // Successfully recovered invoice_number and invoice_date from fallback query
+            self::assertCount(1, $receiptData['allocations']);
+            self::assertSame('INV-LEGACY-0042', $receiptData['allocations'][0]['invoice_number']);
+            self::assertSame('2026-10-01', $receiptData['allocations'][0]['invoice_date']);
+        });
+    }
+
     private function paymentFixture(PaymentDirection $direction, PaymentType $type): array
     {
         $code = Str::upper(Str::random(10));

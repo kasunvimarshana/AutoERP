@@ -215,7 +215,7 @@ final class RentalPaymentService
             return $payment->fresh([
                 'currency',
                 'lines.paymentMethod',
-                'allocations.invoice',
+                'allocations',
                 'unappliedBalance',
             ]);
         });
@@ -367,7 +367,7 @@ final class RentalPaymentService
             return $payment->fresh([
                 'currency',
                 'lines.paymentMethod',
-                'allocations.invoice',
+                'allocations',
                 'unappliedBalance',
             ]);
         });
@@ -574,7 +574,7 @@ final class RentalPaymentService
                 PaymentSourceType::RentalAgreementDeposit->value,
             ])
             ->where('source_id', $agreement->id)
-            ->with(['lines.paymentMethod', 'allocations.invoice', 'unappliedBalance'])
+            ->with(['lines.paymentMethod', 'allocations', 'unappliedBalance'])
             ->get();
 
         // 2. Invoices linked to this agreement
@@ -623,7 +623,7 @@ final class RentalPaymentService
             ->where('tenant_id', $context->tenantId)
             ->where('organization_unit_id', $context->organizationUnitId)
             ->whereIn('id', $allocatedPaymentIds)
-            ->with(['lines.paymentMethod', 'allocations.invoice', 'unappliedBalance'])
+            ->with(['lines.paymentMethod', 'allocations', 'unappliedBalance'])
             ->get();
 
         // 4. Linked refunds originating from these agreement payments
@@ -634,7 +634,7 @@ final class RentalPaymentService
                 ->where('organization_unit_id', $context->organizationUnitId)
                 ->where('payment_type', PaymentType::Refund->value)
                 ->whereIn('original_payment_id', $originalPaymentIds)
-                ->with(['lines.paymentMethod', 'allocations.invoice', 'unappliedBalance'])
+                ->with(['lines.paymentMethod', 'allocations', 'unappliedBalance'])
                 ->get()
             : collect();
 
@@ -654,7 +654,7 @@ final class RentalPaymentService
             $allocs = $p->allocations->map(fn ($a) => [
                 'id' => $a->id,
                 'invoice_id' => $a->invoice_id,
-                'invoice_number' => $a->invoice_number_snapshot ?? $a->invoice?->invoice_number ?? "INV-#{$a->invoice_id}",
+                'invoice_number' => $a->invoice_number_snapshot ?? "INV-#{$a->invoice_id}",
                 'allocated_amount' => (string) $a->allocated_amount,
                 'status' => $a->status,
             ])->all();

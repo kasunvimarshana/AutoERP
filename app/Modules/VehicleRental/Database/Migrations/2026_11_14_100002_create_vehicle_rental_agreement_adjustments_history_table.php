@@ -20,6 +20,7 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable();
             $table->timestamps();
 
+            $table->unique(['id', 'tenant_id'], 'vraah_tenant_uk');
             $table->index(['tenant_id', 'adjustment_id'], 'vraah_adj_ix');
             $table->foreign(['adjustment_id', 'tenant_id'], 'vraah_adj_fk')
                 ->references(['id', 'tenant_id'])

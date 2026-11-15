@@ -25,6 +25,10 @@ return new class extends Migration
             $table->decimal('base_quantity', 20, 6);
             $table->decimal('unit_price', 20, 6);
             $table->decimal('unit_cost_snapshot', 20, 6)->default('0.000000');
+            $table->string('discount_type', 20)->nullable();
+            $table->decimal('discount_value', 20, 6)->default('0.000000');
+            $table->decimal('discount_amount', 20, 6)->default('0.000000');
+            $table->decimal('bill_discount_allocated', 20, 6)->default('0.000000');
             $table->decimal('line_total', 20, 6);
             $table->string('description');
             $table->foreignId('inventory_movement_id')->nullable();
