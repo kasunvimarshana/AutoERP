@@ -8,6 +8,7 @@ describe('Vehicle Rental navigation', () => {
             'Reservations',
             'Customer Agreements',
             'Owner Agreements',
+            'Invoices & Owner Bills',
             'Vehicle Use Register',
             'Running Chart Register',
             'Fleet Expenses',

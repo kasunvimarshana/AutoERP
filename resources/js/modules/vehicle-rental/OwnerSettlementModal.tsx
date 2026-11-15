@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '@/shared/components/Modal';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { LookupSelect } from '@/shared/components/LookupSelect';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
-import { generateOwnerSettlementBill } from './agreementApi';
+import { generateOwnerSettlementBill, searchOwnerAgreements } from './agreementApi';
 
 interface Props {
     open: boolean;
     onClose: () => void;
-    ownerAgreementId: number;
+    ownerAgreementId?: number;
     ownerAgreementReference?: string;
     defaultStartDate?: string;
     defaultEndDate?: string;
@@ -29,6 +31,11 @@ export function OwnerSettlementModal({
     const today = businessDateInputValue();
     const startOfMonth = today.slice(0, 7) + '-01';
 
+    const [selectedAgreement, setSelectedAgreement] = useState<NamedResource | null>(
+        ownerAgreementId
+            ? { id: ownerAgreementId, name: ownerAgreementReference || `Agreement #${ownerAgreementId}` }
+            : null
+    );
     const [startDate, setStartDate] = useState(defaultStartDate ?? startOfMonth);
     const [endDate, setEndDate] = useState(defaultEndDate ?? today);
     const [whtRate, setWhtRate] = useState('10');
@@ -38,16 +45,49 @@ export function OwnerSettlementModal({
     const [error, setError] = useState<ApiError | null>(null);
     const [generatedBill, setGeneratedBill] = useState<{ id: number; invoice_number: string } | null>(null);
 
+    const activeAgreementId = ownerAgreementId ?? selectedAgreement?.id;
+    const activeAgreementRef = ownerAgreementReference ?? selectedAgreement?.name;
+
+    useEffect(() => {
+        if (!open) {
+            setGeneratedBill(null);
+            setError(null);
+            setSubmitting(false);
+            return;
+        }
+
+        if (ownerAgreementId) {
+            setSelectedAgreement({
+                id: ownerAgreementId,
+                name: ownerAgreementReference || `Agreement #${ownerAgreementId}`,
+            });
+        } else {
+            setSelectedAgreement(null);
+        }
+
+        setStartDate(defaultStartDate ?? startOfMonth);
+        setEndDate(defaultEndDate ?? today);
+        setInvoiceDate(today);
+        setDueDate('');
+        setWhtRate('10');
+    }, [open, ownerAgreementId, ownerAgreementReference, defaultStartDate, defaultEndDate]);
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        setSubmitting(true);
         setError(null);
         setGeneratedBill(null);
+
+        if (!activeAgreementId) {
+            setError(toApiError(new Error('Please select an owner agreement to generate a settlement bill.')));
+            return;
+        }
+
+        setSubmitting(true);
 
         try {
             const parsedWht = whtRate.trim() !== '' && !isNaN(Number(whtRate)) ? Number(whtRate) : 0;
             const bill = await generateOwnerSettlementBill({
-                owner_agreement_id: ownerAgreementId,
+                owner_agreement_id: activeAgreementId,
                 start_date: startDate,
                 end_date: endDate,
                 wht_rate: parsedWht,
@@ -66,8 +106,8 @@ export function OwnerSettlementModal({
         }
     }
 
-    const title = ownerAgreementReference
-        ? `Generate Inbound AP Supplier Bill · ${ownerAgreementReference}`
+    const title = activeAgreementRef
+        ? `Generate Inbound AP Supplier Bill · ${activeAgreementRef}`
         : 'Generate Inbound AP Supplier Bill';
 
     return (
@@ -100,6 +140,18 @@ export function OwnerSettlementModal({
                     <p className="text-xs text-slate-600">
                         Generates an official Inbound Purchase Invoice (Supplier Bill) in Accounts Payable. This converts the owner's net disbursement statement into a formal accounting payable, deducting statutory Withholding Tax (WHT) and owner-allocated fleet maintenance chargebacks.
                     </p>
+
+                    {!ownerAgreementId && (
+                        <LookupSelect
+                            label="Vehicle Owner Agreement"
+                            value={selectedAgreement}
+                            onChange={setSelectedAgreement}
+                            search={searchOwnerAgreements}
+                            placeholder="Select active owner agreement..."
+                            loadOnOpen
+                            required
+                        />
+                    )}
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Input

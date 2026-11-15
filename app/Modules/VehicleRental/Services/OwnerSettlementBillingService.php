@@ -273,7 +273,7 @@ final class OwnerSettlementBillingService
             $source = new CreateInvoiceData(
                 tenantId: $context->tenantId,
                 organizationUnitId: $context->organizationUnitId,
-                invoiceType: InvoiceType::Rental,
+                invoiceType: InvoiceType::Purchase,
                 direction: InvoiceDirection::Inbound,
                 invoiceDate: $invoiceDate,
                 dueDate: $dueDate,

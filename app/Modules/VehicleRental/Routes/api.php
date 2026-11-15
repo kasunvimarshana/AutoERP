@@ -16,6 +16,7 @@ use Modules\VehicleRental\Http\Controllers\BillingCycleController;
 use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
 use Modules\VehicleRental\Http\Controllers\DriverDirectoryController;
 use Modules\VehicleRental\Http\Controllers\OwnerSettlementBillController;
+use Modules\VehicleRental\Http\Controllers\RentalBillingDocumentController;
 use Modules\VehicleRental\Http\Controllers\RentalDashboardController;
 use Modules\VehicleRental\Http\Controllers\RentalExpenseController;
 use Modules\VehicleRental\Http\Controllers\RentalIncidentAttachmentController;
@@ -210,4 +211,12 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
 
     Route::post('owner-settlement-bill', [OwnerSettlementBillController::class, 'store'])
         ->middleware('tenant.feature:'.TenantFeature::INVOICE);
+
+    Route::prefix('billing')->middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
+        Route::get('documents', [RentalBillingDocumentController::class, 'index']);
+        Route::get('summary', [RentalBillingDocumentController::class, 'summary']);
+        Route::get('documents/{invoice}', [RentalBillingDocumentController::class, 'show'])->whereNumber('invoice');
+        Route::put('documents/{invoice}', [RentalBillingDocumentController::class, 'update'])->whereNumber('invoice');
+        Route::post('documents/{invoice}/cancel', [RentalBillingDocumentController::class, 'cancel'])->whereNumber('invoice');
+    });
 });
