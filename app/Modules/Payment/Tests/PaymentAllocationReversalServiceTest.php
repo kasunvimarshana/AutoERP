@@ -191,6 +191,182 @@ final class PaymentAllocationReversalServiceTest extends TestCase
         $this->assertSame(PaymentAllocation::ACTIVE_IDENTITY_SLOT, $allocations[1]->active_identity_slot);
     }
 
+    public function test_incremental_top_up_allocation_on_existing_active_allocation(): void
+    {
+        $tenantId = $this->createTenant();
+        FinancePostingFixture::seedCustomerPaymentProfiles($tenantId);
+        $customerId = (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'customer_number' => 'CUS-TOPUP-'.Str::upper(Str::random(4)),
+            'code' => 'CUS-TOPUP-'.Str::upper(Str::random(4)),
+            'name' => 'Top Up Customer',
+            'customer_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            self::PAYMENT_DATE,
+            FinanceAccountRoleCode::Revenue,
+            '1000.000000',
+            description: 'Top up allocation invoice',
+        );
+        $invoice = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $postingPlan) {
+            $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+                tenantId: $tenantId,
+                invoiceType: InvoiceType::Manual,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: self::PAYMENT_DATE,
+                invoiceNumber: 'INV-TOPUP-'.Str::upper(Str::random(4)),
+                partyType: 'customer',
+                partyId: $customerId,
+                lines: [new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Top up invoice line',
+                    quantity: '1.000000',
+                    unitPrice: '1000.000000',
+                )],
+                postingPlan: $postingPlan,
+            ));
+            $statuses = app(InvoiceStatusService::class);
+            $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
+
+            return $statuses->transition($invoice, InvoiceStatus::Posted);
+        });
+
+        $paymentMethodId = (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'scope_key' => 'tenant:'.$tenantId,
+            'code' => 'METH-TOPUP-'.Str::upper(Str::random(4)),
+            'name' => 'Cash Topup',
+            'method_type' => PaymentMethodType::Cash->value,
+            'direction_allowed' => PaymentMethodDirection::Both->value,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payment = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $paymentMethodId): Payment {
+            $payment = app(PaymentCreationService::class)->create(new CreatePaymentData(
+                tenantId: $tenantId,
+                paymentType: PaymentType::CustomerReceipt,
+                direction: PaymentDirection::Inbound,
+                paymentDate: self::PAYMENT_DATE,
+                partyType: 'customer',
+                partyId: $customerId,
+                lines: [new PaymentLineData(
+                    amount: '500.000000',
+                    paymentMethodId: $paymentMethodId,
+                )],
+            ));
+            $lifecycle = app(PaymentDocumentLifecycleService::class);
+            $payment = $lifecycle->submit($payment, (int) $payment->row_version);
+            $payment = $lifecycle->approve($payment, (int) $payment->row_version);
+
+            return app(PaymentPostingService::class)->post($payment, (int) $payment->row_version);
+        });
+
+        // 1. Initial allocation of 200
+        $payment = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Payment => app(PaymentAllocationService::class)->allocate(
+                $payment,
+                [new PaymentAllocationData(
+                    invoiceId: (int) $invoice->getKey(),
+                    allocatedAmount: '200.000000',
+                    allocationDate: self::PAYMENT_DATE,
+                    allocationMethod: self::ALLOCATION_METHOD,
+                )],
+                (int) $payment->row_version,
+            ),
+        );
+
+        $this->assertEqualsWithDelta(200.0, (float) $payment->allocated_amount, 0.01);
+        $this->assertEqualsWithDelta(300.0, (float) $payment->unapplied_amount, 0.01);
+        $this->assertEqualsWithDelta(800.0, (float) $this->invoiceBalance($tenantId, $invoice), 0.01);
+
+        // 2. Incremental top-up allocation of 150 on the same invoice!
+        $payment = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Payment => app(PaymentAllocationService::class)->allocate(
+                $payment,
+                [new PaymentAllocationData(
+                    invoiceId: (int) $invoice->getKey(),
+                    allocatedAmount: '150.000000',
+                    allocationDate: self::PAYMENT_DATE,
+                    allocationMethod: self::ALLOCATION_METHOD,
+                )],
+                (int) $payment->row_version,
+            ),
+        );
+
+        $this->assertEqualsWithDelta(350.0, (float) $payment->allocated_amount, 0.01);
+        $this->assertEqualsWithDelta(150.0, (float) $payment->unapplied_amount, 0.01);
+        $this->assertEqualsWithDelta(650.0, (float) $this->invoiceBalance($tenantId, $invoice), 0.01);
+
+        // Verify there is still only 1 active allocation with accumulated 350
+        $activeAllocations = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => PaymentAllocation::query()
+                ->where('payment_id', $payment->getKey())
+                ->where('invoice_id', $invoice->getKey())
+                ->where('status', AllocationStatus::Active->value)
+                ->get(),
+        );
+        $this->assertCount(1, $activeAllocations);
+        $this->assertEqualsWithDelta(350.0, (float) $activeAllocations[0]->allocated_amount, 0.01);
+
+        // 3. Second incremental top-up allocation of 150
+        $payment = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Payment => app(PaymentAllocationService::class)->allocate(
+                $payment,
+                [new PaymentAllocationData(
+                    invoiceId: (int) $invoice->getKey(),
+                    allocatedAmount: '150.000000',
+                    allocationDate: self::PAYMENT_DATE,
+                    allocationMethod: self::ALLOCATION_METHOD,
+                )],
+                (int) $payment->row_version,
+            ),
+        );
+
+        $this->assertEqualsWithDelta(500.0, (float) $payment->allocated_amount, 0.01);
+        $this->assertEqualsWithDelta(0.0, (float) $payment->unapplied_amount, 0.01);
+        $this->assertEqualsWithDelta(500.0, (float) $this->invoiceBalance($tenantId, $invoice), 0.01);
+
+        // 4. Reverse the allocation with top-ups and verify complete Finance GL reversal!
+        $reversalPayment = $this->withTenantExecutionContext($tenantId, function () use ($payment, $invoice, $tenantId): Payment {
+            $allocationToReverse = PaymentAllocation::query()
+                ->where('payment_id', $payment->getKey())
+                ->where('invoice_id', $invoice->getKey())
+                ->where('status', AllocationStatus::Active->value)
+                ->firstOrFail();
+
+            return app(PaymentAllocationReversalService::class)->reverse(
+                $payment,
+                (int) $allocationToReverse->getKey(),
+                (int) $payment->row_version,
+                (int) $allocationToReverse->row_version,
+                self::PAYMENT_DATE,
+                'Reversing full allocation including all topups',
+            );
+        });
+
+        $this->assertEqualsWithDelta(0.0, (float) $reversalPayment->allocated_amount, 0.01);
+        $this->assertEqualsWithDelta(500.0, (float) $reversalPayment->unapplied_amount, 0.01);
+        $this->assertEqualsWithDelta(1000.0, (float) $this->invoiceBalance($tenantId, $invoice), 0.01);
+
+        $reversedAlloc = $this->withTenantExecutionContext($tenantId, fn () => PaymentAllocation::query()
+            ->where('payment_id', $payment->getKey())
+            ->where('invoice_id', $invoice->getKey())
+            ->firstOrFail());
+        $this->assertSame(AllocationStatus::Reversed, $reversedAlloc->status instanceof AllocationStatus ? $reversedAlloc->status : AllocationStatus::from((string) $reversedAlloc->status));
+        $this->assertNotEmpty($reversedAlloc->metadata['top_up_reversal_references'] ?? []);
+        $this->assertCount(2, $reversedAlloc->metadata['top_up_reversal_references']);
+    }
+
     private function invoiceBalance(int $tenantId, object $invoice): string
     {
         return $this->withTenantExecutionContext(

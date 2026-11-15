@@ -69,6 +69,98 @@ final class InvoiceSettlementServiceTest extends TestCase
         $this->assertSame('1000.000000', $reversed->balanceAfter);
     }
 
+    public function test_credit_note_allocation_tracks_remaining_balance_and_prevents_overallocation(): void
+    {
+        $tenantId = $this->createTenant();
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+
+        $postingPlan1 = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            '2026-06-06',
+            FinanceAccountRoleCode::Revenue,
+            '1000.000000',
+            description: 'Sales invoice',
+        );
+        $salesInvoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06',
+            invoiceNumber: 'INV-SALES-1',
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Sales line',
+                    quantity: '1.000000',
+                    unitPrice: '1000.000000',
+                ),
+            ],
+            postingPlan: $postingPlan1,
+        )));
+
+        $postingPlan2 = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            '2026-06-06',
+            FinanceAccountRoleCode::Revenue,
+            '500.000000',
+            description: 'Credit note',
+        );
+        $creditNote = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Credit,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06',
+            invoiceNumber: 'CN-SALES-1',
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Credit note rebate',
+                    quantity: '1.000000',
+                    unitPrice: '500.000000',
+                ),
+            ],
+            postingPlan: $postingPlan2,
+        )));
+
+        $statuses = app(InvoiceStatusService::class);
+        $this->withTenantExecutionContext($tenantId, function () use ($statuses, $salesInvoice, $creditNote) {
+            $statuses->transition($salesInvoice, InvoiceStatus::Approved);
+            $statuses->transition($salesInvoice, InvoiceStatus::Posted);
+            $statuses->transition($creditNote, InvoiceStatus::Approved);
+            $statuses->transition($creditNote, InvoiceStatus::Posted);
+        });
+
+        $balanceUpdater = app(\Modules\Invoice\Services\InvoiceBalanceUpdater::class);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($balanceUpdater, $salesInvoice, $creditNote) {
+            // 1. Partial allocation of 300 from 500 Credit Note
+            $balanceUpdater->allocateCredit($salesInvoice, 'credit_note', $creditNote->id, '300.000000');
+
+            $creditNote->refresh()->load('balance');
+            $this->assertEqualsWithDelta(300.0, (float) $creditNote->balance->credit_allocated_amount, 0.01);
+            $this->assertEqualsWithDelta(200.0, (float) $creditNote->balance->remaining_amount, 0.01);
+            $this->assertSame(InvoiceStatus::PartiallyPaid, $creditNote->status);
+
+            // 2. Over-allocation attempt: try to allocate 250 when only 200 remains
+            $thrown = false;
+            try {
+                $balanceUpdater->allocateCredit($salesInvoice, 'credit_note', $creditNote->id, '250.000000');
+            } catch (\InvalidArgumentException $e) {
+                $thrown = true;
+                $this->assertStringContainsString('Credit allocation cannot exceed credit note remaining balance', $e->getMessage());
+            }
+            $this->assertTrue($thrown, 'Expected InvalidArgumentException when allocating more credit than available.');
+
+            // 3. Fully allocate the remaining 200
+            $balanceUpdater->allocateCredit($salesInvoice, 'credit_note', $creditNote->id, '200.000000');
+
+            $creditNote->refresh()->load('balance');
+            $this->assertEqualsWithDelta(500.0, (float) $creditNote->balance->credit_allocated_amount, 0.01);
+            $this->assertEqualsWithDelta(0.0, (float) $creditNote->balance->remaining_amount, 0.01);
+            $this->assertSame(InvoiceStatus::Paid, $creditNote->status);
+        });
+    }
+
     private function createTenant(): int
     {
         $suffix = Str::upper(Str::random(5));

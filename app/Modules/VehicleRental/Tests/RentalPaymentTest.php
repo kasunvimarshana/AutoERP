@@ -40,6 +40,7 @@ final class RentalPaymentTest extends TestCase
         PaymentPermission::PAYMENTS_CREATE,
         PaymentPermission::PAYMENTS_ALLOCATE,
         PaymentPermission::PAYMENTS_REVERSE,
+        PaymentPermission::PAYMENTS_REFUND,
         PaymentPermission::PAYMENTS_SUBMIT,
         PaymentPermission::PAYMENTS_APPROVE,
         PaymentPermission::PAYMENTS_POST,
@@ -466,5 +467,296 @@ final class RentalPaymentTest extends TestCase
         // Test API index endpoint
         $res = $this->getJson("{$this->rentalRoot}/customer/agreements/{$customerData['party_id']}/payments");
         // Status should be successful response (or not found if id differs, let's verify via agreement ID)
+    }
+
+    public function test_refund_customer_advance_payment(): void
+    {
+        $perms = array_merge(
+            array_keys(RentalAuthorization::descriptions()),
+            self::PAYMENT_PERMISSIONS
+        );
+        [$context, $customerData] = $this->loginFixture($perms, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+            TenantFeature::PAYMENT,
+        ]);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData): void {
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedRentalDepositProfile($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedCustomerPaymentProfiles($context->tenantId, $context->organizationUnitId);
+
+            $method = PaymentMethod::query()->create([
+                'tenant_id' => $context->tenantId,
+                'code' => 'CASH-REF-'.Str::upper(Str::random(6)),
+                'name' => 'Cash',
+                'method_type' => PaymentMethodType::Cash->value,
+                'direction_allowed' => PaymentMethodDirection::Both->value,
+                'requires_reference' => false,
+                'is_active' => true,
+            ]);
+
+            $agreements = app(AgreementService::class);
+            $agreement = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
+
+            // Record customer advance payment of 20,000 without allocating to an invoice
+            $paymentService = app(RentalPaymentService::class);
+            $payment = $paymentService->recordCustomerReceipt(
+                $context,
+                $agreement->id,
+                $agreement->row_version,
+                ['payment_date' => '2026-09-01', 'exchange_rate' => '1.000000'],
+                [new PaymentLineData(amount: '20000.000000', paymentMethodId: $method->id)],
+                []
+            );
+
+            $payment->refresh();
+            $this->assertEqualsWithDelta(20000.0, (float) $payment->unapplied_amount, 0.01);
+            $this->assertEqualsWithDelta(0.0, (float) $payment->refunded_amount, 0.01);
+
+            // Refund 6,000 from the unapplied advance
+            $refundPayment = $paymentService->refundPayment(
+                $context,
+                AgreementKind::Customer,
+                $agreement->id,
+                $payment->id,
+                [
+                    'amount' => '6000.000000',
+                    'payment_method_id' => $method->id,
+                    'refund_date' => '2026-09-02',
+                    'reason' => 'Customer requested partial refund of unused advance credit',
+                ]
+            );
+
+            $this->assertNotNull($refundPayment->refundPayment);
+            $childPayment = $refundPayment->refundPayment;
+            $this->assertSame(PaymentDocumentStatus::Approved->value, $childPayment->document_status->value ?? $childPayment->document_status);
+            $this->assertSame(PaymentPostingStatus::Posted->value, $childPayment->posting_status->value ?? $childPayment->posting_status);
+            $this->assertSame(PaymentDirection::Outbound->value, $childPayment->direction->value ?? $childPayment->direction);
+            $this->assertEqualsWithDelta(6000.0, (float) $childPayment->total_amount, 0.01);
+
+            $payment->refresh();
+            $this->assertEqualsWithDelta(14000.0, (float) $payment->unapplied_amount, 0.01);
+            $this->assertEqualsWithDelta(6000.0, (float) $payment->refunded_amount, 0.01);
+
+            // Financial summary reflects total unapplied advance and net balance
+            $summaryService = app(AgreementFinancialSummaryService::class);
+            $summary = $summaryService->generate(AgreementKind::Customer, $context, $agreement->id);
+
+            $this->assertEqualsWithDelta(14000.0, (float) $summary['summary']['total_unapplied_advance'], 0.01);
+            $this->assertEqualsWithDelta(-14000.0, (float) $summary['summary']['net_account_balance'], 0.01);
+        });
+    }
+
+    public function test_refund_customer_payment_via_api_and_validation(): void
+    {
+        $perms = array_merge(
+            array_keys(RentalAuthorization::descriptions()),
+            self::PAYMENT_PERMISSIONS
+        );
+        [$context, $customerData] = $this->loginFixture($perms, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+            TenantFeature::PAYMENT,
+        ]);
+
+        $agreementId = 0;
+        $paymentId = 0;
+        $methodId = 0;
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, &$agreementId, &$paymentId, &$methodId): void {
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedRentalDepositProfile($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedCustomerPaymentProfiles($context->tenantId, $context->organizationUnitId);
+
+            $method = PaymentMethod::query()->create([
+                'tenant_id' => $context->tenantId,
+                'code' => 'CASH-API-REF-'.Str::upper(Str::random(6)),
+                'name' => 'Cash',
+                'method_type' => PaymentMethodType::Cash->value,
+                'direction_allowed' => PaymentMethodDirection::Both->value,
+                'requires_reference' => false,
+                'is_active' => true,
+            ]);
+            $methodId = $method->id;
+
+            $agreements = app(AgreementService::class);
+            $agreement = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
+            $agreementId = $agreement->id;
+
+            $paymentService = app(RentalPaymentService::class);
+            $payment = $paymentService->recordCustomerReceipt(
+                $context,
+                $agreement->id,
+                $agreement->row_version,
+                ['payment_date' => '2026-09-01', 'exchange_rate' => '1.000000'],
+                [new PaymentLineData(amount: '10000.000000', paymentMethodId: $method->id)],
+                []
+            );
+            $paymentId = $payment->id;
+        });
+
+        // 1. Over-refund validation (attempting to refund 15000 when unapplied is 10000)
+        $failRes = $this->postJson("{$this->rentalRoot}/customer/agreements/{$agreementId}/payments/{$paymentId}/refund", [
+            'amount' => '15000.000000',
+            'payment_method_id' => $methodId,
+            'refund_date' => '2026-09-02',
+            'reason' => 'Exceeding refund',
+        ]);
+        $failRes->assertStatus(422);
+
+        // 2. Valid refund of 4000
+        $successRes = $this->postJson("{$this->rentalRoot}/customer/agreements/{$agreementId}/payments/{$paymentId}/refund", [
+            'amount' => '4000.000000',
+            'payment_method_id' => $methodId,
+            'refund_date' => '2026-09-02',
+            'reason' => 'Partial refund via API',
+        ]);
+        $successRes->assertStatus(201);
+        $this->assertEqualsWithDelta(4000.0, (float) $successRes->json('data.amount'), 0.01);
+
+        // 3. Verify refund payment is included in listAgreementPayments and exposes row_version
+        $payments = $this->withTenantExecutionContext(
+            $context->tenantId,
+            fn () => app(RentalPaymentService::class)->listAgreementPayments($context, $agreementId, AgreementKind::Customer)
+        );
+        $refundRow = collect($payments)->firstWhere('payment_type', 'refund');
+        $this->assertNotNull($refundRow, 'Refund payment must appear in agreement payments list.');
+        $this->assertEqualsWithDelta(4000.0, (float) $refundRow['total_amount'], 0.01);
+        $this->assertArrayHasKey('row_version', $refundRow);
+        $this->assertGreaterThanOrEqual(1, $refundRow['row_version']);
+    }
+
+    public function test_refund_requires_payments_refund_permission(): void
+    {
+        // Grant PAYMENTS_CREATE but strictly OMIT PAYMENTS_REFUND
+        $permsWithoutRefund = array_diff(
+            array_merge(array_keys(RentalAuthorization::descriptions()), self::PAYMENT_PERMISSIONS),
+            [PaymentPermission::PAYMENTS_REFUND]
+        );
+
+        [$context, $customerData] = $this->loginFixture($permsWithoutRefund, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+            TenantFeature::PAYMENT,
+        ]);
+
+        $agreementId = 0;
+        $paymentId = 0;
+        $methodId = 0;
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, &$agreementId, &$paymentId, &$methodId): void {
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedCustomerPaymentProfiles($context->tenantId, $context->organizationUnitId);
+
+            $method = PaymentMethod::query()->create([
+                'tenant_id' => $context->tenantId,
+                'code' => 'CASH-SEC-'.Str::upper(Str::random(6)),
+                'name' => 'Cash',
+                'method_type' => PaymentMethodType::Cash->value,
+                'direction_allowed' => PaymentMethodDirection::Both->value,
+                'requires_reference' => false,
+                'is_active' => true,
+            ]);
+            $methodId = $method->id;
+
+            $agreements = app(AgreementService::class);
+            $agreement = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
+            $agreementId = $agreement->id;
+
+            $payment = app(RentalPaymentService::class)->recordCustomerReceipt(
+                $context,
+                $agreement->id,
+                $agreement->row_version,
+                ['payment_date' => '2026-09-01', 'exchange_rate' => '1.000000'],
+                [new PaymentLineData(amount: '5000.000000', paymentMethodId: $method->id)],
+                []
+            );
+            $paymentId = $payment->id;
+        });
+
+        // User without payments.refund permission MUST be rejected with 403 Forbidden
+        $res = $this->postJson("{$this->rentalRoot}/customer/agreements/{$agreementId}/payments/{$paymentId}/refund", [
+            'amount' => '2000.000000',
+            'payment_method_id' => $methodId,
+            'refund_date' => '2026-09-02',
+            'reason' => 'Unauthorized refund attempt',
+        ]);
+        $res->assertStatus(403);
+    }
+
+    public function test_refund_owner_disbursement(): void
+    {
+        $perms = array_merge(
+            array_keys(RentalAuthorization::descriptions()),
+            self::PAYMENT_PERMISSIONS
+        );
+        [$context, $customerData, $ownerData] = $this->loginFixture($perms, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+            TenantFeature::PAYMENT,
+        ]);
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $ownerData): void {
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedSupplierPaymentProfiles($context->tenantId, $context->organizationUnitId);
+
+            $method = PaymentMethod::query()->create([
+                'tenant_id' => $context->tenantId,
+                'code' => 'BANK-OWN-'.Str::upper(Str::random(6)),
+                'name' => 'Bank Transfer',
+                'method_type' => PaymentMethodType::BankTransfer->value,
+                'direction_allowed' => PaymentMethodDirection::Both->value,
+                'requires_reference' => false,
+                'is_active' => true,
+            ]);
+
+            $agreements = app(AgreementService::class);
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $paymentService = app(RentalPaymentService::class);
+
+            // 1. Pay owner advance of 15,000 without invoice allocation
+            $disbursement = $paymentService->recordOwnerDisbursement(
+                $context,
+                $ownerAg->id,
+                $ownerAg->row_version,
+                ['payment_date' => '2026-09-01', 'exchange_rate' => '1.000000'],
+                [new PaymentLineData(amount: '15000.000000', paymentMethodId: $method->id)],
+                []
+            );
+
+            $disbursement->refresh();
+            $this->assertEqualsWithDelta(15000.0, (float) $disbursement->unapplied_amount, 0.01);
+            $this->assertSame(PaymentDirection::Outbound->value, $disbursement->direction->value ?? $disbursement->direction);
+
+            // 2. Owner refunds 5,000 to business
+            $refund = $paymentService->refundPayment(
+                $context,
+                AgreementKind::Owner,
+                $ownerAg->id,
+                $disbursement->id,
+                [
+                    'amount' => '5000.000000',
+                    'payment_method_id' => $method->id,
+                    'refund_date' => '2026-09-02',
+                    'reason' => 'Owner refund for overpaid vehicle lease advance',
+                ]
+            );
+
+            $refundPayment = $refund->refundPayment;
+            $this->assertNotNull($refundPayment);
+            $this->assertSame(PaymentDirection::Inbound->value, $refundPayment->direction->value ?? $refundPayment->direction);
+            $this->assertSame(PaymentPostingStatus::Posted->value, $refundPayment->posting_status->value ?? $refundPayment->posting_status);
+            $this->assertEqualsWithDelta(5000.0, (float) $refundPayment->total_amount, 0.01);
+
+            $disbursement->refresh();
+            $this->assertEqualsWithDelta(10000.0, (float) $disbursement->unapplied_amount, 0.01);
+            $this->assertEqualsWithDelta(5000.0, (float) $disbursement->refunded_amount, 0.01);
+        });
     }
 }

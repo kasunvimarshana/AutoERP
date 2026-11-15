@@ -116,6 +116,116 @@ final class PaymentAllocationFinanceService
         ])->save();
     }
 
+    public function postIncremental(
+        Payment $payment,
+        PaymentAllocation $allocation,
+        string $incrementalAmount,
+        ?int $actorId = null
+    ): void {
+        $postingStatus = $payment->posting_status instanceof PaymentPostingStatus
+            ? $payment->posting_status
+            : PaymentPostingStatus::from((string) $payment->posting_status);
+        if ($postingStatus !== PaymentPostingStatus::Posted) {
+            return;
+        }
+
+        $allocationStatus = $allocation->status instanceof AllocationStatus
+            ? $allocation->status
+            : AllocationStatus::from((string) $allocation->status);
+        if ($allocationStatus !== AllocationStatus::Active) {
+            throw new InvalidArgumentException('Only active payment allocations can be posted to Finance.');
+        }
+
+        $policy = $this->policies->resolve($payment);
+        if ($policy->allocationTargetRole === $policy->unappliedRole) {
+            throw new InvalidArgumentException('Payment allocation requires distinct target and unapplied Finance roles.');
+        }
+
+        $direction = $this->direction($payment);
+        $amount = $this->math->normalize($incrementalAmount);
+        if ($this->math->isZero($amount) || $this->math->isNegative($amount)) {
+            return;
+        }
+
+        $lines = $direction === PaymentDirection::Inbound
+            ? [
+                new PostingLine(
+                    debit: $amount,
+                    credit: '0.000000',
+                    description: 'Apply unapplied payment '.$payment->payment_number.' (top-up)',
+                    profileKey: $policy->unappliedRole->value,
+                    sourceLineType: PaymentSourceType::PaymentAllocation->value,
+                    sourceLineId: (int) $allocation->getKey(),
+                ),
+                new PostingLine(
+                    debit: '0.000000',
+                    credit: $amount,
+                    description: 'Settle invoice '.$allocation->invoice_number_snapshot.' (top-up)',
+                    profileKey: $policy->allocationTargetRole->value,
+                    sourceLineType: PaymentSourceType::PaymentAllocation->value,
+                    sourceLineId: (int) $allocation->getKey(),
+                ),
+            ]
+            : [
+                new PostingLine(
+                    debit: $amount,
+                    credit: '0.000000',
+                    description: 'Settle supplier invoice '.$allocation->invoice_number_snapshot.' (top-up)',
+                    profileKey: $policy->allocationTargetRole->value,
+                    sourceLineType: PaymentSourceType::PaymentAllocation->value,
+                    sourceLineId: (int) $allocation->getKey(),
+                ),
+                new PostingLine(
+                    debit: '0.000000',
+                    credit: $amount,
+                    description: 'Apply supplier advance '.$payment->payment_number.' (top-up)',
+                    profileKey: $policy->unappliedRole->value,
+                    sourceLineType: PaymentSourceType::PaymentAllocation->value,
+                    sourceLineId: (int) $allocation->getKey(),
+                ),
+            ];
+
+        $metadata = is_array($allocation->metadata) ? $allocation->metadata : [];
+        $topUpRefs = $metadata['top_up_posting_references'] ?? [];
+        $topUpIndex = count($topUpRefs) + 1;
+
+        $sourceType = 'payment_allocation_topup_'.$topUpIndex;
+        $sourceNumber = (string) $payment->payment_number.'-A'.(int) $allocation->getKey().'-TU'.$topUpIndex;
+
+        $result = $this->postings->post(new PostingContext(
+            source: new PostingSourceData(
+                sourceType: $sourceType,
+                sourceId: (int) $allocation->getKey(),
+                tenantId: (int) $payment->tenant_id,
+                organizationUnitId: $payment->organization_unit_id,
+                sourceModule: self::SOURCE_MODULE,
+                sourceNumber: $sourceNumber,
+                sourceDate: $this->postingDate($payment, $allocation),
+            ),
+            postingDate: $this->postingDate($payment, $allocation),
+            currencyId: $payment->currency_id,
+            exchangeRate: (string) $payment->exchange_rate,
+            lines: $lines,
+            description: 'Payment allocation top-up '.$payment->payment_number.' to '.$allocation->invoice_number_snapshot,
+            postingProfileCode: $policy->postingProfileCode,
+        ), $actorId);
+
+        $topUpRefs[] = $result->journalNumber;
+        $metadata['top_up_posting_references'] = $topUpRefs;
+
+        $fxReference = $this->postRealizedFx($payment, $allocation, $policy->postingProfileCode, $policy->allocationTargetRole, $actorId, $amount, $topUpIndex);
+        if ($fxReference !== null) {
+            $fxTopUpRefs = $metadata['fx_top_up_posting_references'] ?? [];
+            $fxTopUpRefs[] = $fxReference;
+            $metadata['fx_top_up_posting_references'] = $fxTopUpRefs;
+        }
+
+        $allocation->forceFill([
+            'metadata' => $metadata,
+            'row_version' => (int) $allocation->row_version + 1,
+        ])->save();
+    }
+
     public function reverse(
         Payment $payment,
         PaymentAllocation $allocation,
@@ -145,6 +255,26 @@ final class PaymentAllocationFinanceService
         );
         $metadata[PaymentAllocationFinanceMetadata::REVERSAL_REFERENCE] = $result->journalNumber;
 
+        $topUpRefs = $metadata['top_up_posting_references'] ?? [];
+        if (! empty($topUpRefs) && is_array($topUpRefs)) {
+            $topUpReversals = [];
+            for ($i = 1; $i <= count($topUpRefs); $i++) {
+                $topUpSourceType = 'payment_allocation_topup_'.$i;
+                $topUpRevResult = $this->reversals->reverseSource(
+                    (int) $payment->tenant_id,
+                    $payment->organization_unit_id,
+                    self::SOURCE_MODULE,
+                    $topUpSourceType,
+                    (int) $allocation->getKey(),
+                    $reversalDate,
+                    $actorId,
+                    $reason,
+                );
+                $topUpReversals[] = $topUpRevResult->journalNumber;
+            }
+            $metadata['top_up_reversal_references'] = $topUpReversals;
+        }
+
         if (trim((string) ($metadata[PaymentAllocationFinanceMetadata::FX_POSTING_REFERENCE] ?? '')) !== '') {
             if (trim((string) ($metadata[PaymentAllocationFinanceMetadata::FX_REVERSAL_REFERENCE] ?? '')) !== '') {
                 throw new InvalidArgumentException('Payment allocation realized FX posting is already reversed.');
@@ -163,6 +293,26 @@ final class PaymentAllocationFinanceService
             $metadata[PaymentAllocationFinanceMetadata::FX_REVERSAL_REFERENCE] = $fxResult->journalNumber;
         }
 
+        $fxTopUpRefs = $metadata['fx_top_up_posting_references'] ?? [];
+        if (! empty($fxTopUpRefs) && is_array($fxTopUpRefs)) {
+            $fxTopUpReversals = [];
+            for ($j = 1; $j <= count($fxTopUpRefs); $j++) {
+                $fxTopUpSourceType = PaymentSourceType::PaymentAllocationFx->value.'_topup_'.$j;
+                $fxTopUpRevResult = $this->reversals->reverseSource(
+                    (int) $payment->tenant_id,
+                    $payment->organization_unit_id,
+                    self::SOURCE_MODULE,
+                    $fxTopUpSourceType,
+                    (int) $allocation->getKey(),
+                    $reversalDate,
+                    $actorId,
+                    $reason,
+                );
+                $fxTopUpReversals[] = $fxTopUpRevResult->journalNumber;
+            }
+            $metadata['fx_top_up_reversal_references'] = $fxTopUpReversals;
+        }
+
         $allocation->forceFill([
             'metadata' => $metadata,
             'row_version' => (int) $allocation->row_version + 1,
@@ -175,15 +325,18 @@ final class PaymentAllocationFinanceService
         string $postingProfileCode,
         PaymentPostingRole $targetRole,
         ?int $actorId,
+        ?string $amount = null,
+        int $topUpIndex = 0,
     ): ?string {
         $invoiceRate = trim((string) $allocation->invoice_exchange_rate_snapshot);
         if ($invoiceRate === '' || $this->math->compare($invoiceRate, '0') <= 0) {
             throw new InvalidArgumentException('Payment allocation requires a positive invoice exchange rate snapshot.');
         }
 
+        $calcAmount = $amount ?? (string) $allocation->allocated_amount;
         $paymentRate = (string) $payment->exchange_rate;
         $difference = $this->math->mul(
-            (string) $allocation->allocated_amount,
+            $calcAmount,
             $this->math->sub($paymentRate, $invoiceRate),
         );
         if ($this->math->isZero($difference)) {
@@ -270,8 +423,10 @@ final class PaymentAllocationFinanceService
                 ];
         }
 
+        $source = $this->source($payment, $allocation, PaymentSourceType::PaymentAllocationFx, $topUpIndex);
+
         $result = $this->postings->post(new PostingContext(
-            source: $this->source($payment, $allocation, PaymentSourceType::PaymentAllocationFx),
+            source: $source,
             postingDate: $this->postingDate($payment, $allocation),
             currencyId: null,
             exchangeRate: '1.000000',
@@ -287,16 +442,24 @@ final class PaymentAllocationFinanceService
         Payment $payment,
         PaymentAllocation $allocation,
         PaymentSourceType $sourceType,
+        int $topUpIndex = 0,
     ): PostingSourceData {
         $suffix = $sourceType === PaymentSourceType::PaymentAllocationFx ? '-FX' : '';
+        $sourceTypeVal = $sourceType->value;
+        $sourceNum = (string) $payment->payment_number.'-A'.(int) $allocation->getKey().$suffix;
+
+        if ($topUpIndex > 0) {
+            $sourceTypeVal = $sourceType->value.'_topup_'.$topUpIndex;
+            $sourceNum .= '-TU'.$topUpIndex;
+        }
 
         return new PostingSourceData(
-            sourceType: $sourceType->value,
+            sourceType: $sourceTypeVal,
             sourceId: (int) $allocation->getKey(),
             tenantId: (int) $payment->tenant_id,
             organizationUnitId: $payment->organization_unit_id,
             sourceModule: self::SOURCE_MODULE,
-            sourceNumber: (string) $payment->payment_number.'-A'.(int) $allocation->getKey().$suffix,
+            sourceNumber: $sourceNum,
             sourceDate: $allocation->allocation_date?->toDateString(),
         );
     }

@@ -95,4 +95,32 @@ final class RentalPaymentController
 
         return (new PaymentResource($reversedPayment))->response();
     }
+
+    public function refund(AgreementRequest $request, string $kind, int $agreement, int $payment, RentalPaymentService $service): JsonResponse
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'gt:0'],
+            'payment_method_id' => ['required', 'integer', 'min:1'],
+            'refund_date' => ['sometimes', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'exchange_rate' => ['sometimes', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'gt:0'],
+            'reference_number' => ['nullable', 'string', 'max:100'],
+            'external_bank_name' => ['nullable', 'string', 'max:100'],
+            'external_bank_branch' => ['nullable', 'string', 'max:100'],
+            'instrument_number' => ['nullable', 'string', 'max:100'],
+            'instrument_date' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'reason' => ['nullable', 'string', 'max:500'],
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
+        $agreementKind = AgreementKind::from($kind);
+        $refund = $service->refundPayment(
+            $request->context(),
+            $agreementKind,
+            $agreement,
+            $payment,
+            $validated
+        );
+
+        return response()->json(['data' => $refund], Response::HTTP_CREATED);
+    }
 }

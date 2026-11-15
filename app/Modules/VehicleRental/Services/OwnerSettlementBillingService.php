@@ -11,9 +11,14 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\DTOs\InvoicePostingLineData;
+use Modules\Invoice\DTOs\InvoicePostingPlanData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
+use Modules\Invoice\Enums\AdjustmentEffect;
+use Modules\Invoice\Enums\AdjustmentType;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoicePartyType;
@@ -168,6 +173,103 @@ final class OwnerSettlementBillingService
 
             $notes = 'Owner Settlement AP Bill. Gross: '.$grossPayable.', WHT: '.$whtAmount.', Deductions: '.$maintenanceDeductions.', Net Payable: '.$netPayable;
 
+            $hasWht = $this->math->compare($whtAmount, '0.000000') > 0;
+            $hasMaintenance = $this->math->compare($maintenanceDeductions, '0.000000') > 0;
+
+            $lines = [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Gross Vehicle Lease Rent · '.$agreement->reference.' · '.$vehicleNo.' ('.$start->format('d/m/Y').' To '.$end->format('d/m/Y').')',
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $grossPayable,
+                    lineType: InvoiceLineType::Charge,
+                    discountAmount: '0.000000',
+                    sourceLineType: $sourceType,
+                    sourceLineId: $sourceId,
+                ),
+            ];
+
+            $lineNum = 2;
+            if ($hasWht) {
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNum++,
+                    description: 'Statutory Withholding Tax Deduction ('.rtrim(rtrim($whtRate, '0'), '.').'%) · Deduction: '.$whtAmount,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: '0.000000',
+                    lineType: InvoiceLineType::Charge,
+                    discountAmount: '0.000000',
+                );
+            }
+
+            if ($hasMaintenance) {
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNum++,
+                    description: 'Fleet Maintenance Recovery · Deduction: '.$maintenanceDeductions,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: '0.000000',
+                    lineType: InvoiceLineType::Charge,
+                    discountAmount: '0.000000',
+                );
+            }
+
+            $adjustments = [];
+            if ($hasWht) {
+                $adjustments[] = new InvoiceAdjustmentData(
+                    name: 'Statutory Withholding Tax Deduction ('.rtrim(rtrim($whtRate, '0'), '.').'%)',
+                    adjustmentType: AdjustmentType::Withholding,
+                    effect: AdjustmentEffect::Decrease,
+                    amount: $whtAmount,
+                    isSystemGenerated: true,
+                );
+            }
+
+            if ($hasMaintenance) {
+                $adjustments[] = new InvoiceAdjustmentData(
+                    name: 'Fleet Maintenance Recovery',
+                    adjustmentType: AdjustmentType::Discount,
+                    effect: AdjustmentEffect::Decrease,
+                    amount: $maintenanceDeductions,
+                    isSystemGenerated: true,
+                );
+            }
+
+            $postingLines = [
+                new InvoicePostingLineData(
+                    role: FinanceAccountRoleCode::RentalExpense,
+                    debit: $grossPayable,
+                    description: 'Gross vehicle lease rent: '.$agreement->reference,
+                ),
+            ];
+
+            if ($hasWht) {
+                $postingLines[] = new InvoicePostingLineData(
+                    role: FinanceAccountRoleCode::WithholdingPayable,
+                    credit: $whtAmount,
+                    description: 'Statutory withholding tax payable',
+                );
+            }
+
+            if ($hasMaintenance) {
+                $postingLines[] = new InvoicePostingLineData(
+                    role: FinanceAccountRoleCode::RentalExpense,
+                    credit: $maintenanceDeductions,
+                    description: 'Fleet maintenance chargeback recovery',
+                );
+            }
+
+            $postingLines[] = new InvoicePostingLineData(
+                role: FinanceAccountRoleCode::Payable,
+                credit: $netPayable,
+                description: 'Net payable to lessor: '.$agreement->reference,
+            );
+
+            $postingPlan = new InvoicePostingPlanData(
+                profile: FinancePostingProfileCode::SupplierRentalInvoice,
+                postingDate: $invoiceDate,
+                lines: $postingLines,
+                description: $description,
+            );
+
             $source = new CreateInvoiceData(
                 tenantId: $context->tenantId,
                 organizationUnitId: $context->organizationUnitId,
@@ -181,18 +283,8 @@ final class OwnerSettlementBillingService
                 partyId: $agreement->supplier_id,
                 createdBy: $context->actorId,
                 notes: $notes,
-                lines: [
-                    new InvoiceLineData(
-                        lineNumber: 1,
-                        description: $description,
-                        quantity: self::WHOLE_CHARGE,
-                        unitPrice: $grossPayable,
-                        lineType: InvoiceLineType::Charge,
-                        discountAmount: $totalDeductions,
-                        sourceLineType: $sourceType,
-                        sourceLineId: $sourceId,
-                    ),
-                ],
+                lines: $lines,
+                adjustments: $adjustments,
                 sources: [
                     new InvoiceSourceData(
                         tenantId: $context->tenantId,
@@ -201,7 +293,7 @@ final class OwnerSettlementBillingService
                         sourceId: $sourceId,
                         sourceDocumentNumber: $agreement->reference.'-SETTLE-'.CarbonImmutable::parse($startDate)->format('Ym'),
                         sourceDocumentDate: $invoiceDate,
-                        sourceSubtotal: $netPayable,
+                        sourceSubtotal: $grossPayable,
                         sourceGrandTotal: $netPayable,
                     ),
                 ],
@@ -220,15 +312,10 @@ final class OwnerSettlementBillingService
                         invoicedLineTotal: $netPayable,
                     ),
                 ],
+                postingPlan: $postingPlan,
             );
 
-            $invoice = $this->invoiceService->create(
-                $this->invoiceFactory->prepare(
-                    $source,
-                    FinancePostingProfileCode::SupplierRentalInvoice,
-                    FinanceAccountRoleCode::RentalExpense,
-                )
-            );
+            $invoice = $this->invoiceService->create($source);
 
             // Link expense allocations to this invoice
             foreach ($expenseAllocations as $alloc) {

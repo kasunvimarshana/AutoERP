@@ -11,6 +11,8 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
+import { useApi } from '@/shared/hooks/useApi';
+import { listUsablePaymentMethods } from '@/modules/payment/paymentApi';
 import {
     AgreementKind,
     AgreementStatus,
@@ -22,6 +24,7 @@ import {
     listBillingCycles,
     getBillingCycleExportUrl,
     reverseAgreementPayment,
+    refundAgreementPayment,
     getPaymentReceiptPrintUrl,
     type AgreementFinancialSummary,
     type BillingCycle,
@@ -77,6 +80,29 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
     const [reversalTarget, setReversalTarget] = useState<AgreementPayment | null>(null);
     const [reversalReason, setReversalReason] = useState('');
     const [reversalSubmitting, setReversalSubmitting] = useState(false);
+
+    // Refund Modal state
+    const [refundTarget, setRefundTarget] = useState<AgreementPayment | null>(null);
+    const [showRefundModal, setShowRefundModal] = useState(false);
+    const [refundAmount, setRefundAmount] = useState('');
+    const [refundMethodId, setRefundMethodId] = useState('');
+    const [refundDate, setRefundDate] = useState(businessDateInputValue);
+    const [refundReference, setRefundReference] = useState('');
+    const [refundReason, setRefundReason] = useState('');
+    const [refundSubmitting, setRefundSubmitting] = useState(false);
+
+    const methodsApi = useApi(
+        signal => listUsablePaymentMethods({ per_page: 100 }, signal),
+        [],
+        showRefundModal,
+    );
+    const paymentMethods = methodsApi.data?.data ?? [];
+
+    useEffect(() => {
+        if (showRefundModal && !refundMethodId && paymentMethods.length > 0) {
+            setRefundMethodId(String(paymentMethods[0].id));
+        }
+    }, [showRefundModal, refundMethodId, paymentMethods]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -178,6 +204,51 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
         }
     }
 
+    async function handleExecuteRefund(e: React.FormEvent) {
+        e.preventDefault();
+        if (!refundTarget || !refundAmount || !refundReason.trim() || refundSubmitting) return;
+
+        const parsedAmount = Number(refundAmount);
+        const maxUnapplied = Number(refundTarget.unapplied_amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            setError(toApiError(new Error('Refund amount must be greater than zero.')));
+            return;
+        }
+        if (parsedAmount > maxUnapplied) {
+            setError(toApiError(new Error(`Refund amount cannot exceed available unapplied amount of ${maxUnapplied.toFixed(2)}.`)));
+            return;
+        }
+
+        const methodId = Number(refundMethodId || paymentMethods[0]?.id);
+        if (!methodId) {
+            setError(toApiError(new Error('A valid disbursement payment method must be selected.')));
+            return;
+        }
+
+        setRefundSubmitting(true);
+        try {
+            await refundAgreementPayment(kind, agreement.id, refundTarget.id, {
+                amount: refundAmount,
+                payment_method_id: methodId,
+                refund_date: refundDate,
+                reason: refundReason.trim(),
+                reference_number: refundReference.trim() || undefined,
+                expected_version: refundTarget.row_version,
+            });
+            setFeedback(`Refund for ${refundTarget.payment_number} processed successfully.`);
+            setShowRefundModal(false);
+            setRefundTarget(null);
+            setRefundAmount('');
+            setRefundReason('');
+            setRefundReference('');
+            reloadSummary();
+        } catch (err) {
+            setError(toApiError(err));
+        } finally {
+            setRefundSubmitting(false);
+        }
+    }
+
     if (loading && !summary) {
         return <LoadingState label="Loading agreement financial position..." />;
     }
@@ -199,7 +270,7 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
             {summary && (
                 <>
                     {/* Key Metrics Cards */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Invoiced</span>
                             <div className="mt-1 text-lg font-bold text-slate-900">
@@ -246,6 +317,14 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                                 <MoneyDisplay value={summary.summary.total_unallocated_credit} currency={cur} />
                             </div>
                             <span className="text-[11px] text-slate-400">Available credit balance</span>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Account Standing</span>
+                            <div className={`mt-1 text-lg font-bold ${Number(summary.summary.net_account_balance ?? summary.summary.total_remaining_balance) > 0 ? 'text-rose-600' : Number(summary.summary.net_account_balance ?? 0) < 0 ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                <MoneyDisplay value={summary.summary.net_account_balance ?? summary.summary.total_remaining_balance} currency={cur} />
+                            </div>
+                            <span className="text-[11px] text-slate-400">Open balance minus credits</span>
                         </div>
                     </div>
 
@@ -667,17 +746,37 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-1.5">
-                                                    {Number(p.unapplied_amount) > 0 && canManageAdjustments && agreement.status === AgreementStatus.Active && (
-                                                        <Button
-                                                            variant="secondary"
-                                                            onClick={() => {
-                                                                setSelectedPaymentForAllocation(p);
-                                                                setShowPaymentModal(true);
-                                                            }}
-                                                            className="text-xs py-1 px-2"
-                                                        >
-                                                            Allocate
-                                                        </Button>
+                                                    {Number(p.unapplied_amount) > 0 && canManageAdjustments && (
+                                                        <>
+                                                            {agreement.status === AgreementStatus.Active && (
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    onClick={() => {
+                                                                        setSelectedPaymentForAllocation(p);
+                                                                        setShowPaymentModal(true);
+                                                                    }}
+                                                                    className="text-xs py-1 px-2"
+                                                                >
+                                                                    Allocate
+                                                                </Button>
+                                                            )}
+                                                            {p.posting_status === 'posted' && p.payment_type !== 'refund' && (
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    onClick={() => {
+                                                                        setRefundTarget(p);
+                                                                        setRefundAmount(p.unapplied_amount);
+                                                                        setRefundReason('');
+                                                                        setRefundReference('');
+                                                                        setRefundMethodId(paymentMethods[0]?.id ? String(paymentMethods[0].id) : '');
+                                                                        setShowRefundModal(true);
+                                                                    }}
+                                                                    className="text-xs py-1 px-2 text-amber-700 hover:text-amber-900 border-amber-300"
+                                                                >
+                                                                    Refund
+                                                                </Button>
+                                                            )}
+                                                        </>
                                                     )}
                                                     <Button
                                                         variant="ghost"
@@ -976,6 +1075,107 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
                                 disabled={!reversalReason.trim()}
                             >
                                 Confirm Reversal
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+
+            {showRefundModal && refundTarget && (
+                <Modal
+                    open={showRefundModal}
+                    title={`Process Refund · ${refundTarget.payment_number}`}
+                    onClose={() => {
+                        setShowRefundModal(false);
+                        setRefundTarget(null);
+                    }}
+                    closeDisabled={refundSubmitting}
+                >
+                    <form onSubmit={handleExecuteRefund} className="space-y-4 p-1">
+                        <p className="text-sm text-slate-600">
+                            Issue a refund from the unapplied credit balance of this payment. An authentic refund transaction and general ledger entry will be posted.
+                        </p>
+
+                        <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+                            <div><span className="font-semibold">Original Total:</span> <MoneyDisplay value={refundTarget.total_amount} currency={cur} /></div>
+                            <div><span className="font-semibold">Available Unapplied Credit:</span> <MoneyDisplay value={refundTarget.unapplied_amount} currency={cur} /></div>
+                        </div>
+
+                        <Input
+                            label="Refund Amount"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max={refundTarget.unapplied_amount}
+                            value={refundAmount}
+                            onChange={e => setRefundAmount(e.target.value)}
+                            required
+                        />
+
+                        {methodsApi.loading && (
+                            <div className="text-xs text-slate-500 italic py-1">
+                                Loading disbursement methods...
+                            </div>
+                        )}
+
+                        {!methodsApi.loading && paymentMethods.length > 0 && (
+                            <Select
+                                label="Disbursement Method"
+                                value={refundMethodId || String(paymentMethods[0]?.id ?? '')}
+                                onChange={e => setRefundMethodId(e.target.value)}
+                                options={paymentMethods.map(m => ({ value: String(m.id), label: `${m.name} (${m.method_type})` }))}
+                            />
+                        )}
+
+                        {!methodsApi.loading && paymentMethods.length === 0 && (
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">
+                                No active disbursement methods found. Please ensure a payment method is configured.
+                            </div>
+                        )}
+
+                        <Input
+                            label="Refund Date"
+                            type="date"
+                            value={refundDate}
+                            onChange={e => setRefundDate(e.target.value)}
+                            required
+                        />
+
+                        <Input
+                            label="Reference / Check # (optional)"
+                            value={refundReference}
+                            onChange={e => setRefundReference(e.target.value)}
+                            placeholder="e.g. Bank Transfer Ref, Check number"
+                        />
+
+                        <Textarea
+                            label="Reason for Refund"
+                            value={refundReason}
+                            onChange={e => setRefundReason(e.target.value)}
+                            placeholder="Provide reason for refunding the unapplied advance/deposit..."
+                            rows={3}
+                            required
+                        />
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => {
+                                    setShowRefundModal(false);
+                                    setRefundTarget(null);
+                                }}
+                                disabled={refundSubmitting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                loading={refundSubmitting}
+                                disabled={!refundAmount || Number(refundAmount) <= 0 || !refundReason.trim()}
+                            >
+                                Confirm Refund
                             </Button>
                         </div>
                     </form>

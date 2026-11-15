@@ -37,6 +37,8 @@ final class AgreementFinancialAdjustmentsTest extends TestCase
         $this->grant($context, array_keys(\Modules\VehicleRental\Services\RentalAuthorization::descriptions()));
 
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+
             $agreements = app(AgreementService::class);
             $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
             $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
@@ -85,6 +87,38 @@ final class AgreementFinancialAdjustmentsTest extends TestCase
             $this->assertSame('5000.000000', $result['summary']['total_debit_notes']);
             $this->assertSame('5000.000000', $result['summary']['total_invoiced']);
             $this->assertSame('5000.000000', $result['summary']['total_remaining_balance']);
+
+            // Post invoices to enable settlement
+            $statuses = app(InvoiceStatusService::class);
+            if ($debitNote->status === InvoiceStatus::Draft) {
+                $debitNote = $statuses->transition($debitNote, InvoiceStatus::Approved, $context->actorId);
+            }
+            if ($debitNote->status === InvoiceStatus::Approved) {
+                $debitNote = $statuses->transition($debitNote, InvoiceStatus::Posted, $context->actorId);
+            }
+            if ($creditNote->status === InvoiceStatus::Draft) {
+                $creditNote = $statuses->transition($creditNote, InvoiceStatus::Approved, $context->actorId);
+            }
+            if ($creditNote->status === InvoiceStatus::Approved) {
+                $creditNote = $statuses->transition($creditNote, InvoiceStatus::Posted, $context->actorId);
+            }
+
+            // Allocate the 2500 credit note against the 5000 debit note
+            $balanceUpdater = app(\Modules\Invoice\Services\InvoiceBalanceUpdater::class);
+            $balanceUpdater->allocateCredit($debitNote, 'credit_note', $creditNote->id, '2500.000000');
+
+            // Verify credit note balance is now $0 and Paid
+            $creditNote->refresh()->load('balance');
+            $this->assertSame('0.000000', (string) $creditNote->balance->remaining_amount);
+            $this->assertSame('2500.000000', (string) $creditNote->balance->credit_allocated_amount);
+
+            // Verify financial summary now reports $0 unallocated credit and exact non-doubled credit allocated!
+            $afterAllocation = $summaryService->generate(AgreementKind::Customer, $context, $customerAg->id);
+            $this->assertSame('2500.000000', $afterAllocation['summary']['total_credit_notes']);
+            $this->assertSame('0.000000', $afterAllocation['summary']['total_unallocated_credit']);
+            $this->assertSame('2500.000000', $afterAllocation['summary']['total_credit_allocated']);
+            $this->assertSame('2500.000000', $afterAllocation['summary']['total_remaining_balance']);
+            $this->assertSame('2500.000000', $afterAllocation['summary']['net_account_balance']);
         });
     }
 

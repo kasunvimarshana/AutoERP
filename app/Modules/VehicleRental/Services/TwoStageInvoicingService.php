@@ -1469,6 +1469,9 @@ final class TwoStageInvoicingService
             }
         }
 
+        $finalInvoice->refresh();
+        $finalInvoice->load('balance');
+        $remainingToAllocate = (string) ($finalInvoice->balance?->remaining_amount ?? $finalInvoice->balance_due);
         $transferredPaymentTotal = '0.000000';
 
         foreach ($initialAllocations as $alloc) {
@@ -1479,7 +1482,7 @@ final class TwoStageInvoicingService
                     $reversalDate = $alloc->allocation_date->toDateString();
                 }
 
-                // 1. Reverse the allocation from initial invoice
+                // 1. Reverse the allocation from initial invoice back to payment
                 $payment = $this->allocationReversalService->reverse(
                     $payment,
                     $alloc->id,
@@ -1495,25 +1498,32 @@ final class TwoStageInvoicingService
                     $reallocationDate = $payment->payment_date->toDateString();
                 }
 
-                // 2. Allocate payment onto the new consolidated invoice
-                $this->allocationService->allocate(
-                    $payment,
-                    [
-                        new PaymentAllocationData(
-                            invoiceId: $finalInvoice->id,
-                            allocatedAmount: (string) $alloc->allocated_amount,
-                            allocationDate: $reallocationDate,
-                            metadata: [
-                                'transferred_from_invoice_id' => $initialInvoice->id,
-                                'cycle_number' => $cycle->cycle_number,
-                            ],
-                        ),
-                    ],
-                    (int) $payment->row_version,
-                    $context->actorId,
-                );
+                // 2. Bound allocation by available balance on final invoice
+                if ($this->math->compare($remainingToAllocate, '0.000000') > 0) {
+                    $amountToApply = $this->math->compare((string) $alloc->allocated_amount, $remainingToAllocate) > 0
+                        ? $remainingToAllocate
+                        : (string) $alloc->allocated_amount;
 
-                $transferredPaymentTotal = $this->math->add($transferredPaymentTotal, (string) $alloc->allocated_amount, 6);
+                    $this->allocationService->allocate(
+                        $payment,
+                        [
+                            new PaymentAllocationData(
+                                invoiceId: $finalInvoice->id,
+                                allocatedAmount: $amountToApply,
+                                allocationDate: $reallocationDate,
+                                metadata: [
+                                    'transferred_from_invoice_id' => $initialInvoice->id,
+                                    'cycle_number' => $cycle->cycle_number,
+                                ],
+                            ),
+                        ],
+                        (int) $payment->row_version,
+                        $context->actorId,
+                    );
+
+                    $transferredPaymentTotal = $this->math->add($transferredPaymentTotal, $amountToApply, 6);
+                    $remainingToAllocate = $this->math->sub($remainingToAllocate, $amountToApply, 6);
+                }
             }
         }
 

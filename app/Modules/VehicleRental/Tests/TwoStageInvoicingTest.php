@@ -1355,4 +1355,172 @@ final class TwoStageInvoicingTest extends TestCase
             $this->assertEqualsWithDelta(33000.0, (float) $vehAttributions[0]['subtotal'], 0.01);
         });
     }
+
+    public function test_two_stage_invoicing_mode_b_reallocates_multi_payments_bounded_with_surplus_retention(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = ['base_rate' => '50000.000000'];
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $customerAg->id, (int) $customerAg->row_version, [
+                'vehicle_id' => $ownerAg->vehicle_id,
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, (int) $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '10000.000000',
+                'reason' => 'Customer handover',
+            ]);
+
+            // Create initial cycle with provisional invoice of 50,000
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle = $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+                'issue_initial_invoice' => true,
+                'invoice_date' => '2026-09-01',
+                'finalization_mode' => 'consolidated_revision',
+            ]);
+
+            $initialInvoice = Invoice::query()->find($cycle->initial_invoice_id);
+            $this->assertNotNull($initialInvoice);
+
+            // Seed finance posting profile and payment method
+            FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+            FinancePostingFixture::seedCustomerPaymentProfiles($context->tenantId, $context->organizationUnitId);
+            $paymentMethodId = (int) DB::table('payment_methods')->insertGetId([
+                'tenant_id' => $context->tenantId,
+                'scope_key' => 'tenant:'.$context->tenantId,
+                'code' => 'TEST-CASH-BOUNDED-'.time(),
+                'name' => 'Cash Multi Alloc Test',
+                'method_type' => PaymentMethodType::Cash->value,
+                'direction_allowed' => PaymentMethodDirection::Both->value,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $invoiceStatuses = app(InvoiceStatusService::class);
+            $initialInvoice = $invoiceStatuses->transition($initialInvoice, InvoiceStatus::Approved, $context->actorId);
+            $initialInvoice = $invoiceStatuses->transition($initialInvoice, InvoiceStatus::Posted, $context->actorId);
+
+            $paymentCreation = app(PaymentCreationService::class);
+            $lifecycle = app(PaymentDocumentLifecycleService::class);
+            $posting = app(PaymentPostingService::class);
+            $allocationService = app(PaymentAllocationService::class);
+
+            // Payment 1: 25,000 allocated to initial invoice
+            $payment1 = $paymentCreation->create(new CreatePaymentData(
+                tenantId: $context->tenantId,
+                paymentType: PaymentType::CustomerReceipt,
+                direction: PaymentDirection::Inbound,
+                paymentDate: '2026-09-05',
+                organizationUnitId: $context->organizationUnitId,
+                partyType: 'customer',
+                partyId: (int) $customerAg->customer_id,
+                currencyId: (int) $customerAg->currency_id,
+                lines: [new PaymentLineData(amount: '25000.000000', paymentMethodId: $paymentMethodId)],
+            ));
+            $payment1 = $lifecycle->submit($payment1, (int) $payment1->row_version);
+            $payment1 = $lifecycle->approve($payment1, (int) $payment1->row_version);
+            $payment1 = $posting->post($payment1, (int) $payment1->row_version);
+            $payment1 = $allocationService->allocate(
+                $payment1,
+                [new PaymentAllocationData(invoiceId: $initialInvoice->id, allocatedAmount: '25000.000000', allocationDate: '2026-09-05')],
+                (int) $payment1->row_version,
+                $context->actorId
+            );
+
+            // Payment 2: 25,000 allocated to initial invoice
+            $payment2 = $paymentCreation->create(new CreatePaymentData(
+                tenantId: $context->tenantId,
+                paymentType: PaymentType::CustomerReceipt,
+                direction: PaymentDirection::Inbound,
+                paymentDate: '2026-09-10',
+                organizationUnitId: $context->organizationUnitId,
+                partyType: 'customer',
+                partyId: (int) $customerAg->customer_id,
+                currencyId: (int) $customerAg->currency_id,
+                lines: [new PaymentLineData(amount: '25000.000000', paymentMethodId: $paymentMethodId)],
+            ));
+            $payment2 = $lifecycle->submit($payment2, (int) $payment2->row_version);
+            $payment2 = $lifecycle->approve($payment2, (int) $payment2->row_version);
+            $payment2 = $posting->post($payment2, (int) $payment2->row_version);
+            $payment2 = $allocationService->allocate(
+                $payment2,
+                [new PaymentAllocationData(invoiceId: $initialInvoice->id, allocatedAmount: '25000.000000', allocationDate: '2026-09-10')],
+                (int) $payment2->row_version,
+                $context->actorId
+            );
+
+            // Add a deduction item of 15,000 so the final invoice total is 35,000 (less than 50,000 total payments)
+            $invoicing->addItem($context, $cycle->id, [
+                'item_type' => 'deduction',
+                'category' => 'other',
+                'description' => 'Promotional rebate',
+                'quantity' => '1.000000',
+                'unit_rate' => '15000.000000',
+            ], (int) $cycle->row_version);
+
+            $cycle->refresh();
+
+            // Finalize with Mode B
+            $finalized = $invoicing->finalize($context, $cycle->id, [
+                'finalization_mode' => BillingFinalizationMode::ConsolidatedRevision->value,
+                'invoice_date' => '2026-09-30',
+            ], (int) $cycle->row_version);
+
+            $this->assertSame(BillingCycleStatus::Finalized, $finalized->status);
+            $finalInvoice = Invoice::query()->find($finalized->final_invoice_id);
+            $this->assertNotNull($finalInvoice);
+            $this->assertEqualsWithDelta(35000.0, (float) $finalInvoice->grand_total, 0.01);
+
+            // Both initial allocations reversed
+            $allocsOnInitial = PaymentAllocation::query()
+                ->where('invoice_id', $initialInvoice->id)
+                ->where('status', AllocationStatus::Active->value)
+                ->count();
+            $this->assertSame(0, $allocsOnInitial);
+
+            // Final invoice has 2 allocations summing to exactly 35,000
+            $alloc1 = PaymentAllocation::query()
+                ->where('invoice_id', $finalInvoice->id)
+                ->where('payment_id', $payment1->id)
+                ->where('status', AllocationStatus::Active->value)
+                ->first();
+            $this->assertNotNull($alloc1);
+            $this->assertEqualsWithDelta(25000.0, (float) $alloc1->allocated_amount, 0.01);
+
+            $alloc2 = PaymentAllocation::query()
+                ->where('invoice_id', $finalInvoice->id)
+                ->where('payment_id', $payment2->id)
+                ->where('status', AllocationStatus::Active->value)
+                ->first();
+            $this->assertNotNull($alloc2);
+            $this->assertEqualsWithDelta(10000.0, (float) $alloc2->allocated_amount, 0.01);
+
+            // Payment 2 must retain the surplus of 15,000 as unapplied advance
+            $payment2->refresh();
+            $this->assertEqualsWithDelta(15000.0, (float) $payment2->unapplied_amount, 0.01);
+
+            // Cycle total paid amount must equal transferred 35,000
+            $finalized->refresh();
+            $this->assertEqualsWithDelta(35000.0, (float) $finalized->total_paid_amount, 0.01);
+        });
+    }
 }

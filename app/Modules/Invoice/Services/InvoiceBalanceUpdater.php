@@ -10,6 +10,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceBalanceStatus;
 use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceBalance;
 use Modules\Invoice\Models\InvoiceCreditAllocation;
@@ -93,6 +94,35 @@ final class InvoiceBalanceUpdater
                     throw new InvalidArgumentException(
                         'Credit allocation cannot exceed invoice balance.',
                     );
+                }
+
+                if (in_array($creditSourceType, ['credit_note', 'invoice'], true) || $creditSourceType === '') {
+                    $creditNote = Invoice::query()
+                        ->where('tenant_id', $lockedInvoice->tenant_id)
+                        ->lockForUpdate()
+                        ->find($creditSourceId);
+
+                    if ($creditNote !== null && (
+                        $creditNote->invoice_type === InvoiceType::Credit
+                        || $creditNote->invoice_type === InvoiceType::Credit->value
+                    )) {
+                        $creditBalance = $creditNote->balance()->lockForUpdate()->first();
+                        if ($creditBalance === null) {
+                            throw new InvalidArgumentException('Credit note does not have an active balance.');
+                        }
+
+                        if ($this->math->compare($amount, (string) $creditBalance->remaining_amount) > 0) {
+                            throw new InvalidArgumentException(
+                                'Credit allocation cannot exceed credit note remaining balance.',
+                            );
+                        }
+
+                        $creditBalance->credit_allocated_amount = $this->math->add(
+                            (string) $creditBalance->credit_allocated_amount,
+                            $amount,
+                        );
+                        $this->syncBalance($creditNote, $creditBalance);
+                    }
                 }
 
                 $this->recordCreditAllocation(

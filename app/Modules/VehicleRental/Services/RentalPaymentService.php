@@ -16,6 +16,7 @@ use Modules\Payment\Constants\PaymentPermission;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
+use Modules\Payment\DTOs\PaymentRefundData;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentDirection;
@@ -25,11 +26,13 @@ use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentAllocation;
+use Modules\Payment\Models\PaymentRefund;
 use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Services\PaymentReceiptService;
+use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\User\Services\UserAccessResolver;
 use Modules\VehicleRental\Constants\AgreementFields;
@@ -54,6 +57,7 @@ final class RentalPaymentService
         private readonly PaymentReversalService $reversalService,
         private readonly InvoiceStatusService $invoiceStatusService,
         private readonly PaymentReceiptService $receiptService,
+        private readonly PaymentRefundWorkflowService $refundWorkflowService,
         private readonly DecimalMath $math,
     ) {}
 
@@ -474,6 +478,80 @@ final class RentalPaymentService
         });
     }
 
+    public function refundPayment(
+        AgreementContext $context,
+        AgreementKind $kind,
+        int $agreementId,
+        int $paymentId,
+        array $input
+    ): PaymentRefund {
+        $this->authorize($context, $kind, PaymentPermission::PAYMENTS_REFUND);
+
+        return DB::transaction(function () use ($context, $kind, $agreementId, $paymentId, $input): PaymentRefund {
+            $agreement = $kind === AgreementKind::Customer
+                ? CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($agreementId)
+                : OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($agreementId);
+
+            $payment = Payment::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('organization_unit_id', $context->organizationUnitId)
+                ->lockForUpdate()
+                ->findOrFail($paymentId);
+
+            $amount = $this->math->normalize((string) ($input['amount'] ?? '0.000000'));
+            if ($this->math->isNegative($amount) || $this->math->isZero($amount)) {
+                throw ValidationException::withMessages(['amount' => ['Refund amount must be greater than zero.']]);
+            }
+
+            $unapplied = (string) ($payment->unapplied_amount ?? $payment->unappliedBalance?->unapplied_amount ?? '0.000000');
+            if ($this->math->compare($amount, $unapplied) > 0) {
+                throw ValidationException::withMessages(['amount' => ["Refund amount ({$amount}) cannot exceed available unapplied amount ({$unapplied})."]]);
+            }
+
+            $paymentMethodId = (int) ($input['payment_method_id'] ?? 0);
+            if ($paymentMethodId < 1) {
+                throw ValidationException::withMessages(['payment_method_id' => ['A valid refund payment method is required.']]);
+            }
+
+            $refundDate = (string) ($input['refund_date'] ?? now()->toDateString());
+            $expectedVersion = (int) ($input['expected_version'] ?? $payment->row_version);
+
+            $refundData = new PaymentRefundData(
+                paymentId: $payment->id,
+                expectedVersion: $expectedVersion,
+                refundDate: $refundDate,
+                amount: $amount,
+                paymentMethodId: $paymentMethodId,
+                exchangeRate: (string) ($input['exchange_rate'] ?? $payment->exchange_rate ?? '1.000000'),
+                referenceNumber: ! empty($input['reference_number']) ? trim((string) $input['reference_number']) : null,
+                externalBankName: ! empty($input['external_bank_name']) ? trim((string) $input['external_bank_name']) : null,
+                externalBankBranch: ! empty($input['external_bank_branch']) ? trim((string) $input['external_bank_branch']) : null,
+                instrumentNumber: ! empty($input['instrument_number']) ? trim((string) $input['instrument_number']) : null,
+                instrumentDate: ! empty($input['instrument_date']) ? (string) $input['instrument_date'] : null,
+                reason: ! empty($input['reason']) ? trim((string) $input['reason']) : "Refund for payment {$payment->payment_number} on {$agreement->reference}",
+                refundedBy: $context->actorId,
+            );
+
+            $refund = $this->refundWorkflowService->refund($refundData);
+
+            // Auto-approve and post the generated outbound/inbound refund payment
+            $refundPayment = $refund->refundPayment;
+            if ($refundPayment) {
+                if ($refundPayment->document_status === PaymentDocumentStatus::Draft) {
+                    $refundPayment = $this->documentLifecycleService->submit($refundPayment, (int) $refundPayment->row_version, $context->actorId);
+                }
+                if ($refundPayment->document_status === PaymentDocumentStatus::Submitted) {
+                    $refundPayment = $this->documentLifecycleService->approve($refundPayment, (int) $refundPayment->row_version, $context->actorId);
+                }
+                if ($refundPayment->posting_status !== PaymentPostingStatus::Posted) {
+                    $refundPayment = $this->postingService->post($refundPayment, (int) $refundPayment->row_version, $context->actorId);
+                }
+            }
+
+            return $refund->fresh(['refundPayment.lines', 'payment']);
+        });
+    }
+
     public function listAgreementPayments(
         AgreementContext $context,
         int $agreementId,
@@ -548,7 +626,19 @@ final class RentalPaymentService
             ->with(['lines.paymentMethod', 'allocations.invoice', 'unappliedBalance'])
             ->get();
 
-        $merged = $directPayments->concat($allocatedPayments)->unique('id')->sortByDesc('payment_date');
+        // 4. Linked refunds originating from these agreement payments
+        $originalPaymentIds = $directPayments->pluck('id')->merge($allocatedPayments->pluck('id'))->unique()->filter()->all();
+        $refundPayments = ! empty($originalPaymentIds)
+            ? Payment::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('organization_unit_id', $context->organizationUnitId)
+                ->where('payment_type', PaymentType::Refund->value)
+                ->whereIn('original_payment_id', $originalPaymentIds)
+                ->with(['lines.paymentMethod', 'allocations.invoice', 'unappliedBalance'])
+                ->get()
+            : collect();
+
+        $merged = $directPayments->concat($allocatedPayments)->concat($refundPayments)->unique('id')->sortByDesc('payment_date');
 
         return $merged->map(function (Payment $p) {
             $methods = $p->lines->map(fn ($l) => [
@@ -582,6 +672,8 @@ final class RentalPaymentService
                 'unapplied_amount' => (string) ($p->unapplied_amount ?? $p->unappliedBalance?->unapplied_amount ?? '0.000000'),
                 'reference_number' => $p->reference_number,
                 'notes' => $p->notes,
+                'row_version' => (int) $p->row_version,
+                'original_payment_id' => $p->original_payment_id,
                 'methods' => $methods,
                 'allocations' => $allocs,
             ];

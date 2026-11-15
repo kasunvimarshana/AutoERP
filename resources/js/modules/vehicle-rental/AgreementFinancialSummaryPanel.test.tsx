@@ -5,6 +5,7 @@ import { AgreementFinancialSummaryPanel } from './AgreementFinancialSummaryPanel
 import {
     getAgreementFinancialSummary,
     createAgreementFinancialAdjustment,
+    refundAgreementPayment,
     type AgreementFinancialSummary,
 } from './agreementApi';
 import {
@@ -17,11 +18,19 @@ import {
     type TermKey,
 } from './agreements';
 
+vi.mock('@/modules/payment/paymentApi', () => ({
+    listUsablePaymentMethods: vi.fn().mockResolvedValue({
+        data: [{ id: 1, name: 'Bank Transfer', method_type: 'bank_transfer' }],
+    }),
+}));
+
 vi.mock('./agreementApi', () => ({
     getAgreementFinancialSummary: vi.fn(),
     createAgreementFinancialAdjustment: vi.fn(),
+    refundAgreementPayment: vi.fn().mockResolvedValue({ id: 999 }),
     listBillingCycles: vi.fn().mockResolvedValue({ data: [] }),
     listReassignments: vi.fn().mockResolvedValue([]),
+    getPaymentReceiptPrintUrl: vi.fn(id => `/receipt/${id}`),
 }));
 
 const mockAgreement: Agreement = {
@@ -61,7 +70,28 @@ const mockSummaryData: AgreementFinancialSummary = {
         total_credit_allocated: '1000.000000',
         total_remaining_balance: '15200.000000',
         total_unallocated_credit: '1000.000000',
+        total_unapplied_advance: '3000.000000',
+        net_account_balance: '11200.000000',
     },
+    payments: [
+        {
+            id: 201,
+            row_version: 2,
+            payment_number: 'PAY-201',
+            payment_date: '2026-09-10',
+            payment_type: 'customer_receipt',
+            direction: 'inbound',
+            document_status: 'approved',
+            posting_status: 'posted',
+            total_amount: '10000.000000',
+            allocated_amount: '7000.000000',
+            unapplied_amount: '3000.000000',
+            methods: [
+                { id: 1, method_name: 'Bank Transfer', method_type: 'bank_transfer', amount: '10000.000000', reference: 'TRX-101' },
+            ],
+            allocations: [],
+        },
+    ],
     base_charges: [],
     usage_charges: [],
     allocations: [
@@ -199,4 +229,68 @@ it('hides adjustment controls when user lacks manage permissions', async () => {
     });
 
     expect(screen.queryByText('+ Issue Credit / Debit Note')).not.toBeInTheDocument();
+});
+
+it('renders net account standing metric card and unapplied advance', async () => {
+    render(
+        <MemoryRouter>
+            <AgreementFinancialSummaryPanel
+                kind={AgreementKind.Customer}
+                agreement={mockAgreement}
+                canManageAdjustments={true}
+            />
+        </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+        expect(screen.getByText('Net Account Standing')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('PAY-201')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refund' })).toBeInTheDocument();
+});
+
+it('opens refund modal for payment with unapplied credit and submits refund with expected version', async () => {
+    render(
+        <MemoryRouter>
+            <AgreementFinancialSummaryPanel
+                kind={AgreementKind.Customer}
+                agreement={mockAgreement}
+                canManageAdjustments={true}
+            />
+        </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Refund' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText(/Process Refund · PAY-201/)).toBeInTheDocument();
+
+    // Verify refund amount is prefilled with available unapplied amount
+    const amountInput = screen.getByLabelText(/Refund Amount/) as HTMLInputElement;
+    expect(amountInput.value).toBe('3000.000000');
+
+    // Change amount to 1500 and enter reason
+    fireEvent.change(amountInput, { target: { value: '1500.00' } });
+    fireEvent.change(screen.getByLabelText(/Reason for Refund/), { target: { value: 'Partial advance refund' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Refund' }));
+
+    await waitFor(() => {
+        expect(refundAgreementPayment).toHaveBeenCalledWith(
+            AgreementKind.Customer,
+            12,
+            201,
+            expect.objectContaining({
+                amount: '1500.00',
+                reason: 'Partial advance refund',
+                expected_version: 2,
+            }),
+        );
+    });
+
+    expect(await screen.findByText(/Refund for PAY-201 processed successfully/)).toBeInTheDocument();
 });

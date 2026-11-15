@@ -253,14 +253,56 @@ final class PaymentAllocationService
         if ($this->math->compare($allocation->allocatedAmount, $invoiceBalance->remainingAmount) > 0) {
             throw new InvalidArgumentException('Payment allocation cannot exceed invoice remaining balance.');
         }
-        $this->assertNoExistingPaymentInvoiceAllocation($payment, $allocation->invoiceId);
         $snapshot = $this->invoiceSnapshot($allocation->invoiceId);
         $this->assertAllocationDate($payment, $allocation, $snapshot['invoice_date_snapshot']);
+
+        $existing = PaymentAllocation::query()
+            ->where('payment_id', $payment->getKey())
+            ->where('invoice_id', $allocation->invoiceId)
+            ->whereIn('status', [AllocationStatus::Pending->value, AllocationStatus::Active->value])
+            ->lockForUpdate()
+            ->first();
+
+        if ($existing instanceof PaymentAllocation && $existing->status === AllocationStatus::Pending->value) {
+            throw new InvalidArgumentException('Payment has a pending allocation to this invoice. Realize or cancel it before topping up.');
+        }
+
         $settlement = $this->invoiceSettlements->applyPaymentAllocation(
             $allocation->invoiceId,
             $allocation->allocatedAmount,
             false,
         );
+
+        if ($existing instanceof PaymentAllocation) {
+            $metadata = is_array($existing->metadata) ? $existing->metadata : [];
+            $topUps = $metadata['top_ups'] ?? [];
+            $topUps[] = [
+                'amount' => $this->math->normalize($allocation->allocatedAmount),
+                'allocation_date' => $allocation->allocationDate,
+                'realized_at' => now()->toIso8601String(),
+                'realized_by' => $actorId,
+            ];
+            $metadata['top_ups'] = $topUps;
+
+            $existing->forceFill([
+                'allocated_amount' => $this->math->add(
+                    (string) $existing->allocated_amount,
+                    $allocation->allocatedAmount,
+                ),
+                'invoice_balance_after' => $settlement->balanceAfter,
+                'metadata' => $metadata,
+                'row_version' => (int) $existing->row_version + 1,
+            ])->save();
+
+            $this->allocationFinance->postIncremental(
+                $payment,
+                $existing,
+                $allocation->allocatedAmount,
+                $actorId,
+            );
+
+            return $existing;
+        }
 
         $created = $this->createAllocation([
             'tenant_id' => $payment->tenant_id,

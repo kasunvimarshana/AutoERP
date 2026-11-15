@@ -61,6 +61,8 @@ export interface AgreementFinancialSummary {
         total_credit_allocated: string;
         total_remaining_balance: string;
         total_unallocated_credit: string;
+        total_unapplied_advance?: string;
+        net_account_balance?: string;
     };
     base_charges: Array<{
         id: number;
@@ -158,6 +160,8 @@ export interface AgreementPayment {
     unapplied_amount: string;
     reference_number?: string | null;
     notes?: string | null;
+    row_version?: number;
+    original_payment_id?: number | null;
     methods: AgreementPaymentMethod[];
     allocations: AgreementPaymentAllocation[];
 }
@@ -200,6 +204,20 @@ export interface ReverseRentalPaymentPayload {
     reversal_date?: string;
 }
 
+export interface RefundRentalPaymentPayload {
+    amount: string;
+    payment_method_id: number;
+    refund_date?: string;
+    exchange_rate?: string;
+    reference_number?: string | null;
+    external_bank_name?: string | null;
+    external_bank_branch?: string | null;
+    instrument_number?: string | null;
+    instrument_date?: string | null;
+    reason?: string | null;
+    expected_version?: number;
+}
+
 export const listAgreementPayments = (kind: AgreementKind, agreementId: number) =>
     apiClient.get<{ data: AgreementPayment[] }>(`${url(kind)}/${agreementId}/payments`).then(r => r.data.data);
 
@@ -211,6 +229,9 @@ export const allocateAgreementPayment = (kind: AgreementKind, agreementId: numbe
 
 export const reverseAgreementPayment = (kind: AgreementKind, agreementId: number, paymentId: number, payload: ReverseRentalPaymentPayload) =>
     apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments/${paymentId}/reverse`, payload).then(r => r.data.data);
+
+export const refundAgreementPayment = (kind: AgreementKind, agreementId: number, paymentId: number, payload: RefundRentalPaymentPayload) =>
+    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments/${paymentId}/refund`, payload).then(r => r.data.data);
 
 export const getPaymentReceiptPrintUrl = (paymentId: number) => `/api/v1/payments/${paymentId}/receipt`;
 

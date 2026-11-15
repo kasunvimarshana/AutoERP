@@ -113,6 +113,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
             Route::post('/', [RentalPaymentController::class, 'store']);
             Route::post('{payment}/allocate', [RentalPaymentController::class, 'allocate'])->whereNumber('payment');
             Route::post('{payment}/reverse', [RentalPaymentController::class, 'reverse'])->whereNumber('payment');
+            Route::post('{payment}/refund', [RentalPaymentController::class, 'refund'])->whereNumber('payment');
         });
 
     Route::prefix('customer/agreements/{agreement}/deposits')->whereNumber('agreement')->middleware('tenant.feature:'.TenantFeature::PAYMENT)->group(function (): void {

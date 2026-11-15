@@ -10,6 +10,7 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceSourceService;
 use Modules\Payment\Enums\PaymentSourceType;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Services\PaymentSourceService;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
@@ -138,18 +139,14 @@ final class AgreementFinancialSummaryService
             if ($isActive) {
                 if ($type === InvoiceType::Credit->value) {
                     $totalCreditNotes = $this->math->add($totalCreditNotes, $grand);
-                } elseif ($type === InvoiceType::Debit->value) {
-                    $totalDebitNotes = $this->math->add($totalDebitNotes, $grand);
-                    $totalInvoiced = $this->math->add($totalInvoiced, $grand);
-                } else {
-                    $totalInvoiced = $this->math->add($totalInvoiced, $grand);
-                }
-
-                $totalPaid = $this->math->add($totalPaid, $paid);
-                $totalCreditAllocated = $this->math->add($totalCreditAllocated, $credit);
-                if ($type === InvoiceType::Credit->value) {
                     $totalUnallocatedCredit = $this->math->add($totalUnallocatedCredit, $rem);
                 } else {
+                    if ($type === InvoiceType::Debit->value) {
+                        $totalDebitNotes = $this->math->add($totalDebitNotes, $grand);
+                    }
+                    $totalInvoiced = $this->math->add($totalInvoiced, $grand);
+                    $totalPaid = $this->math->add($totalPaid, $paid);
+                    $totalCreditAllocated = $this->math->add($totalCreditAllocated, $credit);
                     $totalRemainingBalance = $this->math->add($totalRemainingBalance, $rem);
                 }
             }
@@ -204,6 +201,25 @@ final class AgreementFinancialSummaryService
             // Graceful fallback if user lacks payment view permission
         }
 
+        $totalUnappliedAdvance = '0.000000';
+        foreach ($payments as $p) {
+            $pStatus = (string) ($p['status'] ?? '');
+            $pPostingStatus = (string) ($p['posting_status'] ?? '');
+            $pDocStatus = (string) ($p['document_status'] ?? '');
+            $pType = (string) ($p['payment_type'] ?? '');
+            if ($pType !== PaymentType::Refund->value
+                && ($pPostingStatus === 'posted' || in_array($pStatus, ['approved', 'posted'], true) || in_array($pDocStatus, ['approved', 'posted'], true))
+                && ! empty($p['unapplied_amount'])
+            ) {
+                $totalUnappliedAdvance = $this->math->add($totalUnappliedAdvance, (string) $p['unapplied_amount']);
+            }
+        }
+
+        $netAccountBalance = $this->math->sub(
+            $this->math->sub($totalRemainingBalance, $totalUnallocatedCredit),
+            $totalUnappliedAdvance
+        );
+
         return [
             'agreement' => [
                 'id' => $agreement->id,
@@ -231,6 +247,8 @@ final class AgreementFinancialSummaryService
                 'total_credit_allocated' => $totalCreditAllocated,
                 'total_remaining_balance' => $totalRemainingBalance,
                 'total_unallocated_credit' => $totalUnallocatedCredit,
+                'total_unapplied_advance' => $totalUnappliedAdvance,
+                'net_account_balance' => $netAccountBalance,
             ],
             'base_charges' => $baseCharges->map(fn (RentalCharge $c) => [
                 'id' => $c->id,
