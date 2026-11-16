@@ -6,6 +6,7 @@ namespace Modules\Customer\Enums;
 
 enum CustomerAddressType: string
 {
+    case General = 'general';
     case Billing = 'billing';
     case Shipping = 'shipping';
     case Registered = 'registered';

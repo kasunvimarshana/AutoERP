@@ -6,6 +6,7 @@ import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
 import {
     customerAddressTypes,
+    GENERAL_CUSTOMER_ADDRESS_TYPE,
     type CustomerAddressPayload,
     type CustomerBankAccountPayload,
     type CustomerContactPayload,
@@ -48,7 +49,7 @@ function ContactDraft({ value, onChange }: Props) {
 }
 function AddressDraft({ value, onChange }: Props) {
     const [type, setType] = useState('registered'); const [line, setLine] = useState(''); const [city, setCity] = useState('');
-    return <Draft title="Initial addresses" rows={value.addresses.map((row) => `${row.address_type} / ${row.address_line_1}`)} remove={(index) => onChange({ ...value, addresses: value.addresses.filter((_, i) => i !== index) })}><Select label="Type" value={type} onChange={(event) => setType(event.target.value)} options={options(customerAddressTypes)} /><Input label="Address line 1" value={line} onChange={(event) => setLine(event.target.value)} /><Input label="City" value={city} onChange={(event) => setCity(event.target.value)} /><Button type="button" disabled={!line} onClick={() => { onChange({ ...value, addresses: [...value.addresses, { address_type: type, address_line_1: line, city: city || null, is_primary: !value.addresses.some((row) => row.address_type === type && row.is_primary), is_active: true }] }); setLine(''); setCity(''); }}>Add address</Button></Draft>;
+    return <Draft title="Initial addresses" rows={value.addresses.map((row) => `${row.address_type} / ${row.address_line_1}`)} remove={(index) => onChange({ ...value, addresses: value.addresses.filter((_, i) => i !== index) })}><Select label="Type" value={type} onChange={(event) => setType(event.target.value)} options={options(customerAddressTypes.filter((addressType) => addressType !== GENERAL_CUSTOMER_ADDRESS_TYPE))} /><Input label="Address line 1" value={line} onChange={(event) => setLine(event.target.value)} /><Input label="City" value={city} onChange={(event) => setCity(event.target.value)} /><Button type="button" disabled={!line} onClick={() => { onChange({ ...value, addresses: [...value.addresses, { address_type: type, address_line_1: line, city: city || null, is_primary: !value.addresses.some((row) => row.address_type === type && row.is_primary), is_active: true }] }); setLine(''); setCity(''); }}>Add address</Button></Draft>;
 }
 function BankDraft({ value, onChange }: Props) {
     const [bank, setBank] = useState(''); const [accountName, setAccountName] = useState(''); const [number, setNumber] = useState(''); const [currency, setCurrency] = useState<NamedResource | null>(null);

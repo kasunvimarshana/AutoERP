@@ -24,7 +24,7 @@ export default function CustomerAddressTab({ customerId, canManage }: { customer
         { key: 'primary', header: 'Primary', render: (row) => row.is_primary ? 'Yes' : 'No' },
         ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: CustomerAddress) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> }] : []),
     ];
-    return <><CustomerRelationHeader title="Addresses" description="Billing, shipping, registered, and service addresses." onAdd={canManage ? crud.startCreate : undefined} />
+    return <><CustomerRelationHeader title="Addresses" description="General, billing, shipping, registered, and service addresses." onAdd={canManage ? crud.startCreate : undefined} />
         <ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
         {canManage && <FormDrawer open={crud.open} title={crud.editing ? 'Edit address' : 'Add address'} onClose={crud.close}>{crud.open && <AddressForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>}
         {canManage && crud.confirmDialog}

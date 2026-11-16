@@ -3,7 +3,8 @@ import type { WhatsAppVerificationRecipient, WhatsAppVerificationStatus } from '
 
 export const customerTypes = ['individual', 'company', 'government', 'internal', 'foreign', 'retail', 'wholesale', 'corporate', 'other'] as const;
 export const customerStatuses = ['pending_approval', 'active', 'inactive', 'on_hold', 'blacklisted'] as const;
-export const customerAddressTypes = ['billing', 'shipping', 'registered', 'service', 'other'] as const;
+export const GENERAL_CUSTOMER_ADDRESS_TYPE = 'general' as const;
+export const customerAddressTypes = [GENERAL_CUSTOMER_ADDRESS_TYPE, 'billing', 'shipping', 'registered', 'service', 'other'] as const;
 export const customerDocumentTypes = ['business_registration', 'tax_certificate', 'vat_certificate', 'svat_certificate', 'contract', 'license', 'insurance', 'id_document', 'other'] as const;
 export const customerDocumentStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
 export const preferredCommunicationChannels = ['email', 'phone', 'mobile', 'sms', 'whatsapp', 'other'] as const;

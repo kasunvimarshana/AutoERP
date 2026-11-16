@@ -10,10 +10,10 @@ import { Modal } from '@/shared/components/Modal';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { WhatsAppVerificationPanel } from '@/shared/components/WhatsAppVerificationPanel';
-import { customerTypes, type CustomerPayload, type CustomerSummary } from '@/modules/customer/customerTypes';
+import { customerTypes, GENERAL_CUSTOMER_ADDRESS_TYPE, type CustomerPayload, type CustomerSummary } from '@/modules/customer/customerTypes';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { CustomerPhoneConflictAlert } from '@/modules/customer/components/CustomerPhoneConflictAlert';
-import { confirmCustomerWhatsAppVerification, createCustomer, getCustomerWhatsAppVerification, startCustomerWhatsAppVerification } from '@/modules/customer/customerApi';
+import { confirmCustomerWhatsAppVerification, createCustomer, createCustomerWithRelations, getCustomerWhatsAppVerification, startCustomerWhatsAppVerification } from '@/modules/customer/customerApi';
 import {
     DEFAULT_CUSTOMER_STATUS,
     defaultCustomerPayload,
@@ -58,6 +58,7 @@ export function VehicleServiceQuickVehicleModal({
     const [customerMode, setCustomerMode] = useState<CustomerMode>('existing');
     const [existingCustomer, setExistingCustomer] = useState<CustomerSummary | null>(null);
     const [customerPayload, setCustomerPayload] = useState<CustomerPayload>(defaultCustomerPayload());
+    const [customerAddress, setCustomerAddress] = useState('');
     const [vehiclePayload, setVehiclePayload] = useState<VehiclePayload>(defaultVehiclePayload(initialVehicleNumber));
     const [make, setMake] = useState<VehicleMake | null>(null);
     const [model, setModel] = useState<VehicleModel | null>(null);
@@ -173,10 +174,20 @@ export function VehicleServiceQuickVehicleModal({
                     try {
                         const customer = customerMode === 'existing'
                             ? existingCustomer
-                            : customerSummary(await createCustomer({
-                                ...customerPayload,
-                                status: DEFAULT_CUSTOMER_STATUS,
-                            }));
+                            : customerSummary(await (customerAddress.trim()
+                                ? createCustomerWithRelations({
+                                    customer: { ...customerPayload, status: DEFAULT_CUSTOMER_STATUS },
+                                    contacts: [],
+                                    addresses: [{
+                                        address_type: GENERAL_CUSTOMER_ADDRESS_TYPE,
+                                        address_line_1: customerAddress.trim(),
+                                        is_primary: true,
+                                        is_active: true,
+                                    }],
+                                    bank_accounts: [],
+                                    credit_profile: null,
+                                })
+                                : createCustomer({ ...customerPayload, status: DEFAULT_CUSTOMER_STATUS })));
 
                         if (!customer) {
                             setSaving(false);
@@ -203,6 +214,7 @@ export function VehicleServiceQuickVehicleModal({
 
                         const createdVehicle = vehicleLookupResource(vehicle, customer);
                         setCustomerPayload(defaultCustomerPayload());
+                        setCustomerAddress('');
                         setExistingCustomer(null);
                         setCustomerMode('existing');
 
@@ -330,6 +342,14 @@ export function VehicleServiceQuickVehicleModal({
                                 value={customerPayload.mobile ?? ''}
                                 onChange={(event) => setCustomerPayload((current) => ({ ...current, mobile: event.target.value || null }))}
                                 error={customerError(error, 'mobile', 'customer.mobile')}
+                            />
+                            <Input
+                                label="Customer address"
+                                value={customerAddress}
+                                onChange={(event) => setCustomerAddress(event.target.value)}
+                                error={customerError(error, 'addresses.0.address_line_1')}
+                                hint="Optional general address for this customer."
+                                maxLength={255}
                             />
                             {canVerifyCustomer ? (
                                 <label className="flex items-start gap-2 text-sm text-slate-700 md:col-span-2">

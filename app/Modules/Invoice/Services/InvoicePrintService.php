@@ -100,6 +100,9 @@ final class InvoicePrintService
         $taxLabel = $this->taxLabel($invoice->lines);
         $layout = $this->layout($invoice);
         $usesFocusedPrint = $this->usesFocusedPrint($invoice);
+        $isServiceA4 = $layout === InvoicePrintLayout::StandardA4
+            && $this->enumValue($invoice->invoice_type) === InvoiceType::Service->value;
+        $lines = $this->lines($invoice->lines, $currency);
 
         return [
             'mode' => $mode,
@@ -116,6 +119,7 @@ final class InvoicePrintService
                 'continuous_horizontal_margin' => $layout->continuousCssHorizontalMargin(),
                 'continuous_vertical_margin' => $layout->continuousCssVerticalMargin(),
                 'is_compact' => $layout->isCompact(),
+                'is_service_a4' => $isServiceA4,
             ],
             'print_context' => $this->printContext($invoice, $printContext),
             'document' => [
@@ -123,6 +127,9 @@ final class InvoicePrintService
                 'number_label' => $kind->numberLabel(),
                 'invoice_number' => $this->nullableString($invoice->invoice_number) ?? 'Unnumbered invoice',
                 'invoice_date' => $this->dateString($invoice->invoice_date),
+                'invoice_date_display' => $invoice->invoice_date instanceof DateTimeInterface
+                    ? $invoice->invoice_date->format('d M Y')
+                    : $this->dateString($invoice->invoice_date),
                 'due_date' => $this->dateString($invoice->due_date),
                 'invoice_type' => $this->label($this->enumValue($invoice->invoice_type)),
                 'direction' => $this->label($this->enumValue($invoice->direction)),
@@ -147,7 +154,7 @@ final class InvoicePrintService
                 'uses_focused_print' => $usesFocusedPrint,
                 'capitalizes_company_header' => $this->isOutbound($invoice),
                 'shows_service_discount_breakdown' => $this->enumValue($invoice->invoice_type) === InvoiceType::Service->value,
-                'lines' => $this->lines($invoice->lines, $currency),
+                'lines' => $lines,
                 'amounts' => $this->amounts($invoice, $currency, $taxLabel, $usesFocusedPrint),
             ],
         ];
@@ -181,6 +188,7 @@ final class InvoicePrintService
             ->map(fn (InvoiceLine $line): array => [
                 'line_number' => (int) $line->line_number,
                 'reference' => $this->lineReference($line),
+                'item_code' => $this->nullableString($line->item_code_snapshot),
                 'item' => $this->lineItemLabel($line),
                 'display_name' => $this->lineDisplayName($line),
                 'description' => (string) $line->description,
