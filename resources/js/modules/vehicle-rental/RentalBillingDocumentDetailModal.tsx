@@ -501,7 +501,7 @@ export function RentalBillingDocumentDetailModal({
                                 )}
                                 {Number(detail.financial_breakdown?.wht_withheld ?? detail.wht_amount) > 0 && (
                                     <div className="flex justify-between text-amber-700">
-                                        <span>Statutory Withholding Tax (10% WHT):</span>
+                                        <span>Statutory Withholding Tax (10% WHT to :3305-000):</span>
                                         <span className="font-mono font-medium">
                                             - <MoneyDisplay value={detail.financial_breakdown?.wht_withheld ?? detail.wht_amount} />
                                         </span>

@@ -47,6 +47,8 @@ export interface RentalBillingDocument {
         make_model: string | null;
     } | null;
     driver_name: string | null;
+    notes?: string | null;
+    maintenance_deductions?: string;
     row_version: number;
     created_at: string;
 }
@@ -139,6 +141,8 @@ export interface RentalBillingSummary {
         total_outstanding: string;
         overdue_count: number;
         overdue_amount: string;
+        draft_count?: number;
+        draft_amount?: string;
     };
     owner_ap: {
         total_gross_billed: string;
@@ -147,6 +151,8 @@ export interface RentalBillingSummary {
         total_outstanding: string;
         overdue_count: number;
         overdue_amount: string;
+        draft_count?: number;
+        draft_amount?: string;
     };
 }
 
@@ -224,5 +230,173 @@ export async function cancelRentalBillingDocument(
     payload: CancelBillingDocumentPayload
 ): Promise<RentalBillingDetail> {
     const res = await apiClient.post<{ data: RentalBillingDetail }>(`${RENTAL_BILLING_API}/documents/${id}/cancel`, payload);
+    return res.data.data;
+}
+
+export interface RentalQuotationLine {
+    line_number: number;
+    description: string;
+    quantity: string;
+    unit_price: string;
+    discount_amount: string;
+    line_total: string;
+}
+
+export interface RentalQuotationPreviewRequest {
+    billing_cycle_id?: number;
+    agreement_id?: number;
+    customer_agreement_id?: number;
+    period_from?: string;
+    period_until?: string;
+    custody_days?: number;
+    excess_km?: string | number;
+    normal_ot_hours?: string | number;
+    double_ot_hours?: string | number;
+    triple_ot_hours?: string | number;
+    night_outs?: number;
+    tolls_amount?: string | number;
+    additions?: { description: string; amount: string; category?: string }[];
+    deductions?: { description: string; amount: string; category?: string }[];
+    tax_rate?: string | number;
+}
+
+export interface RentalQuotationPreview {
+    quotation_number: string;
+    quotation_date: string;
+    direction: 'outbound' | 'inbound';
+    customer: {
+        id: number;
+        name: string;
+        email?: string | null;
+        phone?: string | null;
+    } | null;
+    agreement: {
+        id: number;
+        reference: string;
+        billing_basis: string;
+        starts_on?: string | null;
+        ends_on?: string | null;
+    };
+    billing_cycle: {
+        id: number;
+        cycle_number: number;
+        period_from?: string | null;
+        period_until?: string | null;
+        status: string;
+        finalization_mode?: string;
+    } | null;
+    period: {
+        from: string;
+        until: string;
+    };
+    lines: RentalQuotationLine[];
+    telematics: {
+        trips_count: number;
+        commercial_km: string;
+        normal_ot_hours: string;
+        double_ot_hours: string;
+        triple_ot_hours: string;
+        night_outs: number;
+        assigned_vehicles: string[];
+        assigned_drivers: string[];
+    };
+    vehicle_attributions?: unknown[];
+    driver_attributions?: unknown[];
+    line_items?: unknown[];
+    financial_breakdown: {
+        base_rent: string;
+        excess_km: string;
+        overtime: string;
+        night_out: string;
+        tolls: string;
+        additions: string;
+        deductions: string;
+        gross_subtotal: string;
+        discount_total: string;
+        net_subtotal: string;
+        tax_amount: string;
+        grand_total: string;
+        net_payable: string;
+    };
+}
+
+export interface RentalOwnerBillPreviewRequest {
+    owner_agreement_id?: number;
+    agreement_id?: number;
+    start_date: string;
+    end_date: string;
+    wht_rate?: string | number;
+    include_maintenance_chargebacks?: boolean;
+}
+
+export interface RentalOwnerBillAdjustment {
+    name: string;
+    type: string;
+    effect: string;
+    amount: string;
+}
+
+export interface RentalOwnerBillPreview {
+    bill_number: string;
+    direction: 'inbound';
+    document_date: string;
+    supplier: {
+        id: number;
+        name: string;
+    } | null;
+    agreement: {
+        id: number;
+        reference: string;
+        starts_on?: string | null;
+        ends_on?: string | null;
+        vehicle?: {
+            id: number;
+            registration_number: string;
+            make?: string | null;
+            model?: string | null;
+        } | null;
+    };
+    period: {
+        from: string;
+        until: string;
+    };
+    wht_rate: string;
+    lines: RentalQuotationLine[];
+    adjustments: RentalOwnerBillAdjustment[];
+    financial_breakdown: {
+        gross_payable: string;
+        base_payable: string;
+        usage_payable: string;
+        adjustment_additions: string;
+        wht_amount: string;
+        maintenance_deductions: string;
+        adjustment_deductions: string;
+        total_deductions: string;
+        net_payable: string;
+    };
+    notes: string;
+}
+
+export async function previewRentalQuotation(
+    payload: RentalQuotationPreviewRequest,
+    signal?: AbortSignal
+): Promise<RentalQuotationPreview> {
+    const res = await apiClient.post<{ data: RentalQuotationPreview }>(
+        `${RENTAL_BILLING_API}/quotation-preview`,
+        payload,
+        { signal }
+    );
+    return res.data.data;
+}
+
+export async function previewRentalOwnerBill(
+    payload: RentalOwnerBillPreviewRequest,
+    signal?: AbortSignal
+): Promise<RentalOwnerBillPreview> {
+    const res = await apiClient.post<{ data: RentalOwnerBillPreview }>(
+        `${RENTAL_BILLING_API}/owner-bill-preview`,
+        payload,
+        { signal }
+    );
     return res.data.data;
 }

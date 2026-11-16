@@ -22,6 +22,8 @@ import {
 import { RentalBillingDocumentDetailModal } from './RentalBillingDocumentDetailModal';
 import { RentalInvoiceCreateModal } from './RentalInvoiceCreateModal';
 import { OwnerSettlementModal } from './OwnerSettlementModal';
+import { RentalQuotationPreviewModal } from './RentalQuotationPreviewModal';
+import { RentalOwnerBillPreviewModal } from './RentalOwnerBillPreviewModal';
 
 const STATUS_OPTIONS = [
     { value: 'draft', label: 'Draft' },
@@ -82,6 +84,8 @@ export default function RentalInvoicesAndBillsPage() {
     const [invoiceCreateOpen, setInvoiceCreateOpen] = useState(false);
     const [invoiceCreateMode, setInvoiceCreateMode] = useState<'cycle' | 'base'>('cycle');
     const [ownerSettlementOpen, setOwnerSettlementOpen] = useState(false);
+    const [quotationPreviewOpen, setQuotationPreviewOpen] = useState(false);
+    const [ownerBillPreviewOpen, setOwnerBillPreviewOpen] = useState(false);
 
     const loadSummary = useCallback(async (signal?: AbortSignal) => {
         setLoadingSummary(true);
@@ -166,6 +170,22 @@ export default function RentalInvoicesAndBillsPage() {
                         Refresh
                     </Button>
 
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                            if (tab === 'ar') {
+                                setQuotationPreviewOpen(true);
+                            } else {
+                                setOwnerBillPreviewOpen(true);
+                            }
+                        }}
+                        title={tab === 'ar' ? 'Preview Quotation Document' : 'Preview Pro-Forma Settlement'}
+                    >
+                        <span>📄</span>
+                        <span className="ml-1">{tab === 'ar' ? 'Quotation Preview' : 'Settlement Preview'}</span>
+                    </Button>
+
                     {canCustomerBill && (
                         <>
                             <Button
@@ -206,6 +226,24 @@ export default function RentalInvoicesAndBillsPage() {
 
             {/* Error Notification */}
             <ErrorAlert error={error} inline />
+
+            {/* Direct Page Switcher */}
+            <div className="flex items-center gap-4 text-xs font-semibold text-gray-500 border-b border-gray-100 dark:border-gray-800 pb-2">
+                <span className="text-gray-400">Dedicated Views:</span>
+                <a
+                    href="/vehicle-rental/customer-invoices"
+                    className="text-blue-600 dark:text-blue-400 hover:underline font-bold"
+                >
+                    Customer Invoices Page (AR) ↗
+                </a>
+                <span className="text-gray-300">|</span>
+                <a
+                    href="/vehicle-rental/owner-bills"
+                    className="text-purple-600 dark:text-purple-400 hover:underline font-bold"
+                >
+                    Vehicle Owner Bills Page (AP) ↗
+                </a>
+            </div>
 
             {/* Navigation Tabs (AR vs AP) */}
             <div className="border-b border-slate-200">
@@ -545,6 +583,25 @@ export default function RentalInvoicesAndBillsPage() {
                 onClose={() => setOwnerSettlementOpen(false)}
                 onBillGenerated={() => {
                     handleRefreshAll();
+                }}
+            />
+
+            {/* Quotation Preview Modal */}
+            <RentalQuotationPreviewModal
+                open={quotationPreviewOpen}
+                onClose={() => setQuotationPreviewOpen(false)}
+                onProceedToCreateInvoice={() => {
+                    setInvoiceCreateMode('cycle');
+                    setInvoiceCreateOpen(true);
+                }}
+            />
+
+            {/* Owner Bill Preview Modal */}
+            <RentalOwnerBillPreviewModal
+                open={ownerBillPreviewOpen}
+                onClose={() => setOwnerBillPreviewOpen(false)}
+                onProceedToGenerateBill={() => {
+                    setOwnerSettlementOpen(true);
                 }}
             />
         </div>

@@ -31,6 +31,30 @@ final class RentalBillingDocumentController
         return response()->json(['data' => $summary]);
     }
 
+    public function quotationPreview(RentalBillingDocumentRequest $request): JsonResponse
+    {
+        $data = $this->billingService->previewQuotation($request->context(), $request->validated());
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function previewCustomerQuotation(RentalBillingDocumentRequest $request): JsonResponse
+    {
+        return $this->quotationPreview($request);
+    }
+
+    public function ownerBillPreview(RentalBillingDocumentRequest $request): JsonResponse
+    {
+        $data = $this->billingService->previewOwnerBill($request->context(), $request->validated());
+
+        return response()->json(['data' => $data]);
+    }
+
+    public function previewOwnerBill(RentalBillingDocumentRequest $request): JsonResponse
+    {
+        return $this->ownerBillPreview($request);
+    }
+
     public function show(RentalBillingDocumentRequest $request, int $invoice): JsonResponse
     {
         $document = $this->billingService->getDocumentDetail($request->context(), $invoice);

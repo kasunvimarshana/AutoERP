@@ -568,4 +568,321 @@ final class OwnerSettlementBillingService
             return $invoice;
         });
     }
+
+    public function previewOwnerSettlementBill(
+        AgreementContext $context,
+        int $ownerAgreementId,
+        array $input
+    ): array {
+        $this->authorization->assertBilling($context, AgreementKind::Owner, false);
+
+        $startDate = (string) ($input['start_date'] ?? $input['period_from'] ?? '');
+        $endDate = (string) ($input['end_date'] ?? $input['period_until'] ?? '');
+        if ($startDate === '' || $endDate === '') {
+            throw ValidationException::withMessages(['dates' => ['Specify both start date and end date for the owner settlement bill preview.']]);
+        }
+
+        $start = CarbonImmutable::parse($startDate)->startOfDay();
+        $end = CarbonImmutable::parse($endDate)->endOfDay();
+        if ($end->lessThan($start)) {
+            throw ValidationException::withMessages(['end_date' => ['End date must be on or after start date.']]);
+        }
+
+        $agreement = OwnerAgreement::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->with(['party', 'vehicle'])
+            ->findOrFail($ownerAgreementId);
+
+        $whtRate = isset($input['wht_rate']) && is_numeric($input['wht_rate'])
+            ? (string) $input['wht_rate']
+            : '10.000000';
+
+        // 1. Fetch base charges for period
+        $baseCharges = OwnerBaseCharge::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('agreement_id', $agreement->id)
+            ->whereNull('voided_at')
+            ->where('period_from', '<=', $endDate)
+            ->where('period_until', '>=', $startDate)
+            ->get();
+
+        $basePayable = '0.000000';
+        foreach ($baseCharges as $charge) {
+            $basePayable = $this->math->add($basePayable, (string) $charge->amount, 6);
+        }
+
+        // 2. Fetch usage charges for period (OT, mileage)
+        $usageCharges = OwnerUsageCharge::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('agreement_id', $agreement->id)
+            ->whereNull('voided_at')
+            ->where('period_from', '<=', $endDate)
+            ->where('period_until', '>=', $startDate)
+            ->get();
+
+        $usagePayable = '0.000000';
+        foreach ($usageCharges as $charge) {
+            $usagePayable = $this->math->add($usagePayable, (string) $charge->amount, 6);
+        }
+
+        // Also check unbilled owner BillingCycles if no owner base charges exist
+        if ($baseCharges->isEmpty()) {
+            $unbilledOwnerCycles = BillingCycle::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->where('owner_agreement_id', $agreement->id)
+                ->where('period_from', '<=', $endDate)
+                ->where('period_until', '>=', $startDate)
+                ->whereNull('initial_invoice_id')
+                ->whereNull('final_invoice_id')
+                ->whereNull('supplementary_invoice_id')
+                ->get();
+
+            foreach ($unbilledOwnerCycles as $oCycle) {
+                $basePayable = $this->math->add($basePayable, (string) $oCycle->base_rent_amount, 6);
+                $cycleUsage = $this->math->add((string) $oCycle->excess_km_amount, (string) $oCycle->overtime_amount, 6);
+                $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->night_out_amount, 6);
+                $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->tolls_amount, 6);
+                $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->additions_amount, 6);
+                $usagePayable = $this->math->add($usagePayable, $cycleUsage, 6);
+            }
+        }
+
+        // Pro-rate base rent if terms exist and base charges were empty
+        if ($this->math->compare($basePayable, '0.000000') === 0 && isset($agreement->terms['base_rate'])) {
+            $rate = (string) $agreement->terms['base_rate'];
+            $daysInPeriod = max(1, $start->diffInDays($end) + 1);
+            $daysInMonth = (int) $start->daysInMonth;
+            if ($daysInPeriod >= $daysInMonth) {
+                $basePayable = $rate;
+            } else {
+                $basePayable = $this->math->div($this->math->mul($rate, (string) $daysInPeriod, 6), (string) $daysInMonth, 6);
+            }
+        }
+
+        // Agreement adjustments
+        $agreementAdjustments = AgreementAdjustment::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where('organization_unit_id', $context->organizationUnitId)
+            ->where('owner_agreement_id', $agreement->id)
+            ->where('status', AgreementAdjustmentStatus::Authorized->value)
+            ->whereNull('invoice_id')
+            ->get();
+
+        $adjustmentAdditions = '0.000000';
+        $adjustmentDeductions = '0.000000';
+        foreach ($agreementAdjustments as $adj) {
+            if ($adj->adjustment_type === AgreementAdjustmentType::DebitNote) {
+                $adjustmentAdditions = $this->math->add($adjustmentAdditions, (string) $adj->amount, 6);
+            } else {
+                $adjustmentDeductions = $this->math->add($adjustmentDeductions, (string) $adj->amount, 6);
+            }
+        }
+
+        $grossPayable = $this->math->add($basePayable, $usagePayable, 6);
+        $grossPayable = $this->math->add($grossPayable, $adjustmentAdditions, 6);
+
+        // 3. Calculate 10% Withholding Tax
+        $whtAmount = $this->math->div($this->math->mul($grossPayable, $whtRate, 6), '100.000000', 6);
+
+        // 4. Fetch maintenance expense chargebacks
+        $expenseAllocations = RentalExpenseAllocation::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where('target_owner_agreement_id', $agreement->id)
+            ->where('status', RentalExpenseAllocationStatus::Confirmed->value)
+            ->whereNull('invoice_id')
+            ->get();
+
+        $maintenanceDeductions = '0.000000';
+        foreach ($expenseAllocations as $alloc) {
+            $maintenanceDeductions = $this->math->add($maintenanceDeductions, (string) $alloc->total_amount, 6);
+        }
+
+        // Capping - ensure non-tax deductions do not exceed max(0, grossPayable - whtAmount)
+        $maxDeductionsCapacity = $this->math->compare($grossPayable, $whtAmount) > 0
+            ? $this->math->sub($grossPayable, $whtAmount, 6)
+            : '0.000000';
+
+        $applicableMaintenance = $this->math->compare($maintenanceDeductions, $maxDeductionsCapacity) > 0
+            ? $maxDeductionsCapacity
+            : $maintenanceDeductions;
+
+        $remainingCapacityAfterMaint = $this->math->sub($maxDeductionsCapacity, $applicableMaintenance, 6);
+        $applicableAdjDeductions = $this->math->compare($adjustmentDeductions, $remainingCapacityAfterMaint) > 0
+            ? $remainingCapacityAfterMaint
+            : $adjustmentDeductions;
+
+        $totalDeductions = $this->math->add($whtAmount, $applicableMaintenance, 6);
+        $totalDeductions = $this->math->add($totalDeductions, $applicableAdjDeductions, 6);
+
+        $netPayable = $this->math->sub($grossPayable, $totalDeductions, 6);
+        if ($this->math->compare($netPayable, '0.000000') < 0) {
+            $netPayable = '0.000000';
+        }
+
+        $lines = [];
+        $lineNum = 1;
+        $vehicleNo = $agreement->vehicle?->registration_number ?? $agreement->vehicle?->vehicle_number ?? 'Fleet Vehicle';
+
+        if ($baseCharges->isNotEmpty()) {
+            foreach ($baseCharges as $charge) {
+                $desc = 'Lessor Base Lease Rent · Charge #'.$charge->id.' ('.$charge->period_from.' To '.$charge->period_until.')';
+                $lines[] = [
+                    'line_number' => $lineNum++,
+                    'description' => $desc,
+                    'quantity' => '1.000000',
+                    'unit_price' => (string) $charge->amount,
+                    'discount_amount' => '0.000000',
+                    'line_total' => (string) $charge->amount,
+                ];
+            }
+        } elseif ($this->math->compare($basePayable, '0.000000') > 0) {
+            $desc = 'Gross Vehicle Lease Rent · '.$agreement->reference.' · '.$vehicleNo.' ('.$start->format('d/m/Y').' To '.$end->format('d/m/Y').')';
+            $lines[] = [
+                'line_number' => $lineNum++,
+                'description' => $desc,
+                'quantity' => '1.000000',
+                'unit_price' => $basePayable,
+                'discount_amount' => '0.000000',
+                'line_total' => $basePayable,
+            ];
+        }
+
+        if ($usageCharges->isNotEmpty()) {
+            foreach ($usageCharges as $charge) {
+                $desc = 'Lessor Operational Usage & Overtime · Charge #'.$charge->id.' ('.$charge->period_from.' To '.$charge->period_until.')';
+                $lines[] = [
+                    'line_number' => $lineNum++,
+                    'description' => $desc,
+                    'quantity' => '1.000000',
+                    'unit_price' => (string) $charge->amount,
+                    'discount_amount' => '0.000000',
+                    'line_total' => (string) $charge->amount,
+                ];
+            }
+        } elseif ($this->math->compare($usagePayable, '0.000000') > 0) {
+            $desc = 'Lessor Operational Usage Charges ('.$start->format('d/m/Y').' To '.$end->format('d/m/Y').')';
+            $lines[] = [
+                'line_number' => $lineNum++,
+                'description' => $desc,
+                'quantity' => '1.000000',
+                'unit_price' => $usagePayable,
+                'discount_amount' => '0.000000',
+                'line_total' => $usagePayable,
+            ];
+        }
+
+        foreach ($agreementAdjustments->where('adjustment_type', AgreementAdjustmentType::DebitNote) as $adj) {
+            $desc = 'Lessor Addition · '.$adj->category->value.' ('.$adj->reason.')';
+            $lines[] = [
+                'line_number' => $lineNum++,
+                'description' => $desc,
+                'quantity' => '1.000000',
+                'unit_price' => (string) $adj->amount,
+                'discount_amount' => '0.000000',
+                'line_total' => (string) $adj->amount,
+            ];
+        }
+
+        $adjustments = [];
+        if ($this->math->compare($whtAmount, '0.000000') > 0) {
+            $adjustments[] = [
+                'name' => 'Statutory Withholding Tax Deduction ('.rtrim(rtrim($whtRate, '0'), '.').'%)',
+                'type' => 'withholding',
+                'effect' => 'decrease',
+                'amount' => $whtAmount,
+            ];
+        }
+
+        if ($this->math->compare($applicableMaintenance, '0.000000') > 0) {
+            $adjustments[] = [
+                'name' => 'Fleet Maintenance Recovery',
+                'type' => 'discount',
+                'effect' => 'decrease',
+                'amount' => $applicableMaintenance,
+            ];
+        }
+
+        if ($this->math->compare($applicableAdjDeductions, '0.000000') > 0) {
+            $adjustments[] = [
+                'name' => 'Contractual Agreement Deductions',
+                'type' => 'discount',
+                'effect' => 'decrease',
+                'amount' => $applicableAdjDeductions,
+            ];
+        }
+
+        $partyCode = $agreement->party?->code ?? $agreement->party?->supplier_number ?? '-';
+        $partyPhone = $agreement->party?->phone ?? $agreement->party?->mobile ?? null;
+
+        return [
+            'bill_number' => 'PROFORMA-SETTLE-'.$agreement->reference,
+            'direction' => 'inbound',
+            'is_preview' => true,
+            'persisted' => false,
+            'document_date' => now()->toDateString(),
+            'party' => [
+                'id' => $agreement->party?->id,
+                'type' => 'supplier',
+                'name' => $agreement->party?->display_name ?? $agreement->party?->name ?? 'Vehicle Owner',
+                'code' => $partyCode,
+                'phone' => $partyPhone,
+            ],
+            'supplier' => $agreement->party ? [
+                'id' => $agreement->party->id,
+                'name' => $agreement->party->display_name ?? $agreement->party->name,
+                'code' => $partyCode,
+                'phone' => $partyPhone,
+            ] : null,
+            'agreement' => [
+                'id' => $agreement->id,
+                'reference' => $agreement->reference,
+                'starts_on' => $agreement->starts_on?->toDateString(),
+                'ends_on' => $agreement->ends_on?->toDateString(),
+                'vehicle' => $agreement->vehicle ? [
+                    'id' => $agreement->vehicle->id,
+                    'registration_number' => $vehicleNo,
+                    'make' => $agreement->vehicle->make,
+                    'model' => $agreement->vehicle->model,
+                ] : null,
+            ],
+            'period' => [
+                'from' => $startDate,
+                'until' => $endDate,
+            ],
+            'period_from' => $startDate,
+            'period_until' => $endDate,
+            'is_preview' => true,
+            'persisted' => false,
+            'document_type' => 'owner_bill_simulation',
+            'wht_rate' => $whtRate,
+            'lines' => $lines,
+            'line_items' => $lines,
+            'adjustments' => $adjustments,
+            'financial_breakdown' => [
+                'gross_payable' => $grossPayable,
+                'base_payable' => $basePayable,
+                'usage_payable' => $usagePayable,
+                'adjustment_additions' => $adjustmentAdditions,
+                'wht_rate' => $whtRate,
+                'wht_amount' => $whtAmount,
+                'maintenance_deductions' => $applicableMaintenance,
+                'adjustment_deductions' => $applicableAdjDeductions,
+                'total_deductions' => $totalDeductions,
+                'net_payable' => $netPayable,
+            ],
+            'breakdown' => [
+                'gross_payable' => $grossPayable,
+                'base_payable' => $basePayable,
+                'usage_payable' => $usagePayable,
+                'adjustment_additions' => $adjustmentAdditions,
+                'wht_rate' => $whtRate,
+                'wht_amount' => $whtAmount,
+                'maintenance_deductions' => $applicableMaintenance,
+                'adjustment_deductions' => $applicableAdjDeductions,
+                'total_deductions' => $totalDeductions,
+                'net_payable' => $netPayable,
+            ],
+            'notes' => 'Pro-forma settlement preview. Gross: '.$grossPayable.', WHT: '.$whtAmount.', Net Payable: '.$netPayable,
+        ];
+    }
 }

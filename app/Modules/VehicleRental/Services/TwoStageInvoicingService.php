@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
@@ -48,6 +49,7 @@ use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\BillingFinalizationMode;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
+use Modules\VehicleRental\Enums\RentalBasis;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\AgreementAdjustment;
@@ -1064,6 +1066,147 @@ final class TwoStageInvoicingService
             'driver_attributions' => $driverAttributions,
             'line_items' => $lineItems,
             'reassignments' => $reassignments,
+        ];
+    }
+
+    public function previewQuotationDocument(AgreementContext $context, int $cycleId): array
+    {
+        $cycle = BillingCycle::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->with(['charts.runningChart', 'charts.vehicle', 'items.vehicle', 'items.driver', 'initialInvoice.balance', 'customerAgreement.party', 'customerAgreement.vehicleUses.vehicle', 'ownerAgreement.party', 'ownerAgreement.vehicle'])
+            ->findOrFail($cycleId);
+
+        $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
+        $this->authorization->assertBilling($context, $kind, false);
+
+        $preview = $this->previewFinalStage($context, $cycleId);
+        $agreement = $cycle->customerAgreement ?? $cycle->ownerAgreement;
+
+        $consolidated = $this->buildConsolidatedLines(
+            $context,
+            $agreement,
+            $cycle,
+            (string) $cycle->net_subtotal,
+            'vehicle_rental_billing_cycle',
+            $cycle->id
+        );
+
+        $linesArray = [];
+        foreach ($consolidated['lines'] as $line) {
+            $discount = isset($line->discountAmount) && is_numeric($line->discountAmount) ? (string) $line->discountAmount : '0.000000';
+            $lineTotal = $this->math->sub(
+                $this->math->mul((string) $line->quantity, (string) $line->unitPrice, 6),
+                $discount,
+                6
+            );
+            $linesArray[] = [
+                'line_number' => $line->lineNumber,
+                'description' => $line->description,
+                'quantity' => (string) $line->quantity,
+                'unit_price' => (string) $line->unitPrice,
+                'discount_amount' => $discount,
+                'line_total' => $lineTotal,
+            ];
+        }
+
+        $party = $agreement?->party;
+        $tripsCount = $cycle->charts->count();
+        $commercialKm = (string) $cycle->charts->sum('commercial_km');
+        $normalOtMinutes = (int) $cycle->charts->sum('normal_ot_minutes');
+        $doubleOtMinutes = (int) $cycle->charts->sum('double_ot_minutes');
+        $tripleOtMinutes = (int) $cycle->charts->sum('triple_ot_minutes');
+        $nightOuts = (int) $cycle->charts->sum('night_outs');
+
+        $normalOtHours = $this->math->div((string) $normalOtMinutes, '60', 6);
+        $doubleOtHours = $this->math->div((string) $doubleOtMinutes, '60', 6);
+        $tripleOtHours = $this->math->div((string) $tripleOtMinutes, '60', 6);
+
+        $assignedVehicles = $cycle->charts->map(fn ($c) => $c->vehicle?->registration_number ?? $c->vehicle?->vehicle_number)->filter()->unique()->values()->all();
+        $assignedDrivers = $cycle->charts->map(fn ($c) => $c->driver_name_snapshot ?? $c->runningChart?->driver_reference_snapshot)->filter()->unique()->values()->all();
+
+        $grossSubtotal = $this->math->add(
+            (string) $cycle->base_rent_amount,
+            $this->math->add(
+                (string) $cycle->excess_km_amount,
+                $this->math->add(
+                    (string) $cycle->overtime_amount,
+                    $this->math->add(
+                        (string) $cycle->night_out_amount,
+                        $this->math->add((string) $cycle->tolls_amount, (string) $cycle->additions_amount, 6),
+                        6
+                    ),
+                    6
+                ),
+                6
+            ),
+            6
+        );
+
+        $discountTotal = (string) $cycle->deductions_amount;
+        $netSubtotal = (string) $cycle->net_subtotal;
+        $taxAmount = (string) $cycle->tax_amount;
+        $grandTotal = $this->math->compare((string) $cycle->total_billed_amount, '0.000000') > 0
+            ? (string) $cycle->total_billed_amount
+            : $this->math->add($netSubtotal, $taxAmount, 6);
+
+        return [
+            'quotation_number' => 'QUOT-'.($agreement?->reference ?? 'DRAFT')."-C{$cycle->cycle_number}",
+            'quotation_date' => now()->toDateString(),
+            'direction' => $kind === AgreementKind::Customer ? 'outbound' : 'inbound',
+            'customer' => $party ? [
+                'id' => $party->id,
+                'name' => $party->display_name ?? $party->name,
+                'email' => $party->email ?? null,
+                'phone' => $party->phone ?? null,
+            ] : null,
+            'agreement' => [
+                'id' => $agreement?->id,
+                'reference' => $agreement?->reference,
+                'billing_basis' => $agreement?->billing_basis?->value ?? 'monthly',
+                'starts_on' => $agreement?->starts_on?->toDateString(),
+                'ends_on' => $agreement?->ends_on?->toDateString(),
+            ],
+            'billing_cycle' => [
+                'id' => $cycle->id,
+                'cycle_number' => $cycle->cycle_number,
+                'period_from' => $cycle->period_from?->toDateString(),
+                'period_until' => $cycle->period_until?->toDateString(),
+                'status' => $cycle->status->value,
+                'finalization_mode' => $cycle->finalization_mode->value,
+            ],
+            'period' => [
+                'from' => $cycle->period_from?->toDateString(),
+                'until' => $cycle->period_until?->toDateString(),
+            ],
+            'lines' => $linesArray,
+            'telematics' => [
+                'trips_count' => $tripsCount,
+                'commercial_km' => $commercialKm,
+                'normal_ot_hours' => $normalOtHours,
+                'double_ot_hours' => $doubleOtHours,
+                'triple_ot_hours' => $tripleOtHours,
+                'night_outs' => $nightOuts,
+                'assigned_vehicles' => $assignedVehicles,
+                'assigned_drivers' => $assignedDrivers,
+            ],
+            'vehicle_attributions' => $preview['vehicle_attributions'] ?? [],
+            'driver_attributions' => $preview['driver_attributions'] ?? [],
+            'line_items' => $preview['line_items'] ?? [],
+            'financial_breakdown' => [
+                'base_rent' => (string) $cycle->base_rent_amount,
+                'excess_km' => (string) $cycle->excess_km_amount,
+                'overtime' => (string) $cycle->overtime_amount,
+                'night_out' => (string) $cycle->night_out_amount,
+                'tolls' => (string) $cycle->tolls_amount,
+                'additions' => (string) $cycle->additions_amount,
+                'deductions' => (string) $cycle->deductions_amount,
+                'gross_subtotal' => $grossSubtotal,
+                'discount_total' => $discountTotal,
+                'net_subtotal' => $netSubtotal,
+                'tax_amount' => $taxAmount,
+                'grand_total' => $grandTotal,
+                'net_payable' => $grandTotal,
+            ],
         ];
     }
 
@@ -2877,6 +3020,719 @@ final class TwoStageInvoicingService
         }
 
         return ['lines' => $updatedLines, 'sourceLines' => $updatedSourceLines];
+    }
+
+    public function previewCustomerQuotation(AgreementContext $context, array $input): array
+    {
+        $this->authorization->assertBilling($context, AgreementKind::Customer, false);
+
+        if (! empty($input['billing_cycle_id'])) {
+            $cycleId = (int) $input['billing_cycle_id'];
+            $cycle = BillingCycle::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->with(['customerAgreement.party', 'customerAgreement.vehicle', 'charts.runningChart', 'items'])
+                ->findOrFail($cycleId);
+
+            $finalStage = $this->previewFinalStage($context, $cycleId);
+            $agreement = $cycle->customerAgreement;
+            $terms = $agreement?->terms ?? [];
+            $taxRate = (string) ($input['tax_rate'] ?? $terms['tax_rate'] ?? '0.000000');
+            $taxAmount = '0.000000';
+            if ($this->math->compare($taxRate, '0.000000') > 0) {
+                $taxAmount = $this->math->div($this->math->mul((string) $cycle->net_subtotal, $taxRate, 6), '100.000000', 6);
+            }
+            $grandTotal = $this->math->add((string) $cycle->net_subtotal, $taxAmount, 6);
+
+            $lineItems = [];
+            $lineItems[] = [
+                'line_type' => 'base_rent',
+                'category' => 'base_rent',
+                'description' => "Base Rental Rate ({$finalStage['period_from']} to {$finalStage['period_until']})",
+                'quantity' => '1.000000',
+                'unit_rate' => (string) $cycle->base_rent_amount,
+                'amount' => (string) $cycle->base_rent_amount,
+            ];
+            if ($this->math->compare((string) $cycle->excess_km_amount, '0.000000') > 0) {
+                $lineItems[] = [
+                    'line_type' => 'usage',
+                    'category' => 'excess_km',
+                    'description' => 'Excess Mileage Charge',
+                    'quantity' => '1.000000',
+                    'unit_rate' => (string) $cycle->excess_km_amount,
+                    'amount' => (string) $cycle->excess_km_amount,
+                ];
+            }
+            if ($this->math->compare((string) $cycle->overtime_amount, '0.000000') > 0) {
+                $lineItems[] = [
+                    'line_type' => 'usage',
+                    'category' => 'overtime',
+                    'description' => 'Overtime (Multi-Tier OT)',
+                    'quantity' => '1.000000',
+                    'unit_rate' => (string) $cycle->overtime_amount,
+                    'amount' => (string) $cycle->overtime_amount,
+                ];
+            }
+            if ($this->math->compare((string) $cycle->night_out_amount, '0.000000') > 0) {
+                $lineItems[] = [
+                    'line_type' => 'usage',
+                    'category' => 'night_out',
+                    'description' => 'Driver Night Out Allowance',
+                    'quantity' => '1.000000',
+                    'unit_rate' => (string) $cycle->night_out_amount,
+                    'amount' => (string) $cycle->night_out_amount,
+                ];
+            }
+            if ($this->math->compare((string) $cycle->tolls_amount, '0.000000') > 0) {
+                $lineItems[] = [
+                    'line_type' => 'usage',
+                    'category' => 'tolls',
+                    'description' => 'Highway Toll Reimbursement',
+                    'quantity' => '1.000000',
+                    'unit_rate' => (string) $cycle->tolls_amount,
+                    'amount' => (string) $cycle->tolls_amount,
+                ];
+            }
+            foreach ($finalStage['line_items'] as $item) {
+                $lineItems[] = [
+                    'line_type' => $item['item_type'],
+                    'category' => $item['category'],
+                    'description' => $item['description'],
+                    'quantity' => $item['quantity'],
+                    'unit_rate' => $item['unit_rate'],
+                    'amount' => $item['amount'],
+                ];
+            }
+
+            $totalCustodyDays = 0;
+            foreach ($finalStage['vehicle_attributions'] as $va) {
+                $totalCustodyDays += (int) ($va['custody_days'] ?? 0);
+            }
+            if ($totalCustodyDays === 0) {
+                $totalCustodyDays = max(1, $cycle->period_from->diffInDays($cycle->period_until) + 1);
+            }
+
+            $totalKm = '0.000000';
+            $normalOtMins = 0;
+            $doubleOtMins = 0;
+            $tripleOtMins = 0;
+            $nightOuts = 0;
+            foreach ($finalStage['vehicle_attributions'] as $va) {
+                $totalKm = $this->math->add($totalKm, (string) ($va['total_km'] ?? '0.000000'), 6);
+                $normalOtMins += (int) ($va['normal_ot_minutes'] ?? 0);
+                $doubleOtMins += (int) ($va['double_ot_minutes'] ?? 0);
+                $tripleOtMins += (int) ($va['triple_ot_minutes'] ?? 0);
+                $nightOuts += (int) ($va['night_outs'] ?? 0);
+            }
+
+            $normalOtHours = $this->math->div((string) $normalOtMins, '60', 6);
+            $doubleOtHours = $this->math->div((string) $doubleOtMins, '60', 6);
+            $tripleOtHours = $this->math->div((string) $tripleOtMins, '60', 6);
+
+            return [
+                'document_type' => 'customer_quotation',
+                'is_preview' => true,
+                'persisted' => false,
+                'quotation_number' => 'QTN-CYCLE-'.$cycle->cycle_number,
+                'agreement' => [
+                    'id' => $agreement?->id,
+                    'reference' => $agreement?->reference ?? 'Customer Agreement',
+                    'customer_name' => $agreement?->party?->name ?? 'Customer',
+                    'customer_id' => $agreement?->party_id,
+                    'vehicle_id' => $agreement?->vehicle_id,
+                    'vehicle_number' => $agreement?->vehicle?->registration_number ?? $agreement?->vehicle?->vehicle_number ?? 'Fleet Vehicle',
+                    'starts_on' => $agreement?->starts_on?->toDateString(),
+                    'ends_on' => $agreement?->ends_on?->toDateString(),
+                    'driver_mode' => $agreement?->driver_mode?->value ?? $agreement?->driver_mode,
+                ],
+                'period_from' => $cycle->period_from?->toDateString(),
+                'period_until' => $cycle->period_until?->toDateString(),
+                'custody_days' => $totalCustodyDays,
+                'rates' => [
+                    'base_rate' => (string) ($terms['base_rate'] ?? '0.000000'),
+                    'excess_km_rate' => (string) ($terms['excess_km_rate'] ?? '0.000000'),
+                    'normal_ot_rate' => (string) ($terms['normal_ot_rate'] ?? '0.000000'),
+                    'double_ot_rate' => (string) ($terms['double_ot_rate'] ?? '0.000000'),
+                    'triple_ot_rate' => (string) ($terms['triple_ot_rate'] ?? '0.000000'),
+                    'night_out_rate' => (string) ($terms['night_out_rate'] ?? '0.000000'),
+                    'tax_rate' => $taxRate,
+                ],
+                'telematics_summary' => [
+                    'charts_count' => $finalStage['charts_count'] ?? 0,
+                    'total_km' => $totalKm,
+                    'excess_km' => (string) $cycle->excess_km_amount,
+                    'normal_ot_hours' => $normalOtHours,
+                    'double_ot_hours' => $doubleOtHours,
+                    'triple_ot_hours' => $tripleOtHours,
+                    'night_outs' => $nightOuts,
+                    'tolls_amount' => (string) $cycle->tolls_amount,
+                ],
+                'breakdown' => [
+                    'base_rent_amount' => (string) $cycle->base_rent_amount,
+                    'excess_km_amount' => (string) $cycle->excess_km_amount,
+                    'normal_ot_amount' => (string) $cycle->overtime_amount,
+                    'double_ot_amount' => '0.000000',
+                    'triple_ot_amount' => '0.000000',
+                    'overtime_amount' => (string) $cycle->overtime_amount,
+                    'night_out_amount' => (string) $cycle->night_out_amount,
+                    'tolls_amount' => (string) $cycle->tolls_amount,
+                    'additions_amount' => (string) $cycle->additions_amount,
+                    'deductions_amount' => (string) $cycle->deductions_amount,
+                    'subtotal' => (string) $cycle->net_subtotal,
+                    'tax_amount' => $taxAmount,
+                    'grand_total' => $grandTotal,
+                ],
+                'line_items' => $lineItems,
+                'vehicle_attributions' => $finalStage['vehicle_attributions'] ?? [],
+                'driver_attributions' => $finalStage['driver_attributions'] ?? [],
+            ];
+        }
+
+        $agreementId = (int) ($input['agreement_id'] ?? $input['customer_agreement_id'] ?? 0);
+        if ($agreementId <= 0) {
+            throw ValidationException::withMessages(['agreement_id' => ['Please select a customer agreement.']]);
+        }
+
+        $agreement = CustomerAgreement::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->with(['party', 'vehicle'])
+            ->findOrFail($agreementId);
+
+        $periodFrom = (string) ($input['period_from'] ?? $agreement->starts_on?->toDateString() ?? now()->toDateString());
+        $periodUntil = (string) ($input['period_until'] ?? now()->toDateString());
+
+        $from = CarbonImmutable::parse($periodFrom)->startOfDay();
+        $until = CarbonImmutable::parse($periodUntil)->endOfDay();
+        if ($until->lessThan($from)) {
+            throw ValidationException::withMessages(['period_until' => ['Period until must be on or after period from.']]);
+        }
+        $periodDays = max(1, $from->diffInDays($until) + 1);
+
+        $terms = $agreement->terms ?? [];
+        $baseRate = (string) ($terms['base_rate'] ?? '0.000000');
+        $normalOtRate = (string) ($terms['normal_ot_rate'] ?? $terms['ot_rate'] ?? '0.000000');
+        $doubleOtRate = (string) ($terms['double_ot_rate'] ?? '0.000000');
+        if ($this->math->compare($doubleOtRate, '0.000000') === 0 && $this->math->compare($normalOtRate, '0.000000') > 0) {
+            $doubleOtRate = $this->math->mul($this->math->div($normalOtRate, '1.5', 6), '2.0', 6);
+        }
+        $tripleOtRate = (string) ($terms['triple_ot_rate'] ?? '0.000000');
+        if ($this->math->compare($tripleOtRate, '0.000000') === 0 && $this->math->compare($normalOtRate, '0.000000') > 0) {
+            $tripleOtRate = $this->math->mul($this->math->div($normalOtRate, '1.5', 6), '3.0', 6);
+        }
+        $nightOutRate = (string) ($terms['night_out_rate'] ?? '0.000000');
+        $excessKmRate = (string) ($terms['excess_km_rate'] ?? '0.000000');
+        $freeKmAllowance = (string) ($terms['included_km'] ?? $terms['free_km_allowance'] ?? '0.000000');
+        $taxRate = (string) ($input['tax_rate'] ?? $terms['tax_rate'] ?? '0.000000');
+
+        // Base rent calculation
+        $baseRent = '0.000000';
+        try {
+            $preview = $this->baseRentPreview->calculate(
+                AgreementKind::Customer,
+                $context,
+                $agreement->id,
+                [
+                    'policy' => BaseRentPolicy::ActualCalendarDays->value,
+                    'expected_version' => (int) $agreement->row_version,
+                    'from' => $periodFrom,
+                    'until' => $periodUntil,
+                ]
+            );
+            $baseRent = (string) ($preview['base_rent'] ?? $preview['total'] ?? $preview['amount'] ?? '0.000000');
+        } catch (\Throwable) {
+            if ($agreement->basis === RentalBasis::Daily) {
+                $baseRent = $this->math->mul($baseRate, (string) $periodDays, 6);
+            } else {
+                $baseRent = $this->math->div($this->math->mul($baseRate, (string) $periodDays, 6), '30.000000', 6);
+            }
+        }
+
+        // Custody calculation from VehicleUse
+        $uses = VehicleUse::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('customer_agreement_id', $agreement->id)
+            ->where('starts_at', '<=', $until)
+            ->where(function ($q) use ($from) {
+                $q->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $from)
+                    ->orWhere('returned_at', '>=', $from);
+            })
+            ->where('status', '!=', VehicleUseStatus::Cancelled->value)
+            ->with('vehicle')
+            ->orderBy('starts_at')
+            ->get();
+
+        $totalCustodyDays = 0;
+        $custodyMap = [];
+        $useCount = $uses->count();
+        foreach ($uses as $index => $use) {
+            $handoverTime = $use->handed_over_at ?? $use->starts_at;
+            $returnTime = $use->returned_at ?? $use->ends_at;
+
+            $startStr = $handoverTime?->toDateString() ?? $periodFrom;
+            $endStr = $returnTime?->toDateString() ?? $periodUntil;
+
+            $uStartDay = CarbonImmutable::parse(max($startStr, $periodFrom))->startOfDay();
+            $uEndDay = CarbonImmutable::parse(min($endStr, $periodUntil))->startOfDay();
+
+            if ($uStartDay->greaterThan($uEndDay)) {
+                $days = 0;
+            } else {
+                $hasNextConsecutive = false;
+                if ($index < $useCount - 1) {
+                    $nextUse = $uses[$index + 1];
+                    $nextHandover = ($nextUse->handed_over_at ?? $nextUse->starts_at)?->toDateString() ?? $periodFrom;
+                    $nextStartDay = CarbonImmutable::parse(max($nextHandover, $periodFrom))->startOfDay();
+                    if (($nextStartDay->equalTo($uEndDay) && $nextStartDay->greaterThan($uStartDay))
+                        || ($nextUse->replaces_use_id === $use->id && $nextStartDay->lessThanOrEqualTo($uEndDay) && $nextStartDay->greaterThan($uStartDay))) {
+                        $hasNextConsecutive = true;
+                    }
+                }
+
+                if ($hasNextConsecutive) {
+                    $days = (int) min($periodDays, $uStartDay->diffInDays($uEndDay));
+                } else {
+                    $days = (int) min($periodDays, $uStartDay->diffInDays($uEndDay) + 1);
+                }
+            }
+
+            if ($days > 0) {
+                $custodyMap[$use->vehicle_id] = ($custodyMap[$use->vehicle_id] ?? 0) + $days;
+                $totalCustodyDays += $days;
+            }
+        }
+
+        if ($totalCustodyDays === 0) {
+            $totalCustodyDays = $periodDays;
+            if ($agreement->vehicle_id) {
+                $custodyMap[$agreement->vehicle_id] = $periodDays;
+            }
+        }
+
+        // Running charts
+        $includeCharts = (bool) ($input['include_running_charts'] ?? true);
+        $charts = collect();
+        if ($includeCharts) {
+            $chartQuery = RunningChart::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->whereHas('vehicleUse', fn ($q) => $q->where('customer_agreement_id', $agreement->id));
+
+            if (! empty($input['running_chart_ids'])) {
+                $chartQuery->whereIn('id', (array) $input['running_chart_ids']);
+            } else {
+                $chartQuery->where('starts_at', '<=', $until)
+                    ->where('ends_at', '>=', $from);
+            }
+            $charts = $chartQuery->with(['vehicleUse.vehicle'])->get();
+        }
+
+        $totalCommercialKm = '0.000000';
+        $totalNormalOtMinutes = 0;
+        $totalDoubleOtMinutes = 0;
+        $totalTripleOtMinutes = 0;
+        $totalNightOuts = 0;
+
+        foreach ($charts as $chart) {
+            $totalCommercialKm = $this->math->add($totalCommercialKm, (string) ($chart->commercial_km ?? '0.000000'), 6);
+            $totalNormalOtMinutes += (int) ($chart->normal_ot_minutes ?? 0);
+            $totalDoubleOtMinutes += (int) ($chart->double_ot_minutes ?? 0);
+            $totalTripleOtMinutes += (int) ($chart->triple_ot_minutes ?? 0);
+            $totalNightOuts += (int) ($chart->night_outs ?? 0);
+        }
+
+        // Tolls
+        $chartIds = $charts->pluck('id')->all();
+        $useIds = $charts->pluck('vehicle_use_id')->filter()->unique()->all();
+        $totalTolls = '0.000000';
+        if (! empty($chartIds) || ! empty($useIds)) {
+            $tollExpenses = RentalExpense::query()
+                ->forTenant($context->tenantId)
+                ->where(function (Builder $q) use ($chartIds, $useIds) {
+                    if (! empty($chartIds)) {
+                        $q->whereIn('running_chart_id', $chartIds);
+                    }
+                    if (! empty($useIds)) {
+                        $q->orWhere(function (Builder $sub) use ($useIds) {
+                            $sub->whereIn('vehicle_use_id', $useIds)->whereNull('running_chart_id');
+                        });
+                    }
+                })
+                ->where('expense_type', RentalExpenseType::Toll)
+                ->whereNotIn('status', [RentalExpenseStatus::Rejected, RentalExpenseStatus::Reversed])
+                ->get();
+
+            foreach ($tollExpenses as $te) {
+                $amt = (string) ($te->gross_amount ?? $te->net_amount ?? '0.000000');
+                $totalTolls = $this->math->add($totalTolls, $amt, 6);
+            }
+        }
+
+        // Excess KM
+        $excessKm = '0.000000';
+        if ($this->math->compare($totalCommercialKm, $freeKmAllowance) > 0) {
+            $excessKm = $this->math->sub($totalCommercialKm, $freeKmAllowance, 6);
+        }
+        $excessKmAmount = $this->math->mul($excessKm, $excessKmRate, 6);
+
+        // Multi-tier OT
+        $normalOtHours = $this->math->div((string) $totalNormalOtMinutes, '60', 6);
+        $normalOtAmount = $this->math->mul($normalOtHours, $normalOtRate, 6);
+
+        $doubleOtHours = $this->math->div((string) $totalDoubleOtMinutes, '60', 6);
+        $doubleOtAmount = $this->math->mul($doubleOtHours, $doubleOtRate, 6);
+
+        $tripleOtHours = $this->math->div((string) $totalTripleOtMinutes, '60', 6);
+        $tripleOtAmount = $this->math->mul($tripleOtHours, $tripleOtRate, 6);
+
+        $overtimeAmount = $this->math->add($normalOtAmount, $doubleOtAmount, 6);
+        $overtimeAmount = $this->math->add($overtimeAmount, $tripleOtAmount, 6);
+
+        // Night out
+        $nightOutAmount = $this->math->mul((string) $totalNightOuts, $nightOutRate, 6);
+
+        // Additions & Deductions
+        $additionsAmount = '0.000000';
+        $deductionsAmount = '0.000000';
+        $lineItems = [];
+
+        $lineItems[] = [
+            'line_type' => 'base_rent',
+            'category' => 'base_rent',
+            'description' => "Base Rental Rate ({$periodFrom} to {$periodUntil})",
+            'quantity' => (string) $totalCustodyDays,
+            'unit_rate' => $agreement->basis === RentalBasis::Daily ? $baseRate : $baseRent,
+            'amount' => $baseRent,
+        ];
+
+        if ($this->math->compare($excessKmAmount, '0.000000') > 0) {
+            $lineItems[] = [
+                'line_type' => 'usage',
+                'category' => 'excess_km',
+                'description' => "Excess Mileage ({$excessKm} km @ {$excessKmRate}/km)",
+                'quantity' => $excessKm,
+                'unit_rate' => $excessKmRate,
+                'amount' => $excessKmAmount,
+            ];
+        }
+
+        if ($this->math->compare($normalOtAmount, '0.000000') > 0) {
+            $lineItems[] = [
+                'line_type' => 'usage',
+                'category' => 'overtime_normal',
+                'description' => "Normal Overtime 1.5x ({$normalOtHours} hrs @ {$normalOtRate}/hr)",
+                'quantity' => $normalOtHours,
+                'unit_rate' => $normalOtRate,
+                'amount' => $normalOtAmount,
+            ];
+        }
+
+        if ($this->math->compare($doubleOtAmount, '0.000000') > 0) {
+            $lineItems[] = [
+                'line_type' => 'usage',
+                'category' => 'overtime_double',
+                'description' => "Double Overtime 2.0x ({$doubleOtHours} hrs @ {$doubleOtRate}/hr)",
+                'quantity' => $doubleOtHours,
+                'unit_rate' => $doubleOtRate,
+                'amount' => $doubleOtAmount,
+            ];
+        }
+
+        if ($this->math->compare($tripleOtAmount, '0.000000') > 0) {
+            $lineItems[] = [
+                'line_type' => 'usage',
+                'category' => 'overtime_triple',
+                'description' => "Triple Overtime 3.0x ({$tripleOtHours} hrs @ {$tripleOtRate}/hr)",
+                'quantity' => $tripleOtHours,
+                'unit_rate' => $tripleOtRate,
+                'amount' => $tripleOtAmount,
+            ];
+        }
+
+        if ($this->math->compare($nightOutAmount, '0.000000') > 0) {
+            $lineItems[] = [
+                'line_type' => 'usage',
+                'category' => 'night_out',
+                'description' => "Driver Night Out Allowance ({$totalNightOuts} nights @ {$nightOutRate})",
+                'quantity' => (string) $totalNightOuts,
+                'unit_rate' => $nightOutRate,
+                'amount' => $nightOutAmount,
+            ];
+        }
+
+        if ($this->math->compare($totalTolls, '0.000000') > 0) {
+            $lineItems[] = [
+                'line_type' => 'usage',
+                'category' => 'tolls',
+                'description' => 'Highway Toll Reimbursement',
+                'quantity' => '1.000000',
+                'unit_rate' => $totalTolls,
+                'amount' => $totalTolls,
+            ];
+        }
+
+        if (! empty($input['additions']) && is_array($input['additions'])) {
+            foreach ($input['additions'] as $add) {
+                $amt = (string) ($add['amount'] ?? '0.000000');
+                $additionsAmount = $this->math->add($additionsAmount, $amt, 6);
+                $lineItems[] = [
+                    'line_type' => 'addition',
+                    'category' => (string) ($add['category'] ?? 'other'),
+                    'description' => (string) ($add['description'] ?? 'Quotation Addition'),
+                    'quantity' => (string) ($add['quantity'] ?? '1.000000'),
+                    'unit_rate' => (string) ($add['unit_rate'] ?? $amt),
+                    'amount' => $amt,
+                ];
+            }
+        }
+
+        if (! empty($input['deductions']) && is_array($input['deductions'])) {
+            foreach ($input['deductions'] as $ded) {
+                $amt = (string) ($ded['amount'] ?? '0.000000');
+                $deductionsAmount = $this->math->add($deductionsAmount, $amt, 6);
+                $lineItems[] = [
+                    'line_type' => 'deduction',
+                    'category' => (string) ($ded['category'] ?? 'discount'),
+                    'description' => (string) ($ded['description'] ?? 'Quotation Discount / Deduction'),
+                    'quantity' => (string) ($ded['quantity'] ?? '1.000000'),
+                    'unit_rate' => (string) ($ded['unit_rate'] ?? $amt),
+                    'amount' => $amt,
+                ];
+            }
+        }
+
+        // Agreement adjustments
+        $adjustments = AgreementAdjustment::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where('organization_unit_id', $context->organizationUnitId)
+            ->where('customer_agreement_id', $agreement->id)
+            ->where('status', AgreementAdjustmentStatus::Authorized->value)
+            ->whereNull('invoice_id')
+            ->get();
+
+        foreach ($adjustments as $adj) {
+            $adjAmt = (string) $adj->amount;
+            if ($adj->adjustment_type === AgreementAdjustmentType::DebitNote) {
+                $additionsAmount = $this->math->add($additionsAmount, $adjAmt, 6);
+                $lineItems[] = [
+                    'line_type' => 'addition',
+                    'category' => 'adjustment',
+                    'description' => "Adjustment Debit Note · {$adj->reference}: {$adj->reason}",
+                    'quantity' => '1.000000',
+                    'unit_rate' => $adjAmt,
+                    'amount' => $adjAmt,
+                ];
+            } else {
+                $deductionsAmount = $this->math->add($deductionsAmount, $adjAmt, 6);
+                $lineItems[] = [
+                    'line_type' => 'deduction',
+                    'category' => 'discount',
+                    'description' => "Adjustment Credit Note / Discount · {$adj->reference}: {$adj->reason}",
+                    'quantity' => '1.000000',
+                    'unit_rate' => $adjAmt,
+                    'amount' => $adjAmt,
+                ];
+            }
+        }
+
+        $subtotal = $this->math->add($baseRent, $excessKmAmount, 6);
+        $subtotal = $this->math->add($subtotal, $overtimeAmount, 6);
+        $subtotal = $this->math->add($subtotal, $nightOutAmount, 6);
+        $subtotal = $this->math->add($subtotal, $totalTolls, 6);
+        $subtotal = $this->math->add($subtotal, $additionsAmount, 6);
+        $subtotal = $this->math->compare($subtotal, $deductionsAmount) > 0
+            ? $this->math->sub($subtotal, $deductionsAmount, 6)
+            : '0.000000';
+
+        $taxAmount = '0.000000';
+        if ($this->math->compare($taxRate, '0.000000') > 0) {
+            $taxAmount = $this->math->div($this->math->mul($subtotal, $taxRate, 6), '100.000000', 6);
+        }
+        $grandTotal = $this->math->add($subtotal, $taxAmount, 6);
+
+        // Vehicle attributions
+        $vehicleAttributions = [];
+        $chartsByVehicle = $charts->groupBy(fn ($c) => $c->vehicleUse?->vehicle_id ?? $agreement->vehicle_id ?? 0);
+        if ($chartsByVehicle->isNotEmpty()) {
+            foreach ($chartsByVehicle as $vId => $vCharts) {
+                $vVehicle = $vCharts->first()->vehicleUse?->vehicle ?? Vehicle::query()->find($vId);
+                $regNo = $vVehicle?->registration_number ?? $vVehicle?->vehicle_number ?? "Vehicle #{$vId}";
+                $label = $vVehicle ? trim("{$regNo} · {$vVehicle->make} {$vVehicle->model}") : $regNo;
+                $vCustody = $custodyMap[$vId] ?? $totalCustodyDays;
+
+                $vKm = '0.000000';
+                $vNormalOt = 0;
+                $vDoubleOt = 0;
+                $vTripleOt = 0;
+                $vNight = 0;
+                foreach ($vCharts as $vc) {
+                    $vKm = $this->math->add($vKm, (string) ($vc->commercial_km ?? '0.000000'), 6);
+                    $vNormalOt += (int) ($vc->normal_ot_minutes ?? 0);
+                    $vDoubleOt += (int) ($vc->double_ot_minutes ?? 0);
+                    $vTripleOt += (int) ($vc->triple_ot_minutes ?? 0);
+                    $vNight += (int) ($vc->night_outs ?? 0);
+                }
+
+                $vNormHours = $this->math->div((string) $vNormalOt, '60', 6);
+                $vNormAmt = $this->math->mul($vNormHours, $normalOtRate, 6);
+                $vDblHours = $this->math->div((string) $vDoubleOt, '60', 6);
+                $vDblAmt = $this->math->mul($vDblHours, $doubleOtRate, 6);
+                $vTrpHours = $this->math->div((string) $vTripleOt, '60', 6);
+                $vTrpAmt = $this->math->mul($vTrpHours, $tripleOtRate, 6);
+                $vOt = $this->math->add($vNormAmt, $vDblAmt, 6);
+                $vOt = $this->math->add($vOt, $vTrpAmt, 6);
+                $vNightAmt = $this->math->mul((string) $vNight, $nightOutRate, 6);
+
+                $vBase = ($chartsByVehicle->count() > 1 && $totalCustodyDays > 0)
+                    ? $this->math->div($this->math->mul($baseRent, (string) $vCustody, 6), (string) $totalCustodyDays, 6)
+                    : $baseRent;
+
+                $vSub = $this->math->add($vBase, $vOt, 6);
+                $vSub = $this->math->add($vSub, $vNightAmt, 6);
+
+                $vehicleAttributions[] = [
+                    'vehicle_id' => (int) $vId,
+                    'vehicle_number' => $regNo,
+                    'vehicle_label' => $label,
+                    'custody_days' => $vCustody,
+                    'total_km' => $vKm,
+                    'normal_ot_hours' => $vNormHours,
+                    'double_ot_hours' => $vDblHours,
+                    'triple_ot_hours' => $vTrpHours,
+                    'night_outs' => $vNight,
+                    'allocated_base_rent' => $vBase,
+                    'allocated_ot_amount' => $vOt,
+                    'allocated_night_out_amount' => $vNightAmt,
+                    'subtotal' => $vSub,
+                ];
+            }
+        } else {
+            $vehicleNo = $agreement->vehicle?->registration_number ?? $agreement->vehicle?->vehicle_number ?? 'Fleet Vehicle';
+            $vehicleAttributions[] = [
+                'vehicle_id' => $agreement->vehicle_id,
+                'vehicle_number' => $vehicleNo,
+                'vehicle_label' => $vehicleNo,
+                'custody_days' => $totalCustodyDays,
+                'total_km' => '0.000000',
+                'normal_ot_hours' => '0.000000',
+                'double_ot_hours' => '0.000000',
+                'triple_ot_hours' => '0.000000',
+                'night_outs' => 0,
+                'allocated_base_rent' => $baseRent,
+                'allocated_ot_amount' => '0.000000',
+                'allocated_night_out_amount' => '0.000000',
+                'subtotal' => $baseRent,
+            ];
+        }
+
+        // Driver attributions
+        $driverAttributions = [];
+        $chartsByDriver = $charts->groupBy(fn ($c) => $c->driver_name_snapshot ?? $c->driver_observation ?? 'Assigned Driver');
+        foreach ($chartsByDriver as $dName => $dCharts) {
+            $dKm = '0.000000';
+            $dNorm = 0;
+            $dDbl = 0;
+            $dTrp = 0;
+            $dNight = 0;
+            $dEmpId = null;
+            $dRef = '';
+            foreach ($dCharts as $dc) {
+                $dKm = $this->math->add($dKm, (string) ($dc->commercial_km ?? '0.000000'), 6);
+                $dNorm += (int) ($dc->normal_ot_minutes ?? 0);
+                $dDbl += (int) ($dc->double_ot_minutes ?? 0);
+                $dTrp += (int) ($dc->triple_ot_minutes ?? 0);
+                $dNight += (int) ($dc->night_outs ?? 0);
+                if ($dc->driver_employee_id) {
+                    $dEmpId = $dc->driver_employee_id;
+                }
+                if ($dc->driver_reference_snapshot) {
+                    $dRef = $dc->driver_reference_snapshot;
+                }
+            }
+            $dNormH = $this->math->div((string) $dNorm, '60', 6);
+            $dNormAmt = $this->math->mul($dNormH, $normalOtRate, 6);
+            $dDblH = $this->math->div((string) $dDbl, '60', 6);
+            $dDblAmt = $this->math->mul($dDblH, $doubleOtRate, 6);
+            $dTrpH = $this->math->div((string) $dTrp, '60', 6);
+            $dTrpAmt = $this->math->mul($dTrpH, $tripleOtRate, 6);
+            $dOt = $this->math->add($dNormAmt, $dDblAmt, 6);
+            $dOt = $this->math->add($dOt, $dTrpAmt, 6);
+            $dNightAmt = $this->math->mul((string) $dNight, $nightOutRate, 6);
+            $dEarnings = $this->math->add($dOt, $dNightAmt, 6);
+
+            $driverAttributions[] = [
+                'driver_employee_id' => $dEmpId,
+                'driver_name' => (string) $dName,
+                'driver_reference' => $dRef,
+                'charts_count' => $dCharts->count(),
+                'total_km' => $dKm,
+                'normal_ot_hours' => $dNormH,
+                'normal_ot_amount' => $dNormAmt,
+                'double_ot_hours' => $dDblH,
+                'double_ot_amount' => $dDblAmt,
+                'triple_ot_hours' => $dTrpH,
+                'triple_ot_amount' => $dTrpAmt,
+                'night_outs' => $dNight,
+                'night_out_amount' => $dNightAmt,
+                'total_earnings' => $dEarnings,
+            ];
+        }
+
+        return [
+            'document_type' => 'customer_quotation',
+            'is_preview' => true,
+            'persisted' => false,
+            'quotation_number' => 'QTN-'.CarbonImmutable::parse($periodFrom)->format('Ymd').'-'.Str::upper(Str::random(4)),
+            'agreement' => [
+                'id' => $agreement->id,
+                'reference' => $agreement->reference,
+                'customer_name' => $agreement->party?->name ?? 'Customer',
+                'customer_id' => $agreement->party_id,
+                'vehicle_id' => $agreement->vehicle_id,
+                'vehicle_number' => $agreement->vehicle?->registration_number ?? $agreement->vehicle?->vehicle_number ?? 'Fleet Vehicle',
+                'starts_on' => $agreement->starts_on?->toDateString(),
+                'ends_on' => $agreement->ends_on?->toDateString(),
+                'driver_mode' => $agreement->driver_mode?->value ?? $agreement->driver_mode,
+            ],
+            'period_from' => $periodFrom,
+            'period_until' => $periodUntil,
+            'custody_days' => $totalCustodyDays,
+            'rates' => [
+                'base_rate' => $baseRate,
+                'excess_km_rate' => $excessKmRate,
+                'normal_ot_rate' => $normalOtRate,
+                'double_ot_rate' => $doubleOtRate,
+                'triple_ot_rate' => $tripleOtRate,
+                'night_out_rate' => $nightOutRate,
+                'tax_rate' => $taxRate,
+            ],
+            'telematics_summary' => [
+                'charts_count' => $charts->count(),
+                'total_km' => $totalCommercialKm,
+                'excess_km' => $excessKm,
+                'normal_ot_hours' => $normalOtHours,
+                'double_ot_hours' => $doubleOtHours,
+                'triple_ot_hours' => $tripleOtHours,
+                'night_outs' => $totalNightOuts,
+                'tolls_amount' => $totalTolls,
+            ],
+            'breakdown' => [
+                'base_rent_amount' => $baseRent,
+                'excess_km_amount' => $excessKmAmount,
+                'normal_ot_amount' => $normalOtAmount,
+                'double_ot_amount' => $doubleOtAmount,
+                'triple_ot_amount' => $tripleOtAmount,
+                'overtime_amount' => $overtimeAmount,
+                'night_out_amount' => $nightOutAmount,
+                'tolls_amount' => $totalTolls,
+                'additions_amount' => $additionsAmount,
+                'deductions_amount' => $deductionsAmount,
+                'subtotal' => $subtotal,
+                'tax_amount' => $taxAmount,
+                'grand_total' => $grandTotal,
+            ],
+            'line_items' => $lineItems,
+            'vehicle_attributions' => $vehicleAttributions,
+            'driver_attributions' => $driverAttributions,
+        ];
     }
 
     private function assertCycleVersion(BillingCycle $cycle, int $expectedVersion): void

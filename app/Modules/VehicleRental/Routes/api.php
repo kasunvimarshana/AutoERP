@@ -225,6 +225,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::prefix('billing')->middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
         Route::get('documents', [RentalBillingDocumentController::class, 'index']);
         Route::get('summary', [RentalBillingDocumentController::class, 'summary']);
+        Route::post('quotation-preview', [RentalBillingDocumentController::class, 'quotationPreview']);
+        Route::post('owner-bill-preview', [RentalBillingDocumentController::class, 'ownerBillPreview']);
         Route::get('documents/{invoice}', [RentalBillingDocumentController::class, 'show'])->whereNumber('invoice');
         Route::get('documents/{invoice}/statement', [RentalBillingDocumentController::class, 'statement'])->whereNumber('invoice');
         Route::put('documents/{invoice}', [RentalBillingDocumentController::class, 'update'])->whereNumber('invoice');

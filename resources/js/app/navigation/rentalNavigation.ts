@@ -32,6 +32,8 @@ export const rentalNavigationItem: NavigationModuleItem = {
         { id: 'rental-reservations', type: 'link', label: 'Reservations', to: RESERVATION_REGISTER_PATH, access: access([RESERVATION_PERMISSION.view]) },
         { id: 'rental-customer-agreements', type: 'link', label: 'Customer Agreements', to: agreementPath(AgreementKind.Customer), access: access([agreementPermissions.customer.view]) },
         { id: 'rental-owner-agreements', type: 'link', label: 'Owner Agreements', to: agreementPath(AgreementKind.Owner), access: access([agreementPermissions.owner.view]) },
+        { id: 'rental-customer-invoices', type: 'link', label: 'Customer Invoices', to: '/vehicle-rental/customer-invoices', access: access([agreementPermissions.customer.view]) },
+        { id: 'rental-owner-bills', type: 'link', label: 'Vehicle Owner Bills', to: '/vehicle-rental/owner-bills', access: access([agreementPermissions.owner.view]) },
         { id: 'rental-billing', type: 'link', label: 'Invoices & Owner Bills', to: '/vehicle-rental/billing', access: access([agreementPermissions.customer.view, agreementPermissions.owner.view]) },
         { id: 'rental-vehicle-uses', type: 'link', label: 'Vehicle Use Register', to: USE_REGISTER_PATH, access: access([USE_PERMISSION.view]) },
         { id: 'rental-running-charts', type: 'link', label: 'Running Chart Register', to: CHART_REGISTER_PATH, access: access([CHART_PERMISSION.view]) },

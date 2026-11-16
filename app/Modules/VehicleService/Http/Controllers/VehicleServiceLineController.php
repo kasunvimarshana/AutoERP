@@ -10,7 +10,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Item\Services\ItemQueryService;
-use Modules\Promotion\Constants\PromotionPermission;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceLineRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
@@ -60,7 +59,7 @@ final class VehicleServiceLineController extends VehicleServiceController
         if ($promotion !== null && ! $permissions->allows(
             (int) $request->currentUserId(),
             $request->tenantId(),
-            PromotionPermission::REDEEM,
+            'promotion.redeem',
         )) {
             throw new AuthorizationException('You do not have permission to redeem service offers.');
         }
