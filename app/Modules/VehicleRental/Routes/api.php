@@ -216,6 +216,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('documents', [RentalBillingDocumentController::class, 'index']);
         Route::get('summary', [RentalBillingDocumentController::class, 'summary']);
         Route::get('documents/{invoice}', [RentalBillingDocumentController::class, 'show'])->whereNumber('invoice');
+        Route::get('documents/{invoice}/statement', [RentalBillingDocumentController::class, 'statement'])->whereNumber('invoice');
         Route::put('documents/{invoice}', [RentalBillingDocumentController::class, 'update'])->whereNumber('invoice');
         Route::post('documents/{invoice}/cancel', [RentalBillingDocumentController::class, 'cancel'])->whereNumber('invoice');
     });

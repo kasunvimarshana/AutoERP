@@ -352,6 +352,7 @@ final class RentalBillingDocumentService
             'description' => $line->description,
             'quantity' => (string) $line->quantity,
             'unit_price' => (string) $line->unit_price,
+            'discount_amount' => (string) ($line->discount_amount ?? '0.000000'),
             'subtotal' => (string) $line->subtotal,
             'tax_total' => (string) $line->tax_total,
             'grand_total' => (string) $line->grand_total,
@@ -367,12 +368,108 @@ final class RentalBillingDocumentService
             'rate_snapshot' => $adj->rate_snapshot !== null ? (string) $adj->rate_snapshot : null,
         ])->values()->all();
 
+        $cycle = BillingCycle::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where(function (Builder $b) use ($invoice): void {
+                $b->where('initial_invoice_id', $invoice->id)
+                    ->orWhere('supplementary_invoice_id', $invoice->id)
+                    ->orWhere('final_invoice_id', $invoice->id);
+            })
+            ->with(['charts.runningChart', 'charts.vehicle', 'items'])
+            ->first();
+
+        if ($cycle === null) {
+            foreach ($invoice->sources as $source) {
+                if (str_starts_with((string) $source->source_type, 'vehicle_rental_billing_cycle')) {
+                    $cycle = BillingCycle::query()
+                        ->where('tenant_id', $context->tenantId)
+                        ->where('id', (int) $source->source_id)
+                        ->with(['charts.runningChart', 'charts.vehicle', 'items'])
+                        ->first();
+                    if ($cycle !== null) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        $telematics = null;
+        if ($cycle !== null && $cycle->charts->isNotEmpty()) {
+            $totKm = '0.000000';
+            $normMin = 0;
+            $doubMin = 0;
+            $tripMin = 0;
+            $nightOuts = 0;
+            $teleVehicles = [];
+            $teleDrivers = [];
+
+            foreach ($cycle->charts as $c) {
+                $totKm = $this->math->add($totKm, (string) ($c->commercial_km ?? '0.000000'), 6);
+                $normMin += (int) ($c->normal_ot_minutes ?? 0);
+                $doubMin += (int) ($c->double_ot_minutes ?? 0);
+                $tripMin += (int) ($c->triple_ot_minutes ?? 0);
+                $nightOuts += (int) ($c->night_outs ?? 0);
+                $vNo = $c->vehicle?->registration_number ?? $c->vehicle?->vehicle_number;
+                if ($vNo) {
+                    $teleVehicles[] = $vNo;
+                }
+                if ($c->driver_name_snapshot) {
+                    $teleDrivers[] = $c->driver_name_snapshot;
+                }
+            }
+
+            $telematics = [
+                'has_charts' => true,
+                'trips_count' => $cycle->charts->count(),
+                'commercial_km' => $totKm,
+                'normal_ot_hours' => $this->math->div((string) $normMin, '60', 2),
+                'double_ot_hours' => $this->math->div((string) $doubMin, '60', 2),
+                'triple_ot_hours' => $this->math->div((string) $tripMin, '60', 2),
+                'night_outs' => $nightOuts,
+                'vehicles' => array_values(array_unique($teleVehicles)),
+                'drivers' => array_values(array_unique($teleDrivers)),
+            ];
+        }
+
+        $whtAmount = '0.000000';
+        $maintenanceAmount = '0.000000';
+        foreach ($invoice->adjustments as $adj) {
+            $adjType = $adj->adjustment_type instanceof AdjustmentType ? $adj->adjustment_type->value : (string) $adj->adjustment_type;
+            if ($adjType === AdjustmentType::Withholding->value || $adjType === 'withholding') {
+                $whtAmount = $this->math->add($whtAmount, (string) $adj->amount);
+            } elseif ($adjType === AdjustmentType::Discount->value || $adjType === 'discount') {
+                $maintenanceAmount = $this->math->add($maintenanceAmount, (string) $adj->amount);
+            }
+        }
+
+        $financialBreakdown = [
+            'base_rent_amount' => (string) ($cycle->base_rent_amount ?? $invoice->subtotal),
+            'excess_km_amount' => (string) ($cycle->excess_km_amount ?? '0.000000'),
+            'overtime_amount' => (string) ($cycle->overtime_amount ?? '0.000000'),
+            'night_out_amount' => (string) ($cycle->night_out_amount ?? '0.000000'),
+            'tolls_amount' => (string) ($cycle->tolls_amount ?? '0.000000'),
+            'additions_amount' => (string) ($cycle->additions_amount ?? '0.000000'),
+            'deductions_amount' => (string) ($cycle->deductions_amount ?? $invoice->discount_total ?? '0.000000'),
+            'net_subtotal' => (string) $invoice->subtotal,
+            'tax_amount' => (string) $invoice->tax_total,
+            'wht_withheld' => $whtAmount,
+            'maintenance_deductions' => $maintenanceAmount,
+            'grand_total' => (string) $invoice->grand_total,
+            'paid_total' => (string) ($invoice->paid_total ?? $invoice->balance?->paid_amount ?? '0.000000'),
+            'balance_due' => $balanceDue,
+        ];
+
         $baseItem = $this->formatDocumentItem($invoice, $rentalContext);
 
         return array_merge($baseItem, [
             'lines' => $lines,
             'adjustments' => $adjustments,
             'payments' => $payments,
+            'telematics' => $telematics,
+            'financial_breakdown' => $financialBreakdown,
+            'statement_url' => "/api/v1/vehicle-rental/billing/documents/{$invoice->id}/statement",
+            'print_url' => "/api/v1/invoices/{$invoice->id}/print",
+            'pdf_url' => "/api/v1/invoices/{$invoice->id}/pdf",
             'notes' => $invoice->notes,
             'cancellation_reason' => $invoice->cancellation_reason,
             'can_cancel' => $isUnposted && $canBill,
@@ -380,6 +477,148 @@ final class RentalBillingDocumentService
             'can_record_payment' => $isPosted && $hasOpenBalance && $canBill,
             'can_print' => true,
         ]);
+    }
+
+    public function getStatementData(AgreementContext $context, int $invoiceId): array
+    {
+        $invoice = $this->baseRentalInvoiceQuery($context)
+            ->with([
+                'customer',
+                'supplier',
+                'currency',
+                'balance',
+                'lines',
+                'adjustments',
+                'sources',
+            ])
+            ->findOrFail($invoiceId);
+
+        $this->assertViewPermission($context, $invoice->direction instanceof InvoiceDirection ? $invoice->direction->value : (string) $invoice->direction);
+
+        $cycle = BillingCycle::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where(function (Builder $b) use ($invoice): void {
+                $b->where('initial_invoice_id', $invoice->id)
+                    ->orWhere('supplementary_invoice_id', $invoice->id)
+                    ->orWhere('final_invoice_id', $invoice->id);
+            })
+            ->first();
+
+        if ($cycle === null) {
+            foreach ($invoice->sources as $source) {
+                if (str_starts_with((string) $source->source_type, 'vehicle_rental_billing_cycle')) {
+                    $cycle = BillingCycle::query()
+                        ->where('tenant_id', $context->tenantId)
+                        ->where('id', (int) $source->source_id)
+                        ->first();
+                    if ($cycle !== null) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($cycle !== null) {
+            return app(TwoStageInvoicingService::class)->getCycleStatementData($context, $cycle->id);
+        }
+
+        $contexts = $this->bulkLoadRentalContexts($context, collect([$invoice]));
+        $rentalContext = $contexts[$invoice->id] ?? [];
+        $agreement = $rentalContext['agreement'] ?? null;
+        $vehicle = $rentalContext['vehicle'] ?? null;
+        $party = $invoice->direction === InvoiceDirection::Outbound ? $invoice->customer : $invoice->supplier;
+        $currencyCode = $invoice->currency?->code ?? 'LKR';
+
+        return [
+            'header' => [
+                'company_name' => 'AutoERP Vehicle Rental Operations',
+                'report_title' => $invoice->direction === InvoiceDirection::Outbound ? 'Customer Rental Billing Statement' : 'Lessor Settlement Financial Statement',
+                'cycle_number' => $invoice->invoice_number,
+                'as_of_date' => now()->toDateString(),
+                'status' => strtoupper($invoice->status instanceof InvoiceStatus ? $invoice->status->value : (string) $invoice->status),
+                'mode' => 'Direct Settlement',
+                'finalization_mode' => 'Direct',
+            ],
+            'agreement' => [
+                'id' => $agreement['id'] ?? null,
+                'reference' => $agreement['reference'] ?? '—',
+                'starts_on' => $agreement['starts_on'] ?? '—',
+                'ends_on' => $agreement['ends_on'] ?? 'Open-ended',
+                'period_from' => $invoice->supply_period_start?->format('d/m/Y') ?? $invoice->invoice_date?->format('d/m/Y'),
+                'period_until' => $invoice->supply_period_end?->format('d/m/Y') ?? $invoice->invoice_date?->format('d/m/Y'),
+                'currency' => $currencyCode,
+            ],
+            'party' => [
+                'name' => $party?->display_name ?? $party?->name ?? 'Commercial Client',
+                'code' => $party?->code ?? $party?->customer_number ?? $party?->supplier_number ?? '—',
+                'phone' => $party?->phone ?? $party?->mobile ?? '—',
+                'address' => $party?->billing_address ?? $party?->address ?? '—',
+            ],
+            'financials' => [
+                'base_rent_amount' => (string) $invoice->subtotal,
+                'excess_km_amount' => '0.000000',
+                'overtime_amount' => '0.000000',
+                'night_out_amount' => '0.000000',
+                'tolls_amount' => '0.000000',
+                'additions_amount' => '0.000000',
+                'deductions_amount' => (string) $invoice->discount_total,
+                'net_subtotal' => (string) $invoice->subtotal,
+                'tax_amount' => (string) $invoice->tax_total,
+                'total_billed_amount' => (string) $invoice->grand_total,
+                'total_paid_amount' => (string) ($invoice->paid_total ?? $invoice->balance?->paid_amount ?? '0.000000'),
+                'balance_due' => (string) ($invoice->balance_due ?? $invoice->balance?->remaining_amount ?? '0.000000'),
+            ],
+            'invoices' => [
+                'initial' => [
+                    'number' => $invoice->invoice_number,
+                    'date' => $invoice->invoice_date?->format('d/m/Y') ?? '—',
+                    'total' => (string) $invoice->grand_total,
+                    'paid' => (string) ($invoice->paid_total ?? $invoice->balance?->paid_amount ?? '0.000000'),
+                    'status' => $invoice->status instanceof InvoiceStatus ? $invoice->status->value : (string) $invoice->status,
+                ],
+                'supplementary' => null,
+                'final' => null,
+            ],
+            'vehicle_attributions' => $vehicle ? [
+                [
+                    'vehicle_id' => $vehicle['id'] ?? 0,
+                    'vehicle_number' => $vehicle['registration_number'] ?? '—',
+                    'vehicle_label' => $vehicle['make_model'] ?? '—',
+                    'is_replacement' => false,
+                    'charts_count' => 0,
+                    'custody_days' => 30,
+                    'total_km' => '0.000000',
+                    'normal_ot_hours' => '0.000000',
+                    'double_ot_hours' => '0.000000',
+                    'triple_ot_hours' => '0.000000',
+                    'night_outs' => 0,
+                    'allocated_base_rent' => (string) $invoice->subtotal,
+                    'allocated_excess_km_amount' => '0.000000',
+                    'allocated_tolls_amount' => '0.000000',
+                    'allocated_ot_amount' => '0.000000',
+                    'allocated_night_out_amount' => '0.000000',
+                    'attributed_additions' => '0.000000',
+                    'attributed_deductions' => (string) $invoice->discount_total,
+                    'subtotal' => (string) $invoice->grand_total,
+                ],
+            ] : [],
+            'driver_attributions' => [],
+            'charts' => [],
+            'items' => $invoice->lines->map(fn (InvoiceLine $l) => [
+                'id' => $l->id,
+                'item_type' => 'charge',
+                'category' => 'rental_service',
+                'description' => $l->description,
+                'quantity' => (string) $l->quantity,
+                'unit_rate' => (string) $l->unit_price,
+                'amount' => (string) $l->grand_total,
+                'vehicle_id' => null,
+                'vehicle_number' => null,
+                'driver_employee_id' => null,
+                'driver_name' => null,
+            ])->all(),
+            'reassignments' => [],
+        ];
     }
 
     public function updateDocument(AgreementContext $context, int $invoiceId, array $data): array

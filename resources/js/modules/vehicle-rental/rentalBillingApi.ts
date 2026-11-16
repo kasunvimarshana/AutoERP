@@ -57,6 +57,7 @@ export interface RentalBillingLine {
     description: string;
     quantity: string;
     unit_price: string;
+    discount_amount: string;
     subtotal: string;
     tax_total: string;
     grand_total: string;
@@ -85,10 +86,44 @@ export interface RentalBillingPayment {
     receipt_url: string | null;
 }
 
+export interface RentalTelematicsSummary {
+    has_charts: boolean;
+    trips_count: number;
+    commercial_km: string;
+    normal_ot_hours: string;
+    double_ot_hours: string;
+    triple_ot_hours: string;
+    night_outs: number;
+    vehicles: string[];
+    drivers: string[];
+}
+
+export interface RentalFinancialBreakdown {
+    base_rent_amount: string;
+    excess_km_amount: string;
+    overtime_amount: string;
+    night_out_amount: string;
+    tolls_amount: string;
+    additions_amount: string;
+    deductions_amount: string;
+    net_subtotal: string;
+    tax_amount: string;
+    wht_withheld: string;
+    maintenance_deductions: string;
+    grand_total: string;
+    paid_total: string;
+    balance_due: string;
+}
+
 export interface RentalBillingDetail extends RentalBillingDocument {
     lines: RentalBillingLine[];
     adjustments: RentalBillingAdjustment[];
     payments: RentalBillingPayment[];
+    telematics: RentalTelematicsSummary | null;
+    financial_breakdown: RentalFinancialBreakdown;
+    statement_url: string | null;
+    print_url: string;
+    pdf_url: string;
     notes: string | null;
     cancellation_reason: string | null;
     can_cancel: boolean;

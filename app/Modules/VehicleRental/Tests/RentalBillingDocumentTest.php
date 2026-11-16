@@ -389,6 +389,14 @@ final class RentalBillingDocumentTest extends TestCase
         $this->assertFalse($detail['can_record_payment']); // Draft cannot record payment directly until posted
         $this->assertCount(1, $detail['lines']);
         $this->assertSame('Stage 1 Base Rent', $detail['lines'][0]['description']);
+        $this->assertArrayHasKey('discount_amount', $detail['lines'][0]);
+        $this->assertArrayHasKey('financial_breakdown', $detail);
+        $this->assertArrayHasKey('statement_url', $detail);
+        $this->assertSame('25000.000000', $detail['financial_breakdown']['grand_total']);
+
+        // Test statement route
+        $statementRes = $this->get("/api/v1/vehicle-rental/billing/documents/{$invoiceId}/statement?format=html");
+        $statementRes->assertOk();
 
         // 2. Update Draft
         $updateRes = $this->putJson("/api/v1/vehicle-rental/billing/documents/{$invoiceId}", [

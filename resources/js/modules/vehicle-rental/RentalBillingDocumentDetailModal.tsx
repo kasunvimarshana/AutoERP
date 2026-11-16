@@ -302,6 +302,46 @@ export function RentalBillingDocumentDetailModal({
                         </div>
                     </div>
 
+                    {/* Telematics & Operations Summary Strip */}
+                    {detail.telematics && detail.telematics.has_charts && (
+                        <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/50 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                                    Operational & Telematics Summary
+                                </h4>
+                                <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                                    {detail.telematics.trips_count} Running {detail.telematics.trips_count === 1 ? 'Chart' : 'Charts'} Attached
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                <div className="p-2.5 rounded-lg bg-white border border-indigo-100/80">
+                                    <div className="text-2xs text-slate-500 font-medium">Commercial Distance</div>
+                                    <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                                        {Number(detail.telematics.commercial_km).toLocaleString()} km
+                                    </div>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-white border border-indigo-100/80">
+                                    <div className="text-2xs text-slate-500 font-medium">Normal OT (1.5x)</div>
+                                    <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                                        {detail.telematics.normal_ot_hours} hrs
+                                    </div>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-white border border-indigo-100/80">
+                                    <div className="text-2xs text-slate-500 font-medium">Double OT (2.0x)</div>
+                                    <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                                        {detail.telematics.double_ot_hours} hrs
+                                    </div>
+                                </div>
+                                <div className="p-2.5 rounded-lg bg-white border border-indigo-100/80">
+                                    <div className="text-2xs text-slate-500 font-medium">Night Outs</div>
+                                    <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                                        {detail.telematics.night_outs} nights
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Itemized Lines */}
                     <div className="space-y-2">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Itemized Charges</h4>
@@ -313,24 +353,39 @@ export function RentalBillingDocumentDetailModal({
                                         <th className="py-2.5 px-3">Description</th>
                                         <th className="py-2.5 px-3 text-right">Qty</th>
                                         <th className="py-2.5 px-3 text-right">Unit Price</th>
+                                        {detail.lines.some(l => Number(l.discount_amount) > 0) && (
+                                            <th className="py-2.5 px-3 text-right">Discount</th>
+                                        )}
                                         <th className="py-2.5 px-3 text-right">Tax</th>
                                         <th className="py-2.5 px-3 text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-slate-800">
-                                    {detail.lines.map((line, idx) => (
-                                        <tr key={line.id || idx} className="hover:bg-slate-50/50">
-                                            <td className="py-2 px-3 text-center text-slate-400">{line.line_number}</td>
-                                            <td className="py-2 px-3 font-medium text-slate-900">{line.description}</td>
-                                            <td className="py-2 px-3 text-right font-mono">{line.quantity}</td>
-                                            <td className="py-2 px-3 text-right font-mono"><MoneyDisplay value={line.unit_price} /></td>
-                                            <td className="py-2 px-3 text-right font-mono text-slate-500"><MoneyDisplay value={line.tax_total} /></td>
-                                            <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900"><MoneyDisplay value={line.grand_total} /></td>
-                                        </tr>
-                                    ))}
+                                    {detail.lines.map((line, idx) => {
+                                        const hasLineDiscounts = detail.lines.some(l => Number(l.discount_amount) > 0);
+                                        return (
+                                            <tr key={line.id || idx} className="hover:bg-slate-50/50">
+                                                <td className="py-2 px-3 text-center text-slate-400">{line.line_number}</td>
+                                                <td className="py-2 px-3 font-medium text-slate-900">{line.description}</td>
+                                                <td className="py-2 px-3 text-right font-mono">{line.quantity}</td>
+                                                <td className="py-2 px-3 text-right font-mono"><MoneyDisplay value={line.unit_price} /></td>
+                                                {hasLineDiscounts && (
+                                                    <td className="py-2 px-3 text-right font-mono text-amber-700">
+                                                        {Number(line.discount_amount) > 0 ? (
+                                                            <>- <MoneyDisplay value={line.discount_amount} /></>
+                                                        ) : (
+                                                            '-'
+                                                        )}
+                                                    </td>
+                                                )}
+                                                <td className="py-2 px-3 text-right font-mono text-slate-500"><MoneyDisplay value={line.tax_total} /></td>
+                                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900"><MoneyDisplay value={line.grand_total} /></td>
+                                            </tr>
+                                        );
+                                    })}
                                     {detail.lines.length === 0 && (
                                         <tr>
-                                            <td colSpan={6} className="py-4 text-center text-slate-400">
+                                            <td colSpan={detail.lines.some(l => Number(l.discount_amount) > 0) ? 7 : 6} className="py-4 text-center text-slate-400">
                                                 No itemized lines recorded.
                                             </td>
                                         </tr>
@@ -380,38 +435,108 @@ export function RentalBillingDocumentDetailModal({
                         </div>
                     )}
 
-                    {/* Financial Summary Totals Card */}
-                    <div className="flex flex-col sm:flex-row justify-end gap-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                        <div className="w-full sm:w-72 space-y-2 text-xs">
-                            <div className="flex justify-between text-slate-600">
-                                <span>Subtotal (Gross):</span>
-                                <span className="font-mono font-medium text-slate-800"><MoneyDisplay value={detail.subtotal} /></span>
-                            </div>
-                            {Number(detail.wht_amount) > 0 && (
-                                <div className="flex justify-between text-amber-700">
-                                    <span>Withholding Tax (10% WHT):</span>
-                                    <span className="font-mono font-medium">- <MoneyDisplay value={detail.wht_amount} /></span>
-                                </div>
-                            )}
-                            {Number(detail.tax_total) > 0 && (
+                    {/* Comprehensive Financial Breakdown Card */}
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Comprehensive Financial Breakdown
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div className="space-y-1.5 border-b sm:border-b-0 sm:border-r border-slate-200 sm:pr-4 pb-3 sm:pb-0">
                                 <div className="flex justify-between text-slate-600">
-                                    <span>Tax Total:</span>
-                                    <span className="font-mono font-medium text-slate-800">+ <MoneyDisplay value={detail.tax_total} /></span>
+                                    <span>Base Lease / Rental Fee:</span>
+                                    <span className="font-mono font-medium text-slate-800">
+                                        <MoneyDisplay value={detail.financial_breakdown?.base_rent_amount ?? detail.subtotal} />
+                                    </span>
                                 </div>
-                            )}
-                            <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-200">
-                                <span>{detail.direction === 'outbound' ? 'Grand Total Due:' : 'Net Payable to Owner:'}</span>
-                                <span className="font-mono text-emerald-700"><MoneyDisplay value={detail.grand_total} /></span>
+                                {Number(detail.financial_breakdown?.excess_km_amount) > 0 && (
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Excess Mileage Charges:</span>
+                                        <span className="font-mono font-medium text-slate-800">
+                                            <MoneyDisplay value={detail.financial_breakdown.excess_km_amount} />
+                                        </span>
+                                    </div>
+                                )}
+                                {Number(detail.financial_breakdown?.overtime_amount) > 0 && (
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Driver Overtime Services:</span>
+                                        <span className="font-mono font-medium text-slate-800">
+                                            <MoneyDisplay value={detail.financial_breakdown.overtime_amount} />
+                                        </span>
+                                    </div>
+                                )}
+                                {Number(detail.financial_breakdown?.night_out_amount) > 0 && (
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Night-Out Allowances:</span>
+                                        <span className="font-mono font-medium text-slate-800">
+                                            <MoneyDisplay value={detail.financial_breakdown.night_out_amount} />
+                                        </span>
+                                    </div>
+                                )}
+                                {Number(detail.financial_breakdown?.tolls_amount) > 0 && (
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Tolls & Highway Charges:</span>
+                                        <span className="font-mono font-medium text-slate-800">
+                                            <MoneyDisplay value={detail.financial_breakdown.tolls_amount} />
+                                        </span>
+                                    </div>
+                                )}
+                                {Number(detail.financial_breakdown?.additions_amount) > 0 && (
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Ad-Hoc Additions:</span>
+                                        <span className="font-mono font-medium text-slate-800">
+                                            <MoneyDisplay value={detail.financial_breakdown.additions_amount} />
+                                        </span>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex justify-between text-slate-600 pt-1">
-                                <span>Total Paid / Allocated:</span>
-                                <span className="font-mono font-medium text-emerald-600"><MoneyDisplay value={detail.paid_total} /></span>
-                            </div>
-                            <div className="flex justify-between text-sm font-bold pt-1 border-t border-slate-200">
-                                <span>Outstanding Balance:</span>
-                                <span className={`font-mono ${Number(detail.balance_due) > 0 ? 'text-rose-600 font-extrabold' : 'text-slate-500'}`}>
-                                    <MoneyDisplay value={detail.balance_due} />
-                                </span>
+
+                            <div className="space-y-1.5 sm:pl-2">
+                                {Number(detail.financial_breakdown?.deductions_amount) > 0 && (
+                                    <div className="flex justify-between text-amber-700">
+                                        <span>Contractual Deductions & Discounts:</span>
+                                        <span className="font-mono font-medium">
+                                            - <MoneyDisplay value={detail.financial_breakdown.deductions_amount} />
+                                        </span>
+                                    </div>
+                                )}
+                                {Number(detail.financial_breakdown?.wht_withheld ?? detail.wht_amount) > 0 && (
+                                    <div className="flex justify-between text-amber-700">
+                                        <span>Statutory Withholding Tax (10% WHT):</span>
+                                        <span className="font-mono font-medium">
+                                            - <MoneyDisplay value={detail.financial_breakdown?.wht_withheld ?? detail.wht_amount} />
+                                        </span>
+                                    </div>
+                                )}
+                                {Number(detail.financial_breakdown?.maintenance_deductions) > 0 && (
+                                    <div className="flex justify-between text-amber-700">
+                                        <span>Fleet Maintenance Deductions:</span>
+                                        <span className="font-mono font-medium">
+                                            - <MoneyDisplay value={detail.financial_breakdown.maintenance_deductions} />
+                                        </span>
+                                    </div>
+                                )}
+                                {Number(detail.tax_total) > 0 && (
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Applicable Tax Total:</span>
+                                        <span className="font-mono font-medium text-slate-800">
+                                            + <MoneyDisplay value={detail.tax_total} />
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t border-slate-200">
+                                    <span>{detail.direction === 'outbound' ? 'Grand Total Due:' : 'Net Payable to Owner:'}</span>
+                                    <span className="font-mono text-emerald-700"><MoneyDisplay value={detail.grand_total} /></span>
+                                </div>
+                                <div className="flex justify-between text-slate-600 pt-0.5">
+                                    <span>Total Paid / Allocated:</span>
+                                    <span className="font-mono font-medium text-emerald-600"><MoneyDisplay value={detail.paid_total} /></span>
+                                </div>
+                                <div className="flex justify-between text-sm font-bold pt-1 border-t border-slate-200">
+                                    <span>Outstanding Balance:</span>
+                                    <span className={`font-mono ${Number(detail.balance_due) > 0 ? 'text-rose-600 font-extrabold' : 'text-slate-500'}`}>
+                                        <MoneyDisplay value={detail.balance_due} />
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -554,6 +679,15 @@ export function RentalBillingDocumentDetailModal({
                             >
                                 PDF
                             </Button>
+                            {detail.statement_url && (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => window.open(detail.statement_url + '?format=print', '_blank', 'noopener')}
+                                >
+                                    Statement
+                                </Button>
+                            )}
                             {detail.can_edit && !editing && !cancelling && (
                                 <Button type="button" variant="secondary" onClick={() => setEditing(true)}>
                                     Edit Draft

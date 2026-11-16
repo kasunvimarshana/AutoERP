@@ -30,6 +30,7 @@ use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
+use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
 use Modules\VehicleRental\Models\OwnerUsageCharge;
@@ -134,6 +135,27 @@ final class OwnerSettlementBillingService
                 $usagePayable = $this->math->add($usagePayable, (string) $charge->amount, 6);
             }
 
+            // Also check unbilled owner BillingCycles if no owner base charges exist
+            if ($baseCharges->isEmpty()) {
+                $unbilledOwnerCycles = BillingCycle::query()
+                    ->forContext($context->tenantId, $context->organizationUnitId)
+                    ->where('owner_agreement_id', $agreement->id)
+                    ->where('period_from', '<=', $endDate)
+                    ->where('period_until', '>=', $startDate)
+                    ->whereNull('initial_invoice_id')
+                    ->whereNull('final_invoice_id')
+                    ->whereNull('supplementary_invoice_id')
+                    ->get();
+
+                foreach ($unbilledOwnerCycles as $oCycle) {
+                    $basePayable = $this->math->add($basePayable, (string) $oCycle->base_rent_amount, 6);
+                    $cycleUsage = $this->math->add((string) $oCycle->excess_km_amount, (string) $oCycle->overtime_amount, 6);
+                    $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->night_out_amount, 6);
+                    $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->tolls_amount, 6);
+                    $usagePayable = $this->math->add($usagePayable, $cycleUsage, 6);
+                }
+            }
+
             $grossPayable = $this->math->add($basePayable, $usagePayable, 6);
             if ($this->math->compare($grossPayable, '0.000000') <= 0) {
                 throw ValidationException::withMessages(['settlement' => ['No payable rental charges found for the specified settlement period.']]);
@@ -176,40 +198,124 @@ final class OwnerSettlementBillingService
             $hasWht = $this->math->compare($whtAmount, '0.000000') > 0;
             $hasMaintenance = $this->math->compare($maintenanceDeductions, '0.000000') > 0;
 
-            $lines = [
-                new InvoiceLineData(
-                    lineNumber: 1,
-                    description: 'Gross Vehicle Lease Rent · '.$agreement->reference.' · '.$vehicleNo.' ('.$start->format('d/m/Y').' To '.$end->format('d/m/Y').')',
+            $lines = [];
+            $sourceLines = [];
+            $lineNum = 1;
+
+            if ($baseCharges->isNotEmpty()) {
+                foreach ($baseCharges as $charge) {
+                    $srcLineId = ($sourceId * 1000) + $lineNum;
+                    $desc = 'Lessor Base Lease Rent · Charge #'.$charge->id.' ('.$charge->period_from.' To '.$charge->period_until.')';
+                    $lines[] = new InvoiceLineData(
+                        lineNumber: $lineNum,
+                        description: $desc,
+                        quantity: self::WHOLE_CHARGE,
+                        unitPrice: (string) $charge->amount,
+                        lineType: InvoiceLineType::Charge,
+                        discountAmount: '0.000000',
+                        sourceLineType: $sourceType,
+                        sourceLineId: $srcLineId,
+                    );
+                    $sourceLines[] = new InvoiceSourceLineData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: $sourceType,
+                        sourceId: $sourceId,
+                        sourceLineType: $sourceType,
+                        sourceLineId: $srcLineId,
+                        sourceQuantity: self::WHOLE_CHARGE,
+                        invoicedQuantity: self::WHOLE_CHARGE,
+                        sourceUnitPrice: (string) $charge->amount,
+                        sourceLineTotal: (string) $charge->amount,
+                        invoicedLineTotal: (string) $charge->amount,
+                    );
+                    $lineNum++;
+                }
+            } elseif ($this->math->compare($basePayable, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNum;
+                $desc = 'Gross Vehicle Lease Rent · '.$agreement->reference.' · '.$vehicleNo.' ('.$start->format('d/m/Y').' To '.$end->format('d/m/Y').')';
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNum,
+                    description: $desc,
                     quantity: self::WHOLE_CHARGE,
-                    unitPrice: $grossPayable,
+                    unitPrice: $basePayable,
                     lineType: InvoiceLineType::Charge,
                     discountAmount: '0.000000',
                     sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                ),
-            ];
-
-            $lineNum = 2;
-            if ($hasWht) {
-                $lines[] = new InvoiceLineData(
-                    lineNumber: $lineNum++,
-                    description: 'Statutory Withholding Tax Deduction ('.rtrim(rtrim($whtRate, '0'), '.').'%) · Deduction: '.$whtAmount,
-                    quantity: self::WHOLE_CHARGE,
-                    unitPrice: '0.000000',
-                    lineType: InvoiceLineType::Charge,
-                    discountAmount: '0.000000',
+                    sourceLineId: $srcLineId,
                 );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $basePayable,
+                    sourceLineTotal: $basePayable,
+                    invoicedLineTotal: $basePayable,
+                );
+                $lineNum++;
             }
 
-            if ($hasMaintenance) {
+            if ($usageCharges->isNotEmpty()) {
+                foreach ($usageCharges as $charge) {
+                    $srcLineId = ($sourceId * 1000) + $lineNum;
+                    $desc = 'Lessor Operational Usage & Overtime · Charge #'.$charge->id.' ('.$charge->period_from.' To '.$charge->period_until.')';
+                    $lines[] = new InvoiceLineData(
+                        lineNumber: $lineNum,
+                        description: $desc,
+                        quantity: self::WHOLE_CHARGE,
+                        unitPrice: (string) $charge->amount,
+                        lineType: InvoiceLineType::Charge,
+                        discountAmount: '0.000000',
+                        sourceLineType: $sourceType,
+                        sourceLineId: $srcLineId,
+                    );
+                    $sourceLines[] = new InvoiceSourceLineData(
+                        tenantId: $context->tenantId,
+                        organizationUnitId: $context->organizationUnitId,
+                        sourceType: $sourceType,
+                        sourceId: $sourceId,
+                        sourceLineType: $sourceType,
+                        sourceLineId: $srcLineId,
+                        sourceQuantity: self::WHOLE_CHARGE,
+                        invoicedQuantity: self::WHOLE_CHARGE,
+                        sourceUnitPrice: (string) $charge->amount,
+                        sourceLineTotal: (string) $charge->amount,
+                        invoicedLineTotal: (string) $charge->amount,
+                    );
+                    $lineNum++;
+                }
+            } elseif ($this->math->compare($usagePayable, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNum;
+                $desc = 'Lessor Operational Usage Charges ('.$start->format('d/m/Y').' To '.$end->format('d/m/Y').')';
                 $lines[] = new InvoiceLineData(
-                    lineNumber: $lineNum++,
-                    description: 'Fleet Maintenance Recovery · Deduction: '.$maintenanceDeductions,
+                    lineNumber: $lineNum,
+                    description: $desc,
                     quantity: self::WHOLE_CHARGE,
-                    unitPrice: '0.000000',
+                    unitPrice: $usagePayable,
                     lineType: InvoiceLineType::Charge,
                     discountAmount: '0.000000',
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
                 );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $usagePayable,
+                    sourceLineTotal: $usagePayable,
+                    invoicedLineTotal: $usagePayable,
+                );
+                $lineNum++;
             }
 
             $adjustments = [];
@@ -270,6 +376,20 @@ final class OwnerSettlementBillingService
                 description: $description,
             );
 
+            $referenceFields = [
+                ['label' => 'Agreement Reference', 'value' => (string) $agreement->reference],
+                ['label' => 'Vehicle Registration', 'value' => (string) $vehicleNo],
+                ['label' => 'Settlement Period', 'value' => $start->format('d/m/Y').' To '.$end->format('d/m/Y')],
+                ['label' => 'Gross Lease Payable', 'value' => (string) $grossPayable],
+            ];
+            if ($hasWht) {
+                $referenceFields[] = ['label' => 'Statutory WHT ('.rtrim(rtrim($whtRate, '0'), '.').'%)', 'value' => '-'.(string) $whtAmount];
+            }
+            if ($hasMaintenance) {
+                $referenceFields[] = ['label' => 'Maintenance Chargeback', 'value' => '-'.(string) $maintenanceDeductions];
+            }
+            $referenceFields[] = ['label' => 'Net Settlement Payable', 'value' => (string) $netPayable];
+
             $source = new CreateInvoiceData(
                 tenantId: $context->tenantId,
                 organizationUnitId: $context->organizationUnitId,
@@ -283,6 +403,8 @@ final class OwnerSettlementBillingService
                 partyId: $agreement->supplier_id,
                 createdBy: $context->actorId,
                 notes: $notes,
+                supplyPeriodStart: $start->toDateString(),
+                supplyPeriodEnd: $end->toDateString(),
                 lines: $lines,
                 adjustments: $adjustments,
                 sources: [
@@ -297,21 +419,8 @@ final class OwnerSettlementBillingService
                         sourceGrandTotal: $netPayable,
                     ),
                 ],
-                sourceLines: [
-                    new InvoiceSourceLineData(
-                        tenantId: $context->tenantId,
-                        organizationUnitId: $context->organizationUnitId,
-                        sourceType: $sourceType,
-                        sourceId: $sourceId,
-                        sourceLineType: $sourceType,
-                        sourceLineId: $sourceId,
-                        sourceQuantity: self::WHOLE_CHARGE,
-                        invoicedQuantity: self::WHOLE_CHARGE,
-                        sourceUnitPrice: $grossPayable,
-                        sourceLineTotal: $netPayable,
-                        invoicedLineTotal: $netPayable,
-                    ),
-                ],
+                sourceLines: $sourceLines,
+                purchaserReferenceFields: $referenceFields,
                 postingPlan: $postingPlan,
             );
 

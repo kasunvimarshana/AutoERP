@@ -1213,7 +1213,15 @@ final class TwoStageInvoicingService
 
         $sourceType = 'vehicle_rental_billing_cycle';
         $sourceId = (int) $cycle->id;
-        $description = 'Base Rental · '.$agreement->reference.' · '.$cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d');
+
+        $itemization = $this->buildStage1Lines(
+            $context,
+            $agreement,
+            $cycle,
+            $amount,
+            $sourceType,
+            $sourceId
+        );
 
         $source = new CreateInvoiceData(
             tenantId: $context->tenantId,
@@ -1228,17 +1236,9 @@ final class TwoStageInvoicingService
             partyId: $partyId,
             createdBy: $context->actorId,
             notes: 'Stage 1 Provisional Base Rent Invoice · Cycle: '.$cycle->cycle_number,
-            lines: [
-                new InvoiceLineData(
-                    lineNumber: 1,
-                    description: $description,
-                    quantity: self::WHOLE_CHARGE,
-                    unitPrice: $amount,
-                    lineType: InvoiceLineType::Charge,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                ),
-            ],
+            supplyPeriodStart: $cycle->period_from?->toDateString(),
+            supplyPeriodEnd: $cycle->period_until?->toDateString(),
+            lines: $itemization['lines'],
             sources: [
                 new InvoiceSourceData(
                     tenantId: $context->tenantId,
@@ -1251,21 +1251,8 @@ final class TwoStageInvoicingService
                     sourceGrandTotal: $amount,
                 ),
             ],
-            sourceLines: [
-                new InvoiceSourceLineData(
-                    tenantId: $context->tenantId,
-                    organizationUnitId: $context->organizationUnitId,
-                    sourceType: $sourceType,
-                    sourceId: $sourceId,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                    sourceQuantity: self::WHOLE_CHARGE,
-                    invoicedQuantity: self::WHOLE_CHARGE,
-                    sourceUnitPrice: $amount,
-                    sourceLineTotal: $amount,
-                    invoicedLineTotal: $amount,
-                ),
-            ],
+            sourceLines: $itemization['sourceLines'],
+            purchaserReferenceFields: $itemization['referenceFields'],
         );
 
         return $this->invoiceService->create(
@@ -1294,7 +1281,15 @@ final class TwoStageInvoicingService
 
         $sourceType = 'vehicle_rental_billing_cycle_supplementary';
         $sourceId = (int) $cycle->id;
-        $description = 'Supplementary Usage · '.$agreement->reference.' · Excess KM, OT & Charges ('.$cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d').')';
+
+        $itemization = $this->buildSupplementaryLines(
+            $context,
+            $agreement,
+            $cycle,
+            $deltaAmount,
+            $sourceType,
+            $sourceId
+        );
 
         $source = new CreateInvoiceData(
             tenantId: $context->tenantId,
@@ -1309,17 +1304,9 @@ final class TwoStageInvoicingService
             partyId: $partyId,
             createdBy: $context->actorId,
             notes: 'Stage 2 Supplementary Usage Invoice · Cycle: '.$cycle->cycle_number,
-            lines: [
-                new InvoiceLineData(
-                    lineNumber: 1,
-                    description: $description,
-                    quantity: self::WHOLE_CHARGE,
-                    unitPrice: $deltaAmount,
-                    lineType: InvoiceLineType::Charge,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                ),
-            ],
+            supplyPeriodStart: $cycle->period_from?->toDateString(),
+            supplyPeriodEnd: $cycle->period_until?->toDateString(),
+            lines: $itemization['lines'],
             sources: [
                 new InvoiceSourceData(
                     tenantId: $context->tenantId,
@@ -1332,21 +1319,8 @@ final class TwoStageInvoicingService
                     sourceGrandTotal: $deltaAmount,
                 ),
             ],
-            sourceLines: [
-                new InvoiceSourceLineData(
-                    tenantId: $context->tenantId,
-                    organizationUnitId: $context->organizationUnitId,
-                    sourceType: $sourceType,
-                    sourceId: $sourceId,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                    sourceQuantity: self::WHOLE_CHARGE,
-                    invoicedQuantity: self::WHOLE_CHARGE,
-                    sourceUnitPrice: $deltaAmount,
-                    sourceLineTotal: $deltaAmount,
-                    invoicedLineTotal: $deltaAmount,
-                ),
-            ],
+            sourceLines: $itemization['sourceLines'],
+            purchaserReferenceFields: $itemization['referenceFields'],
         );
 
         return $this->invoiceService->create(
@@ -1375,7 +1349,15 @@ final class TwoStageInvoicingService
 
         $sourceType = 'vehicle_rental_billing_cycle_consolidated';
         $sourceId = (int) $cycle->id;
-        $description = 'Consolidated Rental & Usage · '.$agreement->reference.' · ('.$cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d').')';
+
+        $itemization = $this->buildConsolidatedLines(
+            $context,
+            $agreement,
+            $cycle,
+            $totalAmount,
+            $sourceType,
+            $sourceId
+        );
 
         $source = new CreateInvoiceData(
             tenantId: $context->tenantId,
@@ -1390,17 +1372,9 @@ final class TwoStageInvoicingService
             partyId: $partyId,
             createdBy: $context->actorId,
             notes: 'Stage 2 Consolidated Revised Rental Invoice · Cycle: '.$cycle->cycle_number,
-            lines: [
-                new InvoiceLineData(
-                    lineNumber: 1,
-                    description: $description,
-                    quantity: self::WHOLE_CHARGE,
-                    unitPrice: $totalAmount,
-                    lineType: InvoiceLineType::Charge,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                ),
-            ],
+            supplyPeriodStart: $cycle->period_from?->toDateString(),
+            supplyPeriodEnd: $cycle->period_until?->toDateString(),
+            lines: $itemization['lines'],
             sources: [
                 new InvoiceSourceData(
                     tenantId: $context->tenantId,
@@ -1413,21 +1387,8 @@ final class TwoStageInvoicingService
                     sourceGrandTotal: $totalAmount,
                 ),
             ],
-            sourceLines: [
-                new InvoiceSourceLineData(
-                    tenantId: $context->tenantId,
-                    organizationUnitId: $context->organizationUnitId,
-                    sourceType: $sourceType,
-                    sourceId: $sourceId,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                    sourceQuantity: self::WHOLE_CHARGE,
-                    invoicedQuantity: self::WHOLE_CHARGE,
-                    sourceUnitPrice: $totalAmount,
-                    sourceLineTotal: $totalAmount,
-                    invoicedLineTotal: $totalAmount,
-                ),
-            ],
+            sourceLines: $itemization['sourceLines'],
+            purchaserReferenceFields: $itemization['referenceFields'],
         );
 
         return $this->invoiceService->create(
@@ -1611,7 +1572,16 @@ final class TwoStageInvoicingService
 
         $sourceType = 'vehicle_rental_billing_cycle_credit_note';
         $sourceId = (int) $cycle->id;
-        $description = 'Credit Note · '.$agreement->reference.' · ('.$cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d').')';
+
+        $itemization = $this->buildCreditNoteLines(
+            $context,
+            $agreement,
+            $cycle,
+            $amount,
+            $sourceType,
+            $sourceId,
+            $notes
+        );
 
         $source = new CreateInvoiceData(
             tenantId: $context->tenantId,
@@ -1626,17 +1596,9 @@ final class TwoStageInvoicingService
             partyId: $partyId,
             createdBy: $context->actorId,
             notes: $notes ?: 'Credit Note for Billing Cycle: '.$cycle->cycle_number,
-            lines: [
-                new InvoiceLineData(
-                    lineNumber: 1,
-                    description: $description,
-                    quantity: self::WHOLE_CHARGE,
-                    unitPrice: $amount,
-                    lineType: InvoiceLineType::Charge,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                ),
-            ],
+            supplyPeriodStart: $cycle->period_from?->toDateString(),
+            supplyPeriodEnd: $cycle->period_until?->toDateString(),
+            lines: $itemization['lines'],
             sources: [
                 new InvoiceSourceData(
                     tenantId: $context->tenantId,
@@ -1649,21 +1611,8 @@ final class TwoStageInvoicingService
                     sourceGrandTotal: $amount,
                 ),
             ],
-            sourceLines: [
-                new InvoiceSourceLineData(
-                    tenantId: $context->tenantId,
-                    organizationUnitId: $context->organizationUnitId,
-                    sourceType: $sourceType,
-                    sourceId: $sourceId,
-                    sourceLineType: $sourceType,
-                    sourceLineId: $sourceId,
-                    sourceQuantity: self::WHOLE_CHARGE,
-                    invoicedQuantity: self::WHOLE_CHARGE,
-                    sourceUnitPrice: $amount,
-                    sourceLineTotal: $amount,
-                    invoicedLineTotal: $amount,
-                ),
-            ],
+            sourceLines: $itemization['sourceLines'],
+            purchaserReferenceFields: $itemization['referenceFields'],
         );
 
         $creditNote = $this->invoiceService->create(
@@ -1685,6 +1634,1061 @@ final class TwoStageInvoicingService
         }
 
         return $creditNote;
+    }
+
+    /**
+     * @return array{
+     *     lines: list<InvoiceLineData>,
+     *     sourceLines: list<InvoiceSourceLineData>,
+     *     referenceFields: list<array{label: string, value: string}>
+     * }
+     */
+    private function buildStage1Lines(
+        AgreementContext $context,
+        $agreement,
+        BillingCycle $cycle,
+        string $amount,
+        string $sourceType,
+        int $sourceId
+    ): array {
+        $cycleDays = max(1, $cycle->period_from->diffInDays($cycle->period_until) + 1);
+        $foreignKey = $cycle->customer_agreement_id !== null ? 'customer_agreement_id' : 'owner_agreement_id';
+        $agreementId = $cycle->customer_agreement_id ?? $cycle->owner_agreement_id;
+
+        $uses = VehicleUse::query()
+            ->forContext($context->tenantId, $context->organizationUnitId)
+            ->where($foreignKey, $agreementId)
+            ->where('starts_at', '<=', $cycle->period_until->endOfDay())
+            ->where(function ($q) use ($cycle) {
+                $q->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $cycle->period_from->startOfDay())
+                    ->orWhere('returned_at', '>=', $cycle->period_from->startOfDay());
+            })
+            ->where('status', '!=', VehicleUseStatus::Cancelled->value)
+            ->with('vehicle')
+            ->orderBy('starts_at')
+            ->get();
+
+        $custodyMap = [];
+        $totalCustodyDays = 0;
+        foreach ($uses as $use) {
+            $handoverTime = $use->handover_at ?? $use->starts_at;
+            $returnTime = $use->returned_at ?? $use->ends_at;
+
+            $startStr = $handoverTime?->toDateString() ?? $cycle->period_from->toDateString();
+            $endStr = $returnTime?->toDateString() ?? $cycle->period_until->toDateString();
+
+            $uStartDay = CarbonImmutable::parse(max($startStr, $cycle->period_from->toDateString()))->startOfDay();
+            $uEndDay = CarbonImmutable::parse(min($endStr, $cycle->period_until->toDateString()))->startOfDay();
+
+            if ($uStartDay->greaterThan($uEndDay)) {
+                $days = 0;
+            } else {
+                $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay) + 1);
+            }
+
+            if ($days > 0) {
+                $custodyMap[$use->vehicle_id] = ($custodyMap[$use->vehicle_id] ?? 0) + $days;
+                $totalCustodyDays += $days;
+            }
+        }
+
+        $lines = [];
+        $sourceLines = [];
+        $vehicleNumbers = [];
+        $periodLabel = $cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d');
+
+        if ($uses->isNotEmpty() && count($custodyMap) > 1 && $totalCustodyDays > 0) {
+            $allocatedSoFar = '0.000000';
+            $vehicles = $uses->unique('vehicle_id')->values();
+            $count = $vehicles->count();
+
+            foreach ($vehicles as $index => $u) {
+                $v = $u->vehicle;
+                $vId = (int) $u->vehicle_id;
+                $vDays = $custodyMap[$vId] ?? 0;
+                $regNo = $v?->registration_number ?? $v?->vehicle_number ?? "Vehicle #{$vId}";
+                $vehicleNumbers[] = $regNo;
+
+                if ($index === $count - 1) {
+                    $vAmount = $this->math->sub($amount, $allocatedSoFar, 6);
+                } else {
+                    $vAmount = $this->math->div($this->math->mul($amount, (string) $vDays, 6), (string) $totalCustodyDays, 6);
+                    $allocatedSoFar = $this->math->add($allocatedSoFar, $vAmount, 6);
+                }
+
+                $lineNumber = $index + 1;
+                $lineDesc = "Base Rental Fee · {$regNo} · {$vDays} Days ({$periodLabel})";
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: $lineDesc,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $vAmount,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $vAmount,
+                    sourceLineTotal: $vAmount,
+                    invoicedLineTotal: $vAmount,
+                );
+            }
+        } else {
+            $regNo = null;
+            if ($uses->isNotEmpty()) {
+                $v = $uses->first()->vehicle;
+                $regNo = $v?->registration_number ?? $v?->vehicle_number;
+                if ($regNo) {
+                    $vehicleNumbers[] = $regNo;
+                }
+            }
+            $targetLabel = $regNo ?: $agreement->reference;
+            $lineDesc = "Base Rental Fee · {$targetLabel} · ({$periodLabel})";
+            $srcLineId = ($sourceId * 1000) + 1;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: 1,
+                description: $lineDesc,
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: $amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: $amount,
+                sourceLineTotal: $amount,
+                invoicedLineTotal: $amount,
+            );
+        }
+
+        $referenceFields = [
+            ['label' => 'Agreement Reference', 'value' => (string) $agreement->reference],
+            ['label' => 'Cycle Number', 'value' => (string) $cycle->cycle_number],
+            ['label' => 'Billing Period', 'value' => $periodLabel],
+        ];
+        if (! empty($vehicleNumbers)) {
+            $referenceFields[] = ['label' => 'Assigned Vehicle(s)', 'value' => implode(', ', array_unique($vehicleNumbers))];
+        }
+
+        return [
+            'lines' => $lines,
+            'sourceLines' => $sourceLines,
+            'referenceFields' => $referenceFields,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     lines: list<InvoiceLineData>,
+     *     sourceLines: list<InvoiceSourceLineData>,
+     *     referenceFields: list<array{label: string, value: string}>
+     * }
+     */
+    private function buildSupplementaryLines(
+        AgreementContext $context,
+        $agreement,
+        BillingCycle $cycle,
+        string $deltaAmount,
+        string $sourceType,
+        int $sourceId
+    ): array {
+        $cycle->loadMissing(['charts.vehicle', 'items.vehicle', 'items.driver']);
+        $terms = $agreement?->terms ?? [];
+        $periodLabel = $cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d');
+
+        $lines = [];
+        $sourceLines = [];
+        $vehicleNumbers = [];
+        $lineNumber = 1;
+
+        // 1. If base rent was not previously billed in Stage 1, bill it now
+        if ($cycle->initial_invoice_id === null && $this->math->compare((string) $cycle->base_rent_amount, '0.000000') > 0) {
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: "Base Rental Fee · {$agreement->reference} · ({$periodLabel})",
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $cycle->base_rent_amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $cycle->base_rent_amount,
+                sourceLineTotal: (string) $cycle->base_rent_amount,
+                invoicedLineTotal: (string) $cycle->base_rent_amount,
+            );
+            $lineNumber++;
+        }
+
+        // 2. Excess Kilometers
+        if ($this->math->compare((string) $cycle->excess_km_amount, '0.000000') > 0) {
+            $excessKmRate = (string) ($terms['excess_km_rate'] ?? '0.000000');
+            $freeKm = (string) ($terms['included_km'] ?? $terms['free_km_allowance'] ?? '0.000000');
+            $totalKm = '0.000000';
+            foreach ($cycle->charts as $c) {
+                $totalKm = $this->math->add($totalKm, (string) ($c->commercial_km ?? '0.000000'), 6);
+            }
+            $excessKm = $this->math->compare($totalKm, $freeKm) > 0 ? $this->math->sub($totalKm, $freeKm, 6) : '0.000000';
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: "Excess Mileage Charge · {$excessKm} km @ {$excessKmRate}/km (Included: {$freeKm} km)",
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $cycle->excess_km_amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $cycle->excess_km_amount,
+                sourceLineTotal: (string) $cycle->excess_km_amount,
+                invoicedLineTotal: (string) $cycle->excess_km_amount,
+            );
+            $lineNumber++;
+        }
+
+        // 3. Overtime Charges (Normal, Double, Triple)
+        if ($this->math->compare((string) $cycle->overtime_amount, '0.000000') > 0) {
+            $normalOtRate = (string) ($terms['normal_ot_rate'] ?? '0.000000');
+            $doubleOtRate = (string) ($terms['double_ot_rate'] ?? '0.000000');
+            $tripleOtRate = (string) ($terms['triple_ot_rate'] ?? '0.000000');
+
+            $totNormalMin = (int) $cycle->charts->sum('normal_ot_minutes');
+            $totDoubleMin = (int) $cycle->charts->sum('double_ot_minutes');
+            $totTripleMin = (int) $cycle->charts->sum('triple_ot_minutes');
+
+            $normalHours = $this->math->div((string) $totNormalMin, '60', 6);
+            $doubleHours = $this->math->div((string) $totDoubleMin, '60', 6);
+            $tripleHours = $this->math->div((string) $totTripleMin, '60', 6);
+
+            $normalAmt = $this->math->mul($normalHours, $normalOtRate, 6);
+            $doubleAmt = $this->math->mul($doubleHours, $doubleOtRate, 6);
+            $tripleAmt = $this->math->mul($tripleHours, $tripleOtRate, 6);
+            $itemizedOtSum = $this->math->add($this->math->add($normalAmt, $doubleAmt, 6), $tripleAmt, 6);
+
+            if ($this->math->compare($normalAmt, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: "Driver Overtime · Normal (1.5x) · {$normalHours} hrs @ {$normalOtRate}/hr",
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $normalAmt,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $normalAmt,
+                    sourceLineTotal: $normalAmt,
+                    invoicedLineTotal: $normalAmt,
+                );
+                $lineNumber++;
+            }
+
+            if ($this->math->compare($doubleAmt, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: "Driver Overtime · Double (2.0x) · {$doubleHours} hrs @ {$doubleOtRate}/hr",
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $doubleAmt,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $doubleAmt,
+                    sourceLineTotal: $doubleAmt,
+                    invoicedLineTotal: $doubleAmt,
+                );
+                $lineNumber++;
+            }
+
+            if ($this->math->compare($tripleAmt, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: "Driver Overtime · Triple (3.0x) · {$tripleHours} hrs @ {$tripleOtRate}/hr",
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $tripleAmt,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $tripleAmt,
+                    sourceLineTotal: $tripleAmt,
+                    invoicedLineTotal: $tripleAmt,
+                );
+                $lineNumber++;
+            }
+
+            $otRemainder = $this->math->sub((string) $cycle->overtime_amount, $itemizedOtSum, 6);
+            if ($this->math->compare($otRemainder, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: 'Driver Overtime Service Charges',
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $otRemainder,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $otRemainder,
+                    sourceLineTotal: $otRemainder,
+                    invoicedLineTotal: $otRemainder,
+                );
+                $lineNumber++;
+            }
+        }
+
+        // 4. Night-Out Allowance
+        if ($this->math->compare((string) $cycle->night_out_amount, '0.000000') > 0) {
+            $nightOuts = (int) $cycle->charts->sum('night_outs');
+            $nightOutRate = (string) ($terms['night_out_rate'] ?? '0.000000');
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: "Driver Night-Out Allowance · {$nightOuts} Nights @ {$nightOutRate}",
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $cycle->night_out_amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $cycle->night_out_amount,
+                sourceLineTotal: (string) $cycle->night_out_amount,
+                invoicedLineTotal: (string) $cycle->night_out_amount,
+            );
+            $lineNumber++;
+        }
+
+        // 5. Tolls
+        if ($this->math->compare((string) $cycle->tolls_amount, '0.000000') > 0) {
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: 'Tolls and Highway Charges',
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $cycle->tolls_amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $cycle->tolls_amount,
+                sourceLineTotal: (string) $cycle->tolls_amount,
+                invoicedLineTotal: (string) $cycle->tolls_amount,
+            );
+            $lineNumber++;
+        }
+
+        // 6. Ad-hoc Additions
+        foreach ($cycle->items->where('item_type', BillingCycleItemType::Addition) as $item) {
+            $veh = $item->vehicle?->registration_number ?? $item->vehicle?->vehicle_number;
+            $drv = $item->driver?->display_name;
+            $attr = array_filter([$veh ? "Vehicle: {$veh}" : null, $drv ? "Driver: {$drv}" : null]);
+            $attrStr = ! empty($attr) ? ' ['.implode(', ', $attr).']' : '';
+            $desc = "Addition: {$item->description} ({$item->category->value}){$attrStr}";
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: $desc,
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $item->amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $item->amount,
+                sourceLineTotal: (string) $item->amount,
+                invoicedLineTotal: (string) $item->amount,
+            );
+            $lineNumber++;
+        }
+
+        // 7. Apply Ad-hoc Deductions as discounts against charges
+        $deductions = $cycle->items->where('item_type', BillingCycleItemType::Deduction);
+        $applied = $this->applyDeductionsAsDiscounts($lines, $sourceLines, $deductions);
+        $lines = $applied['lines'];
+        $sourceLines = $applied['sourceLines'];
+
+        // Fallback: if lines are empty but deltaAmount > 0
+        if (empty($lines) && $this->math->compare($deltaAmount, '0.000000') > 0) {
+            $srcLineId = ($sourceId * 1000) + 1;
+            $lines[] = new InvoiceLineData(
+                lineNumber: 1,
+                description: "Supplementary Rental Billing · Cycle: {$cycle->cycle_number} · ({$periodLabel})",
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: $deltaAmount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: $deltaAmount,
+                sourceLineTotal: $deltaAmount,
+                invoicedLineTotal: $deltaAmount,
+            );
+        }
+
+        foreach ($cycle->charts as $c) {
+            $vNum = $c->vehicle?->registration_number ?? $c->vehicle?->vehicle_number;
+            if ($vNum) {
+                $vehicleNumbers[] = $vNum;
+            }
+        }
+
+        $referenceFields = [
+            ['label' => 'Agreement Reference', 'value' => (string) $agreement->reference],
+            ['label' => 'Cycle Number', 'value' => (string) $cycle->cycle_number],
+            ['label' => 'Billing Period', 'value' => $periodLabel],
+        ];
+        if (! empty($vehicleNumbers)) {
+            $referenceFields[] = ['label' => 'Assigned Vehicle(s)', 'value' => implode(', ', array_unique($vehicleNumbers))];
+        }
+
+        return [
+            'lines' => $lines,
+            'sourceLines' => $sourceLines,
+            'referenceFields' => $referenceFields,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     lines: list<InvoiceLineData>,
+     *     sourceLines: list<InvoiceSourceLineData>,
+     *     referenceFields: list<array{label: string, value: string}>
+     * }
+     */
+    private function buildConsolidatedLines(
+        AgreementContext $context,
+        $agreement,
+        BillingCycle $cycle,
+        string $totalAmount,
+        string $sourceType,
+        int $sourceId
+    ): array {
+        $cycle->loadMissing(['charts.vehicle', 'items.vehicle', 'items.driver']);
+        $terms = $agreement?->terms ?? [];
+        $periodLabel = $cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d');
+
+        // 1. Start with Base Rent lines from buildStage1Lines
+        $stage1 = $this->buildStage1Lines(
+            $context,
+            $agreement,
+            $cycle,
+            (string) $cycle->base_rent_amount,
+            $sourceType,
+            $sourceId
+        );
+
+        $lines = $stage1['lines'];
+        $sourceLines = $stage1['sourceLines'];
+        $lineNumber = count($lines) + 1;
+
+        // 2. Excess Kilometers
+        if ($this->math->compare((string) $cycle->excess_km_amount, '0.000000') > 0) {
+            $excessKmRate = (string) ($terms['excess_km_rate'] ?? '0.000000');
+            $freeKm = (string) ($terms['included_km'] ?? $terms['free_km_allowance'] ?? '0.000000');
+            $totalKm = '0.000000';
+            foreach ($cycle->charts as $c) {
+                $totalKm = $this->math->add($totalKm, (string) ($c->commercial_km ?? '0.000000'), 6);
+            }
+            $excessKm = $this->math->compare($totalKm, $freeKm) > 0 ? $this->math->sub($totalKm, $freeKm, 6) : '0.000000';
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: "Excess Mileage Charge · {$excessKm} km @ {$excessKmRate}/km (Included: {$freeKm} km)",
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $cycle->excess_km_amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $cycle->excess_km_amount,
+                sourceLineTotal: (string) $cycle->excess_km_amount,
+                invoicedLineTotal: (string) $cycle->excess_km_amount,
+            );
+            $lineNumber++;
+        }
+
+        // 3. Overtime Charges (Normal, Double, Triple)
+        if ($this->math->compare((string) $cycle->overtime_amount, '0.000000') > 0) {
+            $normalOtRate = (string) ($terms['normal_ot_rate'] ?? '0.000000');
+            $doubleOtRate = (string) ($terms['double_ot_rate'] ?? '0.000000');
+            $tripleOtRate = (string) ($terms['triple_ot_rate'] ?? '0.000000');
+
+            $totNormalMin = (int) $cycle->charts->sum('normal_ot_minutes');
+            $totDoubleMin = (int) $cycle->charts->sum('double_ot_minutes');
+            $totTripleMin = (int) $cycle->charts->sum('triple_ot_minutes');
+
+            $normalHours = $this->math->div((string) $totNormalMin, '60', 6);
+            $doubleHours = $this->math->div((string) $totDoubleMin, '60', 6);
+            $tripleHours = $this->math->div((string) $totTripleMin, '60', 6);
+
+            $normalAmt = $this->math->mul($normalHours, $normalOtRate, 6);
+            $doubleAmt = $this->math->mul($doubleHours, $doubleOtRate, 6);
+            $tripleAmt = $this->math->mul($tripleHours, $tripleOtRate, 6);
+            $itemizedOtSum = $this->math->add($this->math->add($normalAmt, $doubleAmt, 6), $tripleAmt, 6);
+
+            if ($this->math->compare($normalAmt, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: "Driver Overtime · Normal (1.5x) · {$normalHours} hrs @ {$normalOtRate}/hr",
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $normalAmt,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $normalAmt,
+                    sourceLineTotal: $normalAmt,
+                    invoicedLineTotal: $normalAmt,
+                );
+                $lineNumber++;
+            }
+
+            if ($this->math->compare($doubleAmt, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: "Driver Overtime · Double (2.0x) · {$doubleHours} hrs @ {$doubleOtRate}/hr",
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $doubleAmt,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $doubleAmt,
+                    sourceLineTotal: $doubleAmt,
+                    invoicedLineTotal: $doubleAmt,
+                );
+                $lineNumber++;
+            }
+
+            if ($this->math->compare($tripleAmt, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: "Driver Overtime · Triple (3.0x) · {$tripleHours} hrs @ {$tripleOtRate}/hr",
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $tripleAmt,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $tripleAmt,
+                    sourceLineTotal: $tripleAmt,
+                    invoicedLineTotal: $tripleAmt,
+                );
+                $lineNumber++;
+            }
+
+            $otRemainder = $this->math->sub((string) $cycle->overtime_amount, $itemizedOtSum, 6);
+            if ($this->math->compare($otRemainder, '0.000000') > 0) {
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: 'Driver Overtime Service Charges',
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $otRemainder,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $otRemainder,
+                    sourceLineTotal: $otRemainder,
+                    invoicedLineTotal: $otRemainder,
+                );
+                $lineNumber++;
+            }
+        }
+
+        // 4. Night-Out Allowance
+        if ($this->math->compare((string) $cycle->night_out_amount, '0.000000') > 0) {
+            $nightOuts = (int) $cycle->charts->sum('night_outs');
+            $nightOutRate = (string) ($terms['night_out_rate'] ?? '0.000000');
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: "Driver Night-Out Allowance · {$nightOuts} Nights @ {$nightOutRate}",
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $cycle->night_out_amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $cycle->night_out_amount,
+                sourceLineTotal: (string) $cycle->night_out_amount,
+                invoicedLineTotal: (string) $cycle->night_out_amount,
+            );
+            $lineNumber++;
+        }
+
+        // 5. Tolls
+        if ($this->math->compare((string) $cycle->tolls_amount, '0.000000') > 0) {
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: 'Tolls and Highway Charges',
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $cycle->tolls_amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $cycle->tolls_amount,
+                sourceLineTotal: (string) $cycle->tolls_amount,
+                invoicedLineTotal: (string) $cycle->tolls_amount,
+            );
+            $lineNumber++;
+        }
+
+        // 6. Ad-hoc Additions
+        foreach ($cycle->items->where('item_type', BillingCycleItemType::Addition) as $item) {
+            $veh = $item->vehicle?->registration_number ?? $item->vehicle?->vehicle_number;
+            $drv = $item->driver?->display_name;
+            $attr = array_filter([$veh ? "Vehicle: {$veh}" : null, $drv ? "Driver: {$drv}" : null]);
+            $attrStr = ! empty($attr) ? ' ['.implode(', ', $attr).']' : '';
+            $desc = "Addition: {$item->description} ({$item->category->value}){$attrStr}";
+            $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: $lineNumber,
+                description: $desc,
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: (string) $item->amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: (string) $item->amount,
+                sourceLineTotal: (string) $item->amount,
+                invoicedLineTotal: (string) $item->amount,
+            );
+            $lineNumber++;
+        }
+
+        // 7. Apply Ad-hoc Deductions as discounts against charges
+        $deductions = $cycle->items->where('item_type', BillingCycleItemType::Deduction);
+        $applied = $this->applyDeductionsAsDiscounts($lines, $sourceLines, $deductions);
+        $lines = $applied['lines'];
+        $sourceLines = $applied['sourceLines'];
+
+        // Fallback: if lines are empty but totalAmount > 0
+        if (empty($lines) && $this->math->compare($totalAmount, '0.000000') > 0) {
+            $srcLineId = ($sourceId * 1000) + 1;
+            $lines[] = new InvoiceLineData(
+                lineNumber: 1,
+                description: "Consolidated Revised Rental Invoice · Cycle: {$cycle->cycle_number} · ({$periodLabel})",
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: $totalAmount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: $totalAmount,
+                sourceLineTotal: $totalAmount,
+                invoicedLineTotal: $totalAmount,
+            );
+        }
+
+        $vehicleNumbers = [];
+        foreach ($cycle->charts as $c) {
+            $vNum = $c->vehicle?->registration_number ?? $c->vehicle?->vehicle_number;
+            if ($vNum) {
+                $vehicleNumbers[] = $vNum;
+            }
+        }
+
+        $referenceFields = [
+            ['label' => 'Agreement Reference', 'value' => (string) $agreement->reference],
+            ['label' => 'Cycle Number', 'value' => (string) $cycle->cycle_number],
+            ['label' => 'Billing Period', 'value' => $periodLabel],
+            ['label' => 'Invoice Mode', 'value' => 'Consolidated Final Revision'],
+        ];
+        if (! empty($vehicleNumbers)) {
+            $referenceFields[] = ['label' => 'Assigned Vehicle(s)', 'value' => implode(', ', array_unique($vehicleNumbers))];
+        }
+
+        return [
+            'lines' => $lines,
+            'sourceLines' => $sourceLines,
+            'referenceFields' => $referenceFields,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     lines: list<InvoiceLineData>,
+     *     sourceLines: list<InvoiceSourceLineData>,
+     *     referenceFields: list<array{label: string, value: string}>
+     * }
+     */
+    private function buildCreditNoteLines(
+        AgreementContext $context,
+        $agreement,
+        BillingCycle $cycle,
+        string $amount,
+        string $sourceType,
+        int $sourceId,
+        string $notes = ''
+    ): array {
+        $cycle->loadMissing(['items.vehicle', 'items.driver']);
+        $periodLabel = $cycle->period_from?->format('Y-m-d').' To '.$cycle->period_until?->format('Y-m-d');
+        $deductions = $cycle->items->where('item_type', BillingCycleItemType::Deduction);
+
+        $lines = [];
+        $sourceLines = [];
+        $lineNumber = 1;
+
+        $deductionsSum = '0.000000';
+        foreach ($deductions as $d) {
+            $deductionsSum = $this->math->add($deductionsSum, (string) $d->amount, 6);
+        }
+
+        if ($deductions->isNotEmpty() && $this->math->compare($deductionsSum, $amount) === 0) {
+            foreach ($deductions as $item) {
+                $veh = $item->vehicle?->registration_number ?? $item->vehicle?->vehicle_number;
+                $drv = $item->driver?->display_name;
+                $attr = array_filter([$veh ? "Vehicle: {$veh}" : null, $drv ? "Driver: {$drv}" : null]);
+                $attrStr = ! empty($attr) ? ' ['.implode(', ', $attr).']' : '';
+                $desc = "Credit Adjustment: {$item->description} ({$item->category->value}){$attrStr}";
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: $desc,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: (string) $item->amount,
+                    lineType: InvoiceLineType::Charge,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: (string) $item->amount,
+                    sourceLineTotal: (string) $item->amount,
+                    invoicedLineTotal: (string) $item->amount,
+                );
+                $lineNumber++;
+            }
+        } else {
+            $desc = $notes ?: "Credit Note · {$agreement->reference} · ({$periodLabel}) · Cycle: {$cycle->cycle_number}";
+            $srcLineId = ($sourceId * 1000) + 1;
+
+            $lines[] = new InvoiceLineData(
+                lineNumber: 1,
+                description: $desc,
+                quantity: self::WHOLE_CHARGE,
+                unitPrice: $amount,
+                lineType: InvoiceLineType::Charge,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+            );
+            $sourceLines[] = new InvoiceSourceLineData(
+                tenantId: $context->tenantId,
+                organizationUnitId: $context->organizationUnitId,
+                sourceType: $sourceType,
+                sourceId: $sourceId,
+                sourceLineType: $sourceType,
+                sourceLineId: $srcLineId,
+                sourceQuantity: self::WHOLE_CHARGE,
+                invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: $amount,
+                sourceLineTotal: $amount,
+                invoicedLineTotal: $amount,
+            );
+        }
+
+        $referenceFields = [
+            ['label' => 'Agreement Reference', 'value' => (string) $agreement->reference],
+            ['label' => 'Cycle Number', 'value' => (string) $cycle->cycle_number],
+            ['label' => 'Credit Reason', 'value' => $notes ?: 'Billing Cycle Adjustment / Downtime Rebate'],
+            ['label' => 'Period', 'value' => $periodLabel],
+        ];
+
+        return [
+            'lines' => $lines,
+            'sourceLines' => $sourceLines,
+            'referenceFields' => $referenceFields,
+        ];
+    }
+
+    /**
+     * @param  list<InvoiceLineData>  $lines
+     * @param  list<InvoiceSourceLineData>  $sourceLines
+     * @param  iterable<BillingCycleItem>  $deductionItems
+     * @return array{lines: list<InvoiceLineData>, sourceLines: list<InvoiceSourceLineData>}
+     */
+    private function applyDeductionsAsDiscounts(array $lines, array $sourceLines, iterable $deductionItems): array
+    {
+        $remainingDeductions = '0.000000';
+        $deductionDescriptions = [];
+        foreach ($deductionItems as $item) {
+            $remainingDeductions = $this->math->add($remainingDeductions, (string) $item->amount, 6);
+            $deductionDescriptions[] = trim($item->description.' ('.$item->category->value.'): '.$item->amount);
+        }
+
+        if ($this->math->isZero($remainingDeductions) || empty($lines)) {
+            return ['lines' => $lines, 'sourceLines' => $sourceLines];
+        }
+
+        $updatedLines = [];
+        $updatedSourceLines = [];
+
+        foreach ($lines as $idx => $line) {
+            $sourceLine = $sourceLines[$idx];
+            $available = $this->math->sub($line->unitPrice, $line->discountAmount, 6);
+
+            if ($this->math->compare($remainingDeductions, '0.000000') > 0 && $this->math->compare($available, '0.000000') > 0) {
+                $discountToApply = $this->math->compare($remainingDeductions, $available) >= 0 ? $available : $remainingDeductions;
+                $newDiscount = $this->math->add($line->discountAmount, $discountToApply, 6);
+                $remainingDeductions = $this->math->sub($remainingDeductions, $discountToApply, 6);
+
+                $updatedDesc = $line->description.' [Less discount: '.$discountToApply.']';
+
+                $updatedLines[] = new InvoiceLineData(
+                    lineNumber: $line->lineNumber,
+                    description: $updatedDesc,
+                    quantity: $line->quantity,
+                    unitPrice: $line->unitPrice,
+                    lineType: $line->lineType,
+                    itemId: $line->itemId,
+                    uomId: $line->uomId,
+                    discountAmount: $newDiscount,
+                    taxAmount: $line->taxAmount,
+                    chargeAmount: $line->chargeAmount,
+                    lineTotal: null,
+                    sourceLineType: $line->sourceLineType,
+                    sourceLineId: $line->sourceLineId,
+                    metadata: $line->metadata,
+                );
+
+                $updatedSourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $sourceLine->tenantId,
+                    organizationUnitId: $sourceLine->organizationUnitId,
+                    sourceType: $sourceLine->sourceType,
+                    sourceId: $sourceLine->sourceId,
+                    sourceLineType: $sourceLine->sourceLineType,
+                    sourceLineId: $sourceLine->sourceLineId,
+                    sourceQuantity: $sourceLine->sourceQuantity,
+                    invoicedQuantity: $sourceLine->invoicedQuantity,
+                    sourceUnitPrice: $sourceLine->sourceUnitPrice,
+                    sourceLineTotal: $sourceLine->sourceLineTotal,
+                    invoicedLineTotal: $this->math->sub($sourceLine->sourceLineTotal, $discountToApply, 6),
+                    previouslyInvoicedQuantity: $sourceLine->previouslyInvoicedQuantity,
+                );
+            } else {
+                $updatedLines[] = $line;
+                $updatedSourceLines[] = $sourceLine;
+            }
+        }
+
+        return ['lines' => $updatedLines, 'sourceLines' => $updatedSourceLines];
     }
 
     private function assertCycleVersion(BillingCycle $cycle, int $expectedVersion): void
