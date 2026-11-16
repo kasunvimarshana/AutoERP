@@ -21,8 +21,9 @@ final class VehicleServiceLineService
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
         ?int $actorId = null,
+        ?array $promotion = null,
     ): VehicleServiceJobLine {
-        return $this->writes->create($job, $data, $expectedVersion, $actorId);
+        return $this->writes->create($job, $data, $expectedVersion, $actorId, $promotion);
     }
 
     public function update(

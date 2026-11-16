@@ -52,22 +52,10 @@ const sections: NavigationSection[] = [
     },
 ];
 describe('Sidebar', () => {
-    it('keeps visible service and selling shortcuts outside the scrolling navigation', () => {
+    it('keeps the sidebar focused on the main navigation', () => {
         render(<SidebarHarness />);
-        const quickAccess = screen.getByRole('navigation', { name: 'Quick access' });
-        expect(quickAccess).toHaveClass('shrink-0');
+        expect(screen.queryByRole('navigation', { name: 'Quick access' })).not.toBeInTheDocument();
         expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('overflow-y-auto');
-        expect(quickAccess.querySelectorAll('a')).toHaveLength(4);
-        expect(screen.getByRole('link', { name: 'Create Service Job' })).toHaveAttribute('href', '/vehicle-service/jobs/create');
-        expect(screen.getByRole('link', { name: 'Service Job List' })).toHaveAttribute('href', '/vehicle-service/jobs');
-        expect(screen.getByRole('link', { name: 'Create Selling' })).toHaveAttribute('href', '/selling/create');
-        expect(screen.getByRole('link', { name: 'Selling List' })).toHaveAttribute('href', '/selling');
-    });
-
-    it('keeps quick access links named when the desktop sidebar is collapsed', () => {
-        render(sidebarElement(true, () => undefined, true));
-        expect(screen.getByRole('navigation', { name: 'Quick access' }).querySelectorAll('a')).toHaveLength(4);
-        expect(screen.getByRole('link', { name: 'Create Service Job' })).toHaveAttribute('title', 'Create Service Job');
     });
 
     it('keeps only one module expanded and highlights the active child', async () => {

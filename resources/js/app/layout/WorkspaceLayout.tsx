@@ -137,6 +137,7 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
                     mode={mode}
                     homePath={homePath}
                     homeLabel={mode === 'platform' ? 'Platform' : 'Dashboard'}
+                    sections={visibleSections}
                     onToggleCollapsed={() => updateCollapsed(!collapsed)}
                     onOpenMobile={() => setMobileOpenLocationKey(location.key)}
                 />

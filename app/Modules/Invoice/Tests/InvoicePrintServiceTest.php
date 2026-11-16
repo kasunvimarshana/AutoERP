@@ -23,13 +23,13 @@ use Modules\Invoice\Enums\AdjustmentEffect;
 use Modules\Invoice\Enums\AdjustmentType;
 use Modules\Invoice\Enums\InvoiceCopyType;
 use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoicePrintLayout;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Http\Controllers\InvoiceController;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
-use Modules\Invoice\Services\InvoicePrintIssuanceService;
 use Modules\Invoice\Services\InvoicePrintService;
 use Modules\User\Contracts\AuthenticatedUserProviderInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -159,6 +159,71 @@ final class InvoicePrintServiceTest extends TestCase
         $dompdf->loadHtml($html);
         $layout = app(InvoicePrintService::class)->layout($invoice);
         $dompdf->setPaper($layout->paperSize(), $layout->orientation());
+        $dompdf->render();
+
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
+    public function test_service_a4_design_lists_lines_and_keeps_policy_and_trace_on_one_page(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Service Print Customer');
+        $invoice = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Invoice => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+                tenantId: $tenantId,
+                invoiceType: InvoiceType::Service,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: '2026-11-12',
+                organizationUnitId: $organizationUnitId,
+                partyType: InvoicePartyType::Customer->value,
+                partyId: $customerId,
+                lines: [
+                    new InvoiceLineData(lineNumber: 1, description: 'Wash only', quantity: '1.000000', unitPrice: '600.000000', lineType: InvoiceLineType::Service),
+                    new InvoiceLineData(lineNumber: 2, description: 'Engine oil', quantity: '9.000000', unitPrice: '2300.000000', discountAmount: '2000.000000'),
+                    new InvoiceLineData(lineNumber: 3, description: 'Oil filter', quantity: '1.000000', unitPrice: '4265.000000'),
+                    new InvoiceLineData(lineNumber: 4, description: 'Grease', quantity: '6.000000', unitPrice: '281.210000'),
+                ],
+                purchaserReferenceFields: [
+                    ['label' => 'Job No', 'value' => 'VSJ-000902'],
+                    ['label' => 'Vehicle No', 'value' => 'LK-3752'],
+                    ['label' => 'Mileage', 'value' => '242,219 km'],
+                    ['label' => 'Next Service Mileage', 'value' => '247,219 km'],
+                ],
+            )),
+        );
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+        $prints = app(InvoicePrintService::class);
+        $data = $prints->viewData(
+            $invoice,
+            mode: 'pdf',
+            printContext: new InvoicePrintContext(
+                new DateTimeImmutable('2026-11-16T06:47:00+00:00'),
+                'Kasun Perera',
+                InvoiceCopyType::Duplicate,
+            ),
+        );
+        $html = view('invoice.print', $data)->render();
+
+        $this->assertTrue($data['print_layout']['is_service_a4']);
+        $this->assertSame(['Wash only', 'Engine oil', 'Oil filter', 'Grease'], array_column($data['document']['lines'], 'display_name'));
+        $this->assertStringNotContainsString('>LABOUR<', $html);
+        $this->assertStringNotContainsString('>SPARE PARTS / LUBRICANTS<', $html);
+        $this->assertStringContainsString('Job No:</span> VSJ-000902', $html);
+        $this->assertStringContainsString('Date of invoice:</strong> 12 Nov 2026', $html);
+        $this->assertStringContainsString('Line discount', $html);
+        $this->assertStringContainsString('Balance due', $html);
+        $this->assertStringContainsString('Non Refundable, Exchange possible only within 7 days of purchase', $html);
+        $this->assertStringContainsString('( This invoice cannot be used for a VAT input Claim )', $html);
+        $this->assertLessThan(strpos($html, 'class="signatures"'), strpos($html, 'class="service-policy"'));
+        $this->assertStringNotContainsString('Checked by', $html);
+        $this->assertStringContainsString('Thank you for your business.', $html);
+        $this->assertStringContainsString('By: Kasun Perera | Duplicate', $html);
+        $this->assertStringNotContainsString('class="item-code">2</span>', $html);
+
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper($prints->layout($invoice)->pdfPaper(), 'portrait');
         $dompdf->render();
 
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
@@ -342,7 +407,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringContainsString('Balance due:', $html);
     }
 
-    public function test_service_invoice_copy_labels_start_only_after_payment(): void
+    public function test_service_invoice_copy_labels_begin_with_the_first_print_even_when_unpaid(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
         $customerId = $this->customer($tenantId, $organizationUnitId, 'Copy State Customer');
@@ -355,29 +420,7 @@ final class InvoicePrintServiceTest extends TestCase
             'email' => 'kasun@example.test',
         ]));
         $this->app->instance(AuthenticatedUserProviderInterface::class, $users);
-        $issuance = app(InvoicePrintIssuanceService::class);
-
-        $beforePayment = $issuance->issue($invoice);
-        $this->assertNotNull($beforePayment);
-        $this->assertNull($beforePayment->copyType);
         $this->assertNull($invoice->fresh()->original_printed_at);
-        $beforePaymentHtml = view('invoice.print', app(InvoicePrintService::class)->viewData(
-            $invoice,
-            mode: 'pdf',
-            printContext: $beforePayment,
-        ))->render();
-        $this->assertStringContainsString('By: Kasun Perera', $beforePaymentHtml);
-        $this->assertStringNotContainsString('| Original', $beforePaymentHtml);
-        $this->assertStringNotContainsString('| Duplicate', $beforePaymentHtml);
-
-        DB::table('invoice_balances')
-            ->where('invoice_id', $invoice->getKey())
-            ->update([
-                'paid_amount' => '100.000000',
-                'remaining_amount' => '0.000000',
-                'status' => 'paid',
-                'updated_at' => now(),
-            ]);
 
         $originalResponse = $this->withTenantExecutionContext(
             $tenantId,
@@ -388,6 +431,7 @@ final class InvoicePrintServiceTest extends TestCase
         );
         $originalUrl = $originalResponse->getData(true)['data']['print_url'];
         parse_str((string) parse_url($originalUrl, PHP_URL_QUERY), $originalQuery);
+        $originalHtml = $this->get($originalUrl)->assertOk()->getContent();
 
         $duplicateResponse = $this->withTenantExecutionContext(
             $tenantId,
@@ -402,6 +446,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame(InvoiceCopyType::Original->value, $originalQuery['copy_type'] ?? null);
         $this->assertSame(InvoiceCopyType::Duplicate->value, $duplicateQuery['copy_type'] ?? null);
         $this->assertSame('Kasun Perera', $originalQuery['printed_by'] ?? null);
+        $this->assertStringContainsString('By: Kasun Perera | Original', $originalHtml);
         $this->assertNotNull($invoice->fresh()->original_printed_at);
     }
 

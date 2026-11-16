@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from '@/app/routePaths';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { Button } from '@/shared/components/Button';
-import type { NavigationMatch } from '@/app/navigation/navigationTypes';
+import type { NavigationMatch, NavigationSection } from '@/app/navigation/navigationTypes';
 import { Breadcrumbs } from './Breadcrumbs';
 import { OrganizationUnitSwitcher } from './OrganizationUnitSwitcher';
+import { QuickAccessMenu } from './QuickAccessMenu';
 
 export function AppHeader({
     collapsed,
@@ -13,6 +14,7 @@ export function AppHeader({
     mode,
     homePath = mode === 'platform' ? PLATFORM_HOME_PATH : DASHBOARD_PATH,
     homeLabel = mode === 'platform' ? 'Platform' : 'Dashboard',
+    sections,
     onToggleCollapsed,
     onOpenMobile,
 }: {
@@ -21,6 +23,7 @@ export function AppHeader({
     mode: 'tenant' | 'platform';
     homePath?: string;
     homeLabel?: string;
+    sections: NavigationSection[];
     onToggleCollapsed: () => void;
     onOpenMobile: () => void;
 }) {
@@ -84,6 +87,8 @@ export function AppHeader({
             </div>
 
             {mode === 'tenant' && <OrganizationUnitSwitcher />}
+
+            {mode === 'tenant' && <QuickAccessMenu sections={sections} activeItemId={match?.item.id ?? null} />}
 
             <div className="hidden min-w-0 items-center gap-3 md:flex">
                 <div className="min-w-0 text-right">

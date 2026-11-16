@@ -36,8 +36,9 @@ final class VehicleServiceLineWriteService
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
         ?int $actorId = null,
+        ?array $promotion = null,
     ): VehicleServiceJobLine {
-        return DB::transaction(function () use ($job, $data, $expectedVersion, $actorId): VehicleServiceJobLine {
+        return DB::transaction(function () use ($job, $data, $expectedVersion, $actorId, $promotion): VehicleServiceJobLine {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->jobValidator->assertMutable($job);
@@ -48,6 +49,18 @@ final class VehicleServiceLineWriteService
             }
             $this->inventory->reserveLineTree($job, $line, $actorId);
             $this->calculations->recalculateJob($job);
+
+            if ($promotion !== null) {
+                $this->promotions->choose(
+                    (int) $job->tenant_id,
+                    $job->organization_unit_id === null ? null : (int) $job->organization_unit_id,
+                    (int) $actorId,
+                    (int) $job->getKey(),
+                    (int) $line->getKey(),
+                    (int) $job->refresh()->row_version,
+                    $promotion,
+                );
+            }
 
             return $line->refresh()->load(['item', 'variant', 'uom', 'batch', 'children.item', 'children.uom']);
         });

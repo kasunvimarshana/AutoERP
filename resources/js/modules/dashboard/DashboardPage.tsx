@@ -14,6 +14,7 @@ import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { getDashboardSummary } from './dashboardApi';
 import type { DashboardDateRange } from './dashboardTypes';
+import { ServiceSalesCharts } from './ServiceSalesCharts';
 import {
     AgingChart,
     CashFlowChart,
@@ -95,6 +96,8 @@ export default function DashboardPage() {
                         <RevenueTrendChart rows={data.revenue_trend} currency={currency} />
                         <ServiceStatusChart rows={data.service_jobs} />
                     </section>
+
+                    <ServiceSalesCharts sales={data.service_sales} currency={currency} />
 
                     <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
                         <CashFlowChart rows={data.cash_flow} currency={currency} />

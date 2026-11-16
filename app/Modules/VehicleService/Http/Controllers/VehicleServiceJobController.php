@@ -41,6 +41,23 @@ final class VehicleServiceJobController extends VehicleServiceController
         ));
     }
 
+    public function board(
+        ListVehicleServiceJobRequest $request,
+        VehicleServiceJobQueryService $queries,
+    ): JsonResponse {
+        $lanes = [];
+        foreach ($queries->board($request->tenantId(), $request->organizationUnitId(), $request->validated()) as $key => $lane) {
+            $lanes[$key] = [
+                'data' => $lane['jobs']->map(fn (VehicleServiceJob $job): array =>
+                    (new VehicleServiceJobResource($job))->resolve($request))->all(),
+                'total' => $lane['total'],
+                'has_more' => $lane['has_more'],
+            ];
+        }
+
+        return response()->json(['lanes' => $lanes]);
+    }
+
     public function lookup(
         ListVehicleServiceJobRequest $request,
         VehicleServiceJobQueryService $queries,

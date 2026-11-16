@@ -25,6 +25,10 @@ final class ListVehicleServiceJobRequest extends TenantScopedRequest
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
+            'pending_page' => ['nullable', 'integer', 'min:1'],
+            'in_progress_page' => ['nullable', 'integer', 'min:1'],
+            'completed_page' => ['nullable', 'integer', 'min:1'],
+            'billing_closed_page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

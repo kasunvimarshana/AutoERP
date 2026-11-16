@@ -235,6 +235,16 @@ export interface VehicleServiceJob {
     payment_links?: VehicleServicePaymentLink[];
 }
 
+export type VehicleServiceJobBoardLane = 'pending' | 'in_progress' | 'completed' | 'billing_closed';
+
+export interface VehicleServiceJobBoardResult {
+    lanes: Record<VehicleServiceJobBoardLane, {
+        data: VehicleServiceJob[];
+        total: number;
+        has_more: boolean;
+    }>;
+}
+
 export type VehicleServiceDiscountCalculationType = 'fixed' | 'percentage';
 
 export interface VehicleServiceJobDiscount {

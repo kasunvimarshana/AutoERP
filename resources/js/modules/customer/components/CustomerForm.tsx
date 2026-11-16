@@ -7,13 +7,14 @@ import type { NamedResource } from '@/shared/types/common';
 import { customerStatuses, customerTypes, preferredCommunicationChannels, type CustomerPayload } from '../customerTypes';
 import { CustomerCurrencySelect } from './CustomerCurrencySelect';
 
-export function CustomerForm({ value, onChange, currency, onCurrencyChange, error, creating = false }: {
+export function CustomerForm({ value, onChange, currency, onCurrencyChange, error, creating = false, generalAddress }: {
     value: CustomerPayload;
     onChange: (value: CustomerPayload) => void;
     currency: NamedResource | null;
     onCurrencyChange: (value: NamedResource | null) => void;
     error: ApiError | null;
     creating?: boolean;
+    generalAddress?: { value: string; onChange: (value: string) => void; error?: string };
 }) {
     const set = <K extends keyof CustomerPayload>(key: K, next: CustomerPayload[K]) => onChange({ ...value, [key]: next });
     const options = (entries: readonly string[]) => entries.map((entry) => ({ value: entry, label: entry.replaceAll('_', ' ') }));
@@ -28,6 +29,7 @@ export function CustomerForm({ value, onChange, currency, onCurrencyChange, erro
                 {creating && <Select label="Initial status" value={value.status ?? 'pending_approval'} onChange={(event) => set('status', event.target.value)} options={options(customerStatuses)} error={fieldError(error, 'status') ?? fieldError(error, 'customer.status')} />}
                 {!creating && <Input label="Legal name" value={value.legal_name ?? ''} onChange={(event) => set('legal_name', event.target.value || null)} />}
                 <Input label="Display name" value={value.display_name ?? ''} onChange={(event) => set('display_name', event.target.value || null)} />
+                {generalAddress && <div className="xl:col-span-3"><Input label="Customer address" value={generalAddress.value} onChange={(event) => generalAddress.onChange(event.target.value)} error={generalAddress.error} hint="Optional general address." maxLength={255} /></div>}
             </div>
         </Panel>
         <Panel title="Contact and commercial defaults">

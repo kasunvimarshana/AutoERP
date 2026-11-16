@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -19,7 +19,7 @@ import { startCustomerWhatsAppVerification } from './customerApi';
 import { createCustomer, createCustomerWithRelations } from './customerApi';
 import { CustomerPhoneConflictAlert } from './components/CustomerPhoneConflictAlert';
 import { defaultCustomerPayload, loadCustomerCreationDefaults } from './customerCreateDefaults';
-import type { CustomerPayload, CustomerWithRelationsPayload } from './customerTypes';
+import { GENERAL_CUSTOMER_ADDRESS_TYPE, type CustomerPayload, type CustomerWithRelationsPayload } from './customerTypes';
 import { CustomerForm } from './components/CustomerForm';
 import {
     emptyCustomerOneShotDraft,
@@ -51,16 +51,19 @@ export default function CustomerCreatePage() {
     const [includeRelated, setIncludeRelated] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>('basic');
     const [draft, setDraft] = useState<CustomerOneShotDraft>(emptyCustomerOneShotDraft);
+    const [generalAddress, setGeneralAddress] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [verifyAfterSave, setVerifyAfterSave] = useState(false);
     const [loadingDefaults, setLoadingDefaults] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
     const dirty = initialCustomer !== null && (JSON.stringify(customer) !== JSON.stringify(initialCustomer)
         || JSON.stringify(draft) !== JSON.stringify(emptyCustomerOneShotDraft)
+        || generalAddress !== ''
         || (currency?.id ?? null) !== initialCurrencyId);
     const confirmDiscard = useUnsavedChanges(dirty && !submitting);
     const verificationPhone = selectWhatsAppVerificationPhone(customer.mobile, includeRelated ? draft.contacts : []);
     const shouldVerifyAfterSave = verifyAfterSave && canVerifyWhatsApp && verificationPhone !== null;
+    const addressField = { value: generalAddress, onChange: setGeneralAddress, error: fieldError(error, 'addresses.0.address_line_1') ?? undefined };
 
     useEffect(() => {
         const controller = new AbortController();
@@ -92,8 +95,8 @@ export default function CustomerCreatePage() {
         const pendingWindow = shouldVerifyAfterSave ? openPendingWhatsAppWindow() : null;
         setError(null);
         try {
-            const saved = includeRelated
-                ? await createCustomerWithRelations(toPayload(customer, draft))
+            const saved = includeRelated || generalAddress.trim() !== ''
+                ? await createCustomerWithRelations(toPayload(customer, draft, generalAddress, includeRelated))
                 : await createCustomer(customer);
 
             if (shouldVerifyAfterSave) {
@@ -159,7 +162,7 @@ export default function CustomerCreatePage() {
                 {includeRelated ? (
                     <>
                         <TabPanel tabsId="customer-create" tabId="basic" active={activeTab}>
-                            <CustomerForm value={customer} onChange={setCustomer} currency={currency} onCurrencyChange={setCurrency} error={error} creating />
+                            <CustomerForm value={customer} onChange={setCustomer} currency={currency} onCurrencyChange={setCurrency} error={error} creating generalAddress={addressField} />
                         </TabPanel>
                         {relatedTabs.map((tab) => (
                             <TabPanel key={tab.id} tabsId="customer-create" tabId={tab.id} active={activeTab}>
@@ -170,7 +173,7 @@ export default function CustomerCreatePage() {
                         ))}
                     </>
                 ) : (
-                    <CustomerForm value={customer} onChange={setCustomer} currency={currency} onCurrencyChange={setCurrency} error={error} creating />
+                    <CustomerForm value={customer} onChange={setCustomer} currency={currency} onCurrencyChange={setCurrency} error={error} creating generalAddress={addressField} />
                 )}
 
                 <FormActions>
@@ -195,12 +198,17 @@ export default function CustomerCreatePage() {
     );
 }
 
-function toPayload(customer: CustomerPayload, draft: CustomerOneShotDraft): CustomerWithRelationsPayload {
+function toPayload(customer: CustomerPayload, draft: CustomerOneShotDraft, generalAddress: string, includeRelated: boolean): CustomerWithRelationsPayload {
+    const address = generalAddress.trim();
+
     return {
         customer,
-        contacts: draft.contacts,
-        addresses: draft.addresses,
-        bank_accounts: draft.bankAccounts.map(({ currency: _currency, ...row }) => row),
-        credit_profile: draft.creditProfile,
+        contacts: includeRelated ? draft.contacts : [],
+        addresses: [
+            ...(address ? [{ address_type: GENERAL_CUSTOMER_ADDRESS_TYPE, address_line_1: address, is_primary: true, is_active: true }] : []),
+            ...(includeRelated ? draft.addresses : []),
+        ],
+        bank_accounts: includeRelated ? draft.bankAccounts.map(({ currency: _currency, ...row }) => row) : [],
+        credit_profile: includeRelated ? draft.creditProfile : null,
     };
 }

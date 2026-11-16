@@ -23,6 +23,18 @@ export interface DashboardSummary {
     };
     revenue_trend: Array<{ key: string; label: string; value: string }>;
     service_jobs: Array<{ status: string; label: string; count: number; url: string }>;
+    service_sales: {
+        by_week: Array<{ week_start: string; job_count: number; revenue: string }>;
+        by_job_type: Array<{ type: string; label: string; job_count: number; revenue: string; profit: string }>;
+        top_stock_items: Array<{
+            item: { id: number; code: string; name: string };
+            quantity_sold: string;
+            revenue: string;
+            quantity_available: string;
+            reorder_level: string | null;
+            needs_reorder: boolean;
+        }>;
+    };
     cash_flow: Array<{ key: string; label: string; inbound: string; outbound: string; net: string }>;
     inventory_health: {
         inventory_value: string;

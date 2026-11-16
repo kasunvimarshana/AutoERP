@@ -323,6 +323,7 @@ final class PromotionCardService
                         $assignment->vehicle_id === null ? null : (int) $assignment->vehicle_id,
                         now()->toDateString(),
                         $assignment->ends_on,
+                        (int) $assignment->id,
                     );
                 }
             }
@@ -391,14 +392,8 @@ final class PromotionCardService
             ->where('tenant_id', $tenantId)
             ->where('template_id', $card->template_id)
             ->get();
-        if ($benefits->contains(static fn ($benefit): bool => $benefit->kind === PromotionBenefitKind::Earned->value)) {
-            return;
-        }
         $directBenefits = $benefits->where('kind', PromotionBenefitKind::Direct->value);
-        if ($directBenefits->isEmpty()) {
-            return;
-        }
-        $allUsed = $directBenefits->every(function ($benefit) use ($tenantId, $cardId): bool {
+        $directUsed = $directBenefits->every(function ($benefit) use ($tenantId, $cardId): bool {
             $used = $this->math->sum(DB::table('promotion_redemption_events')
                 ->where('tenant_id', $tenantId)
                 ->where('card_id', $cardId)
@@ -407,6 +402,12 @@ final class PromotionCardService
 
             return $this->math->compare($used, (string) $benefit->use_limit) >= 0;
         });
+        $assignments = DB::table('promotion_offer_assignments')->where('tenant_id', $tenantId)
+            ->where('card_id', $cardId)->whereNot('status', PromotionStatus::Transferred->value)->get();
+        $earnedUsed = $assignments->every(
+            static fn ($assignment): bool => $assignment->status === PromotionStatus::Exhausted->value,
+        );
+        $allUsed = ($directBenefits->isNotEmpty() || $assignments->isNotEmpty()) && $directUsed && $earnedUsed;
         $nextStatus = $allUsed ? PromotionStatus::Exhausted : PromotionStatus::Active;
         if ($card->status === $nextStatus->value) {
             return;

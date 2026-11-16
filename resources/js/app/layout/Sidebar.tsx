@@ -1,16 +1,9 @@
 import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { NavigationIcon } from '@/app/navigation/NavigationIcon';
-import type { NavigationIconName, NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
+import type { NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
 import type { AuthOrganizationUnit, AuthTenant, AuthUser } from '@/modules/auth/authTypes';
 import { useDialogAccessibility } from '@/shared/hooks/useDialogAccessibility';
-
-const QUICK_ACCESS_LINKS: { id: string; icon: NavigationIconName }[] = [
-    { id: 'create-service-job', icon: 'service' },
-    { id: 'service-jobs', icon: 'list' },
-    { id: 'selling-create', icon: 'purchase' },
-    { id: 'selling-list', icon: 'list' },
-];
 
 export function Sidebar({
     sections,
@@ -50,14 +43,6 @@ export function Sidebar({
     const sidebarWidth = collapsed ? 'lg:w-20' : 'lg:w-72';
     const sidebarRef = useRef<HTMLElement>(null);
     useDialogAccessibility(mobileOpen, sidebarRef, onCloseMobile);
-    const visibleLinks = new Map(sections.flatMap((section) => section.items.flatMap((item) => (
-        item.type === 'link' ? [item] : item.children
-    ))).map((item) => [item.id, item]));
-    const quickAccessLinks = QUICK_ACCESS_LINKS.flatMap(({ id, icon }) => {
-        const item = visibleLinks.get(id);
-        return item ? [{ ...item, icon }] : [];
-    });
-
     return (
         <>
             {mobileOpen && (
@@ -99,25 +84,6 @@ export function Sidebar({
                         <CloseIcon />
                     </button>
                 </div>
-
-                {quickAccessLinks.length > 0 && (
-                    <nav className="shrink-0 border-b border-slate-800 px-3 py-3" aria-label="Quick access">
-                        <h2 className={`mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 ${collapsed ? 'lg:sr-only' : ''}`}>
-                            Quick access
-                        </h2>
-                        <div className="space-y-1">
-                            {quickAccessLinks.map((item) => (
-                                <SidebarLink
-                                    key={item.id}
-                                    item={item}
-                                    active={activeItemId === item.id}
-                                    collapsed={collapsed}
-                                    onNavigate={onCloseMobile}
-                                />
-                            ))}
-                        </div>
-                    </nav>
-                )}
 
                 <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
                     {sections.map((section) => (

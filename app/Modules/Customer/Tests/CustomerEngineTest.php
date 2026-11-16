@@ -8,8 +8,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Customer\DTOs\CreateCustomerData;
+use Modules\Customer\DTOs\CustomerAddressData;
 use Modules\Customer\DTOs\CustomerCreditProfileData;
 use Modules\Customer\DTOs\UpdateCustomerData;
+use Modules\Customer\Enums\CustomerAddressType;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Models\Customer;
@@ -23,6 +25,31 @@ use Tests\TestCase;
 final class CustomerEngineTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_customer_creation_persists_primary_general_address(): void
+    {
+        $tenantId = $this->tenant();
+
+        $customer = $this->withTenantExecutionContext($tenantId, fn (): Customer => app(CustomerCreationService::class)->create(
+            new CreateCustomerData(
+                tenantId: $tenantId,
+                code: 'CUS-GENERAL-ADDRESS',
+                name: 'Address customer',
+                customerType: CustomerType::Individual,
+                mobile: '0771234567',
+                addresses: [new CustomerAddressData(
+                    addressType: CustomerAddressType::General,
+                    addressLine1: '123 Main Street',
+                    isPrimary: true,
+                )],
+            ),
+        ));
+
+        $address = $customer->addresses->sole();
+        self::assertSame(CustomerAddressType::General, $address->address_type);
+        self::assertSame('123 Main Street', $address->address_line_1);
+        self::assertTrue($address->is_primary);
+    }
 
     public function test_customer_creation_persists_identity_and_one_authoritative_credit_profile(): void
     {

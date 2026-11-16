@@ -71,12 +71,21 @@ export interface PromotionCard {
     status: string;
     row_version: number;
     benefits?: PromotionBenefit[];
+    status_label?: string;
+    assignments?: Array<PromotionProgress & {
+        offer_name: string;
+        qualifying_item_name: string;
+        reward_item_name: string;
+        status_label: string;
+        ends_on: string | null;
+    }>;
 }
 
 export interface PromotionProgress {
     id: number;
     card_id: number | null;
     offer_name: string;
+    qualifying_item_id: number;
     qualifying_item_name: string;
     qualifying_item_code: string;
     reward_item_name: string;
@@ -88,12 +97,19 @@ export interface PromotionProgress {
     progress_quantity: string;
     remaining_to_next: string;
     available_rewards: string;
+    redeemed_rewards: string;
 }
 
 export interface AvailablePromotions {
     cards: PromotionCard[];
     offers: PromotionProgress[];
     unassigned_offers: Array<{ id: number; name: string; count_scope: 'customer' | 'vehicle'; paid_item_code: string; paid_item_name: string }>;
+    card_designs: Array<{ id: number; name: string; ends_on: string }>;
+}
+
+export interface PromotionCardInvoices {
+    qualifications: Array<{ event_type: string; quantity: string; amount: string; invoice_id: number; invoice_number: string; invoice_date: string }>;
+    redemptions: Array<{ event_type: string; quantity: string; amount: string; invoice_id: number; invoice_number: string; invoice_date: string }>;
 }
 
 const get = <T>(url: string, params?: Record<string, number>) =>
@@ -105,6 +121,8 @@ export const promotionApi = {
     offers: () => get<PromotionOffer[]>(`${endpoint}/offers`),
     templates: () => get<PromotionTemplate[]>(`${endpoint}/card-templates`),
     cards: (customerId?: number) => get<PromotionCard[]>(`${endpoint}/cards`, customerId ? { customer_id: customerId } : undefined),
+    cardActivity: (customerId?: number) => get<PromotionCard[]>(`${endpoint}/cards/activity`, customerId ? { customer_id: customerId } : undefined),
+    cardInvoices: (cardId: number) => get<PromotionCardInvoices>(`${endpoint}/cards/${cardId}/invoices`),
     available: (customerId: number, vehicleId: number) =>
         get<AvailablePromotions>(`${endpoint}/available`, { customer_id: customerId, vehicle_id: vehicleId }),
     createOffer: (payload: unknown) => post<PromotionOffer>(`${endpoint}/offers`, payload),

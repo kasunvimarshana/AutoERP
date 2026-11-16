@@ -1,0 +1,5 @@
+# Dashboard incident: timezone and build verification
+
+The workspace was switched again during follow-up investigation, now to `sadheera/prormotion-card` at `a83bc4e0a`. This branch includes both the frontend `ServiceSalesCharts` and the Reporting backend `service_sales` response field. Its local Vite manifest points to `DashboardPage-Uk0TQ1Bo.js`, while the observed production console stack points to `DashboardPage-CNOMVycI.js`. These are different frontend assets; the deployed build is not the exact current local build.
+
+The observed production exception is a missing `service_sales` object at render time (`by_week` read on `undefined`). Timezone calculations can alter date boundaries and chart values but cannot explain that missing response key in this branch. The production dashboard JSON response and deployed PHP source still need inspection to distinguish an omitted backend file, mixed release paths, or stale PHP runtime/opcache. No application code, production configuration, or data was changed.

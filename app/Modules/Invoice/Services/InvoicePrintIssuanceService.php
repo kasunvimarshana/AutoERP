@@ -9,7 +9,6 @@ use DateTimeZone;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Data\InvoicePrintContext;
 use Modules\Invoice\Enums\InvoiceCopyType;
 use Modules\Invoice\Enums\InvoiceType;
@@ -21,7 +20,6 @@ final class InvoicePrintIssuanceService
     public function __construct(
         private readonly AuthenticatedUserProviderInterface $users,
         private readonly TenantExecutionContextInterface $executionContext,
-        private readonly DecimalMath $math,
     ) {}
 
     public function issue(Invoice $invoice): ?InvoicePrintContext
@@ -43,16 +41,6 @@ final class InvoicePrintIssuanceService
                     ->whereKey((int) $invoice->getKey())
                     ->lockForUpdate()
                     ->firstOrFail();
-                $balance = $locked->balance()->lockForUpdate()->firstOrFail();
-
-                if ($this->math->compare((string) $balance->paid_amount, '0.000000') <= 0) {
-                    return new InvoicePrintContext(
-                        new DateTimeImmutable('now', new DateTimeZone('UTC')),
-                        $this->printerName(),
-                        null,
-                    );
-                }
-
                 $printedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
                 $copyType = $locked->original_printed_at === null
                     ? InvoiceCopyType::Original

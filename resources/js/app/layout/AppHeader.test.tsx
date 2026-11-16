@@ -37,6 +37,7 @@ describe('AppHeader', () => {
                     collapsed={false}
                     match={null}
                     mode="platform"
+                    sections={[]}
                     homePath={PLATFORM_HOME_PATH}
                     homeLabel="Platform"
                     onToggleCollapsed={vi.fn()}
@@ -56,6 +57,7 @@ describe('AppHeader', () => {
                     collapsed={false}
                     match={null}
                     mode="tenant"
+                    sections={[]}
                     onToggleCollapsed={vi.fn()}
                     onOpenMobile={vi.fn()}
                 />
