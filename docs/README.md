@@ -9,6 +9,10 @@ This file is the canonical entry point for current architecture, remediation, re
 - Other worktree and feature branches must be compared against this branch before integration.
 - A branch is not merged solely because it contains newer commits. Changes must preserve bounded data access, module ownership, tenant isolation, financial integrity, and current regression fixes.
 
+## Core Module Technical Guides
+
+- [Vehicle Rental Complete Guide](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md): The definitive end-to-end technical, architectural, and operational manual for AutoERP's Vehicle Rental module.
+
 ## Architecture foundations
 
 - Shared-schema multi-tenancy with explicit tenant execution context.
