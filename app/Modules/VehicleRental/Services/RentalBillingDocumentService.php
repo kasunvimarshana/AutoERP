@@ -25,10 +25,15 @@ use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Models\PaymentAllocation;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\BaseChargeSource;
 use Modules\VehicleRental\Enums\BillingCycleStatus;
+use Modules\VehicleRental\Enums\BillingFinalizationMode;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
 use Modules\VehicleRental\Enums\UsageChargeSource;
+use Modules\VehicleRental\Models\AgreementAdjustment;
+use Modules\VehicleRental\Models\AgreementAdjustmentHistory;
 use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\CustomerBaseCharge;
@@ -695,14 +700,38 @@ final class RentalBillingDocumentService
                     ->orWhere('supplementary_invoice_id', $invoice->id)
                     ->orWhere('final_invoice_id', $invoice->id);
             })
-            ->where('status', '!=', BillingCycleStatus::Finalized)
             ->where('status', '!=', BillingCycleStatus::Cancelled)
             ->lockForUpdate()
             ->get();
 
+        $handledCycleIds = [];
         foreach ($cycles as $cycle) {
-            $cycle->status = BillingCycleStatus::Cancelled;
-            $cycle->notes = trim(($cycle->notes ?? '')."\n[Cancelled]: Invoice {$invoice->invoice_number} cancelled: {$reason}");
+            $handledCycleIds[] = $cycle->id;
+            if ($cycle->supplementary_invoice_id === $invoice->id) {
+                $cycle->supplementary_invoice_id = null;
+                $cycle->status = BillingCycleStatus::Stage2Attached;
+                $cycle->finalization_mode = BillingFinalizationMode::SupplementaryInvoice;
+                $cycle->finalized_at = null;
+                $cycle->finalized_by = null;
+                if ($cycle->initial_invoice_id !== null && $cycle->initialInvoice) {
+                    $cycle->total_billed_amount = (string) $cycle->initialInvoice->grand_total;
+                    $cycle->tax_amount = (string) $cycle->initialInvoice->tax_total;
+                } else {
+                    $cycle->total_billed_amount = '0.000000';
+                    $cycle->tax_amount = '0.000000';
+                }
+                $cycle->notes = trim(($cycle->notes ?? '')."\n[Supplementary Cancelled]: Invoice {$invoice->invoice_number} cancelled: {$reason}");
+            } elseif ($cycle->owner_agreement_id !== null && $cycle->initial_invoice_id === null && $cycle->final_invoice_id === $invoice->id) {
+                $cycle->final_invoice_id = null;
+                $cycle->finalization_mode = BillingFinalizationMode::SupplementaryInvoice;
+                $cycle->finalized_at = null;
+                $cycle->finalized_by = null;
+                $cycle->status = $cycle->charts()->exists() ? BillingCycleStatus::Stage2Attached : BillingCycleStatus::Draft;
+                $cycle->notes = trim(($cycle->notes ?? '')."\n[Owner Settlement Cancelled]: Settlement bill {$invoice->invoice_number} cancelled: {$reason}");
+            } else {
+                $cycle->status = BillingCycleStatus::Cancelled;
+                $cycle->notes = trim(($cycle->notes ?? '')."\n[Cancelled]: Invoice {$invoice->invoice_number} cancelled: {$reason}");
+            }
             $cycle->row_version += 1;
             $cycle->save();
         }
@@ -716,9 +745,33 @@ final class RentalBillingDocumentService
 
         foreach ($allocations as $alloc) {
             $alloc->invoice_id = null;
-            $alloc->billed_at = null;
+            $alloc->status = RentalExpenseAllocationStatus::Confirmed;
             $alloc->row_version += 1;
             $alloc->save();
+        }
+
+        // 2b. Unlink any agreement adjustments linked to this invoice
+        $adjustments = AgreementAdjustment::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where('invoice_id', $invoice->id)
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($adjustments as $adj) {
+            $fromStatus = $adj->status;
+            $adj->invoice_id = null;
+            $adj->status = AgreementAdjustmentStatus::Authorized;
+            $adj->row_version += 1;
+            $adj->save();
+
+            $history = new AgreementAdjustmentHistory();
+            $history->tenant_id = $context->tenantId;
+            $history->adjustment_id = $adj->id;
+            $history->from_status = $fromStatus;
+            $history->to_status = AgreementAdjustmentStatus::Authorized;
+            $history->reason = "Restored on invoice {$invoice->invoice_number} cancellation: {$reason}";
+            $history->user_id = $context->actorId;
+            $history->save();
         }
 
         // 3. Void underlying base & usage charges if unposted invoice was cancelled
@@ -787,16 +840,41 @@ final class RentalBillingDocumentService
                     ])->save();
                 }
             } elseif (str_starts_with($st, 'vehicle_rental_billing_cycle')) {
+                if (in_array($sid, $handledCycleIds, true)) {
+                    continue;
+                }
                 $cycle = BillingCycle::query()
                     ->where('tenant_id', $context->tenantId)
                     ->where('id', $sid)
-                    ->where('status', '!=', BillingCycleStatus::Finalized)
                     ->where('status', '!=', BillingCycleStatus::Cancelled)
                     ->lockForUpdate()
                     ->first();
                 if ($cycle) {
-                    $cycle->status = BillingCycleStatus::Cancelled;
-                    $cycle->notes = trim(($cycle->notes ?? '')."\n[Cancelled]: Linked invoice {$invoice->invoice_number} cancelled: {$reason}");
+                    if ($cycle->supplementary_invoice_id === $invoice->id) {
+                        $cycle->supplementary_invoice_id = null;
+                        $cycle->status = BillingCycleStatus::Stage2Attached;
+                        $cycle->finalization_mode = BillingFinalizationMode::SupplementaryInvoice;
+                        $cycle->finalized_at = null;
+                        $cycle->finalized_by = null;
+                        if ($cycle->initial_invoice_id !== null && $cycle->initialInvoice) {
+                            $cycle->total_billed_amount = (string) $cycle->initialInvoice->grand_total;
+                            $cycle->tax_amount = (string) $cycle->initialInvoice->tax_total;
+                        } else {
+                            $cycle->total_billed_amount = '0.000000';
+                            $cycle->tax_amount = '0.000000';
+                        }
+                        $cycle->notes = trim(($cycle->notes ?? '')."\n[Supplementary Cancelled]: Linked invoice {$invoice->invoice_number} cancelled: {$reason}");
+                    } elseif ($cycle->owner_agreement_id !== null && $cycle->initial_invoice_id === null && $cycle->final_invoice_id === $invoice->id) {
+                        $cycle->final_invoice_id = null;
+                        $cycle->finalization_mode = BillingFinalizationMode::SupplementaryInvoice;
+                        $cycle->finalized_at = null;
+                        $cycle->finalized_by = null;
+                        $cycle->status = $cycle->charts()->exists() ? BillingCycleStatus::Stage2Attached : BillingCycleStatus::Draft;
+                        $cycle->notes = trim(($cycle->notes ?? '')."\n[Owner Settlement Cancelled]: Linked invoice {$invoice->invoice_number} cancelled: {$reason}");
+                    } else {
+                        $cycle->status = BillingCycleStatus::Cancelled;
+                        $cycle->notes = trim(($cycle->notes ?? '')."\n[Cancelled]: Linked invoice {$invoice->invoice_number} cancelled: {$reason}");
+                    }
                     $cycle->row_version += 1;
                     $cycle->save();
                 }
@@ -955,6 +1033,7 @@ final class RentalBillingDocumentService
                 'items.vehicle.make',
                 'items.vehicle.model',
                 'items.driver',
+                'charts.vehicle',
             ])
             ->get();
 
@@ -1022,6 +1101,7 @@ final class RentalBillingDocumentService
                     'items.vehicle.make',
                     'items.vehicle.model',
                     'items.driver',
+                    'charts.vehicle',
                 ])
                 ->get()
                 ->keyBy('id');
@@ -1132,6 +1212,16 @@ final class RentalBillingDocumentService
                 }
                 if ($firstItem?->driver) {
                     $drvName = $firstItem->driver->display_name ?? trim($firstItem->driver->first_name.' '.$firstItem->driver->last_name);
+                }
+
+                if (empty($drvName) && $cycle->relationLoaded('charts')) {
+                    $chartDrivers = $cycle->charts->pluck('driver_name_snapshot')->filter()->unique()->values();
+                    if ($chartDrivers->isNotEmpty()) {
+                        $drvName = $chartDrivers->join(', ');
+                    }
+                }
+                if ($veh === null && $cycle->relationLoaded('charts') && $cycle->charts->isNotEmpty()) {
+                    $veh = $cycle->charts->first()?->vehicle;
                 }
             }
 

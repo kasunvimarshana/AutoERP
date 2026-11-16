@@ -28,8 +28,13 @@ use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
+use Modules\VehicleRental\Enums\AgreementAdjustmentType;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
+use Modules\VehicleRental\Models\AgreementAdjustment;
+use Modules\VehicleRental\Models\AgreementAdjustmentHistory;
 use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
@@ -93,9 +98,18 @@ final class OwnerSettlementBillingService
                     }
                 }
                 foreach ($existingInv->lines as $line) {
-                    if (preg_match('/\((\d{2}\/\d{2}\/\d{4})\s+To\s+(\d{2}\/\d{2}\/\d{4})\)/', $line->description ?? '', $m)) {
-                        $exStart = CarbonImmutable::createFromFormat('d/m/Y', $m[1])->startOfDay();
-                        $exEnd = CarbonImmutable::createFromFormat('d/m/Y', $m[2])->endOfDay();
+                    if (preg_match('/(\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4})\s*(?:To|-)\s*(\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4})/i', $line->description ?? '', $m)) {
+                        $parseDate = static function (string $d): CarbonImmutable {
+                            if (str_contains($d, '/')) {
+                                return CarbonImmutable::createFromFormat('d/m/Y', $d);
+                            }
+                            if (preg_match('/^\d{2}-\d{2}-\d{4}$/', $d)) {
+                                return CarbonImmutable::createFromFormat('d-m-Y', $d);
+                            }
+                            return CarbonImmutable::parse($d);
+                        };
+                        $exStart = $parseDate($m[1])->startOfDay();
+                        $exEnd = $parseDate($m[2])->endOfDay();
                         if ($exStart->lessThanOrEqualTo($end) && $exEnd->greaterThanOrEqualTo($start)) {
                             throw ValidationException::withMessages(['settlement' => ['An active owner settlement bill already covers an overlapping period ('.$m[1].' to '.$m[2].' on invoice '.$existingInv->invoice_number.').']]);
                         }
@@ -136,6 +150,7 @@ final class OwnerSettlementBillingService
             }
 
             // Also check unbilled owner BillingCycles if no owner base charges exist
+            $unbilledOwnerCycles = collect();
             if ($baseCharges->isEmpty()) {
                 $unbilledOwnerCycles = BillingCycle::query()
                     ->forContext($context->tenantId, $context->organizationUnitId)
@@ -152,11 +167,32 @@ final class OwnerSettlementBillingService
                     $cycleUsage = $this->math->add((string) $oCycle->excess_km_amount, (string) $oCycle->overtime_amount, 6);
                     $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->night_out_amount, 6);
                     $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->tolls_amount, 6);
+                    $cycleUsage = $this->math->add($cycleUsage, (string) $oCycle->additions_amount, 6);
                     $usagePayable = $this->math->add($usagePayable, $cycleUsage, 6);
                 }
             }
 
+            // Defect 5: Query approved AgreementAdjustment records for the owner agreement
+            $agreementAdjustments = AgreementAdjustment::query()
+                ->where('tenant_id', $context->tenantId)
+                ->where('organization_unit_id', $context->organizationUnitId)
+                ->where('owner_agreement_id', $agreement->id)
+                ->where('status', AgreementAdjustmentStatus::Authorized->value)
+                ->whereNull('invoice_id')
+                ->get();
+
+            $adjustmentAdditions = '0.000000';
+            $adjustmentDeductions = '0.000000';
+            foreach ($agreementAdjustments as $adj) {
+                if ($adj->adjustment_type === AgreementAdjustmentType::DebitNote) {
+                    $adjustmentAdditions = $this->math->add($adjustmentAdditions, (string) $adj->amount, 6);
+                } else {
+                    $adjustmentDeductions = $this->math->add($adjustmentDeductions, (string) $adj->amount, 6);
+                }
+            }
+
             $grossPayable = $this->math->add($basePayable, $usagePayable, 6);
+            $grossPayable = $this->math->add($grossPayable, $adjustmentAdditions, 6);
             if ($this->math->compare($grossPayable, '0.000000') <= 0) {
                 throw ValidationException::withMessages(['settlement' => ['No payable rental charges found for the specified settlement period.']]);
             }
@@ -177,13 +213,28 @@ final class OwnerSettlementBillingService
                 $maintenanceDeductions = $this->math->add($maintenanceDeductions, (string) $alloc->total_amount, 6);
             }
 
-            // Total deduction passed as discount
-            $totalDeductions = $this->math->add($whtAmount, $maintenanceDeductions, 6);
-            if ($this->math->compare($totalDeductions, $grossPayable) > 0) {
-                $totalDeductions = $grossPayable;
-            }
+            // Defect 12: Capping - ensure non-tax deductions do not exceed max(0, grossPayable - whtAmount)
+            $maxDeductionsCapacity = $this->math->compare($grossPayable, $whtAmount) > 0
+                ? $this->math->sub($grossPayable, $whtAmount, 6)
+                : '0.000000';
+
+            $applicableMaintenance = $this->math->compare($maintenanceDeductions, $maxDeductionsCapacity) > 0
+                ? $maxDeductionsCapacity
+                : $maintenanceDeductions;
+
+            $remainingCapacityAfterMaint = $this->math->sub($maxDeductionsCapacity, $applicableMaintenance, 6);
+            $applicableAdjDeductions = $this->math->compare($adjustmentDeductions, $remainingCapacityAfterMaint) > 0
+                ? $remainingCapacityAfterMaint
+                : $adjustmentDeductions;
+
+            $totalDeductions = $this->math->add($whtAmount, $applicableMaintenance, 6);
+            $totalDeductions = $this->math->add($totalDeductions, $applicableAdjDeductions, 6);
 
             $netPayable = $this->math->sub($grossPayable, $totalDeductions, 6);
+            if ($this->math->compare($netPayable, '0.000000') < 0) {
+                $netPayable = '0.000000';
+            }
+
             $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
             $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
             $exchangeRate = (string) ($input['exchange_rate'] ?? '1.000000');
@@ -193,10 +244,11 @@ final class OwnerSettlementBillingService
             $vehicleNo = $agreement->vehicle?->registration_number ?? $agreement->vehicle?->vehicle_number ?? 'Fleet Vehicle';
             $description = 'Lessor Settlement · '.$agreement->reference.' · '.$vehicleNo.' ('.$start->format('d/m/Y').' To '.$end->format('d/m/Y').')';
 
-            $notes = 'Owner Settlement AP Bill. Gross: '.$grossPayable.', WHT: '.$whtAmount.', Deductions: '.$maintenanceDeductions.', Net Payable: '.$netPayable;
+            $notes = 'Owner Settlement AP Bill. Gross: '.$grossPayable.', WHT: '.$whtAmount.', Deductions: '.$applicableMaintenance.', Net Payable: '.$netPayable;
 
             $hasWht = $this->math->compare($whtAmount, '0.000000') > 0;
-            $hasMaintenance = $this->math->compare($maintenanceDeductions, '0.000000') > 0;
+            $hasMaintenance = $this->math->compare($applicableMaintenance, '0.000000') > 0;
+            $hasAdjDeductions = $this->math->compare($applicableAdjDeductions, '0.000000') > 0;
 
             $lines = [];
             $sourceLines = [];
@@ -318,6 +370,35 @@ final class OwnerSettlementBillingService
                 $lineNum++;
             }
 
+            foreach ($agreementAdjustments->where('adjustment_type', AgreementAdjustmentType::DebitNote) as $adj) {
+                $srcLineId = ($sourceId * 1000) + $lineNum;
+                $desc = 'Lessor Addition · '.$adj->category->value.' ('.$adj->reason.')';
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNum,
+                    description: $desc,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: (string) $adj->amount,
+                    lineType: InvoiceLineType::Charge,
+                    discountAmount: '0.000000',
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: (string) $adj->amount,
+                    sourceLineTotal: (string) $adj->amount,
+                    invoicedLineTotal: (string) $adj->amount,
+                );
+                $lineNum++;
+            }
+
             $adjustments = [];
             if ($hasWht) {
                 $adjustments[] = new InvoiceAdjustmentData(
@@ -334,7 +415,17 @@ final class OwnerSettlementBillingService
                     name: 'Fleet Maintenance Recovery',
                     adjustmentType: AdjustmentType::Discount,
                     effect: AdjustmentEffect::Decrease,
-                    amount: $maintenanceDeductions,
+                    amount: $applicableMaintenance,
+                    isSystemGenerated: true,
+                );
+            }
+
+            if ($hasAdjDeductions) {
+                $adjustments[] = new InvoiceAdjustmentData(
+                    name: 'Contractual Agreement Deductions',
+                    adjustmentType: AdjustmentType::Discount,
+                    effect: AdjustmentEffect::Decrease,
+                    amount: $applicableAdjDeductions,
                     isSystemGenerated: true,
                 );
             }
@@ -358,16 +449,26 @@ final class OwnerSettlementBillingService
             if ($hasMaintenance) {
                 $postingLines[] = new InvoicePostingLineData(
                     role: FinanceAccountRoleCode::RentalExpense,
-                    credit: $maintenanceDeductions,
+                    credit: $applicableMaintenance,
                     description: 'Fleet maintenance chargeback recovery',
                 );
             }
 
-            $postingLines[] = new InvoicePostingLineData(
-                role: FinanceAccountRoleCode::Payable,
-                credit: $netPayable,
-                description: 'Net payable to lessor: '.$agreement->reference,
-            );
+            if ($hasAdjDeductions) {
+                $postingLines[] = new InvoicePostingLineData(
+                    role: FinanceAccountRoleCode::RentalExpense,
+                    credit: $applicableAdjDeductions,
+                    description: 'Contractual agreement deductions recovery',
+                );
+            }
+
+            if ($this->math->compare($netPayable, '0.000000') > 0) {
+                $postingLines[] = new InvoicePostingLineData(
+                    role: FinanceAccountRoleCode::Payable,
+                    credit: $netPayable,
+                    description: 'Net payable to lessor: '.$agreement->reference,
+                );
+            }
 
             $postingPlan = new InvoicePostingPlanData(
                 profile: FinancePostingProfileCode::SupplierRentalInvoice,
@@ -386,7 +487,10 @@ final class OwnerSettlementBillingService
                 $referenceFields[] = ['label' => 'Statutory WHT ('.rtrim(rtrim($whtRate, '0'), '.').'%)', 'value' => '-'.(string) $whtAmount];
             }
             if ($hasMaintenance) {
-                $referenceFields[] = ['label' => 'Maintenance Chargeback', 'value' => '-'.(string) $maintenanceDeductions];
+                $referenceFields[] = ['label' => 'Maintenance Chargeback', 'value' => '-'.(string) $applicableMaintenance];
+            }
+            if ($hasAdjDeductions) {
+                $referenceFields[] = ['label' => 'Agreement Deductions', 'value' => '-'.(string) $applicableAdjDeductions];
             }
             $referenceFields[] = ['label' => 'Net Settlement Payable', 'value' => (string) $netPayable];
 
@@ -426,11 +530,39 @@ final class OwnerSettlementBillingService
 
             $invoice = $this->invoiceService->create($source);
 
+            // Defect 2: Mark unbilled owner cycles as finalized
+            foreach ($unbilledOwnerCycles as $cycle) {
+                $cycle->final_invoice_id = $invoice->id;
+                $cycle->status = BillingCycleStatus::Finalized;
+                $cycle->finalized_at = now();
+                $cycle->finalized_by = $context->actorId;
+                $cycle->row_version += 1;
+                $cycle->save();
+            }
+
             // Link expense allocations to this invoice
             foreach ($expenseAllocations as $alloc) {
                 $alloc->invoice_id = $invoice->id;
                 $alloc->status = RentalExpenseAllocationStatus::Invoiced;
+                $alloc->row_version += 1;
                 $alloc->save();
+            }
+
+            // Defect 5: Link agreement adjustments to this invoice and transition to Applied
+            foreach ($agreementAdjustments as $adj) {
+                $adj->invoice_id = $invoice->id;
+                $adj->status = AgreementAdjustmentStatus::Applied;
+                $adj->row_version += 1;
+                $adj->save();
+
+                $history = new AgreementAdjustmentHistory();
+                $history->tenant_id = $context->tenantId;
+                $history->adjustment_id = $adj->id;
+                $history->from_status = AgreementAdjustmentStatus::Authorized;
+                $history->to_status = AgreementAdjustmentStatus::Applied;
+                $history->reason = 'Applied to Owner Settlement Bill '.$invoice->invoice_number;
+                $history->user_id = $context->actorId;
+                $history->save();
             }
 
             return $invoice;

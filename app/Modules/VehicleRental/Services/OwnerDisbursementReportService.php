@@ -455,6 +455,25 @@ final class OwnerDisbursementReportService
 
         $totalPayablesRaw = $basePayable + $normalOtAmount + $doubleOtAmount + $tripleOtAmount + $otherCombined;
 
+        // Total commercial km from running charts during period, or fallback to mileage charges quantity
+        $useIds = $agreement->vehicleUses()->pluck('id')->all();
+        $totalKmRaw = 0.0;
+        if (! empty($useIds) && Schema::hasTable('vehicle_rental_running_charts')) {
+            $totalKmRaw = (float) DB::table('vehicle_rental_running_charts')
+                ->where('tenant_id', $context->tenantId)
+                ->whereIn('vehicle_use_id', $useIds)
+                ->where('starts_at', '<=', $end)
+                ->where('ends_at', '>=', $start)
+                ->sum('commercial_km');
+        }
+        if ($totalKmRaw <= 0.0 && $mileageCharges->isNotEmpty()) {
+            $totalKmRaw = (float) $mileageCharges->sum('quantity');
+        }
+
+        $nonAcRateRaw = (float) ($agreement->terms['non_ac_rate'] ?? $agreement->terms['base_rate'] ?? 0.0);
+        $driverSalaryRaw = (float) ($agreement->terms['driver_rate'] ?? 0.0);
+        $driverBataRaw = (float) $nightOutAmount;
+
         // 3. Detail II Operational Matrix Row
         $detailIiRow = [
             'client_name' => $clientName,
@@ -462,15 +481,15 @@ final class OwnerDisbursementReportService
             'hire_finish' => $end->format('d/m/y'),
             'unit' => $unitLabel,
             'calculated_by' => 'Normal',
-            'total_km' => '2,500',
-            'non_ac_rate' => '100.00',
+            'total_km' => number_format($totalKmRaw, 0, '.', ','),
+            'non_ac_rate' => number_format($nonAcRateRaw, 2, '.', ''),
             'hire_amount' => number_format($basePayable, 2, '.', ''),
             'no_hrs' => number_format($normalOtHours, 2, '.', ''),
             'do_hrs' => number_format($doubleOtHours, 2, '.', ''),
             'to_hrs' => number_format($tripleOtHours, 2, '.', ''),
             'ot_amount' => number_format($normalOtAmount + $doubleOtAmount + $tripleOtAmount, 2, '.', ''),
-            'driver_salary' => '0.00',
-            'driver_bata' => '0.00',
+            'driver_salary' => number_format($driverSalaryRaw, 2, '.', ''),
+            'driver_bata' => number_format($driverBataRaw, 2, '.', ''),
             'other_charges' => number_format($otherCombined, 2, '.', ''),
             'vat_amount' => '0.00',
             'total_payable' => number_format($totalPayablesRaw, 2, '.', ''),

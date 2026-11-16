@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
@@ -38,12 +39,15 @@ use Modules\VehicleRental\Enums\AgreementAdjustmentCategory;
 use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 use Modules\VehicleRental\Enums\AgreementAdjustmentType;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\AirConditioningMode;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Enums\BillingCycleItemCategory;
 use Modules\VehicleRental\Enums\BillingCycleItemType;
 use Modules\VehicleRental\Enums\BillingCycleMode;
 use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\BillingFinalizationMode;
+use Modules\VehicleRental\Enums\RentalExpenseStatus;
+use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\AgreementAdjustment;
@@ -53,6 +57,7 @@ use Modules\VehicleRental\Models\BillingCycleChart;
 use Modules\VehicleRental\Models\BillingCycleItem;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\OwnerAgreement;
+use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Models\VehicleRentalReassignment;
 use Modules\VehicleRental\Models\VehicleUse;
@@ -303,6 +308,28 @@ final class TwoStageInvoicingService
                 throw ValidationException::withMessages(['chart_ids' => ['One or more running charts are already finalized in another billing cycle.']]);
             }
 
+            // Defect 4: Toll expenses aggregation
+            $chartIds = $charts->pluck('id')->all();
+            $useIds = $charts->pluck('vehicle_use_id')->filter()->unique()->all();
+            $tollExpenses = (empty($chartIds) && empty($useIds)) ? collect() : RentalExpense::query()
+                ->forTenant($context->tenantId)
+                ->where(function (Builder $q) use ($chartIds, $useIds) {
+                    if (! empty($chartIds)) {
+                        $q->whereIn('running_chart_id', $chartIds);
+                    }
+                    if (! empty($useIds)) {
+                        $q->orWhere(function (Builder $sub) use ($useIds) {
+                            $sub->whereIn('vehicle_use_id', $useIds)->whereNull('running_chart_id');
+                        });
+                    }
+                })
+                ->where('expense_type', RentalExpenseType::Toll)
+                ->whereNotIn('status', [RentalExpenseStatus::Rejected, RentalExpenseStatus::Reversed])
+                ->get();
+
+            $tollExpensesByChart = $tollExpenses->whereNotNull('running_chart_id')->groupBy('running_chart_id');
+            $tollExpensesByUse = $tollExpenses->whereNull('running_chart_id')->groupBy('vehicle_use_id');
+
             $totalCommercialKm = '0.000000';
             $totalNormalOtMinutes = 0;
             $totalDoubleOtMinutes = 0;
@@ -318,6 +345,21 @@ final class TwoStageInvoicingService
                 $nightOuts = (int) ($chart->night_outs ?? 0);
                 $vehicleId = (int) ($chart->vehicleUse?->vehicle_id ?? 0);
 
+                $chartTolls = '0.000000';
+                if (isset($tollExpensesByChart[$chart->id])) {
+                    foreach ($tollExpensesByChart[$chart->id] as $tollExp) {
+                        $amt = (string) ($tollExp->gross_amount ?? $tollExp->net_amount ?? '0.000000');
+                        $chartTolls = $this->math->add($chartTolls, $amt, 6);
+                    }
+                }
+                if ($chart->vehicle_use_id && isset($tollExpensesByUse[$chart->vehicle_use_id])) {
+                    foreach ($tollExpensesByUse[$chart->vehicle_use_id] as $tollExp) {
+                        $amt = (string) ($tollExp->gross_amount ?? $tollExp->net_amount ?? '0.000000');
+                        $chartTolls = $this->math->add($chartTolls, $amt, 6);
+                    }
+                    unset($tollExpensesByUse[$chart->vehicle_use_id]);
+                }
+
                 $chartAttachment = new BillingCycleChart();
                 $chartAttachment->tenant_id = $context->tenantId;
                 $chartAttachment->billing_cycle_id = $cycle->id;
@@ -331,7 +373,7 @@ final class TwoStageInvoicingService
                 $chartAttachment->double_ot_minutes = $doubleOt;
                 $chartAttachment->triple_ot_minutes = $tripleOt;
                 $chartAttachment->night_outs = $nightOuts;
-                $chartAttachment->tolls_amount = '0.000000';
+                $chartAttachment->tolls_amount = $chartTolls;
                 $chartAttachment->is_replacement = (bool) ($chart->vehicleUse?->replaces_use_id !== null);
                 $chartAttachment->save();
 
@@ -340,6 +382,7 @@ final class TwoStageInvoicingService
                 $totalDoubleOtMinutes += $doubleOt;
                 $totalTripleOtMinutes += $tripleOt;
                 $totalNightOuts += $nightOuts;
+                $totalTolls = $this->math->add($totalTolls, $chartTolls, 6);
             }
 
             // Rates from agreement terms (unconfigured terms resolve to no automatic charge: '0.000000')
@@ -349,6 +392,70 @@ final class TwoStageInvoicingService
             $doubleOtRatePerHour = (string) ($terms['double_ot_rate'] ?? '0.000000');
             $tripleOtRatePerHour = (string) ($terms['triple_ot_rate'] ?? '0.000000');
             $nightOutRate = (string) ($terms['night_out_rate'] ?? '0.000000');
+            $driverRate = (string) ($terms['driver_rate'] ?? '0.000000');
+            $nonAcRate = (string) ($terms['non_ac_rate'] ?? '0.000000');
+            $frontAcRate = (string) ($terms['front_ac_rate'] ?? '0.000000');
+            $dualAcRate = (string) ($terms['dual_ac_rate'] ?? '0.000000');
+
+            // Defect 10: Clean up any previously generated automatic AC differential and agreed driver items on re-attachment
+            $cycle->items()
+                ->where('category', BillingCycleItemCategory::Other)
+                ->where('description', 'like', 'Air Conditioning Differential%')
+                ->delete();
+
+            $cycle->items()
+                ->where('category', BillingCycleItemCategory::DriverSalary)
+                ->where('description', 'Agreed Driver Rate')
+                ->delete();
+
+            // Defect 10: AC differentials
+            $baselineKmRate = $this->math->compare($nonAcRate, '0.000000') > 0 ? $nonAcRate : $excessKmRate;
+            foreach ($charts as $chart) {
+                $acMode = $chart->ac_mode instanceof AirConditioningMode ? $chart->ac_mode->value : (string) $chart->ac_mode;
+                $diffRate = '0.000000';
+                if ($acMode === AirConditioningMode::Front->value) {
+                    if ($this->math->compare($frontAcRate, $baselineKmRate) > 0) {
+                        $diffRate = $this->math->sub($frontAcRate, $baselineKmRate, 6);
+                    }
+                } elseif ($acMode === AirConditioningMode::Dual->value) {
+                    if ($this->math->compare($dualAcRate, $baselineKmRate) > 0) {
+                        $diffRate = $this->math->sub($dualAcRate, $baselineKmRate, 6);
+                    }
+                }
+
+                if ($this->math->compare($diffRate, '0.000000') > 0) {
+                    $chartKm = (string) ($chart->commercial_km ?? '0.000000');
+                    $chartDiffAmount = $this->math->mul($chartKm, $diffRate, 6);
+                    if ($this->math->compare($chartDiffAmount, '0.000000') > 0) {
+                        $acItem = new BillingCycleItem();
+                        $acItem->tenant_id = $context->tenantId;
+                        $acItem->billing_cycle_id = $cycle->id;
+                        $acItem->item_type = BillingCycleItemType::Addition;
+                        $acItem->category = BillingCycleItemCategory::Other;
+                        $acItem->description = "Air Conditioning Differential ({$acMode}) · {$chartKm} km @ {$diffRate}/km";
+                        $acItem->amount = $chartDiffAmount;
+                        $acItem->vehicle_id = (int) ($chart->vehicleUse?->vehicle_id ?? 0) ?: null;
+                        $acItem->driver_employee_id = $chart->driver_employee_id;
+                        $acItem->save();
+                    }
+                }
+            }
+
+            // Defect 10: Driver Rate
+            if ($this->math->compare($driverRate, '0.000000') > 0) {
+                $drvItem = new BillingCycleItem();
+                $drvItem->tenant_id = $context->tenantId;
+                $drvItem->billing_cycle_id = $cycle->id;
+                $drvItem->item_type = BillingCycleItemType::Addition;
+                $drvItem->category = BillingCycleItemCategory::DriverSalary;
+                $drvItem->description = 'Agreed Driver Rate';
+                $drvItem->amount = $driverRate;
+                $driverIds = $charts->pluck('driver_employee_id')->filter()->unique();
+                if ($driverIds->count() === 1) {
+                    $drvItem->driver_employee_id = $driverIds->first();
+                }
+                $drvItem->save();
+            }
 
             // Excess KM calculation
             $excessKm = '0.000000';
@@ -511,8 +618,9 @@ final class TwoStageInvoicingService
 
         $totalCustodyDays = 0;
         $custodyMap = [];
-        foreach ($uses as $use) {
-            $handoverTime = $use->handover_at ?? $use->starts_at;
+        $useCount = $uses->count();
+        foreach ($uses as $index => $use) {
+            $handoverTime = $use->handed_over_at ?? $use->starts_at;
             $returnTime = $use->returned_at ?? $use->ends_at;
 
             $startStr = $handoverTime?->toDateString() ?? $cycle->period_from->toDateString();
@@ -524,7 +632,22 @@ final class TwoStageInvoicingService
             if ($uStartDay->greaterThan($uEndDay)) {
                 $days = 0;
             } else {
-                $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay) + 1);
+                $hasNextConsecutive = false;
+                if ($index < $useCount - 1) {
+                    $nextUse = $uses[$index + 1];
+                    $nextHandover = ($nextUse->handed_over_at ?? $nextUse->starts_at)?->toDateString() ?? $cycle->period_from->toDateString();
+                    $nextStartDay = CarbonImmutable::parse(max($nextHandover, $cycle->period_from->toDateString()))->startOfDay();
+                    if (($nextStartDay->equalTo($uEndDay) && $nextStartDay->greaterThan($uStartDay))
+                        || ($nextUse->replaces_use_id === $use->id && $nextStartDay->lessThanOrEqualTo($uEndDay) && $nextStartDay->greaterThan($uStartDay))) {
+                        $hasNextConsecutive = true;
+                    }
+                }
+
+                if ($hasNextConsecutive) {
+                    $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay));
+                } else {
+                    $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay) + 1);
+                }
             }
 
             if ($days > 0) {
@@ -775,7 +898,7 @@ final class TwoStageInvoicingService
                 $matches = false;
                 if ($driverEmployeeId !== null && (int) $item->driver_employee_id === (int) $driverEmployeeId) {
                     $matches = true;
-                } elseif ($item->driver_employee_id === null && str_contains(strtolower($item->description), strtolower((string) $driverName))) {
+                } elseif ($item->driver_employee_id === null && ! empty(trim((string) $driverName)) && str_contains(strtolower($item->description), strtolower(trim((string) $driverName)))) {
                     $matches = true;
                 }
                 if ($matches) {
@@ -983,6 +1106,12 @@ final class TwoStageInvoicingService
                         $cycle->supplementary_invoice_id = $suppInvoice->id;
                         $cycle->tax_amount = (string) $suppInvoice->tax_total;
                         $cycle->total_billed_amount = (string) $suppInvoice->grand_total;
+                    } elseif ($this->math->compare($amountToBill, '0.000000') < 0) {
+                        $absAmount = substr($amountToBill, 1);
+                        $creditNote = $this->issueCreditNoteInvoice($kind, $context, $agreement, $cycle, $absAmount, $data);
+                        $cycle->supplementary_invoice_id = $creditNote->id;
+                        $cycle->tax_amount = (string) $creditNote->tax_total;
+                        $cycle->total_billed_amount = '0.000000';
                     }
                 } else {
                     $deltaAmount = $this->math->sub((string) $cycle->net_subtotal, (string) $cycle->base_rent_amount, 6);
@@ -1185,9 +1314,7 @@ final class TwoStageInvoicingService
         $gross = $this->math->add($gross, (string) $cycle->tolls_amount, 6);
         $gross = $this->math->add($gross, $additions, 6);
 
-        $net = $this->math->compare($gross, $deductions) > 0
-            ? $this->math->sub($gross, $deductions, 6)
-            : '0.000000';
+        $net = $this->math->sub($gross, $deductions, 6);
 
         $cycle->additions_amount = $additions;
         $cycle->deductions_amount = $deductions;
@@ -1671,8 +1798,9 @@ final class TwoStageInvoicingService
 
         $custodyMap = [];
         $totalCustodyDays = 0;
-        foreach ($uses as $use) {
-            $handoverTime = $use->handover_at ?? $use->starts_at;
+        $useCount = $uses->count();
+        foreach ($uses as $index => $use) {
+            $handoverTime = $use->handed_over_at ?? $use->starts_at;
             $returnTime = $use->returned_at ?? $use->ends_at;
 
             $startStr = $handoverTime?->toDateString() ?? $cycle->period_from->toDateString();
@@ -1684,7 +1812,22 @@ final class TwoStageInvoicingService
             if ($uStartDay->greaterThan($uEndDay)) {
                 $days = 0;
             } else {
-                $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay) + 1);
+                $hasNextConsecutive = false;
+                if ($index < $useCount - 1) {
+                    $nextUse = $uses[$index + 1];
+                    $nextHandover = ($nextUse->handed_over_at ?? $nextUse->starts_at)?->toDateString() ?? $cycle->period_from->toDateString();
+                    $nextStartDay = CarbonImmutable::parse(max($nextHandover, $cycle->period_from->toDateString()))->startOfDay();
+                    if (($nextStartDay->equalTo($uEndDay) && $nextStartDay->greaterThan($uStartDay))
+                        || ($nextUse->replaces_use_id === $use->id && $nextStartDay->lessThanOrEqualTo($uEndDay) && $nextStartDay->greaterThan($uStartDay))) {
+                        $hasNextConsecutive = true;
+                    }
+                }
+
+                if ($hasNextConsecutive) {
+                    $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay));
+                } else {
+                    $days = (int) min($cycleDays, $uStartDay->diffInDays($uEndDay) + 1);
+                }
             }
 
             if ($days > 0) {
@@ -2543,21 +2686,36 @@ final class TwoStageInvoicingService
             $deductionsSum = $this->math->add($deductionsSum, (string) $d->amount, 6);
         }
 
-        if ($deductions->isNotEmpty() && $this->math->compare($deductionsSum, $amount) === 0) {
+        if ($deductions->isNotEmpty()) {
+            $remainingOffset = '0.000000';
+            if ($this->math->compare($deductionsSum, $amount) > 0) {
+                $remainingOffset = $this->math->sub($deductionsSum, $amount, 6);
+            }
+
             foreach ($deductions as $item) {
                 $veh = $item->vehicle?->registration_number ?? $item->vehicle?->vehicle_number;
                 $drv = $item->driver?->display_name;
                 $attr = array_filter([$veh ? "Vehicle: {$veh}" : null, $drv ? "Driver: {$drv}" : null]);
                 $attrStr = ! empty($attr) ? ' ['.implode(', ', $attr).']' : '';
-                $desc = "Credit Adjustment: {$item->description} ({$item->category->value}){$attrStr}";
+
+                $itemAmount = (string) $item->amount;
+                $lineDiscount = '0.000000';
+                if ($this->math->compare($remainingOffset, '0.000000') > 0) {
+                    $lineDiscount = $this->math->compare($remainingOffset, $itemAmount) >= 0 ? $itemAmount : $remainingOffset;
+                    $remainingOffset = $this->math->sub($remainingOffset, $lineDiscount, 6);
+                }
+
+                $offsetDesc = $this->math->compare($lineDiscount, '0.000000') > 0 ? ' [Offset by usage: '.$lineDiscount.']' : '';
+                $desc = "Credit Adjustment: {$item->description} ({$item->category->value}){$attrStr}{$offsetDesc}";
                 $srcLineId = ($sourceId * 1000) + $lineNumber;
 
                 $lines[] = new InvoiceLineData(
                     lineNumber: $lineNumber,
                     description: $desc,
                     quantity: self::WHOLE_CHARGE,
-                    unitPrice: (string) $item->amount,
+                    unitPrice: $itemAmount,
                     lineType: InvoiceLineType::Charge,
+                    discountAmount: $lineDiscount,
                     sourceLineType: $sourceType,
                     sourceLineId: $srcLineId,
                 );
@@ -2570,11 +2728,41 @@ final class TwoStageInvoicingService
                     sourceLineId: $srcLineId,
                     sourceQuantity: self::WHOLE_CHARGE,
                     invoicedQuantity: self::WHOLE_CHARGE,
-                    sourceUnitPrice: (string) $item->amount,
-                    sourceLineTotal: (string) $item->amount,
-                    invoicedLineTotal: (string) $item->amount,
+                    sourceUnitPrice: $itemAmount,
+                    sourceLineTotal: $itemAmount,
+                    invoicedLineTotal: $this->math->sub($itemAmount, $lineDiscount, 6),
                 );
                 $lineNumber++;
+            }
+
+            if ($this->math->compare($amount, $deductionsSum) > 0) {
+                $remainder = $this->math->sub($amount, $deductionsSum, 6);
+                $srcLineId = ($sourceId * 1000) + $lineNumber;
+                $desc = $notes ?: "Credit Adjustment: Net Difference · ({$periodLabel})";
+
+                $lines[] = new InvoiceLineData(
+                    lineNumber: $lineNumber,
+                    description: $desc,
+                    quantity: self::WHOLE_CHARGE,
+                    unitPrice: $remainder,
+                    lineType: InvoiceLineType::Charge,
+                    discountAmount: '0.000000',
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                );
+                $sourceLines[] = new InvoiceSourceLineData(
+                    tenantId: $context->tenantId,
+                    organizationUnitId: $context->organizationUnitId,
+                    sourceType: $sourceType,
+                    sourceId: $sourceId,
+                    sourceLineType: $sourceType,
+                    sourceLineId: $srcLineId,
+                    sourceQuantity: self::WHOLE_CHARGE,
+                    invoicedQuantity: self::WHOLE_CHARGE,
+                    sourceUnitPrice: $remainder,
+                    sourceLineTotal: $remainder,
+                    invoicedLineTotal: $remainder,
+                );
             }
         } else {
             $desc = $notes ?: "Credit Note · {$agreement->reference} · ({$periodLabel}) · Cycle: {$cycle->cycle_number}";

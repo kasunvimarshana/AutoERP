@@ -25,20 +25,37 @@ use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
 use Modules\VehicleRental\Enums\AgreementAction;
+use Modules\VehicleRental\Enums\AgreementAdjustmentCategory;
+use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
+use Modules\VehicleRental\Enums\AgreementAdjustmentType;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\BaseChargeSource;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Enums\BillingCycleStatus;
+use Modules\VehicleRental\Enums\BillingFinalizationMode;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
+use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
+use Modules\VehicleRental\Enums\RentalExpenseStatus;
+use Modules\VehicleRental\Enums\RentalExpenseType;
+use Modules\VehicleRental\Enums\RunningChartAction;
+use Modules\VehicleRental\Enums\VehicleUseAction;
+use Modules\VehicleRental\Models\AgreementAdjustment;
 use Modules\VehicleRental\Models\BillingCycle;
+use Modules\VehicleRental\Models\BillingCycleChart;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\CustomerBaseCharge;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
+use Modules\VehicleRental\Models\RentalExpense;
+use Modules\VehicleRental\Models\RentalExpenseAllocation;
+use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\BaseRentBilling;
 use Modules\VehicleRental\Services\OwnerSettlementBillingService;
 use Modules\VehicleRental\Services\RentalAuthorization;
+use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\TwoStageInvoicingService;
+use Modules\VehicleRental\Services\VehicleUseService;
 use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
@@ -825,5 +842,342 @@ final class RentalBillingDocumentTest extends TestCase
             'reason' => 'Cross-tenant attack',
         ]);
         $cancelRes->assertNotFound();
+    }
+
+    public function test_cancel_draft_supplementary_invoice_reverts_cycle_to_stage2_attached_without_destroying_cycle(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture(null, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+        ]);
+
+        $suppInvoiceId = 0;
+        $rowVersion = 1;
+        $cycleId = 0;
+        $initialInvId = 0;
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, &$suppInvoiceId, &$rowVersion, &$cycleId, &$initialInvId): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms']['base_rate'] = '30000.000000';
+            $agreements = app(AgreementService::class);
+            $custAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $custAg = $agreements->change(AgreementKind::Customer, $context, $custAg->id, $custAg->row_version, AgreementAction::Activate);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle = $invoicing->createCycle(AgreementKind::Customer, $context, $custAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+                'issue_initial_invoice' => true,
+            ]);
+
+            $this->assertNotNull($cycle->initial_invoice_id);
+            $cycleId = $cycle->id;
+            $initialInvId = $cycle->initial_invoice_id;
+
+            // Add ad-hoc charge of 5,000 so supplementary invoice will be issued
+            $invoicing->addItem($context, $cycle->id, [
+                'item_type' => 'addition',
+                'category' => 'other',
+                'description' => 'Airport toll and parking surcharge',
+                'quantity' => '1.000000',
+                'unit_rate' => '5000.000000',
+            ], (int) $cycle->row_version);
+            $cycle->refresh();
+
+            // Finalize in Mode A -> issues supplementary invoice
+            $cycle = $invoicing->finalize($context, $cycle->id, [
+                'finalization_mode' => 'supplementary_invoice',
+            ], (int) $cycle->row_version);
+            $this->assertNotNull($cycle->supplementary_invoice_id);
+            $suppInvoiceId = $cycle->supplementary_invoice_id;
+
+            $suppInvoice = Invoice::findOrFail($suppInvoiceId);
+            $this->assertSame(InvoiceStatus::Draft, $suppInvoice->status);
+            $rowVersion = (int) $suppInvoice->row_version;
+        });
+
+        // Cancel supplementary invoice outside withTenantExecutionContext
+        $cancelRes = $this->postJson("/api/v1/vehicle-rental/billing/documents/{$suppInvoiceId}/cancel", [
+            'expected_version' => $rowVersion,
+            'reason' => 'Disputed airport surcharge',
+        ]);
+        $cancelRes->assertOk();
+
+        // Refresh cycle: supplementary_invoice_id must be null, status must be Stage2Attached, NOT Cancelled!
+        // Audit and total billed fields must be properly reset, and Stage 2 must be re-finalizable!
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $cycleId, $initialInvId): void {
+            $cycle = BillingCycle::findOrFail($cycleId);
+            $this->assertNull($cycle->supplementary_invoice_id);
+            $this->assertSame(BillingCycleStatus::Stage2Attached, $cycle->status);
+            $this->assertSame($initialInvId, $cycle->initial_invoice_id);
+            $this->assertNull($cycle->finalized_at);
+            $this->assertNull($cycle->finalized_by);
+            $this->assertSame(BillingFinalizationMode::SupplementaryInvoice, $cycle->finalization_mode);
+
+            $initialInv = Invoice::findOrFail($initialInvId);
+            $this->assertSame((string) $initialInv->grand_total, (string) $cycle->total_billed_amount);
+
+            // Verify Stage 2 can now be successfully finalized again
+            $invoicing = app(TwoStageInvoicingService::class);
+            $refinalized = $invoicing->finalize($context, $cycle->id, [
+                'finalization_mode' => 'supplementary_invoice',
+            ], (int) $cycle->row_version);
+
+            $this->assertSame(BillingCycleStatus::Finalized, $refinalized->status);
+            $this->assertNotNull($refinalized->supplementary_invoice_id);
+            $this->assertNotSame($initialInvId, $refinalized->supplementary_invoice_id);
+        });
+    }
+
+    public function test_cancel_draft_owner_settlement_bill_restores_owner_cycle_and_agreement_adjustments(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture(null, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+        ]);
+
+        $billId = 0;
+        $rowVersion = 1;
+        $cycleId = 0;
+        $adjId = 0;
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $ownerData, &$billId, &$rowVersion, &$cycleId, &$adjId): void {
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['ends_on'] = '2026-09-30';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerData['terms'] = ['base_rate' => '40000.000000'];
+            $agreements = app(AgreementService::class);
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            // Create unbilled owner billing cycle
+            $twoStage = app(TwoStageInvoicingService::class);
+            $cycle = $twoStage->createCycle(AgreementKind::Owner, $context, $ownerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+                'issue_initial_invoice' => false,
+                'base_rent_amount' => '40000.000000',
+                'billing_mode' => 'without_running_chart',
+            ]);
+            $cycleId = $cycle->id;
+
+            // Create authorized AgreementAdjustment
+            $adj = new AgreementAdjustment();
+            $adj->tenant_id = $context->tenantId;
+            $adj->organization_unit_id = $context->organizationUnitId;
+            $adj->owner_agreement_id = $ownerAg->id;
+            $adj->adjustment_type = AgreementAdjustmentType::DebitNote;
+            $adj->category = AgreementAdjustmentCategory::Other;
+            $adj->status = AgreementAdjustmentStatus::Authorized;
+            $adj->amount = '3000.000000';
+            $adj->original_amount = '3000.000000';
+            $adj->tax_amount = '0.000000';
+            $adj->reason = 'Fuel incentive addition';
+            $adj->actor_id = $context->actorId;
+            $adj->authorized_by_user_id = $context->actorId;
+            $adj->authorized_at = now();
+            $adj->row_version = 1;
+            $adj->save();
+            $adjId = $adj->id;
+
+            // Generate owner settlement bill
+            $settleService = app(OwnerSettlementBillingService::class);
+            $bill = $settleService->generateOwnerSettlementBill($context, $ownerAg->id, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'wht_rate' => '10.000000',
+                'invoice_date' => '2026-09-30',
+            ]);
+            $billId = $bill->id;
+            $rowVersion = (int) $bill->row_version;
+
+            $cycle->refresh();
+            $this->assertSame(BillingCycleStatus::Finalized, $cycle->status);
+            $this->assertSame($bill->id, $cycle->final_invoice_id);
+
+            $adj->refresh();
+            $this->assertSame(AgreementAdjustmentStatus::Applied, $adj->status);
+            $this->assertSame($bill->id, $adj->invoice_id);
+        });
+
+        // Cancel the draft settlement bill
+        $cancelRes = $this->postJson("/api/v1/vehicle-rental/billing/documents/{$billId}/cancel", [
+            'expected_version' => $rowVersion,
+            'reason' => 'Accounting adjustment needed',
+        ]);
+        $cancelRes->assertOk();
+
+        // Verify owner cycle is restored (NOT cancelled) and adjustment is restored to Authorized
+        $this->withTenantExecutionContext($context->tenantId, function () use ($cycleId, $adjId): void {
+            $cycle = BillingCycle::findOrFail($cycleId);
+            $this->assertNull($cycle->final_invoice_id);
+            $this->assertNotSame(BillingCycleStatus::Cancelled, $cycle->status);
+            $this->assertNull($cycle->finalized_at);
+
+            $adj = AgreementAdjustment::findOrFail($adjId);
+            $this->assertNull($adj->invoice_id);
+            $this->assertSame(AgreementAdjustmentStatus::Authorized, $adj->status);
+        });
+    }
+
+    public function test_cancel_document_resets_rental_expense_allocation_status_to_confirmed(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture(null, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+        ]);
+
+        $billId = 0;
+        $rowVersion = 1;
+        $allocId = 0;
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $ownerData, &$billId, &$rowVersion, &$allocId): void {
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['ends_on'] = '2026-09-30';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerData['terms'] = ['base_rate' => '50000.000000'];
+            $agreements = app(AgreementService::class);
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $baseCharge = new OwnerBaseCharge();
+            $baseCharge->tenant_id = $context->tenantId;
+            $baseCharge->organization_unit_id = $context->organizationUnitId;
+            $baseCharge->agreement_id = $ownerAg->id;
+            $baseCharge->period_from = '2026-09-01';
+            $baseCharge->period_until = '2026-09-30';
+            $baseCharge->amount = '50000.000000';
+            $baseCharge->calculation = ['rate' => '50000.000000'];
+            $baseCharge->actor_id = $context->actorId;
+            $baseCharge->save();
+
+            $expense = new RentalExpense();
+            $expense->tenant_id = $context->tenantId;
+            $expense->organization_unit_id = $context->organizationUnitId;
+            $expense->expense_number = 'EXP-CANCEL-001';
+            $expense->expense_type = RentalExpenseType::Maintenance;
+            $expense->status = RentalExpenseStatus::Approved;
+            $expense->vehicle_id = $ownerData['vehicle_id'];
+            $expense->vehicle_label_snapshot = 'CAR-01';
+            $expense->fingerprint = 'FP-CANCEL-001';
+            $expense->expense_date = '2026-09-10';
+            $expense->currency_id = $ownerAg->currency_id;
+            $expense->currency_code_snapshot = 'USD';
+            $expense->gross_amount = '5000.000000';
+            $expense->tax_amount = '0.000000';
+            $expense->net_amount = '5000.000000';
+            $expense->description = 'Tire replacement';
+            $expense->created_by = $context->actorId;
+            $expense->save();
+
+            $alloc = new RentalExpenseAllocation();
+            $alloc->tenant_id = $context->tenantId;
+            $alloc->organization_unit_id = $context->organizationUnitId;
+            $alloc->expense_id = $expense->id;
+            $alloc->sequence = 1;
+            $alloc->allocation_type = RentalExpenseAllocationType::OwnerDeduction;
+            $alloc->target_owner_agreement_id = $ownerAg->id;
+            $alloc->net_amount = '5000.000000';
+            $alloc->total_amount = '5000.000000';
+            $alloc->status = RentalExpenseAllocationStatus::Confirmed;
+            $alloc->save();
+
+            $allocId = $alloc->id;
+
+            $settlementService = app(OwnerSettlementBillingService::class);
+            $bill = $settlementService->generateOwnerSettlementBill($context, $ownerAg->id, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'wht_rate' => '0.000000',
+                'invoice_date' => '2026-09-30',
+            ]);
+
+            $billId = $bill->id;
+            $rowVersion = (int) $bill->row_version;
+            $alloc->refresh();
+            $this->assertSame($bill->id, $alloc->invoice_id);
+            $this->assertSame(RentalExpenseAllocationStatus::Invoiced, $alloc->status);
+        });
+
+        // Cancel draft bill outside withTenantExecutionContext
+        $cancelRes = $this->postJson("/api/v1/vehicle-rental/billing/documents/{$billId}/cancel", [
+            'expected_version' => $rowVersion,
+            'reason' => 'Billing dispute',
+        ]);
+        $cancelRes->assertOk();
+
+        // Allocation must be unlinked AND status must be reset to Confirmed
+        $this->withTenantExecutionContext($context->tenantId, function () use ($allocId): void {
+            $alloc = RentalExpenseAllocation::findOrFail($allocId);
+            $this->assertNull($alloc->invoice_id);
+            $this->assertSame(RentalExpenseAllocationStatus::Confirmed, $alloc->status);
+        });
+    }
+
+    public function test_document_register_resolves_driver_from_cycle_charts_when_items_driver_empty(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture(null, [
+            TenantFeature::VEHICLE_RENTAL,
+            TenantFeature::INVOICE,
+        ]);
+
+        $initialInvId = 0;
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData, &$initialInvId): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms']['base_rate'] = '20000.000000';
+            $agreements = app(AgreementService::class);
+            $custAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $custAg = $agreements->change(AgreementKind::Customer, $context, $custAg->id, $custAg->row_version, AgreementAction::Activate);
+
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['agreed_on'] = '2026-09-01';
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $uses = app(VehicleUseService::class);
+            $use = $uses->plan($context, $custAg->id, $custAg->row_version, [
+                'vehicle_id' => $ownerData['vehicle_id'],
+                'owner_agreement_id' => $ownerAg->id,
+                'starts_at' => '2026-09-01T08:00:00+00:00',
+                'ends_at' => '2026-09-30T18:00:00+00:00',
+            ]);
+            $use = $uses->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, [
+                'occurred_at' => '2026-09-01T08:00:00+00:00',
+                'odometer' => '10000.000000',
+                'reason' => 'Customer handover',
+            ]);
+
+            $charts = app(RunningChartService::class);
+            $chart = $charts->create($context, $use->id, (int) $use->row_version, [
+                'reference' => 'RC-DRIVER-001',
+                'starts_at' => '2026-09-08T08:00:00+00:00',
+                'ends_at' => '2026-09-08T20:00:00+00:00',
+                'start_odometer' => '10000.000000',
+                'end_odometer' => '10100.000000',
+                'commercial_km' => '100.000000',
+                'driver_observation' => 'Sunil Perera',
+            ]);
+            $chart = $charts->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize, ['reason' => 'Trip concluded']);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+            $cycle = $invoicing->createCycle(AgreementKind::Customer, $context, $custAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+                'issue_initial_invoice' => true,
+            ]);
+
+            $cycle = $invoicing->attachRunningCharts($context, $cycle->id, [$chart->id], (int) $cycle->row_version);
+            $initialInvId = $cycle->initial_invoice_id;
+        });
+
+        $res = $this->getJson('/api/v1/vehicle-rental/billing/documents?direction=outbound');
+        $res->assertOk();
+
+        $doc = collect($res->json('data'))->firstWhere('id', $initialInvId);
+        $this->assertNotNull($doc);
+        $this->assertSame('Sunil Perera', $doc['driver_name']);
     }
 }
