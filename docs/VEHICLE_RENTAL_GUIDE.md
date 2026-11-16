@@ -1,7 +1,9 @@
 # AutoERP Vehicle Rental Module: Complete Technical & Operational Guide
 
 > [!NOTE]
-> **Latest Master Specification:** For the complete, up-to-date end-to-end technical guide covering recent Two-Stage Invoicing (Stage 1/2, Mode B, Credit Notes), Multi-Tier Overtime (1.5x/2.0x/3.0x), Dedicated Billing Workspaces, WHT, and Multi-Agreement Settlements, see the canonical [Vehicle Rental Complete Guide](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md).
+> **Authoritative Documentation & Guides:**
+> - **End-User Operator Handbook:** For daily business users (Dispatchers, Fleet Officers, Billing Clerks, Cashiers, and Managers), see the beginner-friendly [Vehicle Rental User Guide](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md).
+> - **Canonical Technical Specification:** For the complete, up-to-date end-to-end technical guide covering Two-Stage Invoicing (Stage 1/2, Mode B, Credit Notes), Multi-Tier Overtime (1.5x/2.0x/3.0x), Dedicated Billing Workspaces, WHT, and Multi-Agreement Settlements, see the canonical [Vehicle Rental Complete Guide](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md).
 
 **Status:** Authoritative Enterprise Technical Specification & Developer Onboarding Guide  
 **Module Directory:** [`app/Modules/VehicleRental`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental)  

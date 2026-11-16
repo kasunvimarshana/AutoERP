@@ -7,6 +7,9 @@
 **Precision Arithmetic:** Arbitrary-Precision String Math via [`DecimalMath`](file:///d:/project-new/AutoERP/app/Modules/Core/Services/DecimalMath.php) (BCMath, scale 6)  
 **Test Suite Coverage:** 306 Backend PHPUnit Tests (2,477 Assertions) · 33 Frontend Vitest Suites (154 Tests) · TypeScript Strict (0 Errors)  
 
+> [!TIP]
+> **Operator Handbook:** For a beginner-friendly, step-by-step user manual with UI walkthroughs, diagrams, and daily business workflows (dispatchers, billing clerks, cashiers, fleet officers), see the companion [Vehicle Rental User Guide](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md).
+
 ---
 
 ## Table of Contents
