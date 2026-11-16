@@ -828,6 +828,10 @@ const appRouter = createBrowserRouter(
                             element={<PaymentEntryPage />}
                         />
                         <Route
+                            path="/payments/:id/edit"
+                            element={<PaymentEntryPage />}
+                        />
+                        <Route
                             path="/payments/methods"
                             element={<PaymentMethodListPage />}
                         />

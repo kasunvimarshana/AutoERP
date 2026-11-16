@@ -33,15 +33,16 @@ final class PaymentReceiptService
         $curCode = $payment->currency_code_snapshot ?? $payment->currency?->code ?? 'LKR';
         $curSymbol = $payment->currency_symbol_snapshot ?? $payment->currency?->symbol ?? 'Rs.';
 
-        $agreementRef = $payment->metadata['agreement_reference'] ?? null;
-        if (! $agreementRef && $payment->allocations->isNotEmpty()) {
+        $invoiceSources = [];
+        if ($payment->allocations->isNotEmpty()) {
             $invoiceIds = $payment->allocations->pluck('invoice_id')->filter()->all();
             if (! empty($invoiceIds)) {
-                $agreementRef = \Illuminate\Support\Facades\DB::table('invoice_sources')
+                $invoiceSources = \Illuminate\Support\Facades\DB::table('invoice_sources')
                     ->where('tenant_id', $payment->tenant_id)
                     ->whereIn('invoice_id', $invoiceIds)
                     ->whereNotNull('source_document_number')
-                    ->value('source_document_number');
+                    ->pluck('source_document_number', 'invoice_id')
+                    ->all();
             }
         }
 
@@ -91,7 +92,7 @@ final class PaymentReceiptService
             }
         }
 
-        $allocations = $payment->allocations->map(function (PaymentAllocation $alloc) use ($legacyInvoices) {
+        $allocations = $payment->allocations->map(function (PaymentAllocation $alloc) use ($legacyInvoices, $invoiceSources) {
             $legacy = $legacyInvoices[$alloc->invoice_id] ?? null;
             $invNo = ! empty($alloc->invoice_number_snapshot)
                 ? $alloc->invoice_number_snapshot
@@ -99,10 +100,14 @@ final class PaymentReceiptService
             $invDate = $alloc->invoice_date_snapshot?->toDateString()
                 ?? ($legacy?->invoice_date ? \Carbon\Carbon::parse($legacy->invoice_date)->toDateString() : '—');
 
+            $allocMeta = is_array($alloc->metadata) ? $alloc->metadata : [];
+            $allocAgrRef = $allocMeta['agreement_reference'] ?? ($invoiceSources[$alloc->invoice_id] ?? null);
+
             return [
                 'id' => $alloc->id,
                 'invoice_id' => $alloc->invoice_id,
                 'invoice_number' => $invNo,
+                'agreement_reference' => $allocAgrRef,
                 'invoice_date' => $invDate,
                 'invoice_total' => (string) $alloc->invoice_total,
                 'balance_before' => (string) $alloc->invoice_balance_before,
@@ -111,6 +116,36 @@ final class PaymentReceiptService
                 'status' => $alloc->status,
             ];
         })->all();
+
+        $agreementRefs = [];
+        if (! empty($payment->metadata['agreement_references']) && is_array($payment->metadata['agreement_references'])) {
+            $agreementRefs = $payment->metadata['agreement_references'];
+        } elseif (! empty($payment->metadata['agreement_reference'])) {
+            $agreementRefs[] = (string) $payment->metadata['agreement_reference'];
+        }
+        foreach ($allocations as $allocItem) {
+            if (! empty($allocItem['agreement_reference'])) {
+                $agreementRefs[] = (string) $allocItem['agreement_reference'];
+            }
+        }
+        if (empty($agreementRefs) && ! empty($invoiceSources)) {
+            $agreementRefs = array_values(array_unique(array_filter($invoiceSources)));
+        }
+        if (empty($agreementRefs) && ! empty($payment->source_id)) {
+            $ref = \Illuminate\Support\Facades\DB::table('customer_agreements')
+                ->where('tenant_id', $payment->tenant_id)
+                ->where('id', $payment->source_id)
+                ->value('reference')
+                ?? \Illuminate\Support\Facades\DB::table('owner_agreements')
+                    ->where('tenant_id', $payment->tenant_id)
+                    ->where('id', $payment->source_id)
+                    ->value('reference');
+            if ($ref) {
+                $agreementRefs[] = $ref;
+            }
+        }
+        $agreementRefs = array_values(array_unique(array_filter($agreementRefs)));
+        $agreementRef = ! empty($agreementRefs) ? implode(', ', $agreementRefs) : null;
 
         $unapplied = (string) ($payment->unapplied_amount ?? $payment->unappliedBalance?->unapplied_amount ?? '0.000000');
         $wordsText = '';
@@ -158,6 +193,7 @@ final class PaymentReceiptService
                 'symbol' => $curSymbol,
             ],
             'agreement_reference' => $agreementRef,
+            'agreement_references' => $agreementRefs,
             'reference_number' => $payment->reference_number,
             'notes' => $payment->notes,
             'total_amount' => (string) $payment->total_amount,

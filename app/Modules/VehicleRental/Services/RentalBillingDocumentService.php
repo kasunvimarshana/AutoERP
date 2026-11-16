@@ -1007,7 +1007,7 @@ final class RentalBillingDocumentService
      * @param Collection<int, Invoice> $invoices
      * @return array<int, array{agreement: ?array, vehicle: ?array, driver_name: ?string}>
      */
-    private function bulkLoadRentalContexts(AgreementContext $context, Collection $invoices): array
+    public function bulkLoadRentalContexts(AgreementContext $context, Collection $invoices): array
     {
         if ($invoices->isEmpty()) {
             return [];

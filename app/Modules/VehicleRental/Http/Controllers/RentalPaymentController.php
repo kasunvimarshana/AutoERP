@@ -56,6 +56,7 @@ final class RentalPaymentController
 
     public function allocate(AgreementRequest $request, string $kind, int $agreement, int $payment, RentalPaymentService $service): JsonResponse
     {
+        $agreementKind = AgreementKind::from($kind);
         $validated = $request->validate([
             'allocations' => ['required', 'array', 'min:1'],
             'allocations.*.invoice_id' => ['required', 'integer', 'min:1'],
@@ -67,6 +68,7 @@ final class RentalPaymentController
 
         $updatedPayment = $service->allocateUnappliedFunds(
             $request->context(),
+            $agreementKind,
             $agreement,
             $payment,
             $validated['allocations'],
@@ -78,6 +80,7 @@ final class RentalPaymentController
 
     public function reverse(AgreementRequest $request, string $kind, int $agreement, int $payment, RentalPaymentService $service): JsonResponse
     {
+        $agreementKind = AgreementKind::from($kind);
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
             'reversal_date' => ['sometimes', 'date_format:'.AgreementFields::DATE_FORMAT],
@@ -87,6 +90,7 @@ final class RentalPaymentController
 
         $reversedPayment = $service->reversePayment(
             $request->context(),
+            $agreementKind,
             $agreement,
             $payment,
             $validated['reason'],
@@ -94,6 +98,60 @@ final class RentalPaymentController
         );
 
         return (new PaymentResource($reversedPayment))->response();
+    }
+
+    public function openDocuments(AgreementRequest $request, string $kind, int $partyId, RentalPaymentService $service): JsonResponse
+    {
+        $agreementKind = AgreementKind::from($kind);
+        $rentalOnly = $request->boolean('rental_only', true);
+        $result = $service->getPartyOpenDocuments($request->context(), $agreementKind, $partyId, $rentalOnly);
+
+        return response()->json(['data' => $result]);
+    }
+
+    public function storePartyPayment(RentalPaymentRequest $request, string $kind, int $partyId, RentalPaymentService $service): JsonResponse
+    {
+        $agreementKind = AgreementKind::from($kind);
+        $expectedVersion = (int) $request->validated('expected_version', 1);
+        $input = $request->validated();
+        $lines = $request->paymentLineData();
+        $allocations = $request->allocationsInput();
+
+        $payment = $service->recordMultiAgreementPayment(
+            $request->context(),
+            $agreementKind,
+            $partyId,
+            $expectedVersion,
+            $input,
+            $lines,
+            $allocations
+        );
+
+        return (new PaymentResource($payment))->response()->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    public function allocatePartyPayment(AgreementRequest $request, string $kind, int $partyId, int $payment, RentalPaymentService $service): JsonResponse
+    {
+        $agreementKind = AgreementKind::from($kind);
+        $validated = $request->validate([
+            'allocations' => ['required', 'array', 'min:1'],
+            'allocations.*.invoice_id' => ['required', 'integer', 'min:1'],
+            'allocations.*.amount' => ['required', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'gt:0'],
+            'allocation_date' => ['sometimes', 'date_format:'.AgreementFields::DATE_FORMAT],
+        ]);
+
+        $allocationDate = (string) ($validated['allocation_date'] ?? now()->toDateString());
+
+        $updatedPayment = $service->allocatePartyUnappliedFunds(
+            $request->context(),
+            $agreementKind,
+            $partyId,
+            $payment,
+            $validated['allocations'],
+            $allocationDate
+        );
+
+        return (new PaymentResource($updatedPayment))->response();
     }
 
     public function refund(AgreementRequest $request, string $kind, int $agreement, int $payment, RentalPaymentService $service): JsonResponse

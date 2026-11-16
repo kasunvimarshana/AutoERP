@@ -1,6 +1,6 @@
 import { CARD_BRANDS } from '../paymentCardBrands';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getInvoice, getInvoiceSignedPrintLink, getInvoiceWhatsAppShare } from '@/modules/invoice/invoiceApi';
 import type { Invoice } from '@/modules/invoice/invoiceTypes';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -25,7 +25,8 @@ import { readableRelation } from '@/shared/utils/object';
 import { parsePositiveInteger } from '@/shared/utils/routeParams';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { SupplierLookupSelect } from '@/modules/supplier/components/SupplierLookupSelect';
-import { createPayment, finalizeSellingPayment, listUsablePaymentMethods, type Payment } from '../paymentApi';
+import { AgreementKind, getPartyOpenRentalDocuments, type PartyOpenDocument } from '@/modules/vehicle-rental/agreementApi';
+import { createPayment, finalizeSellingPayment, getPayment, listUsablePaymentMethods, updatePayment, type Payment } from '../paymentApi';
 import { linePayload, lineIsValid } from '../paymentLineInput';
 import { PAYMENT_AMOUNT_FRACTION_DIGITS, PaymentLineTable, type PaymentLineDraft } from '../components/PaymentLineTable';
 import { SellingPaymentSuccess } from '@/modules/selling/components/SellingPaymentSuccess';
@@ -109,10 +110,14 @@ function invoiceParty(invoice: Invoice): NamedResource | null {
 
 export default function PaymentEntryPage() {
     const navigate = useNavigate();
+    const { id: routePaymentId } = useParams();
+    const editPaymentId = parsePositiveInteger(routePaymentId);
+    const isEditMode = editPaymentId !== null;
     const [searchParams] = useSearchParams();
     const invoiceId = parsePositiveInteger(searchParams.get('invoice_id'));
     const sellingViewRequested = searchParams.get('view') === 'selling';
     const initializedInvoiceId = useRef<number | null>(null);
+    const initializedEditId = useRef<number | null>(null);
     const [paymentType, setPaymentType] = useState(PAYMENT_TYPE_CUSTOMER_RECEIPT);
     const [direction, setDirection] = useState(PAYMENT_DIRECTION_INBOUND);
     const [paymentDate, setPaymentDate] = useState(today());
@@ -122,6 +127,8 @@ export default function PaymentEntryPage() {
     const [party, setParty] = useState<NamedResource | null>(null);
     const [lines, setLines] = useState<PaymentLineDraft[]>([emptyLine(1)]);
     const [sellingRows, setSellingRows] = useState<SellingPaymentRow[]>(emptySellingRows);
+    const [docAllocations, setDocAllocations] = useState<Record<number, string>>({});
+    const [agreementFilter, setAgreementFilter] = useState<string>('all');
     const [nextKey, setNextKey] = useState(2);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -135,6 +142,11 @@ export default function PaymentEntryPage() {
         (signal) => getInvoice(invoiceId ?? 0, signal),
         [invoiceId],
         invoiceId !== null,
+    );
+    const editPayment = useApi(
+        (signal) => getPayment(editPaymentId ?? 0, signal),
+        [editPaymentId],
+        isEditMode,
     );
     const invoiceIssue = settlementInvoice.data ? invoiceSettlementIssue(settlementInvoice.data) : null;
     const sellingInvoice = sellingViewRequested && settlementInvoice.data?.invoice_type === SELLING_INVOICE_TYPE
@@ -165,9 +177,128 @@ export default function PaymentEntryPage() {
         setNextKey(2);
     }, [invoiceIssue, settlementInvoice.data]);
 
+    useEffect(() => {
+        const p = editPayment.data;
+        if (!p || initializedEditId.current === p.id) return;
+        if (p.document_status !== 'draft') {
+            setError(toApiError(new Error('Only draft payments can be edited.')));
+            return;
+        }
+        initializedEditId.current = p.id;
+        setPaymentType(p.payment_type ?? PAYMENT_TYPE_CUSTOMER_RECEIPT);
+        setDirection(p.direction ?? PAYMENT_DIRECTION_INBOUND);
+        setPaymentDate(p.payment_date ?? today());
+        setReference(p.reference_number ?? '');
+        setExchangeRate(p.exchange_rate ?? BASE_EXCHANGE_RATE);
+        setExchangeRateExpanded(!isPositiveDecimal(p.exchange_rate ?? '') || compareDecimalStrings(p.exchange_rate ?? ZERO_AMOUNT, BASE_EXCHANGE_RATE) !== 0);
+        if (p.party?.id) {
+            setParty({
+                id: p.party.id,
+                code: p.party.code ?? p.party.number ?? undefined,
+                name: p.party.name ?? 'Party',
+            });
+        }
+        if (p.lines && p.lines.length > 0) {
+            setLines(p.lines.map((l, idx) => ({
+                key: idx + 1,
+                paymentMethodId: String(l.payment_method?.id ?? l.payment_method_id ?? ''),
+                amount: l.amount,
+                reference: l.reference_number ?? '',
+                metadata: {
+                    card_brand: l.card_brand ?? '',
+                    instrument_direction: l.instrument_direction ?? '',
+                    external_bank_name: l.external_bank_name ?? '',
+                    external_bank_branch: l.external_bank_branch ?? '',
+                    instrument_number: l.instrument_number ?? '',
+                },
+            })));
+            setNextKey(p.lines.length + 1);
+        }
+        if (p.allocations && p.allocations.length > 0) {
+            const loadedAllocations: Record<number, string> = {};
+            p.allocations.forEach((alloc) => {
+                const inv = alloc.invoice as { id: number } | undefined;
+                const invId = (alloc.invoice_id as number | undefined) ?? inv?.id;
+                if (invId) {
+                    loadedAllocations[invId] = String(alloc.allocated_amount ?? ZERO_AMOUNT);
+                }
+            });
+            setDocAllocations(loadedAllocations);
+        }
+    }, [editPayment.data]);
+
     const methods = useApi((signal) => listUsablePaymentMethods({ direction, per_page: 100 }, signal), [direction]);
     const methodRows = methods.data?.data ?? [];
+    const partyType = settlementInvoice.data?.party_type
+        ?? (paymentType === PAYMENT_TYPE_SUPPLIER_PAYMENT ? 'supplier' : 'customer');
+    const partyKind = direction === PAYMENT_DIRECTION_INBOUND ? AgreementKind.Customer : AgreementKind.Owner;
+    const isInvoiceSettlement = invoiceId !== null || initializedInvoiceId.current !== null;
+    const isSellingMode = sellingViewRequested || sellingInvoice !== null;
+    const openRentalDocs = useApi(
+        () => getPartyOpenRentalDocuments(partyKind, party?.id ?? 0),
+        [partyKind, party?.id],
+        party !== null && !isInvoiceSettlement && !isSellingMode && !busy,
+    );
+
+    const openDocs = useMemo(() => openRentalDocs.data?.documents ?? [], [openRentalDocs.data?.documents]);
+    const agreements = useMemo(() => openRentalDocs.data?.agreements ?? [], [openRentalDocs.data?.agreements]);
+    const filteredDocs = useMemo(() => {
+        if (agreementFilter === 'all') return openDocs;
+        return openDocs.filter((d) => String(d.agreement_id) === agreementFilter);
+    }, [openDocs, agreementFilter]);
+
     const total = useMemo(() => sumDecimals(lines.map((line) => line.amount || '0.000000')), [lines]);
+    const totalAllocated = useMemo(() => {
+        const amounts = Object.values(docAllocations).filter((v) => isPositiveDecimal(v));
+        return sumDecimals(amounts.length > 0 ? amounts : [ZERO_AMOUNT]);
+    }, [docAllocations]);
+    const totalOpenDocsBalance = useMemo(() => {
+        return sumDecimals(openDocs.map((d) => d.remaining_amount || ZERO_AMOUNT));
+    }, [openDocs]);
+    const unappliedAdvance = useMemo(() => {
+        if (compareDecimalStrings(total, totalAllocated) > 0) {
+            return nonNegativeDecimal(subtractDecimal(total, totalAllocated));
+        }
+        return ZERO_AMOUNT;
+    }, [total, totalAllocated]);
+    const balanceAfterAllocations = useMemo(() => {
+        return nonNegativeDecimal(subtractDecimal(totalOpenDocsBalance, totalAllocated));
+    }, [totalOpenDocsBalance, totalAllocated]);
+    const hasAllocationsOverRemaining = useMemo(() => {
+        return openDocs.some((doc) => {
+            const allocated = docAllocations[doc.id];
+            return allocated && compareDecimalStrings(allocated, doc.remaining_amount) > 0;
+        });
+    }, [openDocs, docAllocations]);
+    const allocationsExceedTotal = invoiceId === null && compareDecimalStrings(totalAllocated, total) > 0;
+    const activeCurrency = settlementInvoice.data?.currency?.code
+        ?? editPayment.data?.currency?.code
+        ?? openDocs[0]?.currency_code
+        ?? undefined;
+
+    const updateDocAllocation = (invId: number, amount: string) => {
+        setDocAllocations((prev) => ({
+            ...prev,
+            [invId]: amount,
+        }));
+    };
+
+    const allocateFullDoc = (doc: PartyOpenDocument) => {
+        updateDocAllocation(doc.id, doc.remaining_amount);
+    };
+
+    const allocateAllOpenDocs = () => {
+        const next: Record<number, string> = {};
+        openDocs.forEach((doc) => {
+            next[doc.id] = doc.remaining_amount;
+        });
+        setDocAllocations(next);
+    };
+
+    const clearAllAllocations = () => {
+        setDocAllocations({});
+    };
+
     const sellingBalance = sellingInvoice?.balance_due ?? ZERO_AMOUNT;
     const nonCashTotal = sumDecimals(sellingRows.filter((row) => row.kind !== 'cash').map((row) => row.amount || ZERO_AMOUNT));
     const cashRow = sellingRows.find((row) => row.kind === 'cash');
@@ -185,8 +316,6 @@ export default function PaymentEntryPage() {
             ?? (available.length === 1 ? available[0] : undefined);
         return [{ ...row, paymentMethodId: method ? String(method.id) : '', amount }];
     });
-    const partyType = settlementInvoice.data?.party_type
-        ?? (paymentType === PAYMENT_TYPE_SUPPLIER_PAYMENT ? 'supplier' : 'customer');
     const invoiceAmountValid = !settlementInvoice.data
         || compareDecimalStrings(total, settlementInvoice.data.balance_due ?? '0') <= 0;
     const sellingAmountsValid = isNonNegativeDecimal(cashReceived)
@@ -202,6 +331,9 @@ export default function PaymentEntryPage() {
     const canSubmit = !busy
         && completedSellingPayment === null
         && invoiceIssue === null
+        && (!isEditMode || editPayment.data?.document_status === 'draft')
+        && !hasAllocationsOverRemaining
+        && !allocationsExceedTotal
         && (sellingInvoice ? sellingAmountsValid && sellingLinesValid : invoiceAmountValid)
         && (invoiceId === null || party !== null)
         && (!settlementInvoice.data?.currency?.id || isPositiveDecimal(exchangeRate))
@@ -278,30 +410,58 @@ export default function PaymentEntryPage() {
                 if (!method) throw new Error('A valid payment method is required for every line.');
                 return linePayload(line, method, direction);
             });
-            const payment = await (sellingInvoice ? finalizeSellingPayment : createPayment)({
-                payment_type: paymentType,
-                direction,
-                payment_date: paymentDate,
-                party_type: party ? partyType : undefined,
-                party_id: party?.id,
-                currency_id: settlementInvoice.data?.currency?.id ?? undefined,
-                exchange_rate: settlementInvoice.data?.currency?.id ? exchangeRate : undefined,
-                reference_number: reference.trim() || undefined,
-                notes: settlementInvoice.data
-                    ? `Settlement initiated from invoice ${settlementInvoice.data.invoice_number ?? settlementInvoice.data.id}.`
-                    : undefined,
-                lines: payloadLines,
-                allocations: settlementInvoice.data ? [{
-                    invoice_id: settlementInvoice.data.id,
-                    allocated_amount: sellingInvoice ? sellingPaymentTotal : total,
+
+            const formattedAllocations = settlementInvoice.data ? [{
+                invoice_id: settlementInvoice.data.id,
+                allocated_amount: sellingInvoice ? sellingPaymentTotal : total,
+                allocation_date: paymentDate,
+                allocation_method: ALLOCATION_METHOD_SPECIFIC_INVOICE,
+            }] : Object.entries(docAllocations)
+                .filter(([_, amt]) => isPositiveDecimal(amt))
+                .map(([invId, amt]) => ({
+                    invoice_id: Number(invId),
+                    allocated_amount: amt,
                     allocation_date: paymentDate,
                     allocation_method: ALLOCATION_METHOD_SPECIFIC_INVOICE,
-                }] : undefined,
-            });
-            if (sellingInvoice) {
-                setCompletedSellingPayment(payment);
+                }));
+
+            if (isEditMode) {
+                if (!editPayment.data) throw new Error('Existing draft payment data is not loaded.');
+                const updated = await updatePayment(editPaymentId, {
+                    payment_type: paymentType,
+                    direction,
+                    payment_date: paymentDate,
+                    party_type: party ? partyType : undefined,
+                    party_id: party?.id,
+                    currency_id: editPayment.data.currency?.id ?? undefined,
+                    exchange_rate: editPayment.data.currency?.id ? exchangeRate : undefined,
+                    reference_number: reference.trim() || undefined,
+                    expected_version: editPayment.data.row_version,
+                    lines: payloadLines,
+                    allocations: formattedAllocations.length > 0 ? formattedAllocations : undefined,
+                });
+                navigate(`/payments/${updated.id}`);
             } else {
-                navigate(`/payments/${payment.id}`);
+                const payment = await (sellingInvoice ? finalizeSellingPayment : createPayment)({
+                    payment_type: paymentType,
+                    direction,
+                    payment_date: paymentDate,
+                    party_type: party ? partyType : undefined,
+                    party_id: party?.id,
+                    currency_id: settlementInvoice.data?.currency?.id ?? undefined,
+                    exchange_rate: settlementInvoice.data?.currency?.id ? exchangeRate : undefined,
+                    reference_number: reference.trim() || undefined,
+                    notes: settlementInvoice.data
+                        ? `Settlement initiated from invoice ${settlementInvoice.data.invoice_number ?? settlementInvoice.data.id}.`
+                        : undefined,
+                    lines: payloadLines,
+                    allocations: formattedAllocations.length > 0 ? formattedAllocations : undefined,
+                });
+                if (sellingInvoice) {
+                    setCompletedSellingPayment(payment);
+                } else {
+                    navigate(`/payments/${payment.id}`);
+                }
             }
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -310,7 +470,7 @@ export default function PaymentEntryPage() {
         }
     }
 
-    if (invoiceId !== null && settlementInvoice.loading) return <LoadingState />;
+    if ((invoiceId !== null && settlementInvoice.loading) || (isEditMode && editPayment.loading)) return <LoadingState />;
 
     if (sellingInvoice && completedSellingPayment) {
         return <SellingPaymentSuccess
@@ -440,12 +600,22 @@ export default function PaymentEntryPage() {
     return (
         <>
             <ContentHeader
-                title={settlementInvoice.data ? 'Invoice settlement' : 'Payment entry'}
-                description={settlementInvoice.data
-                    ? 'Create the matching customer receipt or supplier payment and allocate it to this invoice atomically.'
-                    : 'Create a payment with one or more configured settlement methods.'}
+                title={
+                    isEditMode
+                        ? `Edit draft payment ${editPayment.data?.payment_number ?? ''}`
+                        : settlementInvoice.data
+                            ? 'Invoice settlement'
+                            : 'Payment entry'
+                }
+                description={
+                    isEditMode
+                        ? 'Update payment details, payment lines, and cross-document allocations before posting.'
+                        : settlementInvoice.data
+                            ? 'Create the matching customer receipt or supplier payment and allocate it to this invoice atomically.'
+                            : 'Create a payment with one or more configured settlement methods and allocate across open documents.'
+                }
             />
-            <ErrorAlert error={error ?? methods.error ?? settlementInvoice.error} />
+            <ErrorAlert error={error ?? methods.error ?? settlementInvoice.error ?? editPayment.error ?? openRentalDocs.error} />
             {settlementInvoice.data && (
                 <Panel title="Invoice to settle">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -492,18 +662,18 @@ export default function PaymentEntryPage() {
             <form className="mt-5 space-y-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
                 <Panel title="Header">
                     <div className="grid gap-4 md:grid-cols-4">
-                        <Select label="Payment type" value={paymentType} options={typeOptions} disabled={invoiceId !== null} onChange={(event) => {
+                        <Select label="Payment type" value={paymentType} options={typeOptions} disabled={invoiceId !== null || isEditMode} onChange={(event) => {
                             const value = event.target.value;
                             setPaymentType(value);
                             if (value === PAYMENT_TYPE_SUPPLIER_PAYMENT) setDirection(PAYMENT_DIRECTION_OUTBOUND);
                             if (value === PAYMENT_TYPE_CUSTOMER_RECEIPT || value === 'advance') setDirection(PAYMENT_DIRECTION_INBOUND);
                             setParty(null);
                         }} />
-                        <Select label="Direction" value={direction} options={directionOptions} disabled={invoiceId !== null} onChange={(event) => setDirection(event.target.value)} />
+                        <Select label="Direction" value={direction} options={directionOptions} disabled={invoiceId !== null || isEditMode} onChange={(event) => setDirection(event.target.value)} />
                         <Input label="Payment date" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
                         <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />
                         {settlementInvoice.data?.currency?.id ? <Input label={`Exchange rate · ${settlementInvoice.data.currency.code ?? 'currency'} to base`} inputMode="decimal" value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} required /> : null}
-                        {invoiceId !== null ? (
+                        {invoiceId !== null || isEditMode ? (
                             <div>
                                 <div className="mb-1.5 block text-sm font-medium text-slate-700">Settlement party</div>
                                 <div className="min-h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
@@ -515,6 +685,159 @@ export default function PaymentEntryPage() {
                             : <SupplierLookupSelect value={party as never} onChange={(next) => setParty(next as NamedResource | null)} />}
                     </div>
                 </Panel>
+
+                {party !== null && !isInvoiceSettlement && !isSellingMode && (
+                    <Panel title="Open documents & agreement allocations">
+                        <div className="space-y-4">
+                            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-medium text-slate-700">Filter by agreement:</span>
+                                    <select
+                                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        value={agreementFilter}
+                                        onChange={(e) => setAgreementFilter(e.target.value)}
+                                    >
+                                        <option value="all">All agreements ({openDocs.length} open documents)</option>
+                                        {agreements.map((agmt) => (
+                                            <option key={agmt.id} value={String(agmt.id)}>
+                                                {agmt.reference} ({agmt.status})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {openDocs.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button size="sm" variant="secondary" onClick={allocateAllOpenDocs}>
+                                            Pay full balance on all
+                                        </Button>
+                                        <Button size="sm" variant="ghost" onClick={clearAllAllocations}>
+                                            Clear allocations
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {openRentalDocs.loading ? (
+                                <p className="text-sm text-slate-500">Loading open documents…</p>
+                            ) : openDocs.length === 0 ? (
+                                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-600">
+                                    No open rental documents found for this party. Any payment recorded will be held as an unapplied advance / surplus balance.
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                                            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                                                <tr>
+                                                    <th className="px-3 py-2.5">Agreement</th>
+                                                    <th className="px-3 py-2.5">Vehicle / Driver</th>
+                                                    <th className="px-3 py-2.5">Invoice</th>
+                                                    <th className="px-3 py-2.5">Date</th>
+                                                    <th className="px-3 py-2.5 text-right">Total</th>
+                                                    <th className="px-3 py-2.5 text-right">Balance Due</th>
+                                                    <th className="px-3 py-2.5 text-right">Allocate Amount</th>
+                                                    <th className="px-3 py-2.5 text-center">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 bg-white">
+                                                {filteredDocs.map((doc) => {
+                                                    const curAlloc = docAllocations[doc.id] ?? '0.000000';
+                                                    const isOver = compareDecimalStrings(curAlloc, doc.remaining_amount) > 0;
+                                                    return (
+                                                        <tr key={doc.id} className={isOver ? 'bg-rose-50/50' : undefined}>
+                                                            <td className="px-3 py-2 font-medium text-slate-900">
+                                                                {doc.agreement_reference ? (
+                                                                    <span className="inline-flex rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                                                        {doc.agreement_reference}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-400">—</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-slate-700">
+                                                                <div>{doc.vehicle_registration ?? '—'}</div>
+                                                                {doc.driver_name && (
+                                                                    <div className="text-xs text-slate-500">{doc.driver_name}</div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2 font-medium text-slate-900">
+                                                                {doc.invoice_number ?? `Inv #${doc.id}`}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-slate-600">
+                                                                {doc.invoice_date ?? '—'}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+                                                                <MoneyDisplay value={doc.total_amount} currency={doc.currency_code ?? activeCurrency} />
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-medium tabular-nums text-amber-700">
+                                                                <MoneyDisplay value={doc.remaining_amount} currency={doc.currency_code ?? activeCurrency} />
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right">
+                                                                <DecimalInput
+                                                                    className="ml-auto w-32 text-right font-semibold tabular-nums"
+                                                                    maxFractionDigits={PAYMENT_AMOUNT_FRACTION_DIGITS}
+                                                                    value={curAlloc}
+                                                                    onChange={(e) => updateDocAllocation(doc.id, e.target.value)}
+                                                                />
+                                                            </td>
+                                                            <td className="px-3 py-2 text-center">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="secondary"
+                                                                    onClick={() => allocateFullDoc(doc)}
+                                                                >
+                                                                    Pay full
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Tendered</div>
+                                            <div className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                                                <MoneyDisplay value={total} currency={activeCurrency} />
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Total Allocated</div>
+                                            <div className="mt-1 text-xl font-bold tabular-nums text-blue-900">
+                                                <MoneyDisplay value={totalAllocated} currency={activeCurrency} />
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Unapplied Advance / Surplus</div>
+                                            <div className="mt-1 text-xl font-bold tabular-nums text-emerald-900">
+                                                <MoneyDisplay value={unappliedAdvance} currency={activeCurrency} />
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Balance After Payment</div>
+                                            <div className="mt-1 text-xl font-bold tabular-nums text-slate-900">
+                                                <MoneyDisplay value={balanceAfterAllocations} currency={activeCurrency} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {hasAllocationsOverRemaining && (
+                                        <p className="text-sm font-medium text-rose-700">
+                                            One or more allocation amounts exceed the document's remaining balance.
+                                        </p>
+                                    )}
+                                    {allocationsExceedTotal && (
+                                        <p className="text-sm font-medium text-rose-700">
+                                            Total allocated amount cannot exceed the total payment amount tendered.
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </Panel>
+                )}
 
                 <Panel title="Payment methods">
                     <PaymentLineTable
@@ -534,11 +857,13 @@ export default function PaymentEntryPage() {
 
                 <div className="flex justify-end">
                     <Button type="submit" loading={busy} disabled={!canSubmit}>
-                        {settlementInvoice.data?.direction === PAYMENT_DIRECTION_OUTBOUND
-                            ? 'Create customer receipt'
-                            : settlementInvoice.data
-                                ? 'Create supplier payment'
-                                : 'Create payment'}
+                        {isEditMode
+                            ? 'Save draft payment'
+                            : settlementInvoice.data?.direction === PAYMENT_DIRECTION_OUTBOUND
+                                ? 'Create customer receipt'
+                                : settlementInvoice.data
+                                    ? 'Create supplier payment'
+                                    : 'Create payment'}
                     </Button>
                 </div>
             </form>

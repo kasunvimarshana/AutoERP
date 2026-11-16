@@ -4,6 +4,7 @@ import type { ApiCollection, ApiResource } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import { AGREEMENT_API, PAGE_SIZE, AgreementKind, AgreementAction, AgreementStatus, type Agreement, type AgreementHistory, type AgreementPayload, type AgreementSuccessorPayload } from './agreements';
+export { AgreementKind, AgreementAction, AgreementStatus, type Agreement, type AgreementHistory, type AgreementPayload, type AgreementSuccessorPayload };
 
 const url = (kind: AgreementKind) => `${AGREEMENT_API}/${kind}/agreements`;
 export const listAgreements = (kind: AgreementKind, page: number, signal?: AbortSignal, search?: string, status?: AgreementStatus | '') =>
@@ -170,6 +171,9 @@ export interface RecordRentalPaymentPayload {
     expected_version: number;
     payment_date: string;
     exchange_rate?: string;
+    currency_id?: number | null;
+    agreement_id?: number | null;
+    agreement_reference?: string | null;
     reference_number?: string | null;
     notes?: string | null;
     lines: Array<{
@@ -217,6 +221,57 @@ export interface RefundRentalPaymentPayload {
     reason?: string | null;
     expected_version?: number;
 }
+
+export interface PartyOpenDocument {
+    id: number;
+    invoice_number: string;
+    invoice_type: string;
+    direction: string;
+    status: string;
+    invoice_date?: string | null;
+    due_date?: string | null;
+    currency_code: string;
+    total_amount: string;
+    remaining_amount: string;
+    balance_due: string;
+    agreement_reference?: string | null;
+    agreement_id?: number | null;
+    vehicle_registration?: string | null;
+    vehicle_name?: string | null;
+    driver_name?: string | null;
+}
+
+export interface PartyOpenDocumentsResponse {
+    party: {
+        id: number;
+        name: string;
+        code: string;
+        kind: string;
+    };
+    agreements: Array<{
+        id: number;
+        reference: string;
+        status: string;
+        starts_on?: string | null;
+        ends_on?: string | null;
+    }>;
+    summary: {
+        total_open_balance: string;
+        total_documents_count: number;
+        active_agreements_count: number;
+        party_unapplied_advance: string;
+    };
+    documents: PartyOpenDocument[];
+}
+
+export const getPartyOpenRentalDocuments = (kind: AgreementKind, partyId: number) =>
+    apiClient.get<{ data: PartyOpenDocumentsResponse }>(`${AGREEMENT_API}/${kind}/parties/${partyId}/open-documents`).then(r => r.data.data);
+
+export const recordPartyRentalPayment = (kind: AgreementKind, partyId: number, payload: RecordRentalPaymentPayload) =>
+    apiClient.post<ApiResource<any>>(`${AGREEMENT_API}/${kind}/parties/${partyId}/payments`, payload).then(r => r.data.data);
+
+export const allocatePartyRentalPayment = (kind: AgreementKind, partyId: number, paymentId: number, payload: AllocateRentalPaymentPayload) =>
+    apiClient.post<ApiResource<any>>(`${AGREEMENT_API}/${kind}/parties/${partyId}/payments/${paymentId}/allocate`, payload).then(r => r.data.data);
 
 export const listAgreementPayments = (kind: AgreementKind, agreementId: number) =>
     apiClient.get<{ data: AgreementPayment[] }>(`${url(kind)}/${agreementId}/payments`).then(r => r.data.data);

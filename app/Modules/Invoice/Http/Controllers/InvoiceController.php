@@ -51,7 +51,7 @@ final class InvoiceController
         if ($request->filled('search')) {
             $query->where('invoice_number', 'like', '%'.trim((string) $request->input('search')).'%');
         }
-        foreach (['invoice_type', 'direction', 'status', 'party_id', 'currency_id'] as $filter) {
+        foreach (['invoice_type', 'direction', 'status', 'party_type', 'party_id', 'currency_id'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }

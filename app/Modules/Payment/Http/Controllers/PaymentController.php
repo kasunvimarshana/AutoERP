@@ -8,8 +8,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Payment\Http\Requests\AllocatePaymentRequest;
+use Modules\Payment\Http\Requests\DeletePaymentRequest;
 use Modules\Payment\Http\Requests\ListPaymentRequest;
 use Modules\Payment\Http\Requests\PaymentActionRequest;
 use Modules\Payment\Http\Requests\RefundPaymentRequest;
@@ -17,17 +19,20 @@ use Modules\Payment\Http\Requests\ReversePaymentAllocationRequest;
 use Modules\Payment\Http\Requests\ReversePaymentRequest;
 use Modules\Payment\Http\Requests\SettlePaymentLineRequest;
 use Modules\Payment\Http\Requests\StorePaymentRequest;
+use Modules\Payment\Http\Requests\UpdatePaymentRequest;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentAllocationReversalService;
 use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
+use Modules\Payment\Services\PaymentDraftDeletionService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Services\PaymentReceiptService;
 use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\Payment\Services\PaymentSettlementService;
+use Modules\Payment\Services\PaymentUpdateService;
 use Symfony\Component\HttpFoundation\Response;
 
 final class PaymentController
@@ -59,6 +64,32 @@ final class PaymentController
     public function store(StorePaymentRequest $request, PaymentCreationService $service): PaymentResource
     {
         return new PaymentResource($service->create($request->toData()));
+    }
+
+    public function update(
+        UpdatePaymentRequest $request,
+        int $payment,
+        PaymentUpdateService $service,
+    ): PaymentResource {
+        $model = $this->find($request, $payment);
+
+        return new PaymentResource($service->update($model, $request->toData()));
+    }
+
+    public function destroy(
+        DeletePaymentRequest $request,
+        int $payment,
+        PaymentDraftDeletionService $service,
+    ): JsonResponse {
+        $model = $this->find($request, $payment);
+        $service->delete(
+            $model,
+            $request->expectedVersion(),
+            $request->currentUserId(),
+            $request->reason(),
+        );
+
+        return response()->json(null, Response::HTTP_NO_CONTENT);
     }
 
     public function show(
@@ -246,7 +277,7 @@ final class PaymentController
     }
 
     private function find(
-        ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentAllocationRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
+        TenantScopedRequest $request,
         int $payment,
     ): Payment {
         return $this->scope(Payment::query(), $request)->findOrFail($payment);
@@ -254,7 +285,7 @@ final class PaymentController
 
     private function scope(
         Builder $query,
-        ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentAllocationRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
+        TenantScopedRequest $request,
     ): Builder {
         $query->where('tenant_id', $request->tenantId());
 

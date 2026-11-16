@@ -20,6 +20,7 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     operational('/payments/cheque-templates', ['payment'], [paymentPermissions.templatesView]),
     operational('/payments/:paymentId/lines/:lineId/cheque-print', ['payment'], [paymentPermissions.chequesPreview]),
     operational('/payments/create', ['payment'], [paymentPermissions.create]),
+    operational('/payments/:id/edit', ['payment'], [paymentPermissions.update]),
     operational('/payments/:id', ['payment'], [paymentPermissions.view]),
     operational('/payments', ['payment'], [paymentPermissions.view]),
 

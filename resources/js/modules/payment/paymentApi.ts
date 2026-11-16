@@ -328,6 +328,21 @@ export const approvePayment = (id: number, expectedVersion: number) => paymentAc
 export const postPayment = (id: number, expectedVersion: number) => paymentAction(id, 'post', expectedVersion);
 export const voidPayment = (id: number, expectedVersion: number, reason?: string) => paymentAction(id, 'void', expectedVersion, reason);
 
+export async function updatePayment(id: number, payload: PaymentPayload & { expected_version: number }) {
+    const response = await apiClient.put<ApiResource<Payment>>(`${endpoints.payments}/${id}`, payload);
+    return response.data.data;
+}
+
+export async function deletePayment(id: number, expectedVersion: number, reason?: string) {
+    await apiClient.delete(`${endpoints.payments}/${id}`, {
+        data: { expected_version: expectedVersion, reason },
+    });
+}
+
+export function getPaymentReceiptUrl(id: number, format: 'html' | 'print' | 'pdf' = 'html'): string {
+    return `${endpoints.payments}/${id}/receipt/export/${format}`;
+}
+
 function createPaymentIdempotencyKey(): string {
     return globalThis.crypto.randomUUID();
 }

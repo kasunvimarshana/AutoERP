@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
     approvePayment,
+    deletePayment,
     getPayment,
     getPaymentAllocations,
+    getPaymentReceiptUrl,
     getPaymentUnappliedBalance,
     postPayment,
     reversePayment,
@@ -51,6 +53,7 @@ const today = () => businessDateInputValue();
 export default function PaymentDetailPage() {
     const id = Number(useParams().id);
     const location = useLocation();
+    const navigate = useNavigate();
     const auth = useAuth();
     const tabState = useOnDemandTab<Tab>('summary');
     const payment = useApi((signal) => getPayment(id, signal), [id]);
@@ -79,6 +82,8 @@ export default function PaymentDetailPage() {
     const canApprove = Boolean(capabilities.can_approve) && hasPaymentPermission(auth, paymentPermissions.approve);
     const canPost = Boolean(capabilities.can_post) && hasPaymentPermission(auth, paymentPermissions.post);
     const canVoid = Boolean(capabilities.can_void) && hasPaymentPermission(auth, paymentPermissions.void);
+    const canEdit = Boolean(capabilities.can_edit) && hasPaymentPermission(auth, paymentPermissions.update);
+    const canDeleteDraft = value.document_status === 'draft' && hasPaymentPermission(auth, paymentPermissions.void);
     const canPrintCheque = Boolean(capabilities.can_print_cheque) && chequeLine?.id && hasPaymentPermission(auth, paymentPermissions.chequesPrint);
     const reversalValid = reversalReason.trim() !== '';
 
@@ -135,17 +140,34 @@ export default function PaymentDetailPage() {
         }
     }
 
+    async function handleDeleteDraft() {
+        if (busy || !window.confirm('Are you sure you want to delete this draft payment? This action cannot be undone.')) return;
+        setBusy(true);
+        setActionError(null);
+        try {
+            await deletePayment(id, value.row_version);
+            navigate('/payments');
+        } catch (error) {
+            setActionError(toApiError(error));
+            setBusy(false);
+        }
+    }
+
     return <>
         <ContentHeader
             title={value.payment_number ?? 'Payment'}
             description={formatDate(value.payment_date)}
             actions={<div className="flex flex-wrap justify-end gap-2">
                 {fromPurchase && <LinkButton to="/purchase/payments" variant="secondary">Back to Purchase</LinkButton>}
+                {canEdit && <LinkButton to={`/payments/${id}/edit`} variant="secondary">Edit draft</LinkButton>}
                 {canSubmit && <Button variant="secondary" loading={busy} onClick={() => void runPaymentAction('submit')}>Submit</Button>}
                 {canApprove && <Button variant="secondary" loading={busy} onClick={() => void runPaymentAction('approve')}>Approve</Button>}
                 {canPost && <Button loading={busy} onClick={() => void runPaymentAction('post')}>Post</Button>}
                 {canVoid && <Button variant="danger" loading={busy} onClick={() => void runPaymentAction('void')}>Void</Button>}
+                {canDeleteDraft && <Button variant="danger" loading={busy} onClick={() => void handleDeleteDraft()}>Delete draft</Button>}
                 {canPrintCheque && <LinkButton to={`/payments/${id}/lines/${chequeLine.id}/cheque-print`}>Print cheque</LinkButton>}
+                <Button variant="secondary" onClick={() => window.open(getPaymentReceiptUrl(id, 'print'), '_blank')}>Print receipt</Button>
+                <Button variant="secondary" onClick={() => window.open(getPaymentReceiptUrl(id, 'html'), '_blank')}>View receipt</Button>
             </div>}
         />
         <Panel className="p-0">

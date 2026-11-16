@@ -117,6 +117,16 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
             Route::post('{payment}/refund', [RentalPaymentController::class, 'refund'])->whereNumber('payment');
         });
 
+    Route::prefix('{kind}/parties/{partyId}')
+        ->whereIn('kind', array_column(AgreementKind::cases(), 'value'))
+        ->whereNumber('partyId')
+        ->middleware('tenant.feature:'.TenantFeature::PAYMENT)
+        ->group(function (): void {
+            Route::get('open-documents', [RentalPaymentController::class, 'openDocuments']);
+            Route::post('payments', [RentalPaymentController::class, 'storePartyPayment']);
+            Route::post('payments/{payment}/allocate', [RentalPaymentController::class, 'allocatePartyPayment'])->whereNumber('payment');
+        });
+
     Route::prefix('customer/agreements/{agreement}/deposits')->whereNumber('agreement')->middleware('tenant.feature:'.TenantFeature::PAYMENT)->group(function (): void {
         Route::get('/', [DepositReceiptController::class, 'index']);
         Route::post('/', [DepositReceiptController::class, 'store']);

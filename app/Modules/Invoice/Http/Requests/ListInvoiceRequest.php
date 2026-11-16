@@ -19,7 +19,7 @@ final class ListInvoiceRequest extends TenantScopedRequest
 
         $merges = [];
         foreach ([
-            'search', 'invoice_type', 'direction', 'status', 'party_id',
+            'search', 'invoice_type', 'direction', 'status', 'party_type', 'party_id',
             'currency_id', 'date_from', 'date_to', 'balance_status',
             'settlement_eligible', 'page', 'per_page',
         ] as $field) {
@@ -42,6 +42,7 @@ final class ListInvoiceRequest extends TenantScopedRequest
             'invoice_type' => ['nullable', Rule::enum(InvoiceType::class)],
             'direction' => ['nullable', Rule::enum(InvoiceDirection::class)],
             'status' => ['nullable', Rule::enum(InvoiceStatus::class)],
+            'party_type' => ['nullable', 'string', 'in:customer,supplier'],
             'party_id' => ['nullable', 'integer', 'min:1'],
             'currency_id' => [
                 'nullable',

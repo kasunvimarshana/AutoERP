@@ -242,7 +242,7 @@
                 </div>
                 @if($agreement_reference)
                 <div style="font-size: 11px; font-weight: 600; color: #2563eb; margin-top: 4px;">
-                    Agreement Ref: {{ $agreement_reference }}
+                    Agreement {{ count($agreement_references ?? []) > 1 ? 'References' : 'Ref' }}: {{ $agreement_reference }}
                 </div>
                 @endif
             </td>
@@ -316,6 +316,7 @@
         <thead>
             <tr>
                 <th>Invoice / Bill #</th>
+                <th>Agreement Ref</th>
                 <th>Invoice Date</th>
                 <th class="text-right">Invoice Total</th>
                 <th class="text-right">Balance Before</th>
@@ -327,6 +328,7 @@
             @foreach($allocations as $alloc)
             <tr>
                 <td style="font-weight: 600; color: #2563eb;">{{ $alloc['invoice_number'] }}</td>
+                <td style="color: #475569; font-weight: 600;">{{ $alloc['agreement_reference'] ?: '—' }}</td>
                 <td>{{ $alloc['invoice_date'] }}</td>
                 <td class="text-right">{{ number_format((float) $alloc['invoice_total'], 2) }}</td>
                 <td class="text-right">{{ number_format((float) $alloc['balance_before'], 2) }}</td>

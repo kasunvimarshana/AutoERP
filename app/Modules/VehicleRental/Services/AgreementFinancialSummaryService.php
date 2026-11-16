@@ -9,8 +9,10 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceSourceService;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentSourceService;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
@@ -197,23 +199,31 @@ final class AgreementFinancialSummaryService
         $payments = [];
         try {
             $payments = $this->rentalPaymentService->listAgreementPayments($context, $agreement->id, $kind);
-        } catch (\Throwable) {
+        } catch (\Illuminate\Auth\Access\AuthorizationException) {
             // Graceful fallback if user lacks payment view permission
         }
 
         $totalUnappliedAdvance = '0.000000';
         foreach ($payments as $p) {
-            $pStatus = (string) ($p['status'] ?? '');
             $pPostingStatus = (string) ($p['posting_status'] ?? '');
             $pDocStatus = (string) ($p['document_status'] ?? '');
             $pType = (string) ($p['payment_type'] ?? '');
             if ($pType !== PaymentType::Refund->value
-                && ($pPostingStatus === 'posted' || in_array($pStatus, ['approved', 'posted'], true) || in_array($pDocStatus, ['approved', 'posted'], true))
+                && ($pPostingStatus === 'posted' || in_array($pDocStatus, ['approved', 'posted'], true))
                 && ! empty($p['unapplied_amount'])
+                && (int) ($p['source_id'] ?? 0) === $agreement->id
             ) {
                 $totalUnappliedAdvance = $this->math->add($totalUnappliedAdvance, (string) $p['unapplied_amount']);
             }
         }
+
+        $partyUnappliedAdvance = $this->math->normalize((string) Payment::query()
+            ->where('tenant_id', $context->tenantId)
+            ->where('party_type', $isCustomer ? 'customer' : 'supplier')
+            ->where('party_id', $agreement->party->getKey())
+            ->where('posting_status', PaymentPostingStatus::Posted->value)
+            ->where('unapplied_amount', '>', 0)
+            ->sum('unapplied_amount'));
 
         $netAccountBalance = $this->math->sub(
             $this->math->sub($totalRemainingBalance, $totalUnallocatedCredit),
@@ -248,6 +258,7 @@ final class AgreementFinancialSummaryService
                 'total_remaining_balance' => $totalRemainingBalance,
                 'total_unallocated_credit' => $totalUnallocatedCredit,
                 'total_unapplied_advance' => $totalUnappliedAdvance,
+                'party_unapplied_advance' => $partyUnappliedAdvance,
                 'net_account_balance' => $netAccountBalance,
             ],
             'base_charges' => $baseCharges->map(fn (RentalCharge $c) => [

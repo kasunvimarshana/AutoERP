@@ -18,8 +18,12 @@ import { AgreementKind, type Agreement } from './agreements';
 import {
     recordAgreementPayment,
     allocateAgreementPayment,
+    getPartyOpenRentalDocuments,
+    recordPartyRentalPayment,
+    allocatePartyRentalPayment,
     getPaymentReceiptPrintUrl,
     type AgreementPayment,
+    type PartyOpenDocument,
     type RecordRentalPaymentPayload,
 } from './agreementApi';
 
@@ -82,6 +86,7 @@ export function AgreementPaymentModal({
 
     // Allocations map: invoiceId -> amount string
     const [allocations, setAllocations] = useState<Record<number, string>>({});
+    const [showCrossAgreement, setShowCrossAgreement] = useState(false);
 
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -95,8 +100,31 @@ export function AgreementPaymentModal({
     );
     const paymentMethods = methodsApi.data?.data ?? [];
 
+    const partyDocsApi = useApi(
+        signal => getPartyOpenRentalDocuments(kind, agreement.party.id),
+        [kind, agreement.party.id],
+        open && showCrossAgreement
+    );
+
+    const crossInvoices: Array<OpenInvoiceDoc & { agreement_reference?: string | null; vehicle_registration?: string | null }> = (partyDocsApi.data?.documents ?? []).map((doc: PartyOpenDocument) => ({
+        id: doc.id,
+        invoice_number: doc.invoice_number,
+        invoice_date: doc.invoice_date ?? '',
+        due_date: doc.due_date,
+        invoice_type: doc.invoice_type,
+        document_kind: 'invoice',
+        status: doc.status,
+        grand_total: doc.total_amount,
+        paid_total: '0.00',
+        balance_due: doc.remaining_amount,
+        agreement_reference: doc.agreement_reference,
+        vehicle_registration: doc.vehicle_registration,
+    }));
+
+    const sourceInvoices = showCrossAgreement ? crossInvoices : openInvoices;
+
     // Filter candidate invoices with positive balance
-    const eligibleInvoices = openInvoices.filter(
+    const eligibleInvoices = sourceInvoices.filter(
         d => d.invoice_type !== 'credit' && Number(d.balance_due) > 0 && d.status !== 'draft' && d.status !== 'voided'
     );
 
@@ -232,10 +260,17 @@ export function AgreementPaymentModal({
                 }));
 
             if (isAllocateMode && initialPayment) {
-                await allocateAgreementPayment(kind, agreement.id, initialPayment.id, {
-                    allocations: allocationItems,
-                    allocation_date: paymentDate,
-                });
+                if (showCrossAgreement) {
+                    await allocatePartyRentalPayment(kind, agreement.party.id, initialPayment.id, {
+                        allocations: allocationItems,
+                        allocation_date: paymentDate,
+                    });
+                } else {
+                    await allocateAgreementPayment(kind, agreement.id, initialPayment.id, {
+                        allocations: allocationItems,
+                        allocation_date: paymentDate,
+                    });
+                }
                 onPaymentSuccess();
                 onClose();
             } else {
@@ -245,6 +280,9 @@ export function AgreementPaymentModal({
 
                 const payload: RecordRentalPaymentPayload = {
                     expected_version: agreement.row_version,
+                    agreement_id: agreement.id,
+                    agreement_reference: agreement.reference,
+                    currency_id: agreement.currency?.id ?? null,
                     payment_date: paymentDate,
                     exchange_rate: exchangeRate,
                     reference_number: referenceNumber.trim() || null,
@@ -253,7 +291,9 @@ export function AgreementPaymentModal({
                     allocations: allocationItems.length > 0 ? allocationItems : undefined,
                 };
 
-                const res = await recordAgreementPayment(kind, agreement.id, payload);
+                const res = showCrossAgreement
+                    ? await recordPartyRentalPayment(kind, agreement.party.id, payload)
+                    : await recordAgreementPayment(kind, agreement.id, payload);
                 setSuccessPaymentId(res.id);
                 onPaymentSuccess();
             }
@@ -340,7 +380,7 @@ export function AgreementPaymentModal({
 
                         {/* Open Invoices Allocation Section */}
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div>
                                     <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                                         {isCustomer ? 'Apply to Open Customer Invoices' : 'Apply to Open Owner Bills'}
@@ -349,24 +389,42 @@ export function AgreementPaymentModal({
                                         Select outstanding invoices to settle, or leave unallocated to hold as an Advance Credit.
                                     </p>
                                 </div>
-                                {eligibleInvoices.length > 0 && (
-                                    <div className="flex gap-2">
-                                        <Button type="button" variant="ghost" onClick={handleClearAllocations}>
-                                            Clear
-                                        </Button>
-                                        <Button type="button" variant="secondary" onClick={handlePayAll}>
-                                            Pay All Invoices
-                                        </Button>
-                                    </div>
-                                )}
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <label className="inline-flex items-center gap-2 cursor-pointer rounded-lg bg-blue-50/70 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-100/60 transition">
+                                        <input
+                                            type="checkbox"
+                                            checked={showCrossAgreement}
+                                            onChange={e => {
+                                                setShowCrossAgreement(e.target.checked);
+                                                setAllocations({});
+                                            }}
+                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span>Show all open documents across all agreements</span>
+                                    </label>
+                                    {eligibleInvoices.length > 0 && (
+                                        <div className="flex gap-2">
+                                            <Button type="button" variant="ghost" onClick={handleClearAllocations}>
+                                                Clear
+                                            </Button>
+                                            <Button type="button" variant="secondary" onClick={handlePayAll}>
+                                                Pay All Invoices
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            {eligibleInvoices.length > 0 ? (
+                            {partyDocsApi.loading && showCrossAgreement ? (
+                                <LoadingState />
+                            ) : eligibleInvoices.length > 0 ? (
                                 <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
                                     <table className="w-full text-left text-xs">
                                         <thead>
                                             <tr className="border-b border-slate-200 bg-slate-50 font-semibold uppercase text-slate-500">
                                                 <th className="px-3 py-2.5">Document #</th>
+                                                {showCrossAgreement && <th className="px-3 py-2.5">Agreement</th>}
+                                                {showCrossAgreement && <th className="px-3 py-2.5">Vehicle</th>}
                                                 <th className="px-3 py-2.5">Date</th>
                                                 <th className="px-3 py-2.5">Status</th>
                                                 <th className="px-3 py-2.5 text-right">Balance Due</th>
@@ -380,6 +438,16 @@ export function AgreementPaymentModal({
                                                     <td className="px-3 py-2 font-medium text-slate-900">
                                                         {inv.invoice_number}
                                                     </td>
+                                                    {showCrossAgreement && (
+                                                        <td className="px-3 py-2 font-semibold text-blue-700">
+                                                            {(inv as any).agreement_reference || '—'}
+                                                        </td>
+                                                    )}
+                                                    {showCrossAgreement && (
+                                                        <td className="px-3 py-2 text-slate-600">
+                                                            {(inv as any).vehicle_registration || '—'}
+                                                        </td>
+                                                    )}
                                                     <td className="px-3 py-2 text-slate-600">
                                                         {formatBusinessDate(inv.invoice_date)}
                                                     </td>
@@ -416,7 +484,7 @@ export function AgreementPaymentModal({
                                         </tbody>
                                         <tfoot>
                                             <tr className="bg-slate-50 font-semibold border-t border-slate-200">
-                                                <td colSpan={4} className="px-3 py-2 text-right text-slate-700">
+                                                <td colSpan={showCrossAgreement ? 6 : 4} className="px-3 py-2 text-right text-slate-700">
                                                     Total Allocated Across Invoices:
                                                 </td>
                                                 <td className="px-3 py-2 text-right font-bold text-slate-900">

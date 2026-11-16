@@ -21,7 +21,7 @@ final class RentalPaymentRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
-            'expected_version' => ['required', 'integer', 'min:1'],
+            'expected_version' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'payment_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
             'exchange_rate' => ['sometimes', 'nullable', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'gt:0'],
             'reference_number' => ['nullable', 'string', 'max:'.self::PAYMENT_REFERENCE_LENGTH],
@@ -31,10 +31,12 @@ final class RentalPaymentRequest extends TenantScopedRequest
             'allocations' => ['nullable', 'array'],
             'allocations.*.invoice_id' => ['required_with:allocations', 'integer', 'min:1'],
             'allocations.*.amount' => ['required_with:allocations', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'gt:0'],
+            'currency_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'agreement_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'agreement_reference' => ['sometimes', 'nullable', 'string', 'max:150'],
             ...$this->paymentLineRules(),
             'party_id' => ['prohibited'],
             'party_type' => ['prohibited'],
-            'currency_id' => ['prohibited'],
             'source_id' => ['prohibited'],
             'source_type' => ['prohibited'],
             'payment_type' => ['prohibited'],
@@ -56,7 +58,7 @@ final class RentalPaymentRequest extends TenantScopedRequest
             'idempotency_key' => $effectiveKey,
         ];
 
-        foreach (['reference_number', 'notes', 'exchange_rate'] as $field) {
+        foreach (['reference_number', 'notes', 'exchange_rate', 'currency_id', 'agreement_id', 'agreement_reference'] as $field) {
             if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
                 $merges[$field] = null;
             }
