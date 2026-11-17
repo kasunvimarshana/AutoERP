@@ -26,6 +26,14 @@ enum InvoicePrintLayout: string
 
     private const CONTINUOUS_END_MARGIN_MM = 4.2;
 
+    private const SERVICE_CONTINUOUS_TOP_MARGIN_MM = 5;
+
+    private const SERVICE_CONTINUOUS_SIDE_MARGIN_MM = 8;
+
+    private const SERVICE_CONTINUOUS_BOTTOM_MARGIN_MM = 2;
+
+    private const SERVICE_CONTINUOUS_CONTENT_MIN_HEIGHT_MM = 116;
+
     public function paperSize(): string
     {
         return match ($this) {
@@ -63,6 +71,19 @@ enum InvoicePrintLayout: string
                 .self::CONTINUOUS_END_MARGIN_MM.'mm '
                 .self::CONTINUOUS_LEFT_PRINT_MARGIN_MM.'mm',
         };
+    }
+
+    public function serviceContinuousCssPageMargin(): string
+    {
+        return self::SERVICE_CONTINUOUS_TOP_MARGIN_MM.'mm '
+            .self::SERVICE_CONTINUOUS_SIDE_MARGIN_MM.'mm '
+            .self::SERVICE_CONTINUOUS_BOTTOM_MARGIN_MM.'mm '
+            .self::SERVICE_CONTINUOUS_SIDE_MARGIN_MM.'mm';
+    }
+
+    public function serviceContinuousContentMinHeight(): string
+    {
+        return self::SERVICE_CONTINUOUS_CONTENT_MIN_HEIGHT_MM.'mm';
     }
 
     public function continuousCssWidth(): string
