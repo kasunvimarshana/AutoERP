@@ -28,11 +28,14 @@ enum InvoicePrintLayout: string
 
     private const SERVICE_CONTINUOUS_TOP_MARGIN_MM = 5;
 
-    private const SERVICE_CONTINUOUS_SIDE_MARGIN_MM = 8;
+    // Compensate for the rightward offset observed on the continuous-feed print sample.
+    private const SERVICE_CONTINUOUS_RIGHT_MARGIN_MM = 13;
+
+    private const SERVICE_CONTINUOUS_LEFT_MARGIN_MM = 3;
 
     private const SERVICE_CONTINUOUS_BOTTOM_MARGIN_MM = 2;
 
-    private const SERVICE_CONTINUOUS_CONTENT_MIN_HEIGHT_MM = 116;
+    private const SERVICE_CONTINUOUS_CONTENT_MIN_HEIGHT_MM = 112;
 
     public function paperSize(): string
     {
@@ -76,9 +79,9 @@ enum InvoicePrintLayout: string
     public function serviceContinuousCssPageMargin(): string
     {
         return self::SERVICE_CONTINUOUS_TOP_MARGIN_MM.'mm '
-            .self::SERVICE_CONTINUOUS_SIDE_MARGIN_MM.'mm '
+            .self::SERVICE_CONTINUOUS_RIGHT_MARGIN_MM.'mm '
             .self::SERVICE_CONTINUOUS_BOTTOM_MARGIN_MM.'mm '
-            .self::SERVICE_CONTINUOUS_SIDE_MARGIN_MM.'mm';
+            .self::SERVICE_CONTINUOUS_LEFT_MARGIN_MM.'mm';
     }
 
     public function serviceContinuousContentMinHeight(): string

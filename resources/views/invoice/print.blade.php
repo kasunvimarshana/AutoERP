@@ -220,20 +220,20 @@
         .layout-service-a4 .service-footer td:last-child { text-align: right; }
         .layout-service-a4 .print-trace { margin-top: 0; font-size: 8px; white-space: nowrap; }
         .pdf-output.layout-service-a4 .sheet { padding: 0; }
-        .layout-service-continuous { color: #173956; font-family: Arial, Helvetica, sans-serif; font-size: 9px; line-height: 1.3; }
+        .layout-service-continuous { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 10px; line-height: 1.25; }
         .layout-service-continuous .sheet { padding: {{ $print_layout['css_page_margin'] }}; }
         .layout-service-continuous .controls { width: {{ $print_layout['continuous_width'] }}; }
         .layout-service-continuous .invoice-header { margin-bottom: 2mm; }
         .layout-service-continuous .invoice-header td { border: 0; vertical-align: top; }
         .layout-service-continuous .company-name { font-size: 16px; font-weight: 700; letter-spacing: .2px; }
-        .layout-service-continuous .company-contact { margin-top: 3px; font-size: 8px; }
+        .layout-service-continuous .company-contact { margin-top: 3px; font-size: 9px; }
         .layout-service-continuous .invoice-heading { font-size: 16px; font-weight: 700; text-align: right; text-transform: uppercase; }
         .layout-service-continuous .identity-table,
         .layout-service-continuous .party-table { margin-bottom: 2mm; }
         .layout-service-continuous .identity-table td,
         .layout-service-continuous .party-table td { width: 50%; border: 1px solid #8193a2; padding: 5px 7px; vertical-align: top; }
-        .layout-service-continuous .party-table td { height: 20mm; }
-        .layout-service-continuous .party-detail { margin-bottom: 3px; }
+        .layout-service-continuous .party-table td { height: 16mm; }
+        .layout-service-continuous .party-detail { margin-bottom: 2px; }
         .layout-service-continuous .party-detail strong { display: inline-block; min-width: 28%; }
         .layout-service-continuous .service-inline-references { margin-top: 3px; }
         .layout-service-continuous .service-inline-references span { display: inline-block; margin-right: 6mm; }
@@ -242,18 +242,17 @@
         .layout-service-continuous .service-lines tr { page-break-inside: avoid; }
         .layout-service-continuous .service-lines th,
         .layout-service-continuous .service-lines td { border: 1px solid #8193a2; padding: 4px 5px; vertical-align: middle; }
-        .layout-service-continuous .service-lines th { background: #e9edf1; font-size: 8px; text-align: right; text-transform: uppercase; }
+        .layout-service-continuous .service-lines th { background: #e9edf1; font-size: 9px; text-align: right; text-transform: uppercase; }
         .layout-service-continuous .service-lines th:first-child,
         .layout-service-continuous .service-lines th:nth-child(2) { text-align: left; }
         .layout-service-continuous .service-lines .line-number { text-align: center; }
-        .layout-service-continuous .service-lines .item-code { display: block; color: #526a7e; font-size: 7px; }
         .layout-service-continuous .settlement-table { margin-top: 2mm; }
         .layout-service-continuous .settlement-table > tbody > tr > td { border: 1px solid #8193a2; padding: 0; vertical-align: top; }
         .layout-service-continuous .payment-box { width: 50%; padding: 7px 9px !important; }
         .layout-service-continuous .payment-box-title { margin-bottom: 7px; font-weight: 700; text-transform: uppercase; }
         .layout-service-continuous .payment-box div { margin-bottom: 5px; }
         .layout-service-continuous .totals-box { width: 50%; }
-        .layout-service-continuous .totals-box td { border-bottom: 1px solid #8193a2; padding: 3px 5px; }
+        .layout-service-continuous .totals-box td { border-bottom: 1px solid #8193a2; padding: 2px 5px; }
         .layout-service-continuous .totals-box tr:last-child td { border-bottom: 0; }
         .layout-service-continuous .totals-box td:last-child { width: 28%; text-align: right; white-space: nowrap; }
         .layout-service-continuous .totals-box .total-row { background: #e9edf1; font-weight: 700; }
@@ -262,10 +261,10 @@
         .layout-service-continuous .signatures { margin-top: 3mm; }
         .layout-service-continuous .signatures td { width: 50%; padding: 0 8mm; text-align: center; }
         .layout-service-continuous .signature-rule { border-top: 1px solid #a9b6c1; padding-top: 3px; }
-        .layout-service-continuous .service-footer { margin-top: 2mm; border-top: 1px solid #c4cdd5; color: #526a7e; font-size: 8px; }
+        .layout-service-continuous .service-footer { margin-top: 2mm; border-top: 1px solid #c4cdd5; color: #111; font-size: 9px; }
         .layout-service-continuous .service-footer td { width: 35%; padding: 8px 0 3px; vertical-align: top; }
         .layout-service-continuous .service-footer td:last-child { width: 65%; text-align: right; }
-        .layout-service-continuous .print-trace { margin-top: 0; font-size: 8px; white-space: normal; overflow-wrap: break-word; }
+        .layout-service-continuous .print-trace { margin-top: 0; font-size: 9px; white-space: normal; overflow-wrap: break-word; }
         .pdf-output.layout-service-continuous .sheet { padding: 0; }
         @media print {
             body { background: #fff; }

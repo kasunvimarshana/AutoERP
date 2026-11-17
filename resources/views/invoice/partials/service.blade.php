@@ -73,7 +73,7 @@
                 <td class="line-number">{{ $loop->iteration }}</td>
                 <td>
                     {{ $line['display_name'] }}
-                    @if (! empty($line['item_code']))<span class="item-code">{{ $line['item_code'] }}</span>@endif
+                    @if (! $isServiceContinuous && ! empty($line['item_code']))<span class="item-code">{{ $line['item_code'] }}</span>@endif
                 </td>
                 <td class="number">{{ $line['quantity']['display'] }}</td>
                 <td class="number">{{ $line['unit_price']['display'] }}</td>

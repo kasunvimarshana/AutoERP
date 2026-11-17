@@ -192,6 +192,7 @@ final class InvoicePrintServiceTest extends TestCase
                 ],
             )),
         );
+        DB::table('invoice_lines')->where('invoice_id', $invoice->getKey())->where('line_number', 3)->update(['item_code_snapshot' => 'FILTER-A4']);
         $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
         $prints = app(InvoicePrintService::class);
         $data = $prints->viewData(
@@ -212,6 +213,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringContainsString('Job No:</span> VSJ-000902', $html);
         $this->assertStringContainsString('Date of invoice:</strong> 12 Nov 2026', $html);
         $this->assertStringContainsString('Line discount', $html);
+        $this->assertStringContainsString('FILTER-A4', $html);
         $this->assertStringContainsString('Balance due', $html);
         $this->assertStringContainsString('Non Refundable, Exchange possible only within 7 days of purchase', $html);
         $this->assertStringContainsString('( This invoice cannot be used for a VAT input Claim )', $html);
@@ -323,6 +325,7 @@ final class InvoicePrintServiceTest extends TestCase
                 ],
             )),
         );
+        DB::table('invoice_lines')->where('invoice_id', $invoice->getKey())->where('line_number', 1)->update(['item_code_snapshot' => 'COOLANT-4L']);
         $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
         $configuration = $this->createMock(ConfigurationResolverInterface::class);
         $configuration->method('value')->willReturnCallback(
@@ -347,12 +350,13 @@ final class InvoicePrintServiceTest extends TestCase
         $layout = $prints->layout($invoice);
 
         $this->assertTrue($data['print_layout']['is_service_continuous']);
-        $this->assertStringContainsString('@page { size: 215.9mm 139.7mm; margin: 5mm 8mm 2mm 8mm; }', $printHtml);
+        $this->assertStringContainsString('@page { size: 215.9mm 139.7mm; margin: 5mm 13mm 2mm 3mm; }', $printHtml);
         $this->assertStringContainsString('layout-continuous layout-service-continuous pdf-output', $html);
         $this->assertStringContainsString('Job No:</strong> VSJ-000864', $html);
         $this->assertStringContainsString('Vehicle:</strong> 15-0572', $html);
         $this->assertStringNotContainsString('class="service-references"', $html);
         $this->assertStringContainsString('3M Coolant Blue 4L', $html);
+        $this->assertStringNotContainsString('COOLANT-4L', $html);
         $this->assertStringContainsString('Subtotal before discounts', $html);
         $this->assertStringContainsString('Non Refundable, Exchange possible only within 7 days of purchase', $html);
         $this->assertStringContainsString('Printed: 16 Nov 2026 10:55 AM | By: Kasun Perera | Original', $html);
