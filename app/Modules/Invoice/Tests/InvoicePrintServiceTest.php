@@ -637,6 +637,54 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertNotNull($invoice->fresh()->original_printed_at);
     }
 
+    public function test_sales_invoice_print_trace_shows_original_then_duplicate_on_both_paper_sizes(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Sales Copy Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId, InvoiceType::Sales);
+        $users = $this->createMock(AuthenticatedUserProviderInterface::class);
+        $users->method('requireCurrentUserRecord')->willReturn(new DataRecord([
+            'first_name' => 'admin',
+            'last_name' => 'tenant',
+        ]));
+        $this->app->instance(AuthenticatedUserProviderInterface::class, $users);
+
+        $originalResponse = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(InvoiceController::class)->signedPrintLink(
+                $this->requestWithScope($tenantId, $organizationUnitId),
+                (int) $invoice->getKey(),
+            ),
+        );
+        $originalUrl = $originalResponse->getData(true)['data']['print_url'];
+        $originalHtml = $this->get($originalUrl)->assertOk()->getContent();
+
+        $this->assertStringContainsString('By: admin tenant | Original', $originalHtml);
+        $this->assertNotNull($invoice->fresh()->original_printed_at);
+
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::Continuous85By55->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+
+        $duplicateResponse = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(InvoiceController::class)->signedPrintLink(
+                $this->requestWithScope($tenantId, $organizationUnitId),
+                (int) $invoice->getKey(),
+            ),
+        );
+        $duplicateUrl = $duplicateResponse->getData(true)['data']['print_url'];
+        $duplicateHtml = $this->get($duplicateUrl)->assertOk()->getContent();
+
+        $this->assertStringContainsString('layout-outbound-continuous', $duplicateHtml);
+        $this->assertStringContainsString('Printed:', $duplicateHtml);
+        $this->assertStringContainsString('By: admin tenant | Duplicate', $duplicateHtml);
+    }
+
     public function test_whatsapp_shared_invoice_pdf_expires_and_respects_current_lifecycle(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();

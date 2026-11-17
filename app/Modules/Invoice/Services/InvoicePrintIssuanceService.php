@@ -27,7 +27,7 @@ final class InvoicePrintIssuanceService
         $type = $invoice->invoice_type instanceof InvoiceType
             ? $invoice->invoice_type
             : InvoiceType::from((string) $invoice->invoice_type);
-        if ($type !== InvoiceType::Service) {
+        if (! in_array($type, [InvoiceType::Service, InvoiceType::Sales], true)) {
             return null;
         }
 
