@@ -7,8 +7,8 @@
     @php
         $isPdf = ($mode ?? 'print') === 'pdf';
         $isCompact = (bool) ($print_layout['is_compact'] ?? false);
-        $isServiceA4 = (bool) ($print_layout['is_service_a4'] ?? false);
-        $isServiceContinuous = (bool) ($print_layout['is_service_continuous'] ?? false);
+        $isOutboundA4 = (bool) ($print_layout['is_outbound_a4'] ?? false);
+        $isOutboundContinuous = (bool) ($print_layout['is_outbound_continuous'] ?? false);
         $usesFocusedPrint = (bool) ($document['uses_focused_print'] ?? false);
         $amounts = $document['amounts'];
         $lines = $document['lines'] ?? [];
@@ -170,103 +170,103 @@
         .layout-continuous .signature-table td { padding-top: 5px; font-size: 10px; }
         .pdf-output.layout-a5 .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         .pdf-output.layout-continuous .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
-        .layout-service-a4 { color: #173956; font-family: Arial, Helvetica, sans-serif; font-size: 10px; line-height: 1.3; }
-        .layout-service-a4 .sheet { padding: 12mm 11mm 9mm; }
-        .layout-service-a4 .invoice-header { margin-bottom: 7mm; }
-        .layout-service-a4 .invoice-header td { border: 0; vertical-align: top; }
-        .layout-service-a4 .company-name { font-size: 19px; font-weight: 700; letter-spacing: .2px; }
-        .layout-service-a4 .company-contact { margin-top: 3px; font-size: 9px; }
-        .layout-service-a4 .invoice-heading { font-size: 19px; font-weight: 700; text-align: right; text-transform: uppercase; }
-        .layout-service-a4 .identity-table,
-        .layout-service-a4 .party-table,
-        .layout-service-a4 .service-references { margin-bottom: 3mm; }
-        .layout-service-a4 .identity-table td,
-        .layout-service-a4 .party-table td,
-        .layout-service-a4 .service-references td { border: 1px solid #8193a2; padding: 6px 8px; vertical-align: top; }
-        .layout-service-a4 .identity-table td,
-        .layout-service-a4 .party-table td { width: 50%; }
-        .layout-service-a4 .party-table td { height: 36mm; }
-        .layout-service-a4 .party-detail { margin-bottom: 5px; }
-        .layout-service-a4 .party-detail strong { display: inline-block; min-width: 30%; }
-        .layout-service-a4 .service-references { background: #f3f5f7; }
-        .layout-service-a4 .service-references td { width: 25%; }
-        .layout-service-a4 .reference-label { display: block; font-size: 9px; font-weight: 700; }
-        .layout-service-a4 .service-lines { margin-top: 4mm; }
-        .layout-service-a4 .service-lines thead { display: table-header-group; }
-        .layout-service-a4 .service-lines tr { page-break-inside: avoid; }
-        .layout-service-a4 .service-lines th,
-        .layout-service-a4 .service-lines td { border: 1px solid #8193a2; padding: 6px 7px; vertical-align: middle; }
-        .layout-service-a4 .service-lines th { background: #e9edf1; font-size: 9px; text-align: right; text-transform: uppercase; }
-        .layout-service-a4 .service-lines th:first-child,
-        .layout-service-a4 .service-lines th:nth-child(2) { text-align: left; }
-        .layout-service-a4 .service-lines .line-number { text-align: center; }
-        .layout-service-a4 .service-lines .item-code { display: block; color: #526a7e; font-size: 8px; }
-        .layout-service-a4 .settlement-table { margin-top: 3mm; }
-        .layout-service-a4 .settlement-table > tbody > tr > td { border: 1px solid #8193a2; padding: 0; vertical-align: top; }
-        .layout-service-a4 .payment-box { width: 50%; padding: 9px 10px !important; }
-        .layout-service-a4 .payment-box-title { margin-bottom: 8px; font-weight: 700; text-transform: uppercase; }
-        .layout-service-a4 .payment-box div { margin-bottom: 6px; }
-        .layout-service-a4 .totals-box { width: 50%; }
-        .layout-service-a4 .totals-box td { border-bottom: 1px solid #8193a2; padding: 5px 7px; }
-        .layout-service-a4 .totals-box tr:last-child td { border-bottom: 0; }
-        .layout-service-a4 .totals-box td:last-child { width: 30%; text-align: right; white-space: nowrap; }
-        .layout-service-a4 .totals-box .total-row { background: #e9edf1; font-weight: 700; }
-        .layout-service-a4 .service-policy { margin-top: 12mm; text-align: center; line-height: 1.6; }
-        .layout-service-a4 .signatures { margin-top: 14mm; }
-        .layout-service-a4 .signatures td { width: 50%; padding: 0 8mm; text-align: center; }
-        .layout-service-a4 .signature-rule { border-top: 1px solid #a9b6c1; padding-top: 5px; }
-        .layout-service-a4 .service-footer { margin-top: 5mm; border-top: 1px solid #c4cdd5; color: #526a7e; font-size: 8px; }
-        .layout-service-a4 .service-footer td { width: 50%; padding-top: 5px; vertical-align: top; }
-        .layout-service-a4 .service-footer td:last-child { text-align: right; }
-        .layout-service-a4 .print-trace { margin-top: 0; font-size: 8px; white-space: nowrap; }
-        .pdf-output.layout-service-a4 .sheet { padding: 0; }
-        .layout-service-continuous { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.25; }
-        .layout-service-continuous .sheet { padding: {{ $print_layout['css_page_margin'] }}; }
-        .layout-service-continuous .controls { width: {{ $print_layout['continuous_width'] }}; }
-        .layout-service-continuous .invoice-header { margin-bottom: 2mm; }
-        .layout-service-continuous .invoice-header td { border: 0; vertical-align: top; }
-        .layout-service-continuous .company-name { font-size: 16px; font-weight: 700; letter-spacing: .2px; }
-        .layout-service-continuous .company-contact { margin-top: 3px; font-size: 9px; }
-        .layout-service-continuous .invoice-heading { font-size: 16px; font-weight: 700; text-align: right; text-transform: uppercase; }
-        .layout-service-continuous .identity-table,
-        .layout-service-continuous .party-table { margin-bottom: 1mm; }
-        .layout-service-continuous .identity-table td,
-        .layout-service-continuous .party-table td { width: 50%; border: 1px solid #8193a2; padding: 5px 7px; vertical-align: top; }
-        .layout-service-continuous .party-table td { height: 16mm; }
-        .layout-service-continuous .party-detail { margin-bottom: 0; }
-        .layout-service-continuous .party-detail strong { display: inline-block; min-width: 28%; }
-        .layout-service-continuous .service-address-lines { display: inline-block; vertical-align: top; }
-        .layout-service-continuous .service-inline-references { margin-top: 3px; }
-        .layout-service-continuous .service-inline-references span { display: inline-block; width: 48%; vertical-align: top; }
-        .layout-service-continuous .service-lines { margin-top: 1mm; }
-        .layout-service-continuous .service-lines thead { display: table-header-group; }
-        .layout-service-continuous .service-lines tr { page-break-inside: avoid; }
-        .layout-service-continuous .service-lines th,
-        .layout-service-continuous .service-lines td { border: 1px solid #8193a2; padding: 4px 5px; vertical-align: middle; }
-        .layout-service-continuous .service-lines th { background: #e9edf1; font-size: 9px; text-align: right; text-transform: uppercase; }
-        .layout-service-continuous .service-lines th:first-child,
-        .layout-service-continuous .service-lines th:nth-child(2) { text-align: left; }
-        .layout-service-continuous .service-lines .line-number { text-align: center; }
-        .layout-service-continuous .settlement-table { margin-top: 1mm; }
-        .layout-service-continuous .settlement-table > tbody > tr > td { border: 1px solid #8193a2; padding: 0; vertical-align: top; }
-        .layout-service-continuous .payment-box { width: 50%; padding: 7px 9px !important; }
-        .layout-service-continuous .payment-box-title { margin-bottom: 7px; font-weight: 700; text-transform: uppercase; }
-        .layout-service-continuous .payment-box div { margin-bottom: 5px; }
-        .layout-service-continuous .totals-box { width: 50%; }
-        .layout-service-continuous .totals-box td { border-bottom: 1px solid #8193a2; padding: 2px 5px; }
-        .layout-service-continuous .totals-box tr:last-child td { border-bottom: 0; }
-        .layout-service-continuous .totals-box td:last-child { width: 28%; text-align: right; white-space: nowrap; }
-        .layout-service-continuous .totals-box .total-row { background: #e9edf1; font-weight: 700; }
-        .layout-service-continuous .service-policy { margin-top: 4mm; text-align: center; line-height: 1.4; }
-        .layout-service-continuous .service-content { min-height: {{ $print_layout['service_content_min_height'] }}; }
-        .layout-service-continuous .signatures { margin-top: 2mm; }
-        .layout-service-continuous .signatures td { width: 50%; padding: 0 8mm; text-align: center; }
-        .layout-service-continuous .signature-rule { border-top: 1px solid #a9b6c1; padding-top: 3px; }
-        .layout-service-continuous .service-footer { margin-top: 1mm; border-top: 1px solid #c4cdd5; color: #111; font-size: 9px; }
-        .layout-service-continuous .service-footer td { width: 35%; padding: 8px 0 3px; vertical-align: top; }
-        .layout-service-continuous .service-footer td:last-child { width: 65%; text-align: right; }
-        .layout-service-continuous .print-trace { margin-top: 0; font-size: 9px; white-space: normal; overflow-wrap: break-word; }
-        .pdf-output.layout-service-continuous .sheet { padding: 0; }
+        .layout-outbound-a4 { color: #173956; font-family: Arial, Helvetica, sans-serif; font-size: 10px; line-height: 1.3; }
+        .layout-outbound-a4 .sheet { padding: 12mm 11mm 9mm; }
+        .layout-outbound-a4 .invoice-header { margin-bottom: 7mm; }
+        .layout-outbound-a4 .invoice-header td { border: 0; vertical-align: top; }
+        .layout-outbound-a4 .company-name { font-size: 19px; font-weight: 700; letter-spacing: .2px; }
+        .layout-outbound-a4 .company-contact { margin-top: 3px; font-size: 9px; }
+        .layout-outbound-a4 .invoice-heading { font-size: 19px; font-weight: 700; text-align: right; text-transform: uppercase; }
+        .layout-outbound-a4 .identity-table,
+        .layout-outbound-a4 .party-table,
+        .layout-outbound-a4 .service-references { margin-bottom: 3mm; }
+        .layout-outbound-a4 .identity-table td,
+        .layout-outbound-a4 .party-table td,
+        .layout-outbound-a4 .service-references td { border: 1px solid #8193a2; padding: 6px 8px; vertical-align: top; }
+        .layout-outbound-a4 .identity-table td,
+        .layout-outbound-a4 .party-table td { width: 50%; }
+        .layout-outbound-a4 .party-table td { height: 36mm; }
+        .layout-outbound-a4 .party-detail { margin-bottom: 5px; }
+        .layout-outbound-a4 .party-detail strong { display: inline-block; min-width: 30%; }
+        .layout-outbound-a4 .service-references { background: #f3f5f7; }
+        .layout-outbound-a4 .service-references td { width: 25%; }
+        .layout-outbound-a4 .reference-label { display: block; font-size: 9px; font-weight: 700; }
+        .layout-outbound-a4 .service-lines { margin-top: 4mm; }
+        .layout-outbound-a4 .service-lines thead { display: table-header-group; }
+        .layout-outbound-a4 .service-lines tr { page-break-inside: avoid; }
+        .layout-outbound-a4 .service-lines th,
+        .layout-outbound-a4 .service-lines td { border: 1px solid #8193a2; padding: 6px 7px; vertical-align: middle; }
+        .layout-outbound-a4 .service-lines th { background: #e9edf1; font-size: 9px; text-align: right; text-transform: uppercase; }
+        .layout-outbound-a4 .service-lines th:first-child,
+        .layout-outbound-a4 .service-lines th:nth-child(2) { text-align: left; }
+        .layout-outbound-a4 .service-lines .line-number { text-align: center; }
+        .layout-outbound-a4 .service-lines .item-code { display: block; color: #526a7e; font-size: 8px; }
+        .layout-outbound-a4 .settlement-table { margin-top: 3mm; }
+        .layout-outbound-a4 .settlement-table > tbody > tr > td { border: 1px solid #8193a2; padding: 0; vertical-align: top; }
+        .layout-outbound-a4 .payment-box { width: 50%; padding: 9px 10px !important; }
+        .layout-outbound-a4 .payment-box-title { margin-bottom: 8px; font-weight: 700; text-transform: uppercase; }
+        .layout-outbound-a4 .payment-box div { margin-bottom: 6px; }
+        .layout-outbound-a4 .totals-box { width: 50%; }
+        .layout-outbound-a4 .totals-box td { border-bottom: 1px solid #8193a2; padding: 5px 7px; }
+        .layout-outbound-a4 .totals-box tr:last-child td { border-bottom: 0; }
+        .layout-outbound-a4 .totals-box td:last-child { width: 30%; text-align: right; white-space: nowrap; }
+        .layout-outbound-a4 .totals-box .total-row { background: #e9edf1; font-weight: 700; }
+        .layout-outbound-a4 .service-policy { margin-top: 12mm; text-align: center; line-height: 1.6; }
+        .layout-outbound-a4 .signatures { margin-top: 14mm; }
+        .layout-outbound-a4 .signatures td { width: 50%; padding: 0 8mm; text-align: center; }
+        .layout-outbound-a4 .signature-rule { border-top: 1px solid #a9b6c1; padding-top: 5px; }
+        .layout-outbound-a4 .service-footer { margin-top: 5mm; border-top: 1px solid #c4cdd5; color: #526a7e; font-size: 8px; }
+        .layout-outbound-a4 .service-footer td { width: 50%; padding-top: 5px; vertical-align: top; }
+        .layout-outbound-a4 .service-footer td:last-child { text-align: right; }
+        .layout-outbound-a4 .print-trace { margin-top: 0; font-size: 8px; white-space: nowrap; }
+        .pdf-output.layout-outbound-a4 .sheet { padding: 0; }
+        .layout-outbound-continuous { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.25; }
+        .layout-outbound-continuous .sheet { padding: {{ $print_layout['css_page_margin'] }}; }
+        .layout-outbound-continuous .controls { width: {{ $print_layout['continuous_width'] }}; }
+        .layout-outbound-continuous .invoice-header { margin-bottom: 2mm; }
+        .layout-outbound-continuous .invoice-header td { border: 0; vertical-align: top; }
+        .layout-outbound-continuous .company-name { font-size: 16px; font-weight: 700; letter-spacing: .2px; }
+        .layout-outbound-continuous .company-contact { margin-top: 3px; font-size: 9px; }
+        .layout-outbound-continuous .invoice-heading { font-size: 16px; font-weight: 700; text-align: right; text-transform: uppercase; }
+        .layout-outbound-continuous .identity-table,
+        .layout-outbound-continuous .party-table { margin-bottom: 1mm; }
+        .layout-outbound-continuous .identity-table td,
+        .layout-outbound-continuous .party-table td { width: 50%; border: 1px solid #8193a2; padding: 5px 7px; vertical-align: top; }
+        .layout-outbound-continuous .party-table td { height: 16mm; }
+        .layout-outbound-continuous .party-detail { margin-bottom: 0; }
+        .layout-outbound-continuous .party-detail strong { display: inline-block; min-width: 28%; }
+        .layout-outbound-continuous .service-address-lines { display: inline-block; vertical-align: top; }
+        .layout-outbound-continuous .service-inline-references { margin-top: 3px; }
+        .layout-outbound-continuous .service-inline-references span { display: inline-block; width: 48%; vertical-align: top; }
+        .layout-outbound-continuous .service-lines { margin-top: 1mm; }
+        .layout-outbound-continuous .service-lines thead { display: table-header-group; }
+        .layout-outbound-continuous .service-lines tr { page-break-inside: avoid; }
+        .layout-outbound-continuous .service-lines th,
+        .layout-outbound-continuous .service-lines td { border: 1px solid #8193a2; padding: 4px 5px; vertical-align: middle; }
+        .layout-outbound-continuous .service-lines th { background: #e9edf1; font-size: 9px; text-align: right; text-transform: uppercase; }
+        .layout-outbound-continuous .service-lines th:first-child,
+        .layout-outbound-continuous .service-lines th:nth-child(2) { text-align: left; }
+        .layout-outbound-continuous .service-lines .line-number { text-align: center; }
+        .layout-outbound-continuous .settlement-table { margin-top: 1mm; }
+        .layout-outbound-continuous .settlement-table > tbody > tr > td { border: 1px solid #8193a2; padding: 0; vertical-align: top; }
+        .layout-outbound-continuous .payment-box { width: 50%; padding: 7px 9px !important; }
+        .layout-outbound-continuous .payment-box-title { margin-bottom: 7px; font-weight: 700; text-transform: uppercase; }
+        .layout-outbound-continuous .payment-box div { margin-bottom: 5px; }
+        .layout-outbound-continuous .totals-box { width: 50%; }
+        .layout-outbound-continuous .totals-box td { border-bottom: 1px solid #8193a2; padding: 2px 5px; }
+        .layout-outbound-continuous .totals-box tr:last-child td { border-bottom: 0; }
+        .layout-outbound-continuous .totals-box td:last-child { width: 28%; text-align: right; white-space: nowrap; }
+        .layout-outbound-continuous .totals-box .total-row { background: #e9edf1; font-weight: 700; }
+        .layout-outbound-continuous .service-policy { margin-top: 4mm; text-align: center; line-height: 1.4; }
+        .layout-outbound-continuous .service-content { min-height: {{ $print_layout['service_content_min_height'] }}; }
+        .layout-outbound-continuous .signatures { margin-top: 2mm; }
+        .layout-outbound-continuous .signatures td { width: 50%; padding: 0 8mm; text-align: center; }
+        .layout-outbound-continuous .signature-rule { border-top: 1px solid #a9b6c1; padding-top: 3px; }
+        .layout-outbound-continuous .service-footer { margin-top: 1mm; border-top: 1px solid #c4cdd5; color: #111; font-size: 9px; }
+        .layout-outbound-continuous .service-footer td { width: 35%; padding: 8px 0 3px; vertical-align: top; }
+        .layout-outbound-continuous .service-footer td:last-child { width: 65%; text-align: right; }
+        .layout-outbound-continuous .print-trace { margin-top: 0; font-size: 9px; white-space: normal; overflow-wrap: break-word; }
+        .pdf-output.layout-outbound-continuous .sheet { padding: 0; }
         @media print {
             body { background: #fff; }
             .controls { display: none !important; }
@@ -276,7 +276,7 @@
         }
     </style>
 </head>
-<body class="{{ $print_layout['css_class'] }}{{ $isServiceA4 ? ' layout-service-a4' : '' }}{{ $isServiceContinuous ? ' layout-service-continuous' : '' }}{{ $isPdf ? ' pdf-output' : '' }}">
+<body class="{{ $print_layout['css_class'] }}{{ $isOutboundA4 ? ' layout-outbound-a4' : '' }}{{ $isOutboundContinuous ? ' layout-outbound-continuous' : '' }}{{ $isPdf ? ' pdf-output' : '' }}">
 
 @if (! $isPdf)
     <div class="controls">
@@ -288,8 +288,8 @@
 @endif
 
 <main class="sheet">
-    @if ($isServiceA4 || $isServiceContinuous)
-        @include('invoice.partials.service')
+    @if ($isOutboundA4 || $isOutboundContinuous)
+        @include('invoice.partials.outbound')
     @else
     @if ($isCompact)
         <table class="compact-header">
@@ -497,7 +497,7 @@
         </table>
     @endif
     @endif
-    @if ($isServiceA4 || $isServiceContinuous)
+    @if ($isOutboundA4 || $isOutboundContinuous)
         <table class="service-footer">
             <tr>
                 <td>Thank you for your business.</td>

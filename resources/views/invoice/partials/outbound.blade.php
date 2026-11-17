@@ -3,7 +3,7 @@
     <tr>
         <td>
             <div class="company-name">{{ $document['capitalizes_company_header'] ? mb_strtoupper($document['supplier']['name']) : $document['supplier']['name'] }}</div>
-            @unless ($isServiceContinuous)
+            @unless ($isOutboundContinuous)
                 <div class="company-contact">
                     {{ $document['supplier']['address'] ?? '' }}
                     @if (! empty($document['supplier']['phone'])) | {{ $document['supplier']['phone'] }} @endif
@@ -26,7 +26,7 @@
         @foreach (['supplier' => 'Supplier', 'purchaser' => 'Purchaser'] as $key => $label)
             @php
                 $party = $document[$key];
-                $addressBreak = $isServiceContinuous && $key === 'supplier' && ! empty($party['address'])
+                $addressBreak = $isOutboundContinuous && $key === 'supplier' && ! empty($party['address'])
                     ? mb_strrpos($party['address'], ',')
                     : false;
             @endphp
@@ -44,7 +44,7 @@
                     </div>
                 @endif
                 @if (! empty($party['phone']))<div class="party-detail"><strong>Telephone:</strong> {{ $party['phone'] }}</div>@endif
-                @if ($isServiceContinuous && $key === 'purchaser' && ! empty($document['purchaser_reference_fields']))
+                @if ($isOutboundContinuous && $key === 'purchaser' && ! empty($document['purchaser_reference_fields']))
                     @php
                         $referenceRows = ['primary' => [], 'mileage' => []];
                         $mileageLabels = ['Mileage', 'Current Mileage', 'Next Service Mileage'];
@@ -67,7 +67,7 @@
     </tr>
 </table>
 
-@if (! $isServiceContinuous && ! empty($document['purchaser_reference_fields']))
+@if (! $isOutboundContinuous && ! empty($document['purchaser_reference_fields']))
     <table class="service-references">
         @foreach (array_chunk($document['purchaser_reference_fields'], 4) as $referenceRow)
             <tr>
@@ -99,7 +99,7 @@
                 <td class="line-number">{{ $loop->iteration }}</td>
                 <td>
                     {{ $line['display_name'] }}
-                    @if (! $isServiceContinuous && ! empty($line['item_code']))<span class="item-code">{{ $line['item_code'] }}</span>@endif
+                    @if (! $isOutboundContinuous && ! empty($line['item_code']))<span class="item-code">{{ $line['item_code'] }}</span>@endif
                 </td>
                 <td class="number">{{ $line['quantity']['display'] }}</td>
                 <td class="number">{{ $line['unit_price']['display'] }}</td>

@@ -259,9 +259,12 @@ final class SellingWorkflowTest extends TestCase
             $this->assertSame('162.000000', (string) $sale->invoice->grand_total);
             $this->assertSame('38.000000', (string) $sale->invoice->discount_total);
             $this->assertSame('162.000000', (string) $sale->invoice->balance_due);
-            $printedAmounts = app(InvoicePrintService::class)->viewData($sale->invoice)['document']['amounts'];
+            $printData = app(InvoicePrintService::class)->viewData($sale->invoice);
+            $printedAmounts = $printData['document']['amounts'];
             $this->assertSame('20.000000', $printedAmounts['line_discount_total']['raw']);
             $this->assertSame('18.000000', $printedAmounts['bill_discount_total']['raw']);
+            $this->assertTrue($printData['print_layout']['is_outbound_a4']);
+            $this->assertStringContainsString('class="settlement-table"', view('invoice.print', $printData)->render());
 
             foreach (['1.000000', '1.000000'] as $quantity) {
                 $sale = app(SaleReturnPostingService::class)->create([

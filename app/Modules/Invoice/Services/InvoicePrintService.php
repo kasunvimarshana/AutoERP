@@ -100,10 +100,13 @@ final class InvoicePrintService
         $taxLabel = $this->taxLabel($invoice->lines);
         $layout = $this->layout($invoice);
         $usesFocusedPrint = $this->usesFocusedPrint($invoice);
-        $isServiceA4 = $layout === InvoicePrintLayout::StandardA4
-            && $this->enumValue($invoice->invoice_type) === InvoiceType::Service->value;
-        $isServiceContinuous = $layout === InvoicePrintLayout::Continuous85By55
-            && $this->enumValue($invoice->invoice_type) === InvoiceType::Service->value;
+        $usesOutboundLayout = $this->isOutbound($invoice)
+            && in_array($this->enumValue($invoice->invoice_type), [
+                InvoiceType::Service->value,
+                InvoiceType::Sales->value,
+            ], true);
+        $isOutboundA4 = $usesOutboundLayout && $layout === InvoicePrintLayout::StandardA4;
+        $isOutboundContinuous = $usesOutboundLayout && $layout === InvoicePrintLayout::Continuous85By55;
         $lines = $this->lines($invoice->lines, $currency);
 
         return [
@@ -115,7 +118,7 @@ final class InvoicePrintService
                 'paper_size' => $layout->paperSize(),
                 'orientation' => $layout->orientation(),
                 'css_page_size' => $layout->cssPageSize(),
-                'css_page_margin' => $isServiceContinuous
+                'css_page_margin' => $isOutboundContinuous
                     ? $layout->serviceContinuousCssPageMargin()
                     : $layout->cssPageMargin(),
                 'continuous_width' => $layout->continuousCssWidth(),
@@ -123,8 +126,8 @@ final class InvoicePrintService
                 'continuous_horizontal_margin' => $layout->continuousCssHorizontalMargin(),
                 'continuous_vertical_margin' => $layout->continuousCssVerticalMargin(),
                 'is_compact' => $layout->isCompact(),
-                'is_service_a4' => $isServiceA4,
-                'is_service_continuous' => $isServiceContinuous,
+                'is_outbound_a4' => $isOutboundA4,
+                'is_outbound_continuous' => $isOutboundContinuous,
                 'service_content_min_height' => $layout->serviceContinuousContentMinHeight(),
             ],
             'print_context' => $this->printContext($invoice, $printContext),

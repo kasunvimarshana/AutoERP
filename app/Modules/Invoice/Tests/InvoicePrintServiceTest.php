@@ -206,7 +206,7 @@ final class InvoicePrintServiceTest extends TestCase
         );
         $html = view('invoice.print', $data)->render();
 
-        $this->assertTrue($data['print_layout']['is_service_a4']);
+        $this->assertTrue($data['print_layout']['is_outbound_a4']);
         $this->assertSame(['Wash only', 'Engine oil', 'Oil filter', 'Grease'], array_column($data['document']['lines'], 'display_name'));
         $this->assertStringNotContainsString('>LABOUR<', $html);
         $this->assertStringNotContainsString('>SPARE PARTS / LUBRICANTS<', $html);
@@ -352,9 +352,9 @@ final class InvoicePrintServiceTest extends TestCase
         $printHtml = view('invoice.print', $prints->viewData($invoice))->render();
         $layout = $prints->layout($invoice);
 
-        $this->assertTrue($data['print_layout']['is_service_continuous']);
+        $this->assertTrue($data['print_layout']['is_outbound_continuous']);
         $this->assertStringContainsString('@page { size: 215.9mm 139.7mm; margin: 5mm 13mm 2mm 3mm; }', $printHtml);
-        $this->assertStringContainsString('layout-continuous layout-service-continuous pdf-output', $html);
+        $this->assertStringContainsString('layout-continuous layout-outbound-continuous pdf-output', $html);
         $this->assertStringContainsString('font-size: 11px; line-height: 1.25', $html);
         $this->assertStringNotContainsString('class="company-contact"', $html);
         $this->assertStringContainsString('363 Kandy Road,<br>Kalagedihena', $html);
@@ -428,6 +428,60 @@ final class InvoicePrintServiceTest extends TestCase
 
         $this->assertStringContainsString('Printed: 16 Nov 2026 10:55 AM | By: admin tenant | Original', $html);
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
+    public function test_sales_invoice_uses_the_service_layout_on_a4_and_continuous_paper(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Sales Print Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId, InvoiceType::Sales);
+        DB::table('invoice_lines')->where('invoice_id', $invoice->getKey())->update(['item_code_snapshot' => 'SALES-ITEM-CODE']);
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+
+        $prints = app(InvoicePrintService::class);
+        $a4Data = $prints->viewData($invoice, mode: 'pdf');
+        $a4Html = view('invoice.print', $a4Data)->render();
+
+        $this->assertTrue($a4Data['print_layout']['is_outbound_a4']);
+        $this->assertStringContainsString('layout-a4 layout-outbound-a4 pdf-output', $a4Html);
+        $this->assertStringContainsString('class="settlement-table"', $a4Html);
+        $this->assertStringContainsString('SALES-ITEM-CODE', $a4Html);
+        $this->assertStringContainsString('Non Refundable, Exchange possible only within 7 days of purchase', $a4Html);
+        $this->assertStringNotContainsString('Job No:', $a4Html);
+
+        $a4Pdf = new Dompdf;
+        $a4Pdf->loadHtml($a4Html);
+        $a4Pdf->setPaper($prints->layout($invoice)->pdfPaper(), 'portrait');
+        $a4Pdf->render();
+        $this->assertSame(1, $a4Pdf->getCanvas()->get_page_count());
+
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::Continuous85By55->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+
+        $prints = app(InvoicePrintService::class);
+        $continuousData = $prints->viewData($invoice, mode: 'pdf');
+        $continuousHtml = view('invoice.print', $continuousData)->render();
+
+        $this->assertTrue($continuousData['print_layout']['is_outbound_continuous']);
+        $this->assertStringContainsString('layout-continuous layout-outbound-continuous pdf-output', $continuousHtml);
+        $this->assertStringContainsString('class="settlement-table"', $continuousHtml);
+        $this->assertStringContainsString('Bill discount', $continuousHtml);
+        $this->assertStringNotContainsString('SALES-ITEM-CODE', $continuousHtml);
+        $this->assertStringNotContainsString('Job No:', $continuousHtml);
+
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($continuousHtml);
+        $dompdf->setPaper($prints->layout($invoice)->pdfPaper(), 'landscape');
+        $dompdf->render();
+
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+        $this->assertEqualsWithDelta(612, $dompdf->getCanvas()->get_width(), 0.01);
+        $this->assertEqualsWithDelta(396, $dompdf->getCanvas()->get_height(), 0.01);
     }
 
     public function test_service_invoice_print_shows_discounts_and_two_decimal_quantity_with_uppercase_header_only(): void
