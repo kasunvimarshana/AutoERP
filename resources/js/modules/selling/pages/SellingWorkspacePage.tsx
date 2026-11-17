@@ -11,6 +11,7 @@ import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { formatMoney } from '@/shared/utils/formatMoney';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
@@ -100,6 +101,7 @@ function SellingWorkspace() {
             || (line.discountType === 'percentage' && compareDecimalStrings(line.discountValue || '0', MAX_PERCENT) > 0)
             || compareDecimalStrings(lineDiscount(line), lineSubtotal(line)) > 0);
     const saleCurrency = lines[0]?.item.tenant_base_currency?.symbol ?? lines[0]?.item.tenant_base_currency?.code ?? '';
+    const saleCurrencyCode = lines[0]?.item.tenant_base_currency?.code ?? undefined;
     const [sales, setSales] = useState<SaleDocument[]>([]);
     const [returns, setReturns] = useState<SaleReturnDocument[]>([]);
     const [listMeta, setListMeta] = useState<PaginationMeta | null>(null);
@@ -510,58 +512,79 @@ function SellingWorkspace() {
         <>
             <ContentHeader title="Create Selling" description="Sell stocked items, issue inventory, and post the customer invoice in one step." actions={<Link className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline" to="/selling">Selling list</Link>} />
             <ErrorAlert error={error} />
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <form className="space-y-5" onSubmit={(event) => void submitSale(event)}>
-                    <Panel title="Sale details">
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <CustomerLookupSelect value={customer} onChange={setCustomer} search={searchSellingCustomers} placeholder={loadingDirectCustomer ? 'Loading default customer...' : 'Search customers...'} disabled={loadingDirectCustomer} required />
-                            <LookupSelect<NamedResource> label="Warehouse" value={warehouse} onChange={changeWarehouse} search={searchSellingWarehouses} placeholder="Choose a warehouse..." required loadOnOpen minSearchLength={0} />
-                            <LookupSelect<NamedResource> label="Location" value={warehouseLocation} onChange={setWarehouseLocation} search={locationSearch} placeholder={warehouse ? 'Choose a location...' : 'Choose a warehouse first'} disabled={!warehouse || resolvingSource} loadOnOpen minSearchLength={0} />
-                            <Input label="Sale date" type="date" value={saleDate} onChange={(event) => setSaleDate(event.target.value)} required />
-                            <Input label="Due date" type="date" hint="Set a due date to record this invoice on credit." value={dueDate} onChange={(event) => setDueDate(event.target.value)} min={saleDate} />
-                        </div>
-                    </Panel>
-                    <Panel title="Stocked items">
-                        <div className="space-y-4">
-                            <SellingItemLookup key={`${warehouse?.id ?? 'no-warehouse'}-${warehouseLocation?.id ?? 'no-location'}-${saleDate}`} value={null} warehouseId={warehouse?.id ?? null} warehouseLocationId={warehouseLocation?.id ?? null} saleDate={saleDate} onChange={addItem} />
-                            <DataTable rows={lines} rowKey={(line) => line.key} emptyMessage="Search and select an item to add it to this sale." columns={[
-                                { key: 'item', header: 'Item', render: (line) => <div className="min-w-64 space-y-2">
-                                    <div><div className="font-medium text-slate-900">{line.item.name}</div><div className="text-xs text-slate-500">{line.item.code}</div></div>
-                                    <InventoryDimensionFields item={line.item} warehouse={warehouse} value={line.dimensions} includeLocation={false} includeSerial includeUom={false} onChange={(dimensions) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, dimensions } : row))} />
-                                </div>, footer: 'Total' },
-                                { key: 'quantity', header: 'Quantity', render: (line) => <div className="flex items-center gap-1">
-                                    <Button type="button" variant="secondary" aria-label={`Decrease ${line.item.name} quantity`} disabled={compareDecimalStrings(line.quantity || '0', ONE_QUANTITY) <= 0} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: subtractDecimal(row.quantity, ONE_QUANTITY) } : row))}>−</Button>
-                                    <DecimalInput aria-label={`Quantity for ${line.item.name}`} className="w-20" maxFractionDigits={3} value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: event.target.value } : row))} />
-                                    <Button type="button" variant="secondary" aria-label={`Increase ${line.item.name} quantity`} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: addDecimal(row.quantity || '0', ONE_QUANTITY) } : row))}>+</Button>
-                                    <span className="text-xs text-slate-500">{line.item.base_uom?.code}</span>
-                                </div> },
-                                { key: 'price', header: 'Unit price', render: (line) => `${line.item.tenant_base_currency?.symbol ?? line.item.tenant_base_currency?.code ?? ''} ${line.item.resolved_sales_unit_price ?? 'Not configured'}` },
-                                { key: 'discount', header: 'Discount', render: (line) => <div>
-                                    <SaleDiscountInput label={`Discount for ${line.item.name}`} currency={saleCurrency} type={line.discountType} value={line.discountValue} onTypeChange={(discountType) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountType } : row))} onValueChange={(discountValue) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountValue } : row))} />
-                                    <span className="text-xs text-slate-500">{saleCurrency} {lineDiscount(line)}</span>
-                                </div>, footer: `${saleCurrency} ${lineDiscountTotal}` },
-                                { key: 'subtotal', header: 'Subtotal', render: (line) => line.item.resolved_sales_unit_price === null || line.item.resolved_sales_unit_price === undefined ? '—' : `${saleCurrency} ${lineTotal(line)}`, footer: `${saleCurrency} ${billDiscountBase}` },
-                                { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <Button type="button" variant="secondary" aria-label={`Remove ${line.item.name}`} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>Remove</Button> },
-                            ]} />
-                            {lines.length > 0 && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">
-                                    <SaleDiscountInput label="Total bill discount" currency={saleCurrency} type={billDiscountType} value={billDiscountValue} onTypeChange={setBillDiscountType} onValueChange={setBillDiscountValue} />
-                                    <dl className="space-y-1 text-sm text-slate-700">
-                                        <div className="flex justify-between"><dt>Item subtotal</dt><dd>{saleCurrency} {grossSubtotal}</dd></div>
-                                        <div className="flex justify-between"><dt>Line discounts</dt><dd>− {saleCurrency} {lineDiscountTotal}</dd></div>
-                                        <div className="flex justify-between"><dt>Bill discount</dt><dd>− {saleCurrency} {billDiscount}</dd></div>
-                                        <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900"><dt>Total before tax</dt><dd>{saleCurrency} {totalBeforeTax}</dd></div>
-                                    </dl>
-                                </div>
-                                {invalidDiscount && <p className="mt-2 text-sm text-rose-700" role="alert">Discount cannot exceed the eligible amount or 100%.</p>}
-                                <p className="mt-2 text-xs text-slate-500">Applicable tax is calculated when the sale is posted. The invoice shows the final payable total.</p>
-                            </div>}
-                        </div>
-                    </Panel>
-                    <Button type="submit" loading={busy} disabled={!customer || !warehouse || lines.length === 0 || invalidDiscount || lines.some((line) => !line.item.base_uom || !line.item.resolved_sales_unit_price || Number(line.quantity) <= 0)}>Post sale and invoice</Button>
-                </form>
-                <Panel title="Workflow guidance"><p className="text-sm text-slate-600">Choose the customer and warehouse, add available items, then post the sale. The customer invoice is created with the sale.</p></Panel>
-            </div>
+            <form className="space-y-5" onSubmit={(event) => void submitSale(event)}>
+                <Panel title="Sale details">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <CustomerLookupSelect value={customer} onChange={setCustomer} search={searchSellingCustomers} placeholder={loadingDirectCustomer ? 'Loading default customer...' : 'Search customers...'} disabled={loadingDirectCustomer} required />
+                        <LookupSelect<NamedResource> label="Warehouse" value={warehouse} onChange={changeWarehouse} search={searchSellingWarehouses} placeholder="Choose a warehouse..." required loadOnOpen minSearchLength={0} />
+                        <LookupSelect<NamedResource> label="Location" value={warehouseLocation} onChange={setWarehouseLocation} search={locationSearch} placeholder={warehouse ? 'Choose a location...' : 'Choose a warehouse first'} disabled={!warehouse || resolvingSource} loadOnOpen minSearchLength={0} />
+                        <Input label="Sale date" type="date" value={saleDate} onChange={(event) => setSaleDate(event.target.value)} required />
+                        <Input label="Due date" type="date" hint="Set a due date to record this invoice on credit." value={dueDate} onChange={(event) => setDueDate(event.target.value)} min={saleDate} />
+                    </div>
+                </Panel>
+                <Panel title="Stocked items">
+                    <div className="space-y-4">
+                        <SellingItemLookup key={`${warehouse?.id ?? 'no-warehouse'}-${warehouseLocation?.id ?? 'no-location'}-${saleDate}`} value={null} warehouseId={warehouse?.id ?? null} warehouseLocationId={warehouseLocation?.id ?? null} saleDate={saleDate} onChange={addItem} />
+                        {lines.length === 0 ? (
+                            <p className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-600">Search and select an item to add it to this sale.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {lines.map((line) => <article key={line.key} className="rounded-xl border border-slate-200 bg-white p-4">
+                                    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                                        <div className="min-w-0">
+                                            <h3 className="break-words font-semibold text-slate-900">{line.item.name}</h3>
+                                            <p className="mt-0.5 text-xs text-slate-500">{line.item.code}</p>
+                                        </div>
+                                        <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${line.item.name}`} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>Remove</Button>
+                                    </div>
+                                    <div className="grid gap-4 pt-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.1fr)_minmax(8rem,0.8fr)_minmax(13rem,1.1fr)_minmax(9rem,0.8fr)] xl:items-end">
+                                        <div>
+                                            <p className="mb-1.5 text-sm font-medium text-slate-700">Quantity</p>
+                                            <div className="flex items-center gap-1.5">
+                                                <Button type="button" variant="secondary" size="sm" className="h-10 w-10 shrink-0" aria-label={`Decrease ${line.item.name} quantity`} disabled={compareDecimalStrings(line.quantity || '0', ONE_QUANTITY) <= 0} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: subtractDecimal(row.quantity, ONE_QUANTITY) } : row))}>−</Button>
+                                                <div className="w-20 shrink-0"><DecimalInput aria-label={`Quantity for ${line.item.name}`} className="text-center tabular-nums" maxFractionDigits={3} value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: event.target.value } : row))} /></div>
+                                                <Button type="button" variant="secondary" size="sm" className="h-10 w-10 shrink-0" aria-label={`Increase ${line.item.name} quantity`} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: addDecimal(row.quantity || '0', ONE_QUANTITY) } : row))}>+</Button>
+                                                <span className="shrink-0 text-xs text-slate-500">{line.item.base_uom?.code}</span>
+                                            </div>
+                                        </div>
+                                        <div className="xl:text-right">
+                                            <p className="mb-1.5 text-sm font-medium text-slate-700">Unit price</p>
+                                            <p className="py-2 font-medium tabular-nums text-slate-900">{line.item.resolved_sales_unit_price == null ? 'Not configured' : formatMoney(line.item.resolved_sales_unit_price, saleCurrencyCode)}</p>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <SaleDiscountInput label="Discount" ariaLabel={`Discount for ${line.item.name}`} currency={saleCurrency} type={line.discountType} value={line.discountValue} onTypeChange={(discountType) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountType } : row))} onValueChange={(discountValue) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountValue } : row))} />
+                                            <p className="mt-1 text-xs text-slate-500">Applied: {formatMoney(lineDiscount(line), saleCurrencyCode)}</p>
+                                        </div>
+                                        <div className="xl:text-right">
+                                            <p className="mb-1.5 text-sm font-medium text-slate-700">Line total</p>
+                                            <p className="py-2 font-semibold tabular-nums text-slate-900">{line.item.resolved_sales_unit_price == null ? '—' : formatMoney(lineTotal(line), saleCurrencyCode)}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 border-t border-slate-100 pt-3">
+                                        <InventoryDimensionFields item={line.item} warehouse={warehouse} value={line.dimensions} includeLocation={false} includeSerial includeUom={false} onChange={(dimensions) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, dimensions } : row))} />
+                                    </div>
+                                </article>)}
+                            </div>
+                        )}
+                        {lines.length > 0 && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">
+                                <SaleDiscountInput label="Total bill discount" currency={saleCurrency} type={billDiscountType} value={billDiscountValue} onTypeChange={setBillDiscountType} onValueChange={setBillDiscountValue} />
+                                <dl className="space-y-1 text-sm text-slate-700">
+                                    <div className="flex justify-between gap-3"><dt>Item subtotal</dt><dd className="tabular-nums">{formatMoney(grossSubtotal, saleCurrencyCode)}</dd></div>
+                                    <div className="flex justify-between gap-3"><dt>Line discounts</dt><dd className="tabular-nums">− {formatMoney(lineDiscountTotal, saleCurrencyCode)}</dd></div>
+                                    <div className="flex justify-between gap-3"><dt>Bill discount</dt><dd className="tabular-nums">− {formatMoney(billDiscount, saleCurrencyCode)}</dd></div>
+                                    <div className="flex justify-between gap-3 border-t border-slate-200 pt-2 font-semibold text-slate-900"><dt>Total before tax</dt><dd className="tabular-nums">{formatMoney(totalBeforeTax, saleCurrencyCode)}</dd></div>
+                                </dl>
+                            </div>
+                            {invalidDiscount && <p className="mt-2 text-sm text-rose-700" role="alert">Discount cannot exceed the eligible amount or 100%.</p>}
+                            <p className="mt-2 text-xs text-slate-500">Applicable tax is calculated when the sale is posted. The invoice shows the final payable total.</p>
+                        </div>}
+                    </div>
+                </Panel>
+                <div className="flex justify-end">
+                    <Button type="submit" className="w-full sm:w-auto" loading={busy} disabled={!customer || !warehouse || lines.length === 0 || invalidDiscount || lines.some((line) => !line.item.base_uom || !line.item.resolved_sales_unit_price || Number(line.quantity) <= 0)}>Post sale and invoice</Button>
+                </div>
+            </form>
         </>
     );
 }

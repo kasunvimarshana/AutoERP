@@ -59,7 +59,11 @@ describe('Selling route state ownership', () => {
         expect(itemOption).toHaveTextContent('Available: 5.000000 PCS');
         expect(itemOption).toHaveTextContent('Sale price: LKR 100.000000');
         fireEvent.click(itemOption);
+        expect(screen.queryByRole('heading', { name: 'Workflow guidance' })).not.toBeInTheDocument();
+        expect(screen.getByText('Unit price').nextElementSibling).toHaveTextContent('100.00');
+        expect(screen.getByText('Line total').nextElementSibling).toHaveTextContent('100.00');
         fireEvent.change(screen.getAllByRole('textbox', { name: 'Discount for Oil filter' }).at(-1)!, { target: { value: '10' } });
+        expect(screen.getByText('Line total').nextElementSibling).toHaveTextContent('90.00');
         fireEvent.change(screen.getByRole('textbox', { name: 'Total bill discount' }), { target: { value: '5' } });
         fireEvent.click(screen.getByRole('button', { name: 'Post sale and invoice' }));
 
