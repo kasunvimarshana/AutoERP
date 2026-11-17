@@ -1359,7 +1359,7 @@ final class VehicleServiceEngineTest extends TestCase
         $expectedFields = [
             ['label' => 'Job No', 'value' => (string) $job->job_number],
             ['label' => 'Vehicle No', 'value' => $vehicleNumber],
-            ['label' => 'Mileage', 'value' => '12,000 km'],
+            ['label' => 'Current Mileage', 'value' => '12,000 km'],
             ['label' => 'Next Service Mileage', 'value' => '17,000 km'],
         ];
 
@@ -1391,7 +1391,7 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame($expectedFields, $document['purchaser_reference_fields']);
         $this->assertStringContainsString('Job No:</span> '.$expectedFields[0]['value'], $html);
         $this->assertStringContainsString('Vehicle No:</span> '.$vehicleNumber, $html);
-        $this->assertStringContainsString('Mileage:</span> 12,000 km', $html);
+        $this->assertStringContainsString('Current Mileage:</span> 12,000 km', $html);
         $this->assertStringContainsString('Next Service Mileage:</span> 17,000 km', $html);
         $this->assertStringNotContainsString('CHANGED-JOB', $html);
         $this->assertStringNotContainsString('CHANGED-VEHICLE', $html);

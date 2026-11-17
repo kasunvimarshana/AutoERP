@@ -354,7 +354,7 @@ final class VehicleServiceInvoiceSourceMapper
         if ($job->odometer_reading !== null) {
             $unit = $this->nullableString($job->vehicle?->odometer_unit);
             $fields[] = [
-                'label' => 'Mileage',
+                'label' => 'Current Mileage',
                 'value' => trim($this->formatReferenceDecimal((string) $job->odometer_reading).' '.($unit ?? '')),
             ];
         }

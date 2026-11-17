@@ -3,10 +3,12 @@
     <tr>
         <td>
             <div class="company-name">{{ $document['capitalizes_company_header'] ? mb_strtoupper($document['supplier']['name']) : $document['supplier']['name'] }}</div>
-            <div class="company-contact">
-                {{ $document['supplier']['address'] ?? '' }}
-                @if (! empty($document['supplier']['phone'])) | {{ $document['supplier']['phone'] }} @endif
-            </div>
+            @unless ($isServiceContinuous)
+                <div class="company-contact">
+                    {{ $document['supplier']['address'] ?? '' }}
+                    @if (! empty($document['supplier']['phone'])) | {{ $document['supplier']['phone'] }} @endif
+                </div>
+            @endunless
         </td>
         <td class="invoice-heading">{{ $document['title'] }}</td>
     </tr>
@@ -22,19 +24,43 @@
 <table class="party-table">
     <tr>
         @foreach (['supplier' => 'Supplier', 'purchaser' => 'Purchaser'] as $key => $label)
-            @php($party = $document[$key])
+            @php
+                $party = $document[$key];
+                $addressBreak = $isServiceContinuous && $key === 'supplier' && ! empty($party['address'])
+                    ? mb_strrpos($party['address'], ',')
+                    : false;
+            @endphp
             <td>
                 @if (! empty($party['tin']))<div class="party-detail"><strong>{{ $label }}'s TIN:</strong> {{ $party['tin'] }}</div>@endif
                 @if (! empty($party['vat_registration_number']))<div class="party-detail"><strong>VAT Registration No:</strong> {{ $party['vat_registration_number'] }}</div>@endif
                 <div class="party-detail"><strong>{{ $label }}'s Name:</strong> {{ $party['name'] }}</div>
-                @if (! empty($party['address']))<div class="party-detail"><strong>Address:</strong> {{ $party['address'] }}</div>@endif
+                @if (! empty($party['address']))
+                    <div class="party-detail"><strong>Address:</strong>
+                        @if ($addressBreak !== false && trim(mb_substr($party['address'], $addressBreak + 1)) !== '')
+                            <span class="service-address-lines">{{ trim(mb_substr($party['address'], 0, $addressBreak + 1)) }}<br>{{ trim(mb_substr($party['address'], $addressBreak + 1)) }}</span>
+                        @else
+                            {{ $party['address'] }}
+                        @endif
+                    </div>
+                @endif
                 @if (! empty($party['phone']))<div class="party-detail"><strong>Telephone:</strong> {{ $party['phone'] }}</div>@endif
                 @if ($isServiceContinuous && $key === 'purchaser' && ! empty($document['purchaser_reference_fields']))
-                    <div class="service-inline-references">
-                        @foreach ($document['purchaser_reference_fields'] as $field)
-                            <span><strong>{{ $field['label'] }}:</strong> {{ $field['value'] }}</span>
-                        @endforeach
-                    </div>
+                    @php
+                        $referenceRows = ['primary' => [], 'mileage' => []];
+                        $mileageLabels = ['Mileage', 'Current Mileage', 'Next Service Mileage'];
+                        foreach ($document['purchaser_reference_fields'] as $field) {
+                            $referenceRows[in_array($field['label'], $mileageLabels, true) ? 'mileage' : 'primary'][] = $field;
+                        }
+                    @endphp
+                    @foreach ($referenceRows as $referenceRow)
+                        @if ($referenceRow !== [])
+                            <div class="service-inline-references">
+                                @foreach ($referenceRow as $field)
+                                    <span><strong>{{ $field['label'] === 'Mileage' ? 'Current Mileage' : $field['label'] }}:</strong> {{ $field['value'] }}</span>
+                                @endforeach
+                            </div>
+                        @endif
+                    @endforeach
                 @endif
             </td>
         @endforeach

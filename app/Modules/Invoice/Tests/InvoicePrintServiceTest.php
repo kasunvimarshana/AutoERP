@@ -345,6 +345,9 @@ final class InvoicePrintServiceTest extends TestCase
                 InvoiceCopyType::Original,
             ),
         );
+        $data['document']['supplier']['address'] = '363 Kandy Road, Kalagedihena';
+        $data['document']['purchaser_reference_fields'][] = ['label' => 'Mileage', 'value' => '4,757 km'];
+        $data['document']['purchaser_reference_fields'][] = ['label' => 'Next Service Mileage', 'value' => '14,757 km'];
         $html = view('invoice.print', $data)->render();
         $printHtml = view('invoice.print', $prints->viewData($invoice))->render();
         $layout = $prints->layout($invoice);
@@ -352,8 +355,12 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertTrue($data['print_layout']['is_service_continuous']);
         $this->assertStringContainsString('@page { size: 215.9mm 139.7mm; margin: 5mm 13mm 2mm 3mm; }', $printHtml);
         $this->assertStringContainsString('layout-continuous layout-service-continuous pdf-output', $html);
+        $this->assertStringContainsString('font-size: 11px; line-height: 1.25', $html);
+        $this->assertStringNotContainsString('class="company-contact"', $html);
+        $this->assertStringContainsString('363 Kandy Road,<br>Kalagedihena', $html);
         $this->assertStringContainsString('Job No:</strong> VSJ-000864', $html);
         $this->assertStringContainsString('Vehicle:</strong> 15-0572', $html);
+        $this->assertMatchesRegularExpression('/Job No:<\/strong> VSJ-000864.*Vehicle:<\/strong> 15-0572.*<\/div>\s*<div class="service-inline-references">.*Current Mileage:<\/strong> 4,757 km.*Next Service Mileage:<\/strong> 14,757 km/s', $html);
         $this->assertStringNotContainsString('class="service-references"', $html);
         $this->assertStringContainsString('3M Coolant Blue 4L', $html);
         $this->assertStringNotContainsString('COOLANT-4L', $html);
