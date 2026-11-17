@@ -1,3 +1,4 @@
+<div class="service-content">
 <table class="invoice-header">
     <tr>
         <td>
@@ -28,12 +29,19 @@
                 <div class="party-detail"><strong>{{ $label }}'s Name:</strong> {{ $party['name'] }}</div>
                 @if (! empty($party['address']))<div class="party-detail"><strong>Address:</strong> {{ $party['address'] }}</div>@endif
                 @if (! empty($party['phone']))<div class="party-detail"><strong>Telephone:</strong> {{ $party['phone'] }}</div>@endif
+                @if ($isServiceContinuous && $key === 'purchaser' && ! empty($document['purchaser_reference_fields']))
+                    <div class="service-inline-references">
+                        @foreach ($document['purchaser_reference_fields'] as $field)
+                            <span><strong>{{ $field['label'] }}:</strong> {{ $field['value'] }}</span>
+                        @endforeach
+                    </div>
+                @endif
             </td>
         @endforeach
     </tr>
 </table>
 
-@if (! empty($document['purchaser_reference_fields']))
+@if (! $isServiceContinuous && ! empty($document['purchaser_reference_fields']))
     <table class="service-references">
         @foreach (array_chunk($document['purchaser_reference_fields'], 4) as $referenceRow)
             <tr>
@@ -104,6 +112,7 @@
 <div class="service-policy">
     <strong>Non Refundable, Exchange possible only within 7 days of purchase</strong>
     <div>( This invoice cannot be used for a VAT input Claim )</div>
+</div>
 </div>
 
 <table class="signatures">

@@ -297,6 +297,128 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
     }
 
+    public function test_service_invoice_continuous_layout_matches_reference_sections_on_one_page(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Continuous Print Customer');
+        $invoice = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Invoice => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+                tenantId: $tenantId,
+                invoiceType: InvoiceType::Service,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: '2026-11-16',
+                organizationUnitId: $organizationUnitId,
+                partyType: InvoicePartyType::Customer->value,
+                partyId: $customerId,
+                lines: [
+                    new InvoiceLineData(lineNumber: 1, description: '3M Coolant Blue 4L', quantity: '1.000000', unitPrice: '5100.000000'),
+                    new InvoiceLineData(lineNumber: 2, description: 'Wash & Vacuum', quantity: '1.000000', unitPrice: '1550.000000'),
+                    new InvoiceLineData(lineNumber: 3, description: 'Oil filter', quantity: '1.000000', unitPrice: '850.000000'),
+                    new InvoiceLineData(lineNumber: 4, description: 'Grease', quantity: '1.000000', unitPrice: '250.000000'),
+                ],
+                purchaserReferenceFields: [
+                    ['label' => 'Job No', 'value' => 'VSJ-000864'],
+                    ['label' => 'Vehicle', 'value' => '15-0572'],
+                ],
+            )),
+        );
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::Continuous85By55->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+
+        $prints = app(InvoicePrintService::class);
+        $data = $prints->viewData(
+            $invoice,
+            mode: 'pdf',
+            printContext: new InvoicePrintContext(
+                new DateTimeImmutable('2026-11-16T05:25:00+00:00'),
+                'Kasun Perera',
+                InvoiceCopyType::Original,
+            ),
+        );
+        $html = view('invoice.print', $data)->render();
+        $printHtml = view('invoice.print', $prints->viewData($invoice))->render();
+        $layout = $prints->layout($invoice);
+
+        $this->assertTrue($data['print_layout']['is_service_continuous']);
+        $this->assertStringContainsString('@page { size: 215.9mm 139.7mm; margin: 5mm 8mm 2mm 8mm; }', $printHtml);
+        $this->assertStringContainsString('layout-continuous layout-service-continuous pdf-output', $html);
+        $this->assertStringContainsString('Job No:</strong> VSJ-000864', $html);
+        $this->assertStringContainsString('Vehicle:</strong> 15-0572', $html);
+        $this->assertStringNotContainsString('class="service-references"', $html);
+        $this->assertStringContainsString('3M Coolant Blue 4L', $html);
+        $this->assertStringContainsString('Subtotal before discounts', $html);
+        $this->assertStringContainsString('Non Refundable, Exchange possible only within 7 days of purchase', $html);
+        $this->assertStringContainsString('Printed: 16 Nov 2026 10:55 AM | By: Kasun Perera | Original', $html);
+
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper($layout->pdfPaper(), $layout->orientation());
+        $dompdf->render();
+
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+        $this->assertEqualsWithDelta(612, $dompdf->getCanvas()->get_width(), 0.01);
+        $this->assertEqualsWithDelta(396, $dompdf->getCanvas()->get_height(), 0.01);
+    }
+
+    public function test_service_invoice_continuous_short_invoice_keeps_footer_on_one_page(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Short Print Customer');
+        $invoice = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Invoice => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+                tenantId: $tenantId,
+                invoiceType: InvoiceType::Service,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: '2026-11-17',
+                organizationUnitId: $organizationUnitId,
+                partyType: InvoicePartyType::Customer->value,
+                partyId: $customerId,
+                lines: [
+                    new InvoiceLineData(lineNumber: 1, description: 'Wash & Vacuum', quantity: '1.000000', unitPrice: '1550.000000'),
+                ],
+                purchaserReferenceFields: [
+                    ['label' => 'Job No', 'value' => 'VSJ-000733'],
+                    ['label' => 'Vehicle No', 'value' => 'CBJ 9292'],
+                ],
+            )),
+        );
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::Continuous85By55->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+
+        $prints = app(InvoicePrintService::class);
+        $html = view('invoice.print', $prints->viewData(
+            $invoice,
+            mode: 'pdf',
+            printContext: new InvoicePrintContext(
+                new DateTimeImmutable('2026-11-16T05:25:00+00:00'),
+                'admin tenant',
+                InvoiceCopyType::Original,
+            ),
+        ))->render();
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $layout = $prints->layout($invoice);
+        $dompdf->setPaper($layout->pdfPaper(), $layout->orientation());
+        $dompdf->render();
+
+        $this->assertStringContainsString('Printed: 16 Nov 2026 10:55 AM | By: admin tenant | Original', $html);
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
     public function test_service_invoice_print_shows_discounts_and_two_decimal_quantity_with_uppercase_header_only(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
