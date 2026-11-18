@@ -14,7 +14,6 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { createVehicleServiceInvoice, getVehicleServiceJob, listBillableLines, previewVehicleServiceInvoice } from '../vehicleServiceApi';
 import type { VehicleServiceInvoicePreview, VehicleServiceJob, VehicleServiceJobLine } from '../vehicleServiceTypes';
@@ -51,7 +50,7 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
     loadError: ApiError | null;
 }) {
     const navigate = useNavigate();
-    const [form, setForm] = useState({ invoice_date: businessDateInputValue(), due_date: '', exchange_rate: '1.000000', notes: '' });
+    const [form, setForm] = useState({ invoice_date: job.job_date, due_date: '', exchange_rate: '1.000000', notes: '' });
     const [quantities, setQuantities] = useState<Record<number, string>>(() => initialQuantities(billableLines));
     const [preview, setPreview] = useState<VehicleServiceInvoicePreview | null>(null);
     const [busy, setBusy] = useState(false);

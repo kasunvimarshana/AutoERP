@@ -3,6 +3,8 @@ export const financePermissions = {
     accountsManage: 'finance.accounts.manage',
     postingProfilesView: 'finance.posting_profiles.view',
     postingProfilesManage: 'finance.posting_profiles.manage',
+    accountingPeriodsView: 'finance.accounting_periods.view',
+    accountingPeriodsManage: 'finance.accounting_periods.manage',
     journalsView: 'finance.journals.view',
     journalsCreate: 'finance.journals.create',
     journalsUpdate: 'finance.journals.update',

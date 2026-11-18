@@ -57,6 +57,7 @@ describe('VehicleServicePaymentPreparePage', () => {
         renderPage();
 
         expect(await screen.findByRole('heading', { name: 'Record payment' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Payment date')).toHaveValue('2026-06-20');
         expect(screen.getByRole('combobox', { name: 'Invoice number' })).toHaveValue('11');
         await user.type(screen.getByLabelText('Cash received'), '100');
         await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
@@ -64,6 +65,7 @@ describe('VehicleServicePaymentPreparePage', () => {
         await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             expected_version: 7,
             invoice_id: 11,
+            payment_date: '2026-06-20',
             lines: [expect.objectContaining({
                 payment_method_id: 3,
                 reference_number: undefined,

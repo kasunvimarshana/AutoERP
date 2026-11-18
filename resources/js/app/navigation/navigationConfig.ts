@@ -867,6 +867,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         },
                     },
                     {
+                        id: "accounting-periods",
+                        type: "link",
+                        label: "Accounting Periods",
+                        to: "/finance/accounting-periods",
+                        match: ["/finance/accounting-periods"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.accountingPeriodsView],
+                        },
+                    },
+                    {
                         id: "posting-profiles",
                         type: "link",
                         label: "Posting Profiles",

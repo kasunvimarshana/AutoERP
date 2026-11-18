@@ -269,6 +269,14 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         }}>Add new vehicle</Button>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {isCreating && <Input
+                            label="Service job date"
+                            type="date"
+                            value={form.job_date}
+                            error={errorFor('job_date')}
+                            required
+                            onChange={(event) => updateForm({ ...form, job_date: event.target.value })}
+                        />}
                         <GenericLookupSelect
                             label="Vehicle"
                             value={vehicle}

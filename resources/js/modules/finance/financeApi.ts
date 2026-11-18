@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type {
+    AccountingPeriod,
     AccountAssignmentPayload,
     AccountBalanceRow,
     AccountPayload,
@@ -28,6 +29,7 @@ import type {
 } from './financeTypes';
 
 export type {
+    AccountingPeriod,
     AccountAssignmentPayload,
     AccountBalanceRow,
     AccountPayload,
@@ -51,6 +53,19 @@ export type {
     PostingProfileSimulationResult,
     TrialBalance,
 } from './financeTypes';
+
+export async function listAccountingPeriods(page: number, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<AccountingPeriod>>(`${endpoints.finance}/accounting-periods`, { params: { page }, signal });
+    return response.data;
+}
+
+export async function changeAccountingPeriodStatus(period: AccountingPeriod, action: 'reopen' | 'close', reason: string) {
+    const response = await apiClient.post<ApiResource<AccountingPeriod>>(`${endpoints.finance}/accounting-periods/${period.id}/${action}`, {
+        expected_version: period.row_version,
+        reason,
+    });
+    return response.data.data;
+}
 
 export async function listAccounts(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<FinanceAccount>>(`${endpoints.finance}/accounts`, { params, signal });

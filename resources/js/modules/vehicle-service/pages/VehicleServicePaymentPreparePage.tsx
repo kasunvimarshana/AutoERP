@@ -196,7 +196,8 @@ export default function VehicleServicePaymentPreparePage() {
     const job = useApi((signal) => getVehicleServiceJob(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
-    const [date, setDate] = useState(businessDateInputValue());
+    const [date, setDate] = useState<string | null>(null);
+    const paymentDate = date ?? job.data?.job_date ?? businessDateInputValue();
     const [backdateReason, setBackdateReason] = useState('');
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('direct');
     const [rows, setRows] = useState<PaymentRow[]>(DIRECT_PAYMENT_KINDS.map(({ kind }) => ({
@@ -309,8 +310,8 @@ export default function VehicleServicePaymentPreparePage() {
     const payload = (): VehicleServicePaymentPayload => ({
         expected_version: options.data?.job_version ?? 0,
         invoice_id: Number(invoiceId),
-        payment_date: date,
-        ...(date < businessDateInputValue() && backdateReason.trim() ? { backdate_reason: backdateReason.trim() } : {}),
+        payment_date: paymentDate,
+        ...(paymentDate < businessDateInputValue() && backdateReason.trim() ? { backdate_reason: backdateReason.trim() } : {}),
         lines: rows.flatMap((row, index) => {
             if (compareDecimalStrings(appliedAmounts[index] ?? ZERO_AMOUNT, ZERO_AMOUNT) <= 0) return [];
             const method = selectedMethodForRow(row, paymentMethods);
@@ -437,12 +438,12 @@ export default function VehicleServicePaymentPreparePage() {
                             <Input
                                 label="Payment date"
                                 type="date"
-                                value={date}
+                                value={paymentDate}
                                 error={fieldError(error, 'payment_date')}
                                 disabled={submissionLocked}
                                 onChange={(event) => { setDate(event.target.value); }}
                             />
-                            {date < businessDateInputValue() && <Input
+                            {paymentDate < businessDateInputValue() && <Input
                                 label="Reason for earlier payment date"
                                 value={backdateReason}
                                 error={fieldError(error, 'backdate_reason')}

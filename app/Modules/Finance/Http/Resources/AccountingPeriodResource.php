@@ -22,6 +22,7 @@ final class AccountingPeriodResource extends JsonResource
             'status' => $this->status instanceof BackedEnum
                 ? $this->status->value
                 : (string) $this->status,
+            'scope' => $this->organization_unit_id === null ? 'all_branches' : 'current_branch',
             'events' => $this->whenLoaded('events', fn (): array => $this->events->map(
                 static fn ($event): array => [
                     'id' => (int) $event->getKey(),

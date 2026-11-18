@@ -14,6 +14,10 @@ final class FinancePermission
 
     public const POSTING_PROFILES_MANAGE = 'finance.posting_profiles.manage';
 
+    public const ACCOUNTING_PERIODS_VIEW = 'finance.accounting_periods.view';
+
+    public const ACCOUNTING_PERIODS_MANAGE = 'finance.accounting_periods.manage';
+
     public const JOURNALS_VIEW = 'finance.journals.view';
 
     public const JOURNALS_CREATE = 'finance.journals.create';
@@ -48,6 +52,8 @@ final class FinancePermission
             self::ACCOUNTS_MANAGE => 'Create and update chart-of-accounts records.',
             self::POSTING_PROFILES_VIEW => 'View Finance posting-profile configuration.',
             self::POSTING_PROFILES_MANAGE => 'Create and update Finance posting profiles.',
+            self::ACCOUNTING_PERIODS_VIEW => 'View Finance accounting periods and their history.',
+            self::ACCOUNTING_PERIODS_MANAGE => 'Reopen and close Finance accounting periods.',
             self::JOURNALS_VIEW => 'View Finance journals and journal details.',
             self::JOURNALS_CREATE => 'Create draft Finance journals.',
             self::JOURNALS_UPDATE => 'Update editable draft Finance journals.',

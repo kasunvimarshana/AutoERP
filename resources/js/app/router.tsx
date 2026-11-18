@@ -332,6 +332,9 @@ const AccountBalanceReportPage = lazy(
 const PostingProfilePage = lazy(
     () => import("@/modules/finance/pages/PostingProfilePage"),
 );
+const AccountingPeriodsPage = lazy(
+    () => import("@/modules/finance/pages/AccountingPeriodsPage"),
+);
 const FinanceReportsPage = lazy(
     () => import("@/modules/finance/pages/FinanceReportsPage"),
 );
@@ -933,6 +936,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/finance/posting-profiles"
                             element={<PostingProfilePage />}
+                        />
+                        <Route
+                            path="/finance/accounting-periods"
+                            element={<AccountingPeriodsPage />}
                         />
                         <Route
                             path="/finance/reversals"

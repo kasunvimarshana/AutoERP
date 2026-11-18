@@ -36,6 +36,7 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     operational('/finance/trial-balance', ['finance'], [financePermissions.reportsView]),
     operational('/finance/account-balances', ['finance'], [financePermissions.reportsView]),
     operational('/finance/posting-profiles', ['finance'], [financePermissions.postingProfilesView]),
+    operational('/finance/accounting-periods', ['finance'], [financePermissions.accountingPeriodsView]),
     operational('/finance/reversals', ['finance'], [financePermissions.journalsView]),
     operational('/finance/reports', ['finance'], [financePermissions.reportsView]),
     operational('/reports/customer-outstanding', ['reporting', 'finance'], [reportingPermissions.view, financePermissions.reportsView]),

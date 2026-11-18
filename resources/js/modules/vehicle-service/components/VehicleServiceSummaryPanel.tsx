@@ -15,6 +15,7 @@ export function VehicleServiceSummaryPanel({ job }: {
         <div>
             <DetailGrid items={[
                 { label: 'Status', value: <VehicleServiceStatusBadge status={job.status} /> },
+                { label: 'Service job date', value: formatDate(job.job_date) },
                 { label: 'Customer', value: readableRelation(job.customer) },
                 { label: 'Vehicle', value: readableRelation(job.vehicle) },
                 { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },

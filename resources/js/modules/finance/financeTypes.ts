@@ -1,3 +1,14 @@
+export interface AccountingPeriod extends Record<string, unknown> {
+    id: number;
+    row_version: number;
+    code: string;
+    name: string;
+    start_date: string;
+    end_date: string;
+    status: 'open' | 'closed';
+    scope: 'all_branches' | 'current_branch';
+}
+
 export interface FinanceAccount extends Record<string, unknown> {
     id: number;
     code: string;

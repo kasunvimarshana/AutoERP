@@ -7,7 +7,9 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Inventory\Models\InventoryReservation;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleService\Constants\VehicleServiceFinanceSource;
 use Modules\VehicleService\Contracts\JobPromotionHandlerInterface;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
@@ -92,6 +94,16 @@ final class VehicleServiceJobService
             }
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->validator->assertMutable($job);
+            if ($job->job_date->toDateString() !== $data->jobDate && (
+                $job->invoiceLinks()->exists()
+                || $job->lines()->whereNotNull('inventory_movement_id')->exists()
+                || InventoryReservation::query()
+                    ->where('source_type', VehicleServiceFinanceSource::JOB)
+                    ->where('source_id', $job->getKey())
+                    ->exists()
+            )) {
+                throw new InvalidArgumentException('Service job date cannot change after stock or billing records exist.');
+            }
             if (($data->customerId !== (int) $job->customer_id || $data->vehicleId !== (int) $job->vehicle_id)
                 && $this->promotions->hasJobChoices($job)) {
                 throw new InvalidArgumentException('Remove card and offer benefits before changing the job customer or vehicle.');

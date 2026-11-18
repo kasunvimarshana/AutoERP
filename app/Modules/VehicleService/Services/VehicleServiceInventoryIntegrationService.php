@@ -117,7 +117,7 @@ final class VehicleServiceInventoryIntegrationService
 
             $this->inventory->reserve(new ReservationData(
                 tenantId: (int) $job->tenant_id,
-                reservationDate: now()->toDateString(),
+                reservationDate: $job->job_date->toDateString(),
                 itemId: (int) $candidate->item_id,
                 warehouseId: (int) $warehouse->getKey(),
                 quantityReserved: (string) $candidate->quantity,
@@ -261,7 +261,7 @@ final class VehicleServiceInventoryIntegrationService
     ): InventoryMovement {
         $movement = $this->inventory->issue(new StockMovementData(
             tenantId: (int) $job->tenant_id,
-            movementDate: now()->toDateString(),
+            movementDate: $job->job_date->toDateString(),
             movementType: InventoryMovementType::Issue,
             direction: InventoryDirection::Out,
             itemId: (int) $line->item_id,

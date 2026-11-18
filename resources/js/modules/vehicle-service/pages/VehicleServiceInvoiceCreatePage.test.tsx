@@ -34,11 +34,13 @@ describe('VehicleServiceInvoiceCreatePage', () => {
         const user = userEvent.setup();
         renderPage();
         expect(await screen.findByText('Invoice JOB-1')).toBeInTheDocument();
+        expect(screen.getByLabelText('Invoice date')).toHaveValue('2026-06-20');
         await user.click(screen.getByRole('button', { name: 'Create & post invoice' }));
         await waitFor(() => expect(apiMocks.createVehicleServiceInvoice).toHaveBeenCalledWith(
             9,
             expect.objectContaining({
                 expected_version: 7,
+                invoice_date: '2026-06-20',
                 line_quantities: { 21: '1.000000' },
                 exchange_rate: '1.000000',
             }),

@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Modules\Finance\Constants\FinancePermission;
 use Modules\Finance\DTOs\AccountingPeriodData;
 use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\DTOs\CreateJournalEntryData;
@@ -25,6 +26,38 @@ use Tests\TestCase;
 final class AccountingPeriodServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_period_reopen_and_close_routes_require_management_permission(): void
+    {
+        foreach (['reopen', 'close'] as $action) {
+            $route = app('router')->getRoutes()->getByName("api.v1.finance.accounting-periods.{$action}");
+
+            $this->assertNotNull($route);
+            $this->assertContains(
+                config('user.tenant.permission_middleware_alias', 'tenant.permission').':'.FinancePermission::ACCOUNTING_PERIODS_MANAGE,
+                $route->gatherMiddleware(),
+            );
+        }
+    }
+
+    public function test_branch_can_manage_its_period_and_the_tenant_wide_period(): void
+    {
+        $tenantId = $this->tenant();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $service = app(AccountingPeriodService::class);
+            $tenantPeriod = $service->create(new AccountingPeriodData(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                code: 'TENANT-2026',
+                name: 'Tenant 2026',
+                startDate: '2026-01-01',
+                endDate: '2026-12-31',
+            ));
+
+            $this->assertTrue($service->scopeQuery($tenantId, 99)->whereKey($tenantPeriod->getKey())->exists());
+        });
+    }
 
     public function test_unconfigured_scope_is_bootstrap_open_but_configured_gaps_fail_closed(): void
     {

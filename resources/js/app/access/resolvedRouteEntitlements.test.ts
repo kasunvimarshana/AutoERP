@@ -16,6 +16,7 @@ const expectedFinanceRoutes = [
     ['/finance/trial-balance', financePermissions.reportsView],
     ['/finance/account-balances', financePermissions.reportsView],
     ['/finance/posting-profiles', financePermissions.postingProfilesView],
+    ['/finance/accounting-periods', financePermissions.accountingPeriodsView],
     ['/finance/reversals', financePermissions.journalsView],
     ['/finance/reports', financePermissions.reportsView],
     ['/finance/bank-reconciliations', financePermissions.bankReconciliationsView],

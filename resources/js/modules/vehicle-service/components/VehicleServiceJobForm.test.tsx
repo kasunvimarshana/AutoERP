@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TestRouter } from '@/test/TestRouter';
 import type { NamedResource } from '@/shared/types/common';
@@ -92,7 +92,6 @@ describe('VehicleServiceJobForm', () => {
 
         [
             'Bill-to customer',
-            'Job date',
             'Expected delivery',
             'Fuel level',
             'Priority',
@@ -102,6 +101,7 @@ describe('VehicleServiceJobForm', () => {
             expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
         });
         expect(screen.getByLabelText('Type')).toHaveValue('');
+        expect(screen.getByLabelText('Service job date')).not.toHaveValue('');
         expect(screen.getByLabelText('Odometer')).toBeDisabled();
         await user.selectOptions(screen.getByLabelText('Type'), 'full_service');
         expect(screen.getByLabelText('Odometer')).toBeRequired();
@@ -137,6 +137,26 @@ describe('VehicleServiceJobForm', () => {
         const submittedPayload = apiMocks.createVehicleServiceJob.mock.calls[0]?.[0];
         expect(submittedPayload).not.toHaveProperty('supervisor_commission_type');
         expect(submittedPayload).not.toHaveProperty('supervisor_commission_value');
+    });
+
+    it('submits the selected past service job date', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        fireEvent.change(screen.getByLabelText('Service job date'), { target: { value: '2026-01-15' } });
+        await user.selectOptions(screen.getByLabelText('Type'), 'body_wash');
+        await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
+        await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
+        await user.type(screen.getByLabelText('Manual Job Card'), 'MJC-OLD');
+        await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+        await waitFor(() => expect(apiMocks.createVehicleServiceJob).toHaveBeenCalledWith(
+            expect.objectContaining({ job_date: '2026-01-15' }),
+        ));
     });
 
     it('clears and disables mileage fields for body wash, then starts blank when changed to full service', async () => {
@@ -197,7 +217,7 @@ describe('VehicleServiceJobForm', () => {
 
         expect(screen.getByLabelText('Type')).toHaveValue('body_wash');
         [
-            'Job date',
+            'Service job date',
             'Expected delivery',
             'Fuel level',
             'Priority',
@@ -252,7 +272,6 @@ describe('VehicleServiceJobForm', () => {
         render(<VehicleServiceSummaryPanel job={existingJob} />);
 
         [
-            'Job date',
             'Expected delivery',
             'Odometer',
             'Next service mileage',
@@ -262,6 +281,7 @@ describe('VehicleServiceJobForm', () => {
         ].forEach((label) => {
             expect(screen.queryByText(label)).not.toBeInTheDocument();
         });
+        expect(screen.getByText('Service job date')).toBeInTheDocument();
         expect(screen.getByText('Manual job card')).toBeInTheDocument();
         expect(screen.getByText('Type')).toBeInTheDocument();
     });

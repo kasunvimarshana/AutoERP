@@ -1427,6 +1427,9 @@ final class VehicleServiceEngineTest extends TestCase
             fn (): Invoice => Invoice::query()->findOrFail($response->json('data.invoice_id')),
         );
         $this->assertSame(InvoiceStatus::Posted, $invoice->status);
+        $this->assertSame($job->job_date->toDateString(), $invoice->invoice_date->toDateString());
+        $this->assertSame($job->job_date->toDateString(), CarbonImmutable::parse((string) DB::table('invoice_posting_plans')
+            ->where('invoice_id', $invoice->getKey())->value('posting_date'))->toDateString());
         $this->assertSame(VehicleServiceJobStatus::Invoiced, $this->refreshJob($job)->status);
         $this->assertEqualsCanonicalizing(['draft', 'completed', 'invoiced'], $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
@@ -1451,7 +1454,34 @@ final class VehicleServiceEngineTest extends TestCase
         ])->assertOk();
 
         $this->assertNotNull($line->refresh()->inventory_movement_id);
+        $this->assertSame($job->job_date->toDateString(), CarbonImmutable::parse((string) DB::table('inventory_movements')
+            ->where('id', $line->inventory_movement_id)->value('movement_date'))->toDateString());
         $this->assertSame(VehicleServiceJobStatus::Invoiced, $this->refreshJob($job)->status);
+    }
+
+    public function test_job_date_cannot_change_after_stock_reservation(): void
+    {
+        $context = $this->context();
+        $this->receiveStock($context, '1.000000');
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '20.000000');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Service job date cannot change after stock or billing records exist.');
+        $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->update(
+                $job,
+                new VehicleServiceJobData(
+                    tenantId: $context['tenant_id'],
+                    jobDate: '2026-06-06',
+                    customerId: $context['customer_id'],
+                    vehicleId: $context['vehicle_id'],
+                    odometerReading: '12000.000000',
+                ),
+                $this->currentJobVersion($job),
+            ),
+        );
     }
 
     public function test_quick_completion_without_a_billable_line_rolls_back_the_job(): void

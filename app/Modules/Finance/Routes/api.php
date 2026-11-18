@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Constants\FinancePermission;
+use Modules\Finance\Http\Controllers\AccountingPeriodController;
 use Modules\Finance\Http\Controllers\FinanceConfigurationController;
 use Modules\Finance\Http\Controllers\FinanceController;
 
@@ -20,6 +21,15 @@ $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
 
 Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.')->group(function () use ($requires): void {
+    Route::middleware($requires(FinancePermission::ACCOUNTING_PERIODS_VIEW))->group(function (): void {
+        Route::get('accounting-periods', [AccountingPeriodController::class, 'index'])->name('accounting-periods.index');
+        Route::get('accounting-periods/{period}', [AccountingPeriodController::class, 'show'])->whereNumber('period')->name('accounting-periods.show');
+    });
+    Route::middleware($requires(FinancePermission::ACCOUNTING_PERIODS_MANAGE))->group(function (): void {
+        Route::post('accounting-periods/{period}/reopen', [AccountingPeriodController::class, 'reopen'])->whereNumber('period')->name('accounting-periods.reopen');
+        Route::post('accounting-periods/{period}/close', [AccountingPeriodController::class, 'close'])->whereNumber('period')->name('accounting-periods.close');
+    });
+
     Route::middleware($requires(FinancePermission::ACCOUNTS_VIEW))->group(function (): void {
         Route::get('accounts', [FinanceController::class, 'accounts'])->name('accounts.index');
         Route::get('accounts/{account}', [FinanceController::class, 'showAccount'])->whereNumber('account')->name('accounts.show');

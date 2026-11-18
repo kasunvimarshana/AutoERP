@@ -47,7 +47,7 @@ final class AccountingPeriodService
                 throw new InvalidArgumentException('Accounting period dates overlap an existing period in this scope.');
             }
 
-            $period = new FinanceAccountingPeriod();
+            $period = new FinanceAccountingPeriod;
             $period->forceFill([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -142,7 +142,10 @@ final class AccountingPeriodService
     ): Builder {
         return FinanceAccountingPeriod::query()
             ->where('tenant_id', $tenantId)
-            ->where('organization_scope_key', $this->scopeKey($organizationUnitId));
+            ->whereIn('organization_scope_key', array_unique([
+                FinanceAccountingPeriod::TENANT_SCOPE_KEY,
+                $this->scopeKey($organizationUnitId),
+            ]));
     }
 
     private function transition(
@@ -219,7 +222,7 @@ final class AccountingPeriodService
         ?int $actorId,
         ?string $reason,
     ): void {
-        $event = new FinanceAccountingPeriodEvent();
+        $event = new FinanceAccountingPeriodEvent;
         $event->forceFill([
             'tenant_id' => (int) $period->tenant_id,
             'organization_unit_id' => $period->organization_unit_id,
