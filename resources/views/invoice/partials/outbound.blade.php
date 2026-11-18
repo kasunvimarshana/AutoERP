@@ -33,7 +33,7 @@
             <td>
                 @if (! empty($party['tin']))<div class="party-detail"><strong>{{ $label }}'s TIN:</strong> {{ $party['tin'] }}</div>@endif
                 @if (! empty($party['vat_registration_number']))<div class="party-detail"><strong>VAT Registration No:</strong> {{ $party['vat_registration_number'] }}</div>@endif
-                <div class="party-detail"><strong>{{ $label }}'s Name:</strong> {{ $isOutboundContinuous && $key === 'supplier' ? mb_strtoupper($party['name']) : $party['name'] }}</div>
+                <div class="party-detail"><strong>{{ $label }}'s Name:</strong> {{ $party['name'] }}</div>
                 @if (! empty($party['address']))
                     <div class="party-detail"><strong>Address:</strong>
                         @if ($addressBreak !== false && trim(mb_substr($party['address'], $addressBreak + 1)) !== '')
@@ -56,7 +56,7 @@
                         @if ($referenceRow !== [])
                             <div class="service-inline-references">
                                 @foreach ($referenceRow as $field)
-                                    <span class="{{ $field['label'] === 'Vehicle No' ? 'vehicle-reference' : '' }}"><strong>{{ $field['label'] === 'Mileage' ? 'Current Mileage' : $field['label'] }}:</strong> {{ $field['value'] }}</span>
+                                    <span><strong>{{ $field['label'] === 'Mileage' ? 'Current Mileage' : $field['label'] }}:</strong> {{ $field['value'] }}</span>
                                 @endforeach
                             </div>
                         @endif

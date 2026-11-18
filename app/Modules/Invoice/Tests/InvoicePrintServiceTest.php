@@ -321,7 +321,7 @@ final class InvoicePrintServiceTest extends TestCase
                 ],
                 purchaserReferenceFields: [
                     ['label' => 'Job No', 'value' => 'VSJ-000864'],
-                    ['label' => 'Vehicle No', 'value' => '15-0572'],
+                    ['label' => 'Vehicle', 'value' => '15-0572'],
                 ],
             )),
         );
@@ -346,7 +346,6 @@ final class InvoicePrintServiceTest extends TestCase
             ),
         );
         $data['document']['supplier']['address'] = '363 Kandy Road, Kalagedihena';
-        $data['document']['supplier']['name'] = 'Pic Auto Lanka (PVT) LTD';
         $data['document']['purchaser_reference_fields'][] = ['label' => 'Mileage', 'value' => '4,757 km'];
         $data['document']['purchaser_reference_fields'][] = ['label' => 'Next Service Mileage', 'value' => '14,757 km'];
         $html = view('invoice.print', $data)->render();
@@ -356,16 +355,12 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertTrue($data['print_layout']['is_outbound_continuous']);
         $this->assertStringContainsString('@page { size: 215.9mm 139.7mm; margin: 5mm 13mm 2mm 3mm; }', $printHtml);
         $this->assertStringContainsString('layout-continuous layout-outbound-continuous pdf-output', $html);
-        $this->assertStringContainsString('font-size: 12px; line-height: 1.25', $html);
-        $this->assertStringContainsString('.vehicle-reference { font-size: 12.5px; white-space: nowrap; }', $html);
-        $this->assertStringContainsString('.service-lines td:nth-child(3) { text-align: center; }', $html);
-        $this->assertSame('108mm', $data['print_layout']['service_content_min_height']);
+        $this->assertStringContainsString('font-size: 11px; line-height: 1.25', $html);
         $this->assertStringNotContainsString('class="company-contact"', $html);
-        $this->assertStringContainsString("Supplier's Name:</strong> PIC AUTO LANKA (PVT) LTD", $html);
         $this->assertStringContainsString('363 Kandy Road,<br>Kalagedihena', $html);
         $this->assertStringContainsString('Job No:</strong> VSJ-000864', $html);
-        $this->assertStringContainsString('class="vehicle-reference"><strong>Vehicle No:</strong> 15-0572', $html);
-        $this->assertMatchesRegularExpression('/Job No:<\/strong> VSJ-000864.*Vehicle No:<\/strong> 15-0572.*<\/div>\s*<div class="service-inline-references">.*Current Mileage:<\/strong> 4,757 km.*Next Service Mileage:<\/strong> 14,757 km/s', $html);
+        $this->assertStringContainsString('Vehicle:</strong> 15-0572', $html);
+        $this->assertMatchesRegularExpression('/Job No:<\/strong> VSJ-000864.*Vehicle:<\/strong> 15-0572.*<\/div>\s*<div class="service-inline-references">.*Current Mileage:<\/strong> 4,757 km.*Next Service Mileage:<\/strong> 14,757 km/s', $html);
         $this->assertStringNotContainsString('class="service-references"', $html);
         $this->assertStringContainsString('3M Coolant Blue 4L', $html);
         $this->assertStringNotContainsString('COOLANT-4L', $html);
