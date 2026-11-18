@@ -35,7 +35,7 @@ enum InvoicePrintLayout: string
 
     private const SERVICE_CONTINUOUS_BOTTOM_MARGIN_MM = 2;
 
-    private const SERVICE_CONTINUOUS_CONTENT_MIN_HEIGHT_MM = 112;
+    private const SERVICE_CONTINUOUS_CONTENT_MIN_HEIGHT_MM = 108;
 
     public function paperSize(): string
     {

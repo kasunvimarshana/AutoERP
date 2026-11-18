@@ -220,7 +220,7 @@
         .layout-outbound-a4 .service-footer td:last-child { text-align: right; }
         .layout-outbound-a4 .print-trace { margin-top: 0; font-size: 8px; white-space: nowrap; }
         .pdf-output.layout-outbound-a4 .sheet { padding: 0; }
-        .layout-outbound-continuous { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.25; }
+        .layout-outbound-continuous { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.25; }
         .layout-outbound-continuous .sheet { padding: {{ $print_layout['css_page_margin'] }}; }
         .layout-outbound-continuous .controls { width: {{ $print_layout['continuous_width'] }}; }
         .layout-outbound-continuous .invoice-header { margin-bottom: 2mm; }
@@ -238,22 +238,25 @@
         .layout-outbound-continuous .service-address-lines { display: inline-block; vertical-align: top; }
         .layout-outbound-continuous .service-inline-references { margin-top: 3px; }
         .layout-outbound-continuous .service-inline-references span { display: inline-block; width: 48%; vertical-align: top; }
+        .layout-outbound-continuous .service-inline-references .vehicle-reference { font-size: 12.5px; white-space: nowrap; }
         .layout-outbound-continuous .service-lines { margin-top: 1mm; }
         .layout-outbound-continuous .service-lines thead { display: table-header-group; }
         .layout-outbound-continuous .service-lines tr { page-break-inside: avoid; }
         .layout-outbound-continuous .service-lines th,
-        .layout-outbound-continuous .service-lines td { border: 1px solid #8193a2; padding: 4px 5px; vertical-align: middle; }
+        .layout-outbound-continuous .service-lines td { border: 1px solid #8193a2; padding: 2px 5px; vertical-align: middle; }
         .layout-outbound-continuous .service-lines th { background: #e9edf1; font-size: 9px; text-align: right; text-transform: uppercase; }
         .layout-outbound-continuous .service-lines th:first-child,
         .layout-outbound-continuous .service-lines th:nth-child(2) { text-align: left; }
         .layout-outbound-continuous .service-lines .line-number { text-align: center; }
+        .layout-outbound-continuous .service-lines th:nth-child(3),
+        .layout-outbound-continuous .service-lines td:nth-child(3) { text-align: center; }
         .layout-outbound-continuous .settlement-table { margin-top: 1mm; }
         .layout-outbound-continuous .settlement-table > tbody > tr > td { border: 1px solid #8193a2; padding: 0; vertical-align: top; }
         .layout-outbound-continuous .payment-box { width: 50%; padding: 7px 9px !important; }
         .layout-outbound-continuous .payment-box-title { margin-bottom: 7px; font-weight: 700; text-transform: uppercase; }
         .layout-outbound-continuous .payment-box div { margin-bottom: 5px; }
         .layout-outbound-continuous .totals-box { width: 50%; }
-        .layout-outbound-continuous .totals-box td { border-bottom: 1px solid #8193a2; padding: 2px 5px; }
+        .layout-outbound-continuous .totals-box td { border-bottom: 1px solid #8193a2; padding: 1px 5px; }
         .layout-outbound-continuous .totals-box tr:last-child td { border-bottom: 0; }
         .layout-outbound-continuous .totals-box td:last-child { width: 28%; text-align: right; white-space: nowrap; }
         .layout-outbound-continuous .totals-box .total-row { background: #e9edf1; font-weight: 700; }
