@@ -34,6 +34,7 @@ export function InventoryDimensionFields({
     includeLocation = true,
     includeSerial = false,
     includeUom = true,
+    defaultOpen = false,
 }: {
     item: NamedResource | null;
     warehouse?: NamedResource | null;
@@ -43,6 +44,7 @@ export function InventoryDimensionFields({
     includeLocation?: boolean;
     includeSerial?: boolean;
     includeUom?: boolean;
+    defaultOpen?: boolean;
 }) {
     const locationSearch = useCallback(
         (params: LookupLoadParams) => searchWarehouseLocations(params, warehouse?.id),
@@ -67,7 +69,7 @@ export function InventoryDimensionFields({
     );
 
     return (
-        <details className="lg:col-span-full">
+        <details className="lg:col-span-full" open={defaultOpen}>
             <summary className="cursor-pointer text-sm font-semibold text-slate-700">Optional dimensions</summary>
             <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {item && (

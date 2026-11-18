@@ -19,8 +19,8 @@ import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { listPaymentMethods, type PaymentMethod } from '@/modules/payment/paymentApi';
 import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
-import { InventoryDimensionFields, emptyInventoryDimensions, type InventoryDimensionValue } from '@/modules/inventory/components/InventoryDimensionFields';
-import { addDecimal, compareDecimalStrings, multiplyDecimal, percentageOfDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
+import { emptyInventoryDimensions } from '@/modules/inventory/components/InventoryDimensionFields';
+import { compareDecimalStrings, multiplyDecimal, percentageOfDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import type { NamedResource } from '@/shared/types/common';
@@ -29,22 +29,13 @@ import type { PaginationMeta } from '@/shared/types/pagination';
 import { sellingPermissions } from '../sellingPermissions';
 import { SellingItemLookup } from '../components/SellingItemLookup';
 import { SaleDiscountInput } from '../components/SaleDiscountInput';
+import { SellingStockedItemsTable, type SaleDraftLine } from '../components/SellingStockedItemsTable';
 
 const ZERO_AMOUNT = '0.000000';
-const ONE_QUANTITY = '1.000000';
 const MAX_PERCENT = '100';
 
 function discountAmount(base: string, type: SaleDiscountType, value: string): string {
     return type === 'percentage' ? percentageOfDecimal(base, value || '0') : value || ZERO_AMOUNT;
-}
-
-interface SaleDraftLine {
-    key: string;
-    item: ItemLookupResource;
-    quantity: string;
-    discountType: SaleDiscountType;
-    discountValue: string;
-    dimensions: InventoryDimensionValue;
 }
 
 function sellingPaymentPath(invoiceId: number): string {
@@ -528,43 +519,7 @@ function SellingWorkspace() {
                         {lines.length === 0 ? (
                             <p className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-600">Search and select an item to add it to this sale.</p>
                         ) : (
-                            <div className="space-y-3">
-                                {lines.map((line) => <article key={line.key} className="rounded-xl border border-slate-200 bg-white p-4">
-                                    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                                        <div className="min-w-0">
-                                            <h3 className="break-words font-semibold text-slate-900">{line.item.name}</h3>
-                                            <p className="mt-0.5 text-xs text-slate-500">{line.item.code}</p>
-                                        </div>
-                                        <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${line.item.name}`} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>Remove</Button>
-                                    </div>
-                                    <div className="grid gap-4 pt-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.1fr)_minmax(8rem,0.8fr)_minmax(13rem,1.1fr)_minmax(9rem,0.8fr)] xl:items-end">
-                                        <div>
-                                            <p className="mb-1.5 text-sm font-medium text-slate-700">Quantity</p>
-                                            <div className="flex items-center gap-1.5">
-                                                <Button type="button" variant="secondary" size="sm" className="h-10 w-10 shrink-0" aria-label={`Decrease ${line.item.name} quantity`} disabled={compareDecimalStrings(line.quantity || '0', ONE_QUANTITY) <= 0} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: subtractDecimal(row.quantity, ONE_QUANTITY) } : row))}>−</Button>
-                                                <div className="w-20 shrink-0"><DecimalInput aria-label={`Quantity for ${line.item.name}`} className="text-center tabular-nums" maxFractionDigits={3} value={line.quantity} onChange={(event) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: event.target.value } : row))} /></div>
-                                                <Button type="button" variant="secondary" size="sm" className="h-10 w-10 shrink-0" aria-label={`Increase ${line.item.name} quantity`} onClick={() => setLines((current) => current.map((row) => row.key === line.key ? { ...row, quantity: addDecimal(row.quantity || '0', ONE_QUANTITY) } : row))}>+</Button>
-                                                <span className="shrink-0 text-xs text-slate-500">{line.item.base_uom?.code}</span>
-                                            </div>
-                                        </div>
-                                        <div className="xl:text-right">
-                                            <p className="mb-1.5 text-sm font-medium text-slate-700">Unit price</p>
-                                            <p className="py-2 font-medium tabular-nums text-slate-900">{line.item.resolved_sales_unit_price == null ? 'Not configured' : formatMoney(line.item.resolved_sales_unit_price, saleCurrencyCode)}</p>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <SaleDiscountInput label="Discount" ariaLabel={`Discount for ${line.item.name}`} currency={saleCurrency} type={line.discountType} value={line.discountValue} onTypeChange={(discountType) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountType } : row))} onValueChange={(discountValue) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, discountValue } : row))} />
-                                            <p className="mt-1 text-xs text-slate-500">Applied: {formatMoney(lineDiscount(line), saleCurrencyCode)}</p>
-                                        </div>
-                                        <div className="xl:text-right">
-                                            <p className="mb-1.5 text-sm font-medium text-slate-700">Line total</p>
-                                            <p className="py-2 font-semibold tabular-nums text-slate-900">{line.item.resolved_sales_unit_price == null ? '—' : formatMoney(lineTotal(line), saleCurrencyCode)}</p>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 border-t border-slate-100 pt-3">
-                                        <InventoryDimensionFields item={line.item} warehouse={warehouse} value={line.dimensions} includeLocation={false} includeSerial includeUom={false} onChange={(dimensions) => setLines((current) => current.map((row) => row.key === line.key ? { ...row, dimensions } : row))} />
-                                    </div>
-                                </article>)}
-                            </div>
+                            <SellingStockedItemsTable lines={lines} setLines={setLines} warehouse={warehouse} currency={saleCurrency} currencyCode={saleCurrencyCode} subtotal={grossSubtotal} lineDiscount={lineDiscount} lineTotal={lineTotal} />
                         )}
                         {lines.length > 0 && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end">

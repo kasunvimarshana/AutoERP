@@ -44,7 +44,7 @@ export function SellingItemLookup({
                 </div>
             )}
             renderEmptyState={() => <p className="px-3 py-2 text-sm text-slate-600" role="status">No matching items with available stock in this warehouse and location.</p>}
-            placeholder={warehouseId ? 'Search stocked items...' : 'Choose a warehouse first'}
+            placeholder={warehouseId ? 'Search by item name or code...' : 'Choose a warehouse first'}
             disabled={warehouseId === null}
         />
     );

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { lookupApi } from '@/shared/api/lookupApi';
@@ -60,10 +60,15 @@ describe('Selling route state ownership', () => {
         expect(itemOption).toHaveTextContent('Sale price: LKR 100.000000');
         fireEvent.click(itemOption);
         expect(screen.queryByRole('heading', { name: 'Workflow guidance' })).not.toBeInTheDocument();
-        expect(screen.getByText('Unit price').nextElementSibling).toHaveTextContent('100.00');
-        expect(screen.getByText('Line total').nextElementSibling).toHaveTextContent('100.00');
+        const itemRow = screen.getByRole('row', { name: /Oil filter/ });
+        expect(screen.getByRole('columnheader', { name: 'Unit price (LKR)' })).toBeInTheDocument();
+        expect(within(itemRow).getAllByText(/100\.00/)).toHaveLength(2);
+        fireEvent.click(within(itemRow).getByRole('button', { name: 'Edit Oil filter' }));
+        expect(within(itemRow).getByRole('textbox', { name: 'Quantity for Oil filter' })).toHaveFocus();
+        expect(within(itemRow).getByRole('button', { name: 'Dimensions for Oil filter' })).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByText('Optional dimensions').closest('details')).toHaveAttribute('open');
         fireEvent.change(screen.getAllByRole('textbox', { name: 'Discount for Oil filter' }).at(-1)!, { target: { value: '10' } });
-        expect(screen.getByText('Line total').nextElementSibling).toHaveTextContent('90.00');
+        expect(within(itemRow).getByText(/90\.00/)).toBeInTheDocument();
         fireEvent.change(screen.getByRole('textbox', { name: 'Total bill discount' }), { target: { value: '5' } });
         fireEvent.click(screen.getByRole('button', { name: 'Post sale and invoice' }));
 
