@@ -8,6 +8,7 @@ use Modules\User\Http\Controllers\RoleController;
 use Modules\User\Http\Controllers\UserController;
 use Modules\User\Http\Controllers\UserDeviceController;
 use Modules\User\Http\Controllers\UserDocumentController;
+use Modules\User\Http\Controllers\UserQuickAccessController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -29,6 +30,9 @@ Route::prefix('api/v1')
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::get('users/password-policy', [UserController::class, 'passwordPolicy'])->name('users.password-policy');
+        Route::get('user/quick-access', [UserQuickAccessController::class, 'show'])->name('quick-access.show');
+        Route::put('user/quick-access', [UserQuickAccessController::class, 'update'])->name('quick-access.update');
+        Route::delete('user/quick-access', [UserQuickAccessController::class, 'destroy'])->name('quick-access.destroy');
         Route::get('users/{user}', [UserController::class, 'show'])->whereNumber('user')->name('users.show');
         Route::patch('users/{user}', [UserController::class, 'update'])->whereNumber('user')->name('users.update');
         Route::patch('users/{user}/status', [UserController::class, 'changeStatus'])->whereNumber('user')->name('users.status');

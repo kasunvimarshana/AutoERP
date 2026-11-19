@@ -1,20 +1,23 @@
-import { useState, useId } from 'react';
+import { useState, useMemo } from 'react';
 import { NavigationIcon } from '@/app/navigation/NavigationIcon';
-import type { NavigationIconName } from '@/app/navigation/navigationTypes';
+import type { NavigationIconName, NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
+import { tenantNavigationSections } from '@/app/navigation/navigationConfig';
+import { filterNavigation, findNavigationMatch } from '@/app/navigation/navigationUtils';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { Modal } from '@/shared/components/Modal';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
-import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
 import { ConfirmDialog, useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import {
     useQuickAccessConfig,
     QUICK_ACCESS_ICONS,
-    SYSTEM_PRESET_ITEMS,
+    getAvailablePresets,
     normalizePath,
+    stripQuery,
     type QuickAccessItemConfig,
 } from './quickAccessService';
 
@@ -36,22 +39,93 @@ const EMPTY_FORM: ItemFormState = {
     enabled: true,
 };
 
+function useAuthSafe() {
+    try {
+        return useAuth();
+    } catch {
+        return null;
+    }
+}
+
 export default function QuickAccessSettingsPage() {
-    const { items, updateItems, resetToDefaults } = useQuickAccessConfig();
+    const auth = useAuthSafe();
+    const {
+        items,
+        rowVersion,
+        isDefault,
+        isLoading,
+        isSaving,
+        error: configError,
+        updateItems,
+        resetToDefaults,
+        refreshFromServer,
+    } = useQuickAccessConfig();
+
     const [modalOpen, setModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [selectedPreset, setSelectedPreset] = useState<string>('');
     const [formData, setFormData] = useState<ItemFormState>(EMPTY_FORM);
     const [formErrors, setFormErrors] = useState<Partial<Record<keyof ItemFormState, string>>>({});
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+    const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success');
     const { confirm, confirmDialog } = useConfirmDialog();
+
+    // Drag-and-drop state
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+    // Filtered workspace navigation sections based on current user permissions and modules
+    const permittedSections: NavigationSection[] = useMemo(() => {
+        if (!auth) return tenantNavigationSections;
+        return filterNavigation(tenantNavigationSections, {
+            tenantId: auth.tenant?.id ?? null,
+            isPlatformOperator: auth.isPlatformOperator,
+            organizationUnitId: auth.organizationUnit?.id ?? null,
+            roles: auth.roles,
+            permissions: auth.permissions,
+            permissionsLoaded: auth.permissionsLoaded,
+            enabledModules: auth.enabledModules,
+            enabledModulesLoaded: auth.enabledModulesLoaded,
+        });
+    }, [auth]);
+
+    // Compute accessible links map for permissions boundary check
+    const accessibleLinks = useMemo(() => {
+        const all = permittedSections.flatMap((s) =>
+            s.items.flatMap((item) => (item.type === 'link' ? [item] : item.children))
+        );
+        const byId = new Map<string, NavigationLinkItem>(all.map((item) => [item.id, item]));
+        const byPath = new Map<string, NavigationLinkItem>();
+        for (const link of all) {
+            byPath.set(stripQuery(link.to), link);
+            if (link.match) {
+                for (const candidate of link.match) {
+                    byPath.set(stripQuery(candidate), link);
+                }
+            }
+        }
+        return { byId, byPath };
+    }, [permittedSections]);
+
+    // Dynamically available presets from all registered modules
+    const availablePresets = useMemo(() => {
+        return getAvailablePresets(permittedSections);
+    }, [permittedSections]);
+
+    const isItemAccessible = (item: QuickAccessItemConfig): boolean => {
+        const path = stripQuery(item.to);
+        return accessibleLinks.byId.has(item.id)
+            || accessibleLinks.byPath.has(path)
+            || Boolean(findNavigationMatch(path, '', permittedSections));
+    };
 
     const enabledCount = items.filter((item) => item.enabled).length;
     const disabledCount = items.length - enabledCount;
 
-    const showFeedback = (message: string) => {
+    const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
         setFeedbackMessage(message);
-        setTimeout(() => setFeedbackMessage(null), 4000);
+        setFeedbackType(type);
+        setTimeout(() => setFeedbackMessage(null), 5000);
     };
 
     const handleOpenAdd = () => {
@@ -86,7 +160,7 @@ export default function QuickAccessSettingsPage() {
 
     const handlePresetSelect = (presetId: string) => {
         setSelectedPreset(presetId);
-        const found = SYSTEM_PRESET_ITEMS.find((p) => p.id === presetId);
+        const found = availablePresets.find((p) => p.id === presetId);
         if (!found) return;
         setFormData((prev) => ({
             ...prev,
@@ -98,13 +172,17 @@ export default function QuickAccessSettingsPage() {
         setFormErrors({});
     };
 
-    const handleToggleEnabled = (itemId: string) => {
+    const handleToggleEnabled = async (itemId: string) => {
         const next = items.map((item) => (item.id === itemId ? { ...item, enabled: !item.enabled } : item));
-        updateItems(next);
-        showFeedback('Updated menu visibility.');
+        const res = await updateItems(next);
+        if (res.conflict) {
+            showFeedback(res.message || 'Conflict detected; refreshed with latest settings.', 'error');
+        } else {
+            showFeedback('Updated menu visibility.');
+        }
     };
 
-    const handleMove = (index: number, direction: 'up' | 'down') => {
+    const handleMove = async (index: number, direction: 'up' | 'down') => {
         const targetIndex = direction === 'up' ? index - 1 : index + 1;
         if (targetIndex < 0 || targetIndex >= items.length) return;
 
@@ -113,8 +191,55 @@ export default function QuickAccessSettingsPage() {
         next[index] = next[targetIndex];
         next[targetIndex] = temp;
 
-        updateItems(next);
-        showFeedback('Reordered quick access shortcuts.');
+        const res = await updateItems(next);
+        if (res.conflict) {
+            showFeedback(res.message || 'Conflict detected; refreshed with latest settings.', 'error');
+        } else {
+            showFeedback('Reordered quick access shortcuts.');
+        }
+    };
+
+    // Drag and Drop handlers
+    const handleDragStart = (index: number, e: React.DragEvent) => {
+        setDraggedIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(index));
+    };
+
+    const handleDragOver = (index: number, e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverIndex !== index) {
+            setDragOverIndex(index);
+        }
+    };
+
+    const handleDrop = async (targetIndex: number, e: React.DragEvent) => {
+        e.preventDefault();
+        if (draggedIndex === null || draggedIndex === targetIndex) {
+            setDraggedIndex(null);
+            setDragOverIndex(null);
+            return;
+        }
+
+        const next = [...items];
+        const [moved] = next.splice(draggedIndex, 1);
+        next.splice(targetIndex, 0, moved);
+
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+
+        const res = await updateItems(next);
+        if (res.conflict) {
+            showFeedback(res.message || 'Conflict detected; refreshed with latest settings.', 'error');
+        } else {
+            showFeedback('Reordered quick access shortcuts via drag-and-drop.');
+        }
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIndex(null);
+        setDragOverIndex(null);
     };
 
     const handleDelete = async (item: QuickAccessItemConfig) => {
@@ -127,8 +252,12 @@ export default function QuickAccessSettingsPage() {
         if (!confirmed) return;
 
         const next = items.filter((i) => i.id !== item.id);
-        updateItems(next);
-        showFeedback(`Removed "${item.label}" from Quick Access.`);
+        const res = await updateItems(next);
+        if (res.conflict) {
+            showFeedback(res.message || 'Conflict detected; refreshed with latest settings.', 'error');
+        } else {
+            showFeedback(`Removed "${item.label}" from Quick Access.`);
+        }
     };
 
     const handleReset = async () => {
@@ -140,11 +269,15 @@ export default function QuickAccessSettingsPage() {
         });
         if (!confirmed) return;
 
-        resetToDefaults();
-        showFeedback('Reset Quick Access menu to default settings.');
+        const res = await resetToDefaults();
+        if (res.success) {
+            showFeedback('Reset Quick Access menu to default settings.');
+        } else {
+            showFeedback(res.message || 'Failed to reset settings.', 'error');
+        }
     };
 
-    const handleSaveForm = (e: React.FormEvent) => {
+    const handleSaveForm = async (e: React.FormEvent) => {
         e.preventDefault();
         const errors: Partial<Record<keyof ItemFormState, string>> = {};
 
@@ -157,7 +290,7 @@ export default function QuickAccessSettingsPage() {
         }
         if (!trimmedTo) {
             errors.to = 'Route path is required.';
-        } else if (!trimmedTo.startsWith('/') || trimmedTo.startsWith('//')) {
+        } else if (!trimmedTo.startsWith('/') || trimmedTo.startsWith('//') || trimmedTo.startsWith('/\\')) {
             errors.to = 'Route must start with a single forward slash (/), e.g. /customers.';
         } else {
             const normalizedTo = normalizePath(trimmedTo);
@@ -190,28 +323,34 @@ export default function QuickAccessSettingsPage() {
         let next: QuickAccessItemConfig[];
         if (editingId) {
             next = items.map((item) => (item.id === editingId ? cleanItem : item));
-            showFeedback(`Updated shortcut "${cleanItem.label}".`);
         } else {
             next = [...items, cleanItem];
-            showFeedback(`Added new shortcut "${cleanItem.label}".`);
         }
 
-        updateItems(next);
+        const res = await updateItems(next);
         setModalOpen(false);
+
+        if (res.conflict) {
+            showFeedback(res.message || 'Conflict detected; refreshed with latest settings.', 'error');
+        } else {
+            showFeedback(editingId ? `Updated shortcut "${cleanItem.label}".` : `Added new shortcut "${cleanItem.label}".`);
+        }
     };
 
-    // Group enabled items for live preview
-    const previewGroups = items
-        .filter((item) => item.enabled)
-        .reduce<Array<{ label: string; links: QuickAccessItemConfig[] }>>((acc, item) => {
-            let grp = acc.find((g) => g.label === item.group);
-            if (!grp) {
-                grp = { label: item.group, links: [] };
-                acc.push(grp);
-            }
-            grp.links.push(item);
-            return acc;
-        }, []);
+    // Live preview: only displays enabled AND accessible items, grouped by configured category
+    const previewGroups = useMemo(() => {
+        return items
+            .filter((item) => item.enabled && isItemAccessible(item))
+            .reduce<Array<{ label: string; links: QuickAccessItemConfig[] }>>((acc, item) => {
+                let grp = acc.find((g) => g.label === item.group);
+                if (!grp) {
+                    grp = { label: item.group, links: [] };
+                    acc.push(grp);
+                }
+                grp.links.push(item);
+                return acc;
+            }, []);
+    }, [items, accessibleLinks, permittedSections]);
 
     const iconSelectOptions = QUICK_ACCESS_ICONS.map((icon) => ({
         value: icon,
@@ -219,8 +358,8 @@ export default function QuickAccessSettingsPage() {
     }));
 
     const presetSelectOptions = [
-        { value: '', label: 'Select a common page to auto-fill...' },
-        ...SYSTEM_PRESET_ITEMS.map((preset) => ({
+        { value: '', label: 'Select a registered module page to auto-fill...' },
+        ...availablePresets.map((preset) => ({
             value: preset.id,
             label: `${preset.group} > ${preset.label} (${preset.to})`,
         })),
@@ -230,13 +369,14 @@ export default function QuickAccessSettingsPage() {
         <div className="space-y-6">
             <ContentHeader
                 title="Quick Access Settings"
-                description="Manage and customize the shortcuts in your header Quick Access dropdown. Easily enable, reorder, edit, or create one-click navigation links."
+                description="Manage and customize the shortcuts in your header Quick Access dropdown. Easily enable, reorder via drag-and-drop, edit, or create one-click navigation links."
                 actions={(
                     <div className="flex flex-wrap items-center gap-2">
                         <Button
                             type="button"
                             variant="secondary"
                             onClick={handleReset}
+                            disabled={isSaving}
                         >
                             <svg className="h-4 w-4 shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
@@ -248,6 +388,7 @@ export default function QuickAccessSettingsPage() {
                             type="button"
                             variant="primary"
                             onClick={handleOpenAdd}
+                            disabled={isSaving}
                         >
                             <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <path d="M12 5v14m-7-7h14" />
@@ -259,12 +400,30 @@ export default function QuickAccessSettingsPage() {
             />
 
             {feedbackMessage && (
-                <SuccessAlert message={feedbackMessage} onDismiss={() => setFeedbackMessage(null)} />
+                feedbackType === 'error' ? (
+                    <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
+                        <span>{feedbackMessage}</span>
+                        <button type="button" onClick={() => setFeedbackMessage(null)} className="text-xs font-semibold underline ml-4 cursor-pointer">
+                            Dismiss
+                        </button>
+                    </div>
+                ) : (
+                    <SuccessAlert message={feedbackMessage} onDismiss={() => setFeedbackMessage(null)} />
+                )
+            )}
+
+            {configError && !feedbackMessage && (
+                <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" role="alert">
+                    <span>{configError}</span>
+                    <button type="button" onClick={() => refreshFromServer()} className="text-xs font-semibold underline ml-4 cursor-pointer">
+                        Retry Sync
+                    </button>
+                </div>
             )}
 
             {/* Status summary banner */}
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-sm text-slate-700">
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
                     <span className="font-semibold text-slate-900">Configured Shortcuts:</span>
                     <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs border border-slate-200">
                         Total: <span className="font-bold text-slate-900">{items.length}</span>
@@ -275,10 +434,20 @@ export default function QuickAccessSettingsPage() {
                     <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-2xs border border-slate-200">
                         Hidden: <span className="font-bold text-slate-800">{disabledCount}</span>
                     </span>
+                    {isSaving && (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-blue-600 font-medium">
+                            <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Saving to server...
+                        </span>
+                    )}
                 </div>
-                <p className="text-xs text-slate-500">
-                    Preferences are saved in your browser storage and update the header dropdown immediately.
-                </p>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                    <span>Persisted in Database & cached in LocalStorage. Dropdown reflects changes immediately.</span>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -286,7 +455,7 @@ export default function QuickAccessSettingsPage() {
                 <div className="lg:col-span-2">
                     <Panel
                         title="Shortcut Entries"
-                        description="Toggle items on or off, edit labels, or change their display order."
+                        description="Drag rows by the handle to reorder, toggle visibility, or edit shortcuts."
                     >
                         {items.length === 0 ? (
                             <div className="py-12 text-center">
@@ -306,7 +475,7 @@ export default function QuickAccessSettingsPage() {
                                 <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                                     <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-600">
                                         <tr>
-                                            <th scope="col" className="w-16 px-3 py-3 text-center">Order</th>
+                                            <th scope="col" className="w-12 px-2 py-3 text-center" title="Drag to reorder">Order</th>
                                             <th scope="col" className="px-4 py-3">Shortcut</th>
                                             <th scope="col" className="px-3 py-3">Group</th>
                                             <th scope="col" className="px-3 py-3">Route</th>
@@ -315,106 +484,145 @@ export default function QuickAccessSettingsPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 bg-white">
-                                        {items.map((item, index) => (
-                                            <tr key={item.id} className="transition-colors hover:bg-slate-50/80">
-                                                {/* Reorder Buttons */}
-                                                <td className="px-3 py-3 text-center whitespace-nowrap">
-                                                    <div className="inline-flex flex-col gap-0.5">
-                                                        <button
-                                                            type="button"
-                                                            disabled={index === 0}
-                                                            onClick={() => handleMove(index, 'up')}
-                                                            className="inline-flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-30 disabled:pointer-events-none"
-                                                            aria-label={`Move ${item.label} up`}
-                                                            title="Move up"
-                                                        >
-                                                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                                                <path fillRule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clipRule="evenodd" />
-                                                            </svg>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            disabled={index === items.length - 1}
-                                                            onClick={() => handleMove(index, 'down')}
-                                                            className="inline-flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-30 disabled:pointer-events-none"
-                                                            aria-label={`Move ${item.label} down`}
-                                                            title="Move down"
-                                                        >
-                                                            <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                        {items.map((item, index) => {
+                                            const accessible = isItemAccessible(item);
+                                            const isDragging = draggedIndex === index;
+                                            const isOver = dragOverIndex === index;
 
-                                                {/* Icon + Label */}
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60">
-                                                            <NavigationIcon name={item.icon} className="h-4 w-4" />
+                                            return (
+                                                <tr
+                                                    key={item.id}
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStart(index, e)}
+                                                    onDragOver={(e) => handleDragOver(index, e)}
+                                                    onDrop={(e) => handleDrop(index, e)}
+                                                    onDragEnd={handleDragEnd}
+                                                    className={`transition-colors ${
+                                                        isDragging ? 'opacity-40 bg-slate-100' : 'hover:bg-slate-50/80'
+                                                    } ${isOver ? 'border-t-2 border-blue-500 bg-blue-50/40' : ''}`}
+                                                >
+                                                    {/* Reorder: Drag handle + accessible up/down buttons */}
+                                                    <td className="px-2 py-3 text-center whitespace-nowrap">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <span
+                                                                className="inline-flex h-7 w-6 cursor-grab items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700 active:cursor-grabbing"
+                                                                title="Drag to reorder"
+                                                                aria-label={`Drag ${item.label} to reorder`}
+                                                            >
+                                                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                                                                    <circle cx="9" cy="6" r="1.5" />
+                                                                    <circle cx="15" cy="6" r="1.5" />
+                                                                    <circle cx="9" cy="12" r="1.5" />
+                                                                    <circle cx="15" cy="12" r="1.5" />
+                                                                    <circle cx="9" cy="18" r="1.5" />
+                                                                    <circle cx="15" cy="18" r="1.5" />
+                                                                </svg>
+                                                            </span>
+                                                            <div className="inline-flex flex-col gap-0.5">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={index === 0}
+                                                                    onClick={() => handleMove(index, 'up')}
+                                                                    className="inline-flex h-4 w-4 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-20 disabled:pointer-events-none"
+                                                                    aria-label={`Move ${item.label} up`}
+                                                                    title="Move up"
+                                                                >
+                                                                    <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                        <path fillRule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clipRule="evenodd" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={index === items.length - 1}
+                                                                    onClick={() => handleMove(index, 'down')}
+                                                                    className="inline-flex h-4 w-4 items-center justify-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-20 disabled:pointer-events-none"
+                                                                    aria-label={`Move ${item.label} down`}
+                                                                    title="Move down"
+                                                                >
+                                                                    <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Icon + Label */}
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2.5">
+                                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60">
+                                                                <NavigationIcon name={item.icon} className="h-4 w-4" />
+                                                            </span>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium text-slate-900">{item.label}</span>
+                                                                {!accessible && (
+                                                                    <span className="inline-flex items-center text-[11px] font-medium text-amber-600" title="Hidden from dropdown because your role/plan lacks access to this module">
+                                                                        Restricted in workspace
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Group */}
+                                                    <td className="px-3 py-3 whitespace-nowrap">
+                                                        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                                            {item.group}
                                                         </span>
-                                                        <span className="font-medium text-slate-900">{item.label}</span>
-                                                    </div>
-                                                </td>
+                                                    </td>
 
-                                                {/* Group */}
-                                                <td className="px-3 py-3 whitespace-nowrap">
-                                                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                                        {item.group}
-                                                    </span>
-                                                </td>
+                                                    {/* Route */}
+                                                    <td className="px-3 py-3">
+                                                        <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
+                                                            {item.to}
+                                                        </code>
+                                                    </td>
 
-                                                {/* Route */}
-                                                <td className="px-3 py-3">
-                                                    <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
-                                                        {item.to}
-                                                    </code>
-                                                </td>
-
-                                                {/* Visibility Toggle */}
-                                                <td className="px-3 py-3 text-center whitespace-nowrap">
-                                                    <button
-                                                        type="button"
-                                                        role="switch"
-                                                        aria-checked={item.enabled}
-                                                        aria-label={`Toggle visibility for ${item.label}`}
-                                                        onClick={() => handleToggleEnabled(item.id)}
-                                                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-colors ${
-                                                            item.enabled
-                                                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                                        }`}
-                                                    >
-                                                        <span className={`h-2 w-2 rounded-full ${item.enabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                                                        <span>{item.enabled ? 'Visible' : 'Hidden'}</span>
-                                                    </button>
-                                                </td>
-
-                                                {/* Actions */}
-                                                <td className="px-4 py-3 text-right whitespace-nowrap">
-                                                    <div className="inline-flex items-center gap-1.5">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-8 px-2 text-slate-600 hover:text-blue-600"
-                                                            onClick={() => handleOpenEdit(item)}
-                                                            aria-label={`Edit ${item.label}`}
+                                                    {/* Visibility Toggle */}
+                                                    <td className="px-3 py-3 text-center whitespace-nowrap">
+                                                        <button
+                                                            type="button"
+                                                            role="switch"
+                                                            aria-checked={item.enabled}
+                                                            aria-label={`Toggle visibility for ${item.label}`}
+                                                            onClick={() => handleToggleEnabled(item.id)}
+                                                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-colors ${
+                                                                item.enabled
+                                                                    ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                            }`}
                                                         >
-                                                            Edit
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-8 px-2 text-slate-500 hover:text-rose-600"
-                                                            onClick={() => handleDelete(item)}
-                                                            aria-label={`Delete ${item.label}`}
-                                                        >
-                                                            Delete
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                            <span className={`h-2 w-2 rounded-full ${item.enabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                                            <span>{item.enabled ? 'Visible' : 'Hidden'}</span>
+                                                        </button>
+                                                    </td>
+
+                                                    {/* Actions */}
+                                                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                        <div className="inline-flex items-center gap-1.5">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 px-2 text-slate-600 hover:text-blue-600"
+                                                                onClick={() => handleOpenEdit(item)}
+                                                                aria-label={`Edit ${item.label}`}
+                                                            >
+                                                                Edit
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 px-2 text-slate-500 hover:text-rose-600"
+                                                                onClick={() => handleDelete(item)}
+                                                                aria-label={`Delete ${item.label}`}
+                                                            >
+                                                                Delete
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -431,12 +639,12 @@ export default function QuickAccessSettingsPage() {
                         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-md">
                             <div className="flex items-center justify-between border-b border-slate-100 px-2 pb-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick access</p>
-                                <span className="text-[11px] text-slate-400">Preview</span>
+                                <span className="text-[11px] text-slate-400">Live Preview</span>
                             </div>
 
                             {previewGroups.length === 0 ? (
                                 <div className="py-6 text-center text-xs text-slate-400">
-                                    No shortcuts are currently enabled. The menu in the header will be hidden.
+                                    No shortcuts are currently enabled and accessible. The menu in the header will be hidden.
                                 </div>
                             ) : (
                                 <div className="space-y-3 pt-2">
@@ -465,15 +673,19 @@ export default function QuickAccessSettingsPage() {
                         <ul className="space-y-2 text-xs leading-relaxed text-slate-600">
                             <li className="flex items-start gap-2">
                                 <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
-                                <span><strong>Permissions Guard:</strong> Shortcuts are automatically filtered by your workspace permissions. If a user lacks permission for a linked module, it will be safely hidden.</span>
+                                <span><strong>Drag & Drop Reordering:</strong> Drag any row using the grip handle on the left to customize dropdown priority instantly.</span>
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
-                                <span><strong>Local Storage:</strong> Configurations are saved in your current browser session and persist across reloads.</span>
+                                <span><strong>Permissions Guard:</strong> Shortcuts are filtered by role permissions and module access. Inaccessible destinations are never exposed.</span>
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
-                                <span><strong>Fast Access:</strong> You can quickly reach this configuration page anytime by clicking &quot;Customize&quot; at the top of the Quick Access dropdown.</span>
+                                <span><strong>Database Persistence:</strong> Preferences are persisted in the database as the source of truth, with LocalStorage caching for instantaneous menu rendering.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
+                                <span><strong>Fast Customization:</strong> Click &quot;Customize&quot; at the top of the header Quick Access dropdown at any time to return to this screen.</span>
                             </li>
                         </ul>
                     </Panel>
@@ -491,7 +703,7 @@ export default function QuickAccessSettingsPage() {
                         <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
                             <Select
                                 label="Quick Presets"
-                                hint="Optional: select a common AutoERP page to automatically fill in details."
+                                hint="Optional: select any registered page from existing modules to auto-fill details."
                                 options={presetSelectOptions}
                                 placeholder={null}
                                 value={selectedPreset}
@@ -561,6 +773,7 @@ export default function QuickAccessSettingsPage() {
                         <Button
                             type="submit"
                             variant="primary"
+                            disabled={isSaving}
                         >
                             {editingId ? 'Save Changes' : 'Save Shortcut'}
                         </Button>

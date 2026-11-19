@@ -61,6 +61,7 @@ final class UserServiceProvider extends ServiceProvider
         $this->app->singleton(PermissionDefinitionRegistryInterface::class, PermissionDefinitionRegistry::class);
         $this->app->singleton(TenantAccessProvisionerInterface::class, TenantAccessProvisioner::class);
         $this->app->scoped(UserAccessResolver::class);
+        $this->app->scoped(\Modules\User\Services\UserQuickAccessService::class);
         $this->app->scoped(PlatformOperatorAccessResolver::class);
         $this->app->scoped(PlatformOperatorCheckerInterface::class, PlatformOperatorAccessResolver::class);
         $this->app->scoped(PlatformPermissionCheckerInterface::class, PlatformOperatorAccessResolver::class);

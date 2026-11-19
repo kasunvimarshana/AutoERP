@@ -3,14 +3,29 @@ import { Link, useLocation } from 'react-router-dom';
 import { NavigationIcon } from '@/app/navigation/NavigationIcon';
 import type { NavigationIconName, NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
 import { findNavigationMatch } from '@/app/navigation/navigationUtils';
+import { useAuth } from '@/modules/auth/AuthProvider';
+import { fetchQuickAccessSettings } from '@/modules/settings/quickAccessApi';
 import {
     getStoredQuickAccessItems,
+    getQuickAccessStorageKey,
+    saveQuickAccessItems,
+    parseRawItems,
     stripQuery,
     QUICK_ACCESS_UPDATE_EVENT,
     type QuickAccessItemConfig,
 } from '@/modules/settings/quickAccessService';
 
+function useAuthSafe() {
+    try {
+        return useAuth();
+    } catch {
+        return null;
+    }
+}
+
 export function QuickAccessMenu({ sections, activeItemId }: { sections: NavigationSection[]; activeItemId: string | null }) {
+    const auth = useAuthSafe();
+    const storageKey = getQuickAccessStorageKey(auth?.tenant?.id, auth?.user?.id);
     const [openLocation, setOpenLocation] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const triggerPointerType = useRef<string | null>(null);
@@ -18,20 +33,41 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
     const locationKey = `${location.pathname}${location.search}`;
     const open = openLocation === locationKey;
 
-    const [configuredItems, setConfiguredItems] = useState<QuickAccessItemConfig[]>(() => getStoredQuickAccessItems());
+    const [configuredItems, setConfiguredItems] = useState<QuickAccessItemConfig[]>(() => getStoredQuickAccessItems(storageKey));
 
     useEffect(() => {
+        setConfiguredItems(getStoredQuickAccessItems(storageKey));
         const handleUpdate = () => {
-            setConfiguredItems(getStoredQuickAccessItems());
+            setConfiguredItems(getStoredQuickAccessItems(storageKey));
         };
 
         window.addEventListener(QUICK_ACCESS_UPDATE_EVENT, handleUpdate);
         window.addEventListener('storage', handleUpdate);
+
+        let isMounted = true;
+        const controller = new AbortController();
+
+        if (auth?.tenant?.id && auth?.user?.id) {
+            fetchQuickAccessSettings(controller.signal)
+                .then((data) => {
+                    if (!isMounted) return;
+                    const serverItems = Array.isArray(data.items) ? data.items : [];
+                    const parsed = parseRawItems(serverItems);
+                    saveQuickAccessItems(parsed, storageKey, data.row_version);
+                    setConfiguredItems(parsed);
+                })
+                .catch(() => {
+                    // Silently ignore sync failures in header menu (offline, aborted, etc.)
+                });
+        }
+
         return () => {
+            isMounted = false;
+            controller.abort();
             window.removeEventListener(QUICK_ACCESS_UPDATE_EVENT, handleUpdate);
             window.removeEventListener('storage', handleUpdate);
         };
-    }, []);
+    }, [storageKey, auth?.tenant?.id, auth?.user?.id]);
 
     const allLinks = sections.flatMap((section) =>
         section.items.flatMap((item) => (item.type === 'link' ? [item] : item.children))
@@ -147,10 +183,11 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
                             <div key={group.label} className={index > 0 ? 'mt-3 border-t border-slate-200 pt-3' : ''}>
                                 <p className="px-2 pb-1 text-sm font-bold text-slate-900">{group.label}</p>
                                 {group.links.map((item) => {
+                                    const hasQuery = item.to.includes('?');
                                     const isCurrent = activeItemId === item.id
-                                        || (item.to === location.pathname && location.pathname !== '/')
                                         || item.to === locationKey
-                                        || (stripQuery(item.to) === location.pathname && location.pathname !== '/');
+                                        || (!hasQuery && item.to === location.pathname && location.pathname !== '/')
+                                        || (!hasQuery && stripQuery(item.to) === location.pathname && location.pathname !== '/');
                                     return (
                                         <Link
                                             key={item.id}

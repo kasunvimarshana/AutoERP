@@ -3,8 +3,12 @@ import {
     DEFAULT_QUICK_ACCESS_ITEMS,
     QUICK_ACCESS_STORAGE_KEY,
     QUICK_ACCESS_UPDATE_EVENT,
+    getAvailablePresets,
+    getQuickAccessStorageKey,
     getStoredQuickAccessItems,
+    getStoredRowVersion,
     normalizePath,
+    parseRawItems,
     resetQuickAccessItems,
     saveQuickAccessItems,
     stripQuery,
@@ -38,6 +42,20 @@ describe('quickAccessService', () => {
         // Corrupt array containing only invalid objects falls back to defaults
         window.localStorage.setItem(QUICK_ACCESS_STORAGE_KEY, JSON.stringify([{ corrupt: true }]));
         expect(getStoredQuickAccessItems()).toEqual(DEFAULT_QUICK_ACCESS_ITEMS);
+    });
+
+    it('parseRawItems correctly parses arrays, preserves empty arrays, and falls back on corruption', () => {
+        expect(parseRawItems([])).toEqual([]);
+
+        expect(parseRawItems([{ corrupted: true }, null])).toEqual(DEFAULT_QUICK_ACCESS_ITEMS);
+
+        const parsed = parseRawItems([
+            { id: 'item-2', label: 'Item 2', to: '/path-2', group: 'G2', icon: 'list', enabled: true, order: 2 },
+            { id: 'item-1', label: 'Item 1', to: '/path-1', group: 'G1', icon: 'list', enabled: true, order: 1 },
+        ]);
+        expect(parsed.length).toBe(2);
+        expect(parsed[0].id).toBe('item-1');
+        expect(parsed[1].id).toBe('item-2');
     });
 
     it('preserves an intentionally empty list when user clears all shortcuts', () => {
@@ -116,5 +134,61 @@ describe('quickAccessService', () => {
         expect(normalizePath('/invoices/?view=service')).toBe('/invoices?view=service');
         expect(normalizePath('')).toBe('/');
         expect(normalizePath('/')).toBe('/');
+    });
+
+    it('scopes storage keys per tenant and user for isolated multi-tenant caching', () => {
+        expect(getQuickAccessStorageKey()).toBe(QUICK_ACCESS_STORAGE_KEY);
+        expect(getQuickAccessStorageKey(1, 42)).toBe('autoerp.quick_access_items.1.42');
+        expect(getQuickAccessStorageKey('tenant-xyz', 'user-abc')).toBe('autoerp.quick_access_items.tenant-xyz.user-abc');
+
+        // Storage isolation between users
+        const keyUser1 = getQuickAccessStorageKey(1, 101);
+        const keyUser2 = getQuickAccessStorageKey(1, 102);
+
+        // Even if an unscoped global key exists in localStorage, keyUser2 does NOT leak it
+        window.localStorage.setItem(QUICK_ACCESS_STORAGE_KEY, JSON.stringify([
+            { id: 'global-leak', label: 'Global Leak', to: '/leak', group: 'Leak', icon: 'list', enabled: true, order: 1 },
+        ]));
+
+        saveQuickAccessItems([
+            { id: 'u1-item', label: 'User 1 Item', to: '/customers', group: 'CRM', icon: 'customer', enabled: true, order: 1 },
+        ], keyUser1);
+
+        expect(getStoredQuickAccessItems(keyUser1)[0].id).toBe('u1-item');
+        // User 2 sees defaults because their key has not been written, and does NOT leak global key
+        expect(getStoredQuickAccessItems(keyUser2)).toEqual(DEFAULT_QUICK_ACCESS_ITEMS);
+    });
+
+    it('dynamically extracts presets from provided navigation sections', () => {
+        const customSections = [
+            {
+                id: 'custom-section',
+                label: 'Custom Operations',
+                items: [
+                    { id: 'single-link', type: 'link' as const, label: 'Single Link', to: '/custom-op', icon: 'service' as const },
+                    {
+                        id: 'nested-mod',
+                        type: 'module' as const,
+                        label: 'Nested Module',
+                        icon: 'settings' as const,
+                        children: [
+                            { id: 'child-1', type: 'link' as const, label: 'Child One', to: '/nested/child-1', icon: 'list' as const },
+                        ],
+                    },
+                ],
+            },
+        ];
+
+        const presets = getAvailablePresets(customSections);
+        expect(presets.some((p) => p.id === 'single-link' && p.group === 'Custom Operations')).toBe(true);
+        expect(presets.some((p) => p.id === 'child-1' && p.group === 'Nested Module')).toBe(true);
+    });
+
+    it('stores and retrieves row version for optimistic concurrency control', () => {
+        const key = getQuickAccessStorageKey(10, 20);
+        expect(getStoredRowVersion(key)).toBeNull();
+
+        saveQuickAccessItems(DEFAULT_QUICK_ACCESS_ITEMS, key, 3);
+        expect(getStoredRowVersion(key)).toBe(3);
     });
 });

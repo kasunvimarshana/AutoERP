@@ -164,6 +164,27 @@ describe('QuickAccessMenu', () => {
         expect(link).toHaveAttribute('aria-current', 'page');
     });
 
+    it('does not highlight query item when viewing a different query parameter on same pathname', async () => {
+        const queryItems: QuickAccessItemConfig[] = [
+            { id: 'custom-query-link', label: 'Service Invoices', to: '/vehicle-service/jobs?view=completed', group: 'Service', icon: 'list', enabled: true, order: 1 },
+        ];
+        window.localStorage.setItem(QUICK_ACCESS_STORAGE_KEY, JSON.stringify(queryItems));
+
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs?view=pending']}>
+                <QuickAccessMenu sections={sections} activeItemId={null} />
+            </TestRouter>
+        );
+
+        const trigger = screen.getByRole('button', { name: 'Quick Access' });
+        await user.click(trigger);
+
+        const menu = screen.getByRole('navigation', { name: 'Quick access' });
+        const link = within(menu).getByRole('link', { name: 'Service Invoices' });
+        expect(link).not.toHaveAttribute('aria-current');
+    });
+
     it('does not render when storage contains an intentionally empty list', () => {
         window.localStorage.setItem(QUICK_ACCESS_STORAGE_KEY, JSON.stringify([]));
         render(<TestRouter><QuickAccessMenu sections={sections} activeItemId={null} /></TestRouter>);

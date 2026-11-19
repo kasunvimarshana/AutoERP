@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TestRouter } from '@/test/TestRouter';
 import QuickAccessSettingsPage from './QuickAccessSettingsPage';
@@ -69,6 +69,28 @@ describe('QuickAccessSettingsPage', () => {
 
         const moveDownFirst = screen.getByRole('button', { name: 'Move Create Service Job down' });
         await user.click(moveDownFirst);
+
+        const stored = getStoredQuickAccessItems();
+        expect(stored[0].id).toBe('service-jobs');
+        expect(stored[1].id).toBe('create-service-job');
+    });
+
+    it('reorders items via drag and drop', () => {
+        render(
+            <TestRouter>
+                <QuickAccessSettingsPage />
+            </TestRouter>
+        );
+
+        const rows = screen.getAllByRole('row');
+        // row 0 is header, row 1 is Create Service Job, row 2 is Service Job List
+        const firstRow = rows[1];
+        const secondRow = rows[2];
+
+        fireEvent.dragStart(firstRow, { dataTransfer: { setData: () => {}, effectAllowed: 'move' } });
+        fireEvent.dragOver(secondRow, { preventDefault: () => {}, dataTransfer: { dropEffect: 'move' } });
+        fireEvent.drop(secondRow, { preventDefault: () => {} });
+        fireEvent.dragEnd(firstRow);
 
         const stored = getStoredQuickAccessItems();
         expect(stored[0].id).toBe('service-jobs');
