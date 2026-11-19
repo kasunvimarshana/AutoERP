@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
+import { Input } from '@/shared/components/Input';
+import { Select } from '@/shared/components/Select';
+import { Tabs, type TabItem } from '@/shared/components/Tabs';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { toApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     exportRentalReport,
@@ -108,12 +113,13 @@ export default function OwnerDisbursementReportPage() {
                 description="Lessor settlements, monthly base lease entitlements, vehicle-wise statement of accounts (Detail I & II), repair chargebacks, and withholding tax (WHT) ledger statements."
                 actions={
                     <div className="flex items-center gap-2">
-                        <Link
+                        <LinkButton
                             to="/vehicle-rental/reports"
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                            variant="secondary"
+                            size="sm"
                         >
                             &larr; Reports Hub
-                        </Link>
+                        </LinkButton>
                         {data && (
                             <>
                                 <Button
@@ -151,121 +157,64 @@ export default function OwnerDisbursementReportPage() {
             {/* Filter Parameter Form */}
             <Panel title="Settlement Period & Vehicle Focus">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Settlement Period From</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.start_date}
-                            onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Settlement Period Until</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.end_date}
-                            onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Owner Contract / Vehicle Focus</label>
-                        <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.owner_agreement_id ?? ''}
-                            onChange={e => setParams(p => ({ ...p, owner_agreement_id: e.target.value ? Number(e.target.value) : undefined }))}
-                        >
-                            <option value="">All Fleet Contracts (Summary)</option>
-                            {data?.rows.map(r => (
-                                <option key={r.owner_agreement_id} value={r.owner_agreement_id}>
-                                    {r.agreement_reference} &mdash; {r.vehicle_number} ({r.owner_name})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Withholding Tax (WHT %)</label>
-                        <div className="relative">
-                            <input
-                                type="number"
-                                step="0.5"
-                                min="0"
-                                max="100"
-                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none pr-7"
-                                value={params.wht_rate ?? 10}
-                                onChange={e => setParams(p => ({ ...p, wht_rate: Number(e.target.value) }))}
-                            />
-                            <span className="absolute right-2.5 top-2 text-xs font-semibold text-slate-400">%</span>
-                        </div>
-                    </div>
+                    <Input
+                        type="date"
+                        label="Settlement Period From"
+                        value={params.start_date}
+                        onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
+                        required
+                    />
+                    <Input
+                        type="date"
+                        label="Settlement Period Until"
+                        value={params.end_date}
+                        onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
+                        required
+                    />
+                    <Select
+                        label="Owner Contract / Vehicle Focus"
+                        value={params.owner_agreement_id ? String(params.owner_agreement_id) : ''}
+                        onChange={e => setParams(p => ({ ...p, owner_agreement_id: e.target.value ? Number(e.target.value) : undefined }))}
+                        placeholder="All Fleet Contracts (Summary)"
+                        options={(data?.rows ?? []).map(r => ({
+                            value: String(r.owner_agreement_id),
+                            label: `${r.agreement_reference} — ${r.vehicle_number} (${r.owner_name})`,
+                        }))}
+                    />
+                    <Input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="100"
+                        label="Withholding Tax (WHT %)"
+                        value={params.wht_rate ?? 10}
+                        onChange={e => setParams(p => ({ ...p, wht_rate: Number(e.target.value) }))}
+                    />
                     <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
-                        <button
+                        <Button
                             type="submit"
                             disabled={loading}
-                            className="rounded-md bg-blue-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                            loading={loading}
                         >
-                            {loading ? 'Compiling Report...' : 'Apply Filters & Compile'}
-                        </button>
+                            Apply Filters & Compile
+                        </Button>
                     </div>
                 </form>
             </Panel>
 
             {/* View Mode Tabs */}
-            <div className="flex border-b border-slate-200 overflow-x-auto">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('summary')}
-                    className={`px-4 py-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors ${
-                        activeTab === 'summary'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                >
-                    Owner Settlements Summary
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('statement_detail_1')}
-                    className={`px-4 py-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors ${
-                        activeTab === 'statement_detail_1'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                >
-                    Statement of Accounts (Detail I)
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('statement_detail_2')}
-                    className={`px-4 py-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors ${
-                        activeTab === 'statement_detail_2'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                >
-                    Statement of Accounts (Detail II)
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('wht_ledger')}
-                    className={`px-4 py-2 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors ${
-                        activeTab === 'wht_ledger'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                >
-                    Withholding Tax (WHT) Ledger (:3305-000 WHT)
-                </button>
-            </div>
+            <Tabs
+                tabs={[
+                    { id: 'summary' as const, label: 'Owner Settlements Summary' },
+                    { id: 'statement_detail_1' as const, label: 'Statement of Accounts (Detail I)' },
+                    { id: 'statement_detail_2' as const, label: 'Statement of Accounts (Detail II)' },
+                    { id: 'wht_ledger' as const, label: 'Withholding Tax (WHT) Ledger (:3305-000 WHT)' },
+                ]}
+                active={activeTab}
+                onChange={setActiveTab}
+            />
 
-            {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
-                    {error}
-                </div>
-            )}
+            <ErrorAlert error={error ? toApiError(error) : null} inline />
 
             {data && (
                 <>

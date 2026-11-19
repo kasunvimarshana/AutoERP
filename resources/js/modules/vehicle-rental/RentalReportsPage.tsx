@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
 
@@ -137,12 +138,12 @@ export default function RentalReportsPage() {
                         </p>
                     </div>
                     <div className="shrink-0 flex items-center gap-3">
-                        <Link
+                        <LinkButton
                             to="/vehicle-rental/running-chart/report"
-                            className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+                            size="md"
                         >
                             Open Running Chart Sheet
-                        </Link>
+                        </LinkButton>
                     </div>
                 </div>
             </div>

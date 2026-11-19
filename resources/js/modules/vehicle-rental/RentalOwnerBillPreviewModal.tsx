@@ -80,12 +80,12 @@ export function RentalOwnerBillPreviewModal({
             onClose={onClose}
             title="Vehicle Owner Bill & Settlement Preview"
         >
-            <div className="space-y-6 p-6">
-                {error && <ErrorAlert error={error} />}
+            <div className="space-y-6">
+                {error && <ErrorAlert error={error} inline />}
 
                 {/* Form Controls */}
                 <form onSubmit={handleCalculatePreview} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div className="md:col-span-2">
                             <LookupSelect
                                 label="Vehicle Owner Agreement"
@@ -97,10 +97,8 @@ export function RentalOwnerBillPreviewModal({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                                Start Date
-                            </label>
                             <Input
+                                label="Start Date"
                                 type="date"
                                 value={startDate}
                                 onChange={e => setStartDate(e.target.value)}
@@ -108,31 +106,30 @@ export function RentalOwnerBillPreviewModal({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                                End Date
-                            </label>
                             <Input
+                                label="End Date"
                                 type="date"
                                 value={endDate}
                                 onChange={e => setEndDate(e.target.value)}
                             />
                         </div>
-                    </div>
 
-                    <div className="flex justify-between items-center pt-2">
-                        <div className="flex items-center gap-2">
-                            <label className="text-xs text-slate-600 font-medium">Withholding Tax (WHT %):</label>
-                            <input
+                        <div>
+                            <Input
+                                label="WHT (%)"
                                 type="number"
                                 step="0.1"
-                                className="w-20 px-2 py-1 text-xs border rounded border-slate-300 bg-white text-slate-900"
+                                min="0"
+                                max="100"
                                 value={whtRate}
                                 onChange={e => setWhtRate(e.target.value)}
                             />
                         </div>
+                    </div>
 
-                        <Button type="submit" variant="primary" disabled={loading}>
-                            {loading ? 'Calculating...' : 'Generate Settlement Preview'}
+                    <div className="flex justify-end items-center pt-2">
+                        <Button type="submit" variant="primary" disabled={loading} loading={loading}>
+                            Generate Settlement Preview
                         </Button>
                     </div>
                 </form>

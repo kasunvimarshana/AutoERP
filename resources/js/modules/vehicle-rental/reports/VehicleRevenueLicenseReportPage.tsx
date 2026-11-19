@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
+import { Input } from '@/shared/components/Input';
+import { Select } from '@/shared/components/Select';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { toApiError } from '@/shared/api/apiError';
 import {
     exportRentalReport,
     fetchVehicleRevenueLicenseReport,
@@ -85,12 +88,13 @@ export default function VehicleRevenueLicenseReportPage() {
                 description="Regulatory compliance tracking for fleet revenue licences, expiration warnings, and renewal schedules."
                 actions={
                     <div className="flex items-center gap-2">
-                        <Link
+                        <LinkButton
                             to="/vehicle-rental/reports"
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                            variant="secondary"
+                            size="sm"
                         >
                             &larr; Reports Hub
-                        </Link>
+                        </LinkButton>
                         {data && (
                             <>
                                 <Button
@@ -119,54 +123,44 @@ export default function VehicleRevenueLicenseReportPage() {
             {/* Filter Parameter Form */}
             <Panel title="Filter Expiration Dates">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Expiry From Date (Optional)</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.start_date || ''}
-                            onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Expiry To Date (Optional)</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.end_date || ''}
-                            onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Status Filter</label>
-                        <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.status}
-                            onChange={e => setParams(p => ({ ...p, status: e.target.value as VehicleRevenueLicenseReportParams['status'] }))}
-                        >
-                            <option value="all">All Fleet Licences</option>
-                            <option value="expired">Expired Licences Only</option>
-                            <option value="expiring_soon">Expiring Within 30 Days</option>
-                            <option value="active">Valid Licences</option>
-                        </select>
-                    </div>
-                    <div>
-                        <button
+                    <Input
+                        type="date"
+                        label="Expiry From Date (Optional)"
+                        value={params.start_date || ''}
+                        onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
+                    />
+                    <Input
+                        type="date"
+                        label="Expiry To Date (Optional)"
+                        value={params.end_date || ''}
+                        onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
+                    />
+                    <Select
+                        label="Status Filter"
+                        value={params.status}
+                        onChange={e => setParams(p => ({ ...p, status: e.target.value as VehicleRevenueLicenseReportParams['status'] }))}
+                        placeholder={null}
+                        options={[
+                            { value: 'all', label: 'All Fleet Licences' },
+                            { value: 'expired', label: 'Expired Licences Only' },
+                            { value: 'expiring_soon', label: 'Expiring Within 30 Days' },
+                            { value: 'active', label: 'Valid Licences' },
+                        ]}
+                    />
+                    <div className="flex items-end">
+                        <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                            loading={loading}
+                            className="w-full"
                         >
-                            {loading ? 'Filtering...' : 'Apply Filters'}
-                        </button>
+                            Apply Filters
+                        </Button>
                     </div>
                 </form>
             </Panel>
 
-            {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
-                    {error}
-                </div>
-            )}
+            <ErrorAlert error={error ? toApiError(error) : null} inline />
 
             {data && (
                 <>

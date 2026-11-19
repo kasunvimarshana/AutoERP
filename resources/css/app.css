@@ -21,6 +21,11 @@ body {
     color: #0f172a;
 }
 
+::selection {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+}
+
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
 select:not(:disabled) {

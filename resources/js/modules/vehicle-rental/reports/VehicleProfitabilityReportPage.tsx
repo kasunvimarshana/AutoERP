@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
+import { Input } from '@/shared/components/Input';
+import { Select } from '@/shared/components/Select';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { toApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     exportRentalReport,
@@ -89,12 +92,13 @@ export default function VehicleProfitabilityReportPage() {
                 description="Vehicle-level profit & loss, direct operating costs (owner lease, fuel, maintenance, tolls), gross margins, and per-kilometer economics."
                 actions={
                     <div className="flex items-center gap-2">
-                        <Link
+                        <LinkButton
                             to="/vehicle-rental/reports"
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                            variant="secondary"
+                            size="sm"
                         >
                             &larr; Reports Hub
-                        </Link>
+                        </LinkButton>
                         {data && (
                             <>
                                 <Button
@@ -123,55 +127,45 @@ export default function VehicleProfitabilityReportPage() {
             {/* Filter Parameter Form */}
             <Panel title="Report Period & Scope">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Period From</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.start_date}
-                            onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Period Until</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.end_date}
-                            onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Ownership Scope</label>
-                        <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.ownership_type}
-                            onChange={e => setParams(p => ({ ...p, ownership_type: e.target.value as VehicleProfitabilityReportParams['ownership_type'] }))}
-                        >
-                            <option value="all">Entire Fleet (Company & Leased)</option>
-                            <option value="company">Company Owned Fleet Only</option>
-                            <option value="owner_leased">Owner Leased Fleet Only</option>
-                        </select>
-                    </div>
-                    <div>
-                        <button
+                    <Input
+                        type="date"
+                        label="Period From"
+                        value={params.start_date}
+                        onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
+                        required
+                    />
+                    <Input
+                        type="date"
+                        label="Period Until"
+                        value={params.end_date}
+                        onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
+                        required
+                    />
+                    <Select
+                        label="Ownership Scope"
+                        value={params.ownership_type}
+                        onChange={e => setParams(p => ({ ...p, ownership_type: e.target.value as VehicleProfitabilityReportParams['ownership_type'] }))}
+                        placeholder={null}
+                        options={[
+                            { value: 'all', label: 'Entire Fleet (Company & Leased)' },
+                            { value: 'company', label: 'Company Owned Fleet Only' },
+                            { value: 'owner_leased', label: 'Owner Leased Fleet Only' },
+                        ]}
+                    />
+                    <div className="flex items-end">
+                        <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                            loading={loading}
+                            className="w-full"
                         >
-                            {loading ? 'Evaluating Unit Economics...' : 'Calculate Profitability'}
-                        </button>
+                            Calculate Profitability
+                        </Button>
                     </div>
                 </form>
             </Panel>
 
-            {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
-                    {error}
-                </div>
-            )}
+            <ErrorAlert error={error ? toApiError(error) : null} inline />
 
             {data && (
                 <>

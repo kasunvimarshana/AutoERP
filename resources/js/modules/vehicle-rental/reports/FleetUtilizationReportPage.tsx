@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
+import { Input } from '@/shared/components/Input';
+import { Select } from '@/shared/components/Select';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { toApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     exportRentalReport,
@@ -90,12 +93,13 @@ export default function FleetUtilizationReportPage() {
                 description="Comprehensive physical fleet operational custody, period kilometer distance, and asset utilization analysis."
                 actions={
                     <div className="flex items-center gap-2">
-                        <Link
+                        <LinkButton
                             to="/vehicle-rental/reports"
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                            variant="secondary"
+                            size="sm"
                         >
                             &larr; Reports Hub
-                        </Link>
+                        </LinkButton>
                         {data && (
                             <>
                                 <Button
@@ -124,68 +128,57 @@ export default function FleetUtilizationReportPage() {
             {/* Filter Parameter Form */}
             <Panel title="Report Parameters">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Start Date</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.start_date}
-                            onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">End Date</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.end_date}
-                            onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Ownership Type</label>
-                        <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.ownership_type}
-                            onChange={e => setParams(p => ({ ...p, ownership_type: e.target.value as FleetUtilizationReportParams['ownership_type'] }))}
-                        >
-                            <option value="all">All Ownerships</option>
-                            <option value="company">Company Owned</option>
-                            <option value="owner_leased">Owner Leased</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Custody Status</label>
-                        <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.custody_status}
-                            onChange={e => setParams(p => ({ ...p, custody_status: e.target.value as FleetUtilizationReportParams['custody_status'] }))}
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="in_custody">In Custody</option>
-                            <option value="available">Available / Idle</option>
-                            <option value="planned">Planned</option>
-                        </select>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
+                    <Input
+                        type="date"
+                        label="Start Date"
+                        value={params.start_date}
+                        onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
+                        required
+                    />
+                    <Input
+                        type="date"
+                        label="End Date"
+                        value={params.end_date}
+                        onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
+                        required
+                    />
+                    <Select
+                        label="Ownership Type"
+                        value={params.ownership_type}
+                        onChange={e => setParams(p => ({ ...p, ownership_type: e.target.value as FleetUtilizationReportParams['ownership_type'] }))}
+                        options={[
+                            { value: 'all', label: 'All Ownerships' },
+                            { value: 'company', label: 'Company Owned' },
+                            { value: 'owner_leased', label: 'Owner Leased' },
+                        ]}
+                        placeholder={null}
+                    />
+                    <Select
+                        label="Custody Status"
+                        value={params.custody_status}
+                        onChange={e => setParams(p => ({ ...p, custody_status: e.target.value as FleetUtilizationReportParams['custody_status'] }))}
+                        options={[
+                            { value: 'all', label: 'All Statuses' },
+                            { value: 'in_custody', label: 'In Custody' },
+                            { value: 'available', label: 'Available / Idle' },
+                            { value: 'planned', label: 'Planned' },
+                        ]}
+                        placeholder={null}
+                    />
+                    <div className="flex items-end">
+                        <Button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                            loading={loading}
+                            className="w-full"
                         >
-                            {loading ? 'Generating...' : 'Generate Report'}
-                        </button>
+                            Generate Report
+                        </Button>
                     </div>
                 </form>
             </Panel>
 
-            {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
-                    {error}
-                </div>
-            )}
+            <ErrorAlert error={error ? toApiError(error) : null} inline />
 
             {data && (
                 <>

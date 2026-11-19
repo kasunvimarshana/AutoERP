@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export function ContentHeader({ title, description, actions, badge }: {
     title: string;
-    description?: string;
+    description?: ReactNode;
     actions?: ReactNode;
     badge?: ReactNode;
 }) {

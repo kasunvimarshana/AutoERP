@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { Button } from '@/shared/components/Button';
+import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -204,36 +205,36 @@ export default function CustomerInvoicesPage() {
     };
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Header Section */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Customer Invoices (AR)</h1>
-                    <p className="text-sm text-slate-500 mt-1">
+        <div className="space-y-6">
+            <ContentHeader
+                title="Customer Invoices (AR)"
+                description={
+                    <>
                         <span>Accounts Receivable</span> — Manage rental billing, stage-1 base charges, stage-2 telematics reconciliations, and quotation previews.
-                    </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        variant="secondary"
-                        onClick={() => setQuotationPreviewOpen(true)}
-                        className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    >
-                        Preview Quotation / Pro-Forma
-                    </Button>
-                    {canCustomerBill && (
+                    </>
+                }
+                actions={
+                    <>
                         <Button
-                            variant="primary"
-                            onClick={() => {
-                                setPrefilledAgreementId(undefined);
-                                setInvoiceCreateOpen(true);
-                            }}
+                            variant="secondary"
+                            onClick={() => setQuotationPreviewOpen(true)}
                         >
-                            + Create Customer Invoice
+                            Preview Quotation / Pro-Forma
                         </Button>
-                    )}
-                </div>
-            </div>
+                        {canCustomerBill && (
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    setPrefilledAgreementId(undefined);
+                                    setInvoiceCreateOpen(true);
+                                }}
+                            >
+                                + Create Customer Invoice
+                            </Button>
+                        )}
+                    </>
+                }
+            />
 
             {/* Financial Summary Cards */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -278,8 +279,8 @@ export default function CustomerInvoicesPage() {
             <form onSubmit={handleSearchSubmit} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-6">
                     <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Search Invoices</label>
                         <Input
+                            label="Search Invoices"
                             placeholder="Invoice #, vehicle reg, agreement ref..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
@@ -302,8 +303,8 @@ export default function CustomerInvoicesPage() {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Invoice Status</label>
                         <Select
+                            label="Invoice Status"
                             value={statusFilter}
                             onChange={e => {
                                 setStatusFilter(e.target.value);
@@ -314,8 +315,8 @@ export default function CustomerInvoicesPage() {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Balance Status</label>
                         <Select
+                            label="Balance Status"
                             value={balanceFilter}
                             onChange={e => {
                                 setBalanceFilter(e.target.value);
@@ -349,27 +350,31 @@ export default function CustomerInvoicesPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-2 text-xs text-slate-500 border-t border-slate-100">
-                    <span className="font-medium text-slate-600">Date Range:</span>
-                    <Input
-                        type="date"
-                        className="py-1 text-xs w-36"
-                        value={dateFrom}
-                        onChange={e => {
-                            setDateFrom(e.target.value);
-                            setPage(1);
-                        }}
-                    />
-                    <span>to</span>
-                    <Input
-                        type="date"
-                        className="py-1 text-xs w-36"
-                        value={dateTo}
-                        onChange={e => {
-                            setDateTo(e.target.value);
-                            setPage(1);
-                        }}
-                    />
+                <div className="flex flex-wrap items-center gap-3 pt-3 text-xs text-slate-600 border-t border-slate-100">
+                    <span className="font-semibold text-slate-700">Date Range:</span>
+                    <div className="w-40">
+                        <Input
+                            type="date"
+                            aria-label="From Date"
+                            value={dateFrom}
+                            onChange={e => {
+                                setDateFrom(e.target.value);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                    <span className="text-slate-400">to</span>
+                    <div className="w-40">
+                        <Input
+                            type="date"
+                            aria-label="To Date"
+                            value={dateTo}
+                            onChange={e => {
+                                setDateTo(e.target.value);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
                 </div>
             </form>
 

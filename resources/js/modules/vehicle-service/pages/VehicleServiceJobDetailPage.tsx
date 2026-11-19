@@ -182,12 +182,14 @@ export default function VehicleServiceJobDetailPage() {
         setContentVersion((current) => current + 1);
         tabs.openTab('lines');
     };
+    const jobLines = Array.isArray(jobLinesResult.data) ? jobLinesResult.data : [];
+
     return (
         <>
             <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
             <PromotionJobStrip customerId={job.customer_id} vehicleId={job.vehicle_id}
                 pendingChoices={pendingPromotionChoices}
-                existingPaidItemIds={(jobLinesResult.data ?? []).filter((line) => line.status !== 'cancelled'
+                existingPaidItemIds={jobLines.filter((line) => line.status !== 'cancelled'
                     && typeof line.item_id === 'number')
                     .map((line) => line.item_id!)}
                 onAddPaidItem={canAddPromotionLine ? async (item) => {

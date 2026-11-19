@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
+import { Input } from '@/shared/components/Input';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { toApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     exportRentalReport,
@@ -103,12 +106,13 @@ export default function RentalRevenueReportPage() {
                 description="Aggregated commercial performance across customer contracts, base rent cycles, excess distance, overtime, toll reimbursements, and all-invoice billing registers."
                 actions={
                     <div className="flex items-center gap-2">
-                        <Link
+                        <LinkButton
                             to="/vehicle-rental/reports"
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                            variant="secondary"
+                            size="sm"
                         >
                             &larr; Reports Hub
-                        </Link>
+                        </LinkButton>
                         {data && (
                             <>
                                 <Button
@@ -137,34 +141,29 @@ export default function RentalRevenueReportPage() {
             {/* Filter Parameter Form */}
             <Panel title="Report Date Range">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Billing Period From</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.start_date}
-                            onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Billing Period Until</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.end_date}
-                            onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <button
+                    <Input
+                        type="date"
+                        label="Billing Period From"
+                        value={params.start_date}
+                        onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
+                        required
+                    />
+                    <Input
+                        type="date"
+                        label="Billing Period Until"
+                        value={params.end_date}
+                        onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
+                        required
+                    />
+                    <div className="flex items-end">
+                        <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                            loading={loading}
+                            className="w-full"
                         >
-                            {loading ? 'Compiling Report...' : 'Generate Revenue Summary'}
-                        </button>
+                            Generate Revenue Summary
+                        </Button>
                     </div>
                 </form>
             </Panel>
@@ -195,11 +194,7 @@ export default function RentalRevenueReportPage() {
                 </button>
             </div>
 
-            {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
-                    {error}
-                </div>
-            )}
+            <ErrorAlert error={error ? toApiError(error) : null} inline />
 
             {data && (
                 <>

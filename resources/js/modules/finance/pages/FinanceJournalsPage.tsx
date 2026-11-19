@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { LinkButton } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -45,7 +46,7 @@ export default function FinanceJournalsPage() {
         <ContentHeader
             title="Journal entries"
             description="Draft, posted, cancelled, and reversed accounting journals."
-            actions={canCreate ? <Link className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" to="/finance/journals/create">New journal</Link> : undefined}
+            actions={canCreate ? <LinkButton to="/finance/journals/create">New journal</LinkButton> : undefined}
         />
         <div className="mb-4 grid gap-3 md:grid-cols-[minmax(16rem,1fr)_14rem]">
             <Input type="search" placeholder="Search journal or source number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

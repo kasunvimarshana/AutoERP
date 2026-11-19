@@ -6,7 +6,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
     error?: string;
     hint?: string;
     options: SelectOption[];
-    placeholder?: string;
+    placeholder?: string | null;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
@@ -17,6 +17,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     const selectId = id ?? props.name ?? generatedId;
     const messageId = `${selectId}-message`;
     const isMultiple = Boolean(props.multiple);
+    const hasBlankOption = options.some((opt) => opt.value === '');
+    const shouldRenderPlaceholder = !isMultiple && Boolean(placeholder) && !hasBlankOption;
 
     return (
         <div className="block text-sm text-slate-700">
@@ -37,7 +39,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
                     className={`min-h-10 w-full ${isMultiple ? 'rounded-lg p-2' : 'appearance-none cursor-pointer rounded-lg pl-3 pr-9 py-2'} border bg-white text-slate-900 shadow-2xs transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 ${error ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-300 focus:border-blue-600 focus:ring-blue-500/20'} ${className}`}
                     {...props}
                 >
-                    {!isMultiple && <option value="">{placeholder}</option>}
+                    {shouldRenderPlaceholder ? <option value="">{placeholder}</option> : null}
                     {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
                 {!isMultiple && (

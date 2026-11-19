@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { Button } from '@/shared/components/Button';
+import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -206,37 +207,37 @@ export default function SupplierBillsPage() {
     };
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Header Section */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Vehicle Owner & Supplier Bills (AP)</h1>
-                    <p className="text-sm text-slate-500 mt-1">
+        <div className="space-y-6">
+            <ContentHeader
+                title="Vehicle Owner & Supplier Bills (AP)"
+                description={
+                    <>
                         <span>Accounts Payable</span> — Manage lessor settlements, 10% statutory WHT deductions (:3305-000), maintenance chargebacks, and disbursements.
-                    </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        variant="secondary"
-                        onClick={() => setBillPreviewOpen(true)}
-                        className="border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100"
-                    >
-                        Preview Pro-Forma Settlement
-                    </Button>
-                    {canOwnerBill && (
+                    </>
+                }
+                actions={
+                    <>
                         <Button
-                            variant="primary"
-                            onClick={() => {
-                                setPrefilledOwnerAgreementId(undefined);
-                                setPrefilledDates({});
-                                setSettlementModalOpen(true);
-                            }}
+                            variant="secondary"
+                            onClick={() => setBillPreviewOpen(true)}
                         >
-                            + Generate Owner Bill
+                            Preview Pro-Forma Settlement
                         </Button>
-                    )}
-                </div>
-            </div>
+                        {canOwnerBill && (
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    setPrefilledOwnerAgreementId(undefined);
+                                    setPrefilledDates({});
+                                    setSettlementModalOpen(true);
+                                }}
+                            >
+                                + Generate Owner Bill
+                            </Button>
+                        )}
+                    </>
+                }
+            />
 
             {/* Financial Summary Cards */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -281,8 +282,8 @@ export default function SupplierBillsPage() {
             <form onSubmit={handleSearchSubmit} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-6">
                     <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Search Bills</label>
                         <Input
+                            label="Search Bills"
                             placeholder="Bill #, vehicle reg, agreement ref..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
@@ -305,8 +306,8 @@ export default function SupplierBillsPage() {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Bill Status</label>
                         <Select
+                            label="Bill Status"
                             value={statusFilter}
                             onChange={e => {
                                 setStatusFilter(e.target.value);
@@ -317,8 +318,8 @@ export default function SupplierBillsPage() {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">Balance Status</label>
                         <Select
+                            label="Balance Status"
                             value={balanceFilter}
                             onChange={e => {
                                 setBalanceFilter(e.target.value);
@@ -352,27 +353,31 @@ export default function SupplierBillsPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 pt-2 text-xs text-slate-500 border-t border-slate-100">
-                    <span className="font-medium text-slate-600">Date Range:</span>
-                    <Input
-                        type="date"
-                        className="py-1 text-xs w-36"
-                        value={dateFrom}
-                        onChange={e => {
-                            setDateFrom(e.target.value);
-                            setPage(1);
-                        }}
-                    />
-                    <span>to</span>
-                    <Input
-                        type="date"
-                        className="py-1 text-xs w-36"
-                        value={dateTo}
-                        onChange={e => {
-                            setDateTo(e.target.value);
-                            setPage(1);
-                        }}
-                    />
+                <div className="flex flex-wrap items-center gap-3 pt-3 text-xs text-slate-600 border-t border-slate-100">
+                    <span className="font-semibold text-slate-700">Date Range:</span>
+                    <div className="w-40">
+                        <Input
+                            type="date"
+                            aria-label="From Date"
+                            value={dateFrom}
+                            onChange={e => {
+                                setDateFrom(e.target.value);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
+                    <span className="text-slate-400">to</span>
+                    <div className="w-40">
+                        <Input
+                            type="date"
+                            aria-label="To Date"
+                            value={dateTo}
+                            onChange={e => {
+                                setDateTo(e.target.value);
+                                setPage(1);
+                            }}
+                        />
+                    </div>
                 </div>
             </form>
 

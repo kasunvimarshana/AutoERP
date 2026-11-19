@@ -175,10 +175,8 @@ export function RentalQuotationPreviewModal({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                Period From <span className="text-rose-500">*</span>
-                            </label>
                             <Input
+                                label="Period From"
                                 type="date"
                                 value={periodFrom}
                                 onChange={e => setPeriodFrom(e.target.value)}
@@ -187,10 +185,8 @@ export function RentalQuotationPreviewModal({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                Period Until <span className="text-rose-500">*</span>
-                            </label>
                             <Input
+                                label="Period Until"
                                 type="date"
                                 value={periodUntil}
                                 onChange={e => setPeriodUntil(e.target.value)}
@@ -220,125 +216,115 @@ export function RentalQuotationPreviewModal({
 
                     {showOverrides && (
                         <div className="mt-4 border-t border-slate-100 pt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs">
-                            <div>
-                                <label className="block text-slate-600 mb-1">Custody Days (Proration)</label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="e.g. 30"
-                                    value={custodyDays}
-                                    onChange={e => setCustodyDays(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Excess KM</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="e.g. 50"
-                                    value={excessKm}
-                                    onChange={e => setExcessKm(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Normal OT Hours (1.5x)</label>
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    min="0"
-                                    placeholder="Normal OT"
-                                    value={normalOtHours}
-                                    onChange={e => setNormalOtHours(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Double OT Hours (2.0x)</label>
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    min="0"
-                                    placeholder="Double OT"
-                                    value={doubleOtHours}
-                                    onChange={e => setDoubleOtHours(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Triple OT Hours (3.0x)</label>
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    min="0"
-                                    placeholder="Triple OT"
-                                    value={tripleOtHours}
-                                    onChange={e => setTripleOtHours(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Driver Night Outs</label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    placeholder="Nights"
-                                    value={nightOuts}
-                                    onChange={e => setNightOuts(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Highway Tolls</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="Tolls amount"
-                                    value={tollsAmount}
-                                    onChange={e => setTollsAmount(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-slate-600 mb-1">Tax Rate (%)</label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    placeholder="Tax %"
-                                    value={taxRate}
-                                    onChange={e => setTaxRate(e.target.value)}
-                                />
-                            </div>
+                            <Input
+                                label="Custody Days (Proration)"
+                                type="number"
+                                min="0"
+                                placeholder="e.g. 30"
+                                value={custodyDays}
+                                onChange={e => setCustodyDays(e.target.value)}
+                            />
+                            <Input
+                                label="Excess KM"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="e.g. 50"
+                                value={excessKm}
+                                onChange={e => setExcessKm(e.target.value)}
+                            />
+                            <Input
+                                label="Normal OT Hours (1.5x)"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                placeholder="Normal OT"
+                                value={normalOtHours}
+                                onChange={e => setNormalOtHours(e.target.value)}
+                            />
+                            <Input
+                                label="Double OT Hours (2.0x)"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                placeholder="Double OT"
+                                value={doubleOtHours}
+                                onChange={e => setDoubleOtHours(e.target.value)}
+                            />
+                            <Input
+                                label="Triple OT Hours (3.0x)"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                placeholder="Triple OT"
+                                value={tripleOtHours}
+                                onChange={e => setTripleOtHours(e.target.value)}
+                            />
+                            <Input
+                                label="Driver Night Outs"
+                                type="number"
+                                min="0"
+                                placeholder="Nights"
+                                value={nightOuts}
+                                onChange={e => setNightOuts(e.target.value)}
+                            />
+                            <Input
+                                label="Highway Tolls"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="Tolls amount"
+                                value={tollsAmount}
+                                onChange={e => setTollsAmount(e.target.value)}
+                            />
+                            <Input
+                                label="Tax Rate (%)"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                placeholder="Tax %"
+                                value={taxRate}
+                                onChange={e => setTaxRate(e.target.value)}
+                            />
                             <div className="col-span-2">
-                                <label className="block text-slate-600 mb-1">Ad-hoc Addition</label>
+                                <label className="mb-1.5 block font-medium text-slate-700">Ad-hoc Addition</label>
                                 <div className="flex gap-2">
                                     <Input
                                         placeholder="Description (e.g. Airport fee)"
+                                        aria-label="Addition description"
                                         value={additionDesc}
                                         onChange={e => setAdditionDesc(e.target.value)}
                                     />
-                                    <Input
-                                        type="number"
-                                        placeholder="Amount"
-                                        className="w-28"
-                                        value={additionAmount}
-                                        onChange={e => setAdditionAmount(e.target.value)}
-                                    />
+                                    <div className="w-28 shrink-0">
+                                        <Input
+                                            type="number"
+                                            placeholder="Amount"
+                                            aria-label="Addition amount"
+                                            value={additionAmount}
+                                            onChange={e => setAdditionAmount(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <div className="col-span-2">
-                                <label className="block text-slate-600 mb-1">Promotional Discount</label>
+                                <label className="mb-1.5 block font-medium text-slate-700">Promotional Discount</label>
                                 <div className="flex gap-2">
                                     <Input
                                         placeholder="Description (e.g. 5% rebate)"
+                                        aria-label="Discount description"
                                         value={discountDesc}
                                         onChange={e => setDiscountDesc(e.target.value)}
                                     />
-                                    <Input
-                                        type="number"
-                                        placeholder="Amount"
-                                        className="w-28"
-                                        value={discountAmount}
-                                        onChange={e => setDiscountAmount(e.target.value)}
-                                    />
+                                    <div className="w-28 shrink-0">
+                                        <Input
+                                            type="number"
+                                            placeholder="Amount"
+                                            aria-label="Discount amount"
+                                            value={discountAmount}
+                                            onChange={e => setDiscountAmount(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

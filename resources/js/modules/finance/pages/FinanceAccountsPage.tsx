@@ -7,6 +7,7 @@ import { financePermissions } from '../financePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { Pagination } from '@/shared/components/Pagination';
@@ -32,7 +33,7 @@ export default function FinanceAccountsPage() {
     ];
     const actions = canManage || canViewReports ? <div className="flex items-center gap-3 text-sm font-semibold">
         {canViewReports && <Link className="text-blue-600 hover:text-blue-800 hover:underline" to="/finance/account-balances">Account balances</Link>}
-        {canManage && <Link className="rounded-lg bg-blue-600 px-4 py-2 text-white shadow-xs hover:bg-blue-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500" to="/finance/accounts/create">New account</Link>}
+        {canManage && <LinkButton to="/finance/accounts/create">New account</LinkButton>}
     </div> : undefined;
 
     return (

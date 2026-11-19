@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
+import { Input } from '@/shared/components/Input';
+import { Select } from '@/shared/components/Select';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { toApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import {
     exportRentalReport,
@@ -90,12 +94,13 @@ export default function RentalIncidentReportPage() {
                 description="Fleet risk management register, damage event classifications, liability determinations, and photographic evidence audits."
                 actions={
                     <div className="flex items-center gap-2">
-                        <Link
+                        <LinkButton
                             to="/vehicle-rental/reports"
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                            variant="secondary"
+                            size="sm"
                         >
                             &larr; Reports Hub
-                        </Link>
+                        </LinkButton>
                         {data && (
                             <>
                                 <Button
@@ -124,72 +129,59 @@ export default function RentalIncidentReportPage() {
             {/* Filter Parameter Form */}
             <Panel title="Incident Filter Criteria">
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Occurred From</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.start_date}
-                            onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Occurred Until</label>
-                        <input
-                            type="date"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.end_date}
-                            onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Incident Type</label>
-                        <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.incident_type || ''}
-                            onChange={e => setParams(p => ({ ...p, incident_type: e.target.value }))}
-                        >
-                            <option value="">All Incident Types</option>
-                            <option value="accident">Accident</option>
-                            <option value="damage">Damage</option>
-                            <option value="theft">Theft</option>
-                            <option value="violation">Violation</option>
-                            <option value="breakdown">Breakdown</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Review Status</label>
-                        <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-blue-500 focus:outline-none"
-                            value={params.status || ''}
-                            onChange={e => setParams(p => ({ ...p, status: e.target.value }))}
-                        >
-                            <option value="">All Statuses</option>
-                            <option value="recorded">Recorded / Under Review</option>
-                            <option value="confirmed">Confirmed Risk</option>
-                            <option value="rejected">Rejected Claim</option>
-                        </select>
-                    </div>
-                    <div>
-                        <button
+                    <Input
+                        type="date"
+                        label="Occurred From"
+                        value={params.start_date}
+                        onChange={e => setParams(p => ({ ...p, start_date: e.target.value }))}
+                        required
+                    />
+                    <Input
+                        type="date"
+                        label="Occurred Until"
+                        value={params.end_date}
+                        onChange={e => setParams(p => ({ ...p, end_date: e.target.value }))}
+                        required
+                    />
+                    <Select
+                        label="Incident Type"
+                        value={params.incident_type || ''}
+                        onChange={e => setParams(p => ({ ...p, incident_type: e.target.value }))}
+                        placeholder="All Incident Types"
+                        options={[
+                            { value: 'accident', label: 'Accident' },
+                            { value: 'damage', label: 'Damage' },
+                            { value: 'theft', label: 'Theft' },
+                            { value: 'violation', label: 'Violation' },
+                            { value: 'breakdown', label: 'Breakdown' },
+                            { value: 'other', label: 'Other' },
+                        ]}
+                    />
+                    <Select
+                        label="Review Status"
+                        value={params.status || ''}
+                        onChange={e => setParams(p => ({ ...p, status: e.target.value }))}
+                        placeholder="All Statuses"
+                        options={[
+                            { value: 'recorded', label: 'Recorded / Under Review' },
+                            { value: 'confirmed', label: 'Confirmed Risk' },
+                            { value: 'rejected', label: 'Rejected Claim' },
+                        ]}
+                    />
+                    <div className="flex items-end">
+                        <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                            loading={loading}
+                            className="w-full"
                         >
-                            {loading ? 'Searching...' : 'Filter Incidents'}
-                        </button>
+                            Filter Incidents
+                        </Button>
                     </div>
                 </form>
             </Panel>
 
-            {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800 shadow-2xs">
-                    {error}
-                </div>
-            )}
+            <ErrorAlert error={error ? toApiError(error) : null} inline />
 
             {data && (
                 <>

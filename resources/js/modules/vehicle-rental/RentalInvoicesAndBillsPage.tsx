@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { Button } from '@/shared/components/Button';
+import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -9,6 +11,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Pagination } from '@/shared/components/Pagination';
+import { Tabs } from '@/shared/components/Tabs';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { AgreementKind, agreementPermissions } from './agreements';
 import { BILLING_PERMISSION } from './baseRentBillingApi';
@@ -148,145 +151,126 @@ export default function RentalInvoicesAndBillsPage() {
     }
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Top Workspace Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                        Invoices & Vehicle Owner Bills
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-1">
-                        Centralized financial billing cockpit for Customer Invoices (AR) and Vehicle Owner Payables (AP).
-                    </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={handleRefreshAll}
-                        title="Refresh register data"
-                    >
-                        Refresh
-                    </Button>
-
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => {
-                            if (tab === 'ar') {
-                                setQuotationPreviewOpen(true);
-                            } else {
-                                setOwnerBillPreviewOpen(true);
-                            }
-                        }}
-                        title={tab === 'ar' ? 'Preview Quotation Document' : 'Preview Pro-Forma Settlement'}
-                    >
-                        <span>📄</span>
-                        <span className="ml-1">{tab === 'ar' ? 'Quotation Preview' : 'Settlement Preview'}</span>
-                    </Button>
-
-                    {canCustomerBill && (
-                        <>
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => {
-                                    setInvoiceCreateMode('base');
-                                    setInvoiceCreateOpen(true);
-                                }}
-                            >
-                                + Advance Base Rent
-                            </Button>
-
-                            <Button
-                                type="button"
-                                variant="primary"
-                                onClick={() => {
-                                    setInvoiceCreateMode('cycle');
-                                    setInvoiceCreateOpen(true);
-                                }}
-                            >
-                                + Billing Cycle Invoice
-                            </Button>
-                        </>
-                    )}
-
-                    {canOwnerBill && (
+        <div className="space-y-6">
+            <ContentHeader
+                title="Invoices & Vehicle Owner Bills"
+                description="Centralized financial billing cockpit for Customer Invoices (AR) and Vehicle Owner Payables (AP)."
+                actions={
+                    <>
                         <Button
                             type="button"
                             variant="secondary"
-                            onClick={() => setOwnerSettlementOpen(true)}
+                            onClick={handleRefreshAll}
+                            title="Refresh register data"
                         >
-                            + Owner Settlement Bill
+                            Refresh
                         </Button>
-                    )}
-                </div>
-            </div>
+
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                                if (tab === 'ar') {
+                                    setQuotationPreviewOpen(true);
+                                } else {
+                                    setOwnerBillPreviewOpen(true);
+                                }
+                            }}
+                            title={tab === 'ar' ? 'Preview Quotation Document' : 'Preview Pro-Forma Settlement'}
+                        >
+                            <span>📄</span>
+                            <span className="ml-1">{tab === 'ar' ? 'Quotation Preview' : 'Settlement Preview'}</span>
+                        </Button>
+
+                        {canCustomerBill && (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setInvoiceCreateMode('base');
+                                        setInvoiceCreateOpen(true);
+                                    }}
+                                >
+                                    + Advance Base Rent
+                                </Button>
+
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    onClick={() => {
+                                        setInvoiceCreateMode('cycle');
+                                        setInvoiceCreateOpen(true);
+                                    }}
+                                >
+                                    + Billing Cycle Invoice
+                                </Button>
+                            </>
+                        )}
+
+                        {canOwnerBill && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setOwnerSettlementOpen(true)}
+                            >
+                                + Owner Settlement Bill
+                            </Button>
+                        )}
+                    </>
+                }
+            />
 
             {/* Error Notification */}
             <ErrorAlert error={error} inline />
 
             {/* Direct Page Switcher */}
-            <div className="flex items-center gap-4 text-xs font-semibold text-gray-500 border-b border-gray-100 dark:border-gray-800 pb-2">
-                <span className="text-gray-400">Dedicated Views:</span>
-                <a
-                    href="/vehicle-rental/customer-invoices"
-                    className="text-blue-600 dark:text-blue-400 hover:underline font-bold"
+            <div className="flex items-center gap-4 text-xs font-semibold text-slate-500 border-b border-slate-200 pb-2">
+                <span className="text-slate-400">Dedicated Views:</span>
+                <Link
+                    to="/vehicle-rental/customer-invoices"
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
                 >
-                    Customer Invoices Page (AR) ↗
-                </a>
-                <span className="text-gray-300">|</span>
-                <a
-                    href="/vehicle-rental/owner-bills"
-                    className="text-purple-600 dark:text-purple-400 hover:underline font-bold"
+                    Customer Invoices Page (AR) &rarr;
+                </Link>
+                <span className="text-slate-300">|</span>
+                <Link
+                    to="/vehicle-rental/owner-bills"
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-semibold"
                 >
-                    Vehicle Owner Bills Page (AP) ↗
-                </a>
+                    Vehicle Owner Bills Page (AP) &rarr;
+                </Link>
             </div>
 
             {/* Navigation Tabs (AR vs AP) */}
-            <div className="border-b border-slate-200">
-                <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                    {canCustomerView && (
-                        <button
-                            type="button"
-                            onClick={() => handleTabSwitch('ar')}
-                            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                tab === 'ar'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                            }`}
-                        >
-                            Customer Invoices (AR)
-                            {summary?.customer_ar && (
-                                <span className="ml-2.5 py-0.5 px-2 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                                    {summary.customer_ar.overdue_count > 0 ? `${summary.customer_ar.overdue_count} Overdue` : 'Active'}
-                                </span>
-                            )}
-                        </button>
-                    )}
-
-                    {canOwnerView && (
-                        <button
-                            type="button"
-                            onClick={() => handleTabSwitch('ap')}
-                            className={`whitespace-nowrap pb-4 px-1 border-b-2 font-bold text-sm transition-all ${
-                                tab === 'ap'
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                            }`}
-                        >
-                            Vehicle Owner Bills (AP)
-                            {summary?.owner_ap && (
-                                <span className="ml-2.5 py-0.5 px-2 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                    {summary.owner_ap.overdue_count > 0 ? `${summary.owner_ap.overdue_count} Overdue` : 'Active'}
-                                </span>
-                            )}
-                        </button>
-                    )}
-                </nav>
-            </div>
+            <Tabs
+                tabs={[
+                    ...(canCustomerView ? [{
+                        id: 'ar' as const,
+                        label: 'Customer Invoices (AR)',
+                        badge: summary?.customer_ar ? (
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                summary.customer_ar.overdue_count > 0 ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                                {summary.customer_ar.overdue_count > 0 ? `${summary.customer_ar.overdue_count} Overdue` : 'Active'}
+                            </span>
+                        ) : undefined,
+                    }] : []),
+                    ...(canOwnerView ? [{
+                        id: 'ap' as const,
+                        label: 'Vehicle Owner Bills (AP)',
+                        badge: summary?.owner_ap ? (
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                summary.owner_ap.overdue_count > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                                {summary.owner_ap.overdue_count > 0 ? `${summary.owner_ap.overdue_count} Overdue` : 'Active'}
+                            </span>
+                        ) : undefined,
+                    }] : []),
+                ]}
+                active={tab}
+                onChange={handleTabSwitch}
+            />
 
             {/* Metric KPI Cards */}
             {tab === 'ar' && (

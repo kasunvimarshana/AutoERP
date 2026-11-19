@@ -53,4 +53,41 @@ describe("Select", () => {
         expect(select).toHaveAttribute("multiple");
         expect(screen.queryByText("Choose tags")).not.toBeInTheDocument();
     });
+
+    it("supports suppressing the placeholder option when placeholder is null", () => {
+        render(
+            <Select
+                label="Ownership"
+                options={[
+                    { value: "all", label: "All Ownerships" },
+                    { value: "company", label: "Company Owned" },
+                ]}
+                placeholder={null}
+            />,
+        );
+
+        const select = screen.getByRole("combobox", { name: "Ownership" });
+        expect(select).toBeInTheDocument();
+        expect(screen.queryByText("Select...")).not.toBeInTheDocument();
+        expect(screen.getByText("All Ownerships")).toBeInTheDocument();
+    });
+
+    it("does not render duplicate placeholder when options already have a blank-value option", () => {
+        render(
+            <Select
+                label="Status Filter"
+                options={[
+                    { value: "", label: "All Statuses" },
+                    { value: "draft", label: "Draft" },
+                    { value: "paid", label: "Paid" },
+                ]}
+            />,
+        );
+
+        const select = screen.getByRole("combobox", { name: "Status Filter" });
+        expect(select).toBeInTheDocument();
+        expect(screen.queryByText("Select...")).not.toBeInTheDocument();
+        expect(screen.getByText("All Statuses")).toBeInTheDocument();
+        expect(screen.getAllByRole("option")).toHaveLength(3);
+    });
 });

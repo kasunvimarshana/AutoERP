@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import RentalInvoicesAndBillsPage from './RentalInvoicesAndBillsPage';
 import * as rentalBillingApi from './rentalBillingApi';
 import * as agreementApi from './agreementApi';
@@ -176,6 +177,12 @@ const mockDetail: rentalBillingApi.RentalBillingDetail = {
     can_print: true,
 };
 
+const renderPage = () => render(
+    <MemoryRouter>
+        <RentalInvoicesAndBillsPage />
+    </MemoryRouter>
+);
+
 describe('RentalInvoicesAndBillsPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -188,7 +195,7 @@ describe('RentalInvoicesAndBillsPage', () => {
     });
 
     it('renders the initial page with AR metrics and customer invoices table', async () => {
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         expect(screen.getByText('Invoices & Vehicle Owner Bills')).toBeInTheDocument();
         expect(screen.getByText('Customer Invoices (AR)')).toBeInTheDocument();
@@ -216,14 +223,14 @@ describe('RentalInvoicesAndBillsPage', () => {
             meta: { current_page: 1, last_page: 1, per_page: 25, total: 1, from: 1, to: 1 },
         });
 
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         await waitFor(() => {
             expect(screen.getByText('INV-2026-0001')).toBeInTheDocument();
         });
 
         // Switch to AP tab
-        const apTab = screen.getByRole('button', { name: /Vehicle Owner Bills \(AP\)/i });
+        const apTab = screen.getByRole('tab', { name: /Vehicle Owner Bills \(AP\)/i });
         fireEvent.click(apTab);
 
         await waitFor(() => {
@@ -239,7 +246,7 @@ describe('RentalInvoicesAndBillsPage', () => {
     });
 
     it('filters documents when search or status changes', async () => {
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         const searchInput = screen.getByLabelText('Search');
         fireEvent.change(searchInput, { target: { value: 'Acme' } });
@@ -263,7 +270,7 @@ describe('RentalInvoicesAndBillsPage', () => {
     });
 
     it('opens document detail modal when View is clicked', async () => {
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         await waitFor(() => {
             expect(screen.getByText('INV-2026-0001')).toBeInTheDocument();
@@ -281,7 +288,7 @@ describe('RentalInvoicesAndBillsPage', () => {
     });
 
     it('opens billing cycle creation modal when + Billing Cycle Invoice is clicked', async () => {
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         const createCycleBtn = screen.getByRole('button', { name: '+ Billing Cycle Invoice' });
         fireEvent.click(createCycleBtn);
@@ -294,7 +301,7 @@ describe('RentalInvoicesAndBillsPage', () => {
     });
 
     it('opens owner settlement modal when + Owner Settlement Bill is clicked', async () => {
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         const createOwnerBillBtn = screen.getByRole('button', { name: '+ Owner Settlement Bill' });
         fireEvent.click(createOwnerBillBtn);
@@ -313,7 +320,7 @@ describe('RentalInvoicesAndBillsPage', () => {
             'vehicle-rental.owner-agreements.view',
         ];
 
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         await waitFor(() => {
             expect(screen.getByText('Invoices & Vehicle Owner Bills')).toBeInTheDocument();
@@ -343,7 +350,7 @@ describe('RentalInvoicesAndBillsPage', () => {
             meta: { current_page: 1, last_page: 1, per_page: 25, total: 1, from: 1, to: 1 },
         });
 
-        render(<RentalInvoicesAndBillsPage />);
+        renderPage();
 
         await waitFor(() => {
             expect(rentalBillingApi.listRentalBillingDocuments).toHaveBeenCalledWith(
