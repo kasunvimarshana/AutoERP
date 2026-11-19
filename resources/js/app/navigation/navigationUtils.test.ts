@@ -11,6 +11,7 @@ import { tenantWorkspaceNavigationSections } from './tenantWorkspaceNavigation';
 import {
     filterNavigation,
     findNavigationMatch,
+    navigationBreadcrumbs,
 } from './navigationUtils';
 
 describe('navigation access and matching', () => {
@@ -437,6 +438,12 @@ describe('navigation access and matching', () => {
             'Reference Data',
             'Settings',
         ]);
+        const settingsModule = administration?.items.find((item) => item.label === 'Settings');
+        expect(settingsModule?.type).toBe('module');
+        expect(settingsModule?.type === 'module' ? settingsModule.children.map((child) => child.label) : []).toEqual([
+            'Configuration',
+            'Quick Access',
+        ]);
 
         const items = tenantNavigationSections
             .flatMap((section) => section.items)
@@ -450,5 +457,17 @@ describe('navigation access and matching', () => {
             'Items',
             'Create Item',
         ]);
+    });
+
+    it('matches settings configuration and quick-access destinations with parent hierarchy', () => {
+        const configMatch = findNavigationMatch('/settings', '', tenantWorkspaceNavigationSections);
+        expect(configMatch?.parent?.id).toBe('settings');
+        expect(configMatch?.item.id).toBe('settings-configuration');
+        expect(navigationBreadcrumbs(configMatch)).toEqual(['Administration', 'Settings', 'Configuration']);
+
+        const quickAccessMatch = findNavigationMatch('/settings/quick-access', '', tenantWorkspaceNavigationSections);
+        expect(quickAccessMatch?.parent?.id).toBe('settings');
+        expect(quickAccessMatch?.item.id).toBe('settings-quick-access');
+        expect(navigationBreadcrumbs(quickAccessMatch)).toEqual(['Administration', 'Settings', 'Quick Access']);
     });
 });

@@ -1287,14 +1287,31 @@ export const tenantNavigationSections: NavigationSection[] = [
             },
             {
                 id: "settings",
-                type: "link",
+                type: "module",
                 label: "Settings",
-                to: "/settings",
                 icon: "settings",
-                access: {
-                    ...tenantAccess([]),
-                    permissions: ["configuration.entries.view"],
-                },
+                access: tenantAccess([]),
+                children: [
+                    {
+                        id: "settings-configuration",
+                        type: "link",
+                        label: "Configuration",
+                        to: "/settings",
+                        match: ["/settings"],
+                        access: {
+                            ...tenantAccess([]),
+                            permissions: ["configuration.entries.view"],
+                        },
+                    },
+                    {
+                        id: "settings-quick-access",
+                        type: "link",
+                        label: "Quick Access",
+                        to: "/settings/quick-access",
+                        match: ["/settings/quick-access"],
+                        access: tenantAccess([]),
+                    },
+                ],
             },
         ],
     },

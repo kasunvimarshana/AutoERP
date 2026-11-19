@@ -2,23 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { NavigationIcon } from '@/app/navigation/NavigationIcon';
 import type { NavigationIconName, NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
-
-const QUICK_ACCESS_GROUPS: { label: string; links: { id: string; icon: NavigationIconName }[] }[] = [
-    {
-        label: 'Vehicle Service',
-        links: [
-            { id: 'create-service-job', icon: 'service' },
-            { id: 'service-jobs', icon: 'list' },
-        ],
-    },
-    {
-        label: 'Selling',
-        links: [
-            { id: 'selling-create', icon: 'purchase' },
-            { id: 'selling-list', icon: 'list' },
-        ],
-    },
-];
+import { findNavigationMatch } from '@/app/navigation/navigationUtils';
+import {
+    getStoredQuickAccessItems,
+    stripQuery,
+    QUICK_ACCESS_UPDATE_EVENT,
+    type QuickAccessItemConfig,
+} from '@/modules/settings/quickAccessService';
 
 export function QuickAccessMenu({ sections, activeItemId }: { sections: NavigationSection[]; activeItemId: string | null }) {
     const [openLocation, setOpenLocation] = useState<string | null>(null);
@@ -27,16 +17,64 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
     const location = useLocation();
     const locationKey = `${location.pathname}${location.search}`;
     const open = openLocation === locationKey;
-    const visibleLinks = new Map<string, NavigationLinkItem>(sections.flatMap((section) => section.items.flatMap((item) => (
-        item.type === 'link' ? [item] : item.children
-    ))).map((item) => [item.id, item]));
-    const groups = QUICK_ACCESS_GROUPS.map((group) => ({
-        label: group.label,
-        links: group.links.flatMap(({ id, icon }) => {
-            const item = visibleLinks.get(id);
-            return item ? [{ ...item, icon }] : [];
-        }),
-    })).filter((group) => group.links.length > 0);
+
+    const [configuredItems, setConfiguredItems] = useState<QuickAccessItemConfig[]>(() => getStoredQuickAccessItems());
+
+    useEffect(() => {
+        const handleUpdate = () => {
+            setConfiguredItems(getStoredQuickAccessItems());
+        };
+
+        window.addEventListener(QUICK_ACCESS_UPDATE_EVENT, handleUpdate);
+        window.addEventListener('storage', handleUpdate);
+        return () => {
+            window.removeEventListener(QUICK_ACCESS_UPDATE_EVENT, handleUpdate);
+            window.removeEventListener('storage', handleUpdate);
+        };
+    }, []);
+
+    const allLinks = sections.flatMap((section) =>
+        section.items.flatMap((item) => (item.type === 'link' ? [item] : item.children))
+    );
+    const visibleLinksById = new Map<string, NavigationLinkItem>(allLinks.map((item) => [item.id, item]));
+    const visibleLinksByPath = new Map<string, NavigationLinkItem>();
+    for (const link of allLinks) {
+        visibleLinksByPath.set(stripQuery(link.to), link);
+        if (link.match) {
+            for (const candidate of link.match) {
+                visibleLinksByPath.set(stripQuery(candidate), link);
+            }
+        }
+    }
+
+    // Group active configured items that pass navigation permissions
+    const groups: Array<{ label: string; links: Array<{ id: string; label: string; to: string; icon: NavigationIconName }> }> = [];
+    const groupMap = new Map<string, typeof groups[number]>();
+
+    for (const item of configuredItems) {
+        if (!item.enabled) continue;
+
+        // Check if accessible in the permitted sections (by ID, by direct path/match, or navigation hierarchy)
+        const itemPath = stripQuery(item.to);
+        const isAccessible = visibleLinksById.has(item.id)
+            || visibleLinksByPath.has(itemPath)
+            || Boolean(findNavigationMatch(itemPath, '', sections));
+        if (!isAccessible) continue;
+
+        let group = groupMap.get(item.group);
+        if (!group) {
+            group = { label: item.group, links: [] };
+            groupMap.set(item.group, group);
+            groups.push(group);
+        }
+
+        group.links.push({
+            id: item.id,
+            label: item.label,
+            to: item.to,
+            icon: item.icon,
+        });
+    }
 
     useEffect(() => {
         if (!open) return undefined;
@@ -94,22 +132,38 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
             {open && (
                 <div className="absolute right-0 top-full z-30 w-80 max-w-[calc(100vw-2rem)] pt-2">
                     <nav id="quick-access-menu" aria-label="Quick access" className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                        <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Quick access</p>
+                        <div className="flex items-center justify-between px-2 pb-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick access</p>
+                            <Link
+                                to="/settings/quick-access"
+                                onClick={() => setOpenLocation(null)}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                title="Manage Quick Access items"
+                            >
+                                Customize
+                            </Link>
+                        </div>
                         {groups.map((group, index) => (
                             <div key={group.label} className={index > 0 ? 'mt-3 border-t border-slate-200 pt-3' : ''}>
                                 <p className="px-2 pb-1 text-sm font-bold text-slate-900">{group.label}</p>
-                                {group.links.map((item) => (
-                                    <Link
-                                        key={item.id}
-                                        to={item.to}
-                                        onClick={() => setOpenLocation(null)}
-                                        aria-current={activeItemId === item.id ? 'page' : undefined}
-                                        className={`flex min-h-10 items-center gap-3 rounded-lg px-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeItemId === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}
-                                    >
-                                        <NavigationIcon name={item.icon} className="h-5 w-5 shrink-0 text-blue-600" />
-                                        {item.label}
-                                    </Link>
-                                ))}
+                                {group.links.map((item) => {
+                                    const isCurrent = activeItemId === item.id
+                                        || (item.to === location.pathname && location.pathname !== '/')
+                                        || item.to === locationKey
+                                        || (stripQuery(item.to) === location.pathname && location.pathname !== '/');
+                                    return (
+                                        <Link
+                                            key={item.id}
+                                            to={item.to}
+                                            onClick={() => setOpenLocation(null)}
+                                            aria-current={isCurrent ? 'page' : undefined}
+                                            className={`flex min-h-10 items-center gap-3 rounded-lg px-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${isCurrent ? 'bg-blue-50 text-blue-700' : 'text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}
+                                        >
+                                            <NavigationIcon name={item.icon} className="h-5 w-5 shrink-0 text-blue-600" />
+                                            {item.label}
+                                        </Link>
+                                    );
+                                })}
                             </div>
                         ))}
                     </nav>

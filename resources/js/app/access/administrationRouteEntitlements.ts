@@ -47,6 +47,7 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     tenant('/administration/tenant', undefined, tenantWorkspacePermissions),
     tenant('/reference-data', undefined, [referenceDataPermissions.view]),
     tenant('/settings', undefined, [settingsPermissions.view]),
+    tenant('/settings/quick-access'),
 
     operational('/supplier-vehicles/create', ['supplier', 'vehicle'], [vehiclePermissions.ownershipsManage]),
     operational('/supplier-vehicles/:id/edit', ['supplier', 'vehicle'], [vehiclePermissions.ownershipsManage]),

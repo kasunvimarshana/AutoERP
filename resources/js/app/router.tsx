@@ -43,6 +43,7 @@ const PermissionCataloguePage = lazy(
     () => import("@/modules/access/PermissionCataloguePage"),
 );
 const SettingsPage = lazy(() => import("@/modules/settings/SettingsPage"));
+const QuickAccessSettingsPage = lazy(() => import("@/modules/settings/QuickAccessSettingsPage"));
 const OrganizationUnitManagementPage = lazy(() => import("@/modules/organization-unit/OrganizationUnitManagementPage"));
 const ReferenceDataPage = lazy(() => import("@/modules/reference-data/ReferenceDataPage"));
 const TenantWorkspacePage = lazy(() => import("@/modules/tenant/TenantWorkspacePage"));
@@ -526,6 +527,7 @@ const appRouter = createBrowserRouter(
                             element={<AuditLogDetailPage />}
                         />
                         <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/settings/quick-access" element={<QuickAccessSettingsPage />} />
                         <Route
                             path="/reference-data"
                             element={<ReferenceDataPage />}
