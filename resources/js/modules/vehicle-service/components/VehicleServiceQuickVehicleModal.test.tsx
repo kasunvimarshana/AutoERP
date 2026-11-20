@@ -1,11 +1,18 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import { TestRouter } from '@/test/TestRouter';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
-const mocks = vi.hoisted(() => ({ createCustomer: vi.fn(), createCustomerWithRelations: vi.fn(), createVehicle: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+    createCustomer: vi.fn(),
+    createCustomerWithRelations: vi.fn(),
+    createVehicle: vi.fn(),
+    createMake: vi.fn(),
+    createModel: vi.fn(),
+    createType: vi.fn(),
+}));
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => ({}) }));
 vi.mock('@/modules/auth/accessControl', () => ({ hasPermission: () => true }));
 vi.mock('@/modules/customer/customerApi', () => ({
@@ -14,11 +21,17 @@ vi.mock('@/modules/customer/customerApi', () => ({
     generateCustomerCode: async () => 'CUS-NEW',
     searchCurrencies: async () => ({ data: [{ id: 1, code: 'LKR', name: 'Rupee' }] }),
 }));
-vi.mock('@/modules/vehicle/vehicleApi', () => ({ createVehicleWithRelations: mocks.createVehicle, generateVehicleCode: async () => 'VEH-NEW' }));
+vi.mock('@/modules/vehicle/vehicleApi', () => ({
+    createVehicleWithRelations: mocks.createVehicle,
+    createVehicleMake: mocks.createMake,
+    createVehicleModel: mocks.createModel,
+    createVehicleType: mocks.createType,
+    generateVehicleCode: async () => 'VEH-NEW',
+}));
 vi.mock('@/modules/customer/components/CustomerLookupSelect', () => ({ CustomerLookupSelect: () => null }));
-vi.mock('@/modules/vehicle/components/VehicleMakeSelect', () => ({ VehicleMakeSelect: () => null }));
-vi.mock('@/modules/vehicle/components/VehicleModelSelect', () => ({ VehicleModelSelect: () => null }));
-vi.mock('@/modules/vehicle/components/VehicleTypeSelect', () => ({ VehicleTypeSelect: () => null }));
+vi.mock('@/modules/vehicle/components/VehicleMakeSelect', () => ({ VehicleMakeSelect: ({ value }: { value: { name: string } | null }) => <span>Selected make: {value?.name ?? 'none'}</span> }));
+vi.mock('@/modules/vehicle/components/VehicleModelSelect', () => ({ VehicleModelSelect: ({ value }: { value: { name: string } | null }) => <span>Selected model: {value?.name ?? 'none'}</span> }));
+vi.mock('@/modules/vehicle/components/VehicleTypeSelect', () => ({ VehicleTypeSelect: ({ value }: { value: { name: string } | null }) => <span>Selected type: {value?.name ?? 'none'}</span> }));
 
 describe('Service job new customer duplicate handling', () => {
     beforeEach(() => vi.clearAllMocks());
@@ -59,5 +72,48 @@ describe('Service job new customer duplicate handling', () => {
         expect(screen.getByLabelText('WhatsApp Number')).toHaveValue('0776580914');
         expect(mocks.createVehicle).not.toHaveBeenCalled();
         expect(onCreated).not.toHaveBeenCalled();
+    });
+});
+
+describe('Service job vehicle master quick add', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('creates and selects a make, then creates a model under that make without losing vehicle input', async () => {
+        mocks.createMake.mockResolvedValue({ id: 1, code: 'TOYOTA', name: 'Toyota', is_active: true });
+        mocks.createModel.mockResolvedValue({ id: 2, code: 'COROLLA', name: 'Corolla', make: { id: 1, name: 'Toyota' }, is_active: true });
+        const user = userEvent.setup();
+        render(<TestRouter><VehicleServiceQuickVehicleModal open initialVehicleNumber="ABC-1234" onClose={vi.fn()} onCreated={vi.fn()} /></TestRouter>);
+
+        await user.type(screen.getByLabelText('Registration Number'), 'XYZ');
+        await user.click(screen.getByRole('button', { name: 'Add Model' }));
+        expect(screen.getByText('Select or add a Make before saving this Model.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save Model' })).toBeDisabled();
+        await user.click(screen.getByRole('button', { name: 'Add Make' }));
+        await user.type(screen.getByLabelText('Make name'), 'Toyota');
+        await user.type(within(screen.getByRole('group', { name: 'New Make details' })).getByLabelText('Code'), 'TOYOTA');
+        await user.click(screen.getByRole('button', { name: 'Save Make' }));
+        expect(await screen.findByText('Selected make: Toyota')).toBeInTheDocument();
+        expect(screen.getByLabelText('Registration Number')).toHaveValue('ABC-1234XYZ');
+
+        await user.click(screen.getByRole('button', { name: 'Add Model' }));
+        expect(screen.getByText('Toyota', { selector: 'strong' })).toBeInTheDocument();
+        await user.type(screen.getByLabelText('Model name'), 'Corolla');
+        await user.type(within(screen.getByRole('group', { name: 'New Model details' })).getByLabelText('Code'), 'COROLLA');
+        await user.click(screen.getByRole('button', { name: 'Save Model' }));
+        await waitFor(() => expect(mocks.createModel).toHaveBeenCalledWith({ code: 'COROLLA', name: 'Corolla', vehicle_make_id: 1 }));
+        expect(await screen.findByText('Selected model: Corolla')).toBeInTheDocument();
+    });
+
+    it('shows backend validation and keeps the quick form open', async () => {
+        mocks.createType.mockRejectedValue(new ApiError('Validation failed', 422, null, null, { code: ['Code already exists.'] }));
+        const user = userEvent.setup();
+        render(<TestRouter><VehicleServiceQuickVehicleModal open initialVehicleNumber="ABC-1234" onClose={vi.fn()} onCreated={vi.fn()} /></TestRouter>);
+        await user.click(screen.getByRole('button', { name: 'Add Type' }));
+        await user.type(screen.getByLabelText('Type name'), 'Car');
+        await user.type(within(screen.getByRole('group', { name: 'New Type details' })).getByLabelText('Code'), 'CAR');
+        await user.click(screen.getByRole('button', { name: 'Save Type' }));
+        expect(await screen.findByText('Code already exists.')).toBeInTheDocument();
+        expect(screen.getByLabelText('Type name')).toHaveValue('Car');
+        expect(screen.getByRole('button', { name: 'Save vehicle and continue' })).toBeDisabled();
     });
 });

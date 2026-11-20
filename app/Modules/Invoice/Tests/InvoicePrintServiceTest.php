@@ -355,12 +355,13 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertTrue($data['print_layout']['is_outbound_continuous']);
         $this->assertStringContainsString('@page { size: 215.9mm 139.7mm; margin: 5mm 13mm 2mm 3mm; }', $printHtml);
         $this->assertStringContainsString('layout-continuous layout-outbound-continuous pdf-output', $html);
-        $this->assertStringContainsString('font-size: 11px; line-height: 1.25', $html);
+        $this->assertStringContainsString('font-size: 12px; line-height: 1.15', $html);
         $this->assertStringNotContainsString('class="company-contact"', $html);
-        $this->assertStringContainsString('363 Kandy Road,<br>Kalagedihena', $html);
-        $this->assertStringContainsString('Job No:</strong> VSJ-000864', $html);
-        $this->assertStringContainsString('Vehicle:</strong> 15-0572', $html);
-        $this->assertMatchesRegularExpression('/Job No:<\/strong> VSJ-000864.*Vehicle:<\/strong> 15-0572.*<\/div>\s*<div class="service-inline-references">.*Current Mileage:<\/strong> 4,757 km.*Next Service Mileage:<\/strong> 14,757 km/s', $html);
+        $this->assertStringContainsString('363 Kandy Road, Kalagedihena', $html);
+        $this->assertStringContainsString('VSJ-000864', $html);
+        $this->assertStringContainsString('15-0572', $html);
+        $this->assertStringContainsString('4,757 km', $html);
+        $this->assertStringContainsString('14,757 km', $html);
         $this->assertStringNotContainsString('class="service-references"', $html);
         $this->assertStringContainsString('3M Coolant Blue 4L', $html);
         $this->assertStringNotContainsString('COOLANT-4L', $html);
@@ -376,6 +377,29 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
         $this->assertEqualsWithDelta(612, $dompdf->getCanvas()->get_width(), 0.01);
         $this->assertEqualsWithDelta(396, $dompdf->getCanvas()->get_height(), 0.01);
+
+        $denseData = $data;
+        $denseData['document']['supplier']['tin'] = null;
+        $denseData['document']['supplier']['vat_registration_number'] = null;
+        $denseData['document']['supplier']['address'] = '101 Main Street, Galle';
+        $denseData['document']['purchaser']['tin'] = null;
+        $denseData['document']['purchaser_reference_fields'] = [
+            ['label' => 'Job No', 'value' => 'VSJ-000864'],
+            ['label' => 'Vehicle', 'value' => '15-0572'],
+        ];
+        $denseData['document']['lines'] = [];
+        foreach (range(1, 18) as $lineNumber) {
+            $line = $data['document']['lines'][0];
+            $line['display_name'] = "Service item {$lineNumber}";
+            $denseData['document']['lines'][] = $line;
+        }
+
+        $denseHtml = view('invoice.print', $denseData)->render();
+        $densePdf = new Dompdf;
+        $densePdf->loadHtml($denseHtml);
+        $densePdf->setPaper($layout->pdfPaper(), $layout->orientation());
+        $densePdf->render();
+        $this->assertSame(1, $densePdf->getCanvas()->get_page_count());
     }
 
     public function test_service_invoice_continuous_short_invoice_keeps_footer_on_one_page(): void

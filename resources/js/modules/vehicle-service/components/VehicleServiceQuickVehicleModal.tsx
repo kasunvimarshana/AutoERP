@@ -28,6 +28,7 @@ import {
 } from '@/modules/vehicle/vehicleCreateDefaults';
 import { VehicleMakeSelect } from '@/modules/vehicle/components/VehicleMakeSelect';
 import { VehicleModelSelect } from '@/modules/vehicle/components/VehicleModelSelect';
+import { VehicleQuickMasterCreate, type QuickMasterCreated, type QuickMasterKind } from '@/modules/vehicle/components/VehicleQuickMasterCreate';
 import { VehicleTypeSelect } from '@/modules/vehicle/components/VehicleTypeSelect';
 import type {
     Vehicle,
@@ -55,6 +56,7 @@ export function VehicleServiceQuickVehicleModal({
 }) {
     const auth = useAuth();
     const canVerifyCustomer = hasPermission(auth, 'customers.update');
+    const canManageVehicleMasters = hasPermission(auth, 'vehicle.update');
     const [customerMode, setCustomerMode] = useState<CustomerMode>('existing');
     const [existingCustomer, setExistingCustomer] = useState<CustomerSummary | null>(null);
     const [customerPayload, setCustomerPayload] = useState<CustomerPayload>(defaultCustomerPayload());
@@ -63,6 +65,8 @@ export function VehicleServiceQuickVehicleModal({
     const [make, setMake] = useState<VehicleMake | null>(null);
     const [model, setModel] = useState<VehicleModel | null>(null);
     const [type, setType] = useState<VehicleType | null>(null);
+    const [addingMaster, setAddingMaster] = useState<QuickMasterKind | null>(null);
+    const [savingMaster, setSavingMaster] = useState(false);
     const [saving, setSaving] = useState(false);
     const [loadingVehicleDefaults, setLoadingVehicleDefaults] = useState(false);
     const [loadingCustomerDefaults, setLoadingCustomerDefaults] = useState(false);
@@ -81,6 +85,7 @@ export function VehicleServiceQuickVehicleModal({
             setMake(null);
             setModel(null);
             setType(null);
+            setAddingMaster(null);
         });
         void loadVehicleCreationDefaults(controller.signal)
             .then(({ code }) => {
@@ -119,6 +124,18 @@ export function VehicleServiceQuickVehicleModal({
     }
 
     if (!open) return null;
+
+    const masterCreated = (created: QuickMasterCreated) => {
+        if (created.kind === 'make') {
+            setMake(created.resource);
+            setModel(null);
+        } else if (created.kind === 'model') {
+            setModel(created.resource);
+        } else {
+            setType(created.resource);
+        }
+        setAddingMaster(null);
+    };
 
     const finishCreatedFlow = () => {
         if (!createdForVerification) return;
@@ -160,14 +177,14 @@ export function VehicleServiceQuickVehicleModal({
             open={open}
             title="Register vehicle for this job"
             onClose={onClose}
-            closeDisabled={saving}
+            closeDisabled={saving || savingMaster}
             closeOnBackdrop={false}
         >
             <form
                 className="space-y-5"
                 onSubmit={async (event) => {
                     event.preventDefault();
-                    if (saving || loadingCustomerDefaults || loadingVehicleDefaults) return;
+                    if (saving || savingMaster || addingMaster || loadingCustomerDefaults || loadingVehicleDefaults) return;
                     setSaving(true);
                     setError(null);
 
@@ -259,23 +276,44 @@ export function VehicleServiceQuickVehicleModal({
                             }))}
                             error={vehicleError(error, 'manufacture_year')}
                         />
-                        <VehicleMakeSelect
-                            value={make}
-                            onChange={(next) => {
-                                const nextId = next?.id ?? null;
-                                if (nextId !== (make?.id ?? null)) setModel(null);
-                                setMake(next);
-                            }}
-                            error={vehicleError(error, 'vehicle_make_id')}
-                        />
-                        <VehicleModelSelect
-                            makeId={make?.id}
-                            value={model}
-                            onChange={setModel}
-                            error={vehicleError(error, 'vehicle_model_id')}
-                        />
-                        <VehicleTypeSelect value={type} onChange={setType} error={vehicleError(error, 'vehicle_type_id')} />
+                        <div className="relative">
+                            {canManageVehicleMasters && <AddMasterButton kind="make" onClick={setAddingMaster} disabled={savingMaster} />}
+                            <VehicleMakeSelect
+                                value={make}
+                                onChange={(next) => {
+                                    const nextId = next?.id ?? null;
+                                    if (nextId !== (make?.id ?? null)) setModel(null);
+                                    setMake(next);
+                                }}
+                                error={vehicleError(error, 'vehicle_make_id')}
+                            />
+                        </div>
+                        <div className="relative">
+                            {canManageVehicleMasters && <AddMasterButton kind="model" onClick={setAddingMaster} disabled={savingMaster} />}
+                            <VehicleModelSelect
+                                makeId={make?.id}
+                                value={model}
+                                onChange={setModel}
+                                error={vehicleError(error, 'vehicle_model_id')}
+                            />
+                        </div>
+                        <div className="relative">
+                            {canManageVehicleMasters && <AddMasterButton kind="type" onClick={setAddingMaster} disabled={savingMaster} />}
+                            <VehicleTypeSelect value={type} onChange={setType} error={vehicleError(error, 'vehicle_type_id')} />
+                        </div>
                     </div>
+                    {addingMaster && (
+                        <div className="mt-4">
+                            <VehicleQuickMasterCreate
+                                key={addingMaster}
+                                kind={addingMaster}
+                                make={make}
+                                onCancel={() => setAddingMaster(null)}
+                                onCreated={masterCreated}
+                                onSavingChange={setSavingMaster}
+                            />
+                        </div>
+                    )}
                 </Panel>
 
                 <Panel title="Customer details">
@@ -384,11 +422,26 @@ export function VehicleServiceQuickVehicleModal({
                 </Panel>
 
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-                    <Button type="submit" loading={saving} disabled={loadingCustomerDefaults || loadingVehicleDefaults}>Save vehicle and continue</Button>
+                    <Button type="button" variant="secondary" onClick={onClose} disabled={saving || savingMaster}>Cancel</Button>
+                    <Button type="submit" loading={saving} disabled={Boolean(addingMaster) || savingMaster || loadingCustomerDefaults || loadingVehicleDefaults}>Save vehicle and continue</Button>
                 </div>
             </form>
         </Modal>
+    );
+}
+
+function AddMasterButton({ kind, onClick, disabled }: { kind: QuickMasterKind; onClick: (kind: QuickMasterKind) => void; disabled: boolean }) {
+    const label = kind[0].toUpperCase() + kind.slice(1);
+    return (
+        <button
+            type="button"
+            className="absolute right-0 top-0 z-10 rounded px-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-500"
+            onClick={() => onClick(kind)}
+            disabled={disabled}
+            aria-label={`Add ${label}`}
+        >
+            + Add
+        </button>
     );
 }
 

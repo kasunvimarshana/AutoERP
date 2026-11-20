@@ -26,22 +26,13 @@
         @foreach (['supplier' => 'Supplier', 'purchaser' => 'Purchaser'] as $key => $label)
             @php
                 $party = $document[$key];
-                $addressBreak = $isOutboundContinuous && $key === 'supplier' && ! empty($party['address'])
-                    ? mb_strrpos($party['address'], ',')
-                    : false;
             @endphp
             <td>
                 @if (! empty($party['tin']))<div class="party-detail"><strong>{{ $label }}'s TIN:</strong> {{ $party['tin'] }}</div>@endif
                 @if (! empty($party['vat_registration_number']))<div class="party-detail"><strong>VAT Registration No:</strong> {{ $party['vat_registration_number'] }}</div>@endif
                 <div class="party-detail"><strong>{{ $label }}'s Name:</strong> {{ $party['name'] }}</div>
                 @if (! empty($party['address']))
-                    <div class="party-detail"><strong>Address:</strong>
-                        @if ($addressBreak !== false && trim(mb_substr($party['address'], $addressBreak + 1)) !== '')
-                            <span class="service-address-lines">{{ trim(mb_substr($party['address'], 0, $addressBreak + 1)) }}<br>{{ trim(mb_substr($party['address'], $addressBreak + 1)) }}</span>
-                        @else
-                            {{ $party['address'] }}
-                        @endif
-                    </div>
+                    <div class="party-detail"><strong>Address:</strong> {{ $party['address'] }}</div>
                 @endif
                 @if (! empty($party['phone']))<div class="party-detail"><strong>Telephone:</strong> {{ $party['phone'] }}</div>@endif
                 @if ($isOutboundContinuous && $key === 'purchaser' && ! empty($document['purchaser_reference_fields']))
@@ -116,6 +107,7 @@
             <div class="payment-box-title">Payment details</div>
             <div><strong>Payment method:</strong> {{ $document['resolved_payment_mode'] ?? 'Not recorded' }}</div>
             <div><strong>Paid amount:</strong> {{ $amounts['paid_total']['display'] }}</div>
+            @if ($isOutboundContinuous)<div><strong>Balance due:</strong> {{ $amounts['balance_due']['display'] }}</div>@endif
             @if (! empty($document['payment_terms']))<div><strong>Terms:</strong> {{ $document['payment_terms'] }}</div>@endif
             @if (! empty($document['notes']))<div><strong>Additional information:</strong> {{ $document['notes'] }}</div>@endif
         </td>
@@ -128,8 +120,10 @@
                 @unless ($zeroMoney($amounts['charge_total']))<tr><td>Charges</td><td>{{ $amounts['charge_total']['display'] }}</td></tr>@endunless
                 @unless ($zeroMoney($amounts['adjustment_total']))<tr><td>Other adjustments</td><td>{{ $amounts['adjustment_total']['display'] }}</td></tr>@endunless
                 <tr class="total-row"><td>Total amount</td><td>{{ $amounts['grand_total']['display'] }}</td></tr>
-                <tr><td>Paid</td><td>{{ $amounts['paid_total']['display'] }}</td></tr>
-                <tr class="total-row"><td>Balance due</td><td>{{ $amounts['balance_due']['display'] }}</td></tr>
+                @unless ($isOutboundContinuous)
+                    <tr><td>Paid</td><td>{{ $amounts['paid_total']['display'] }}</td></tr>
+                    <tr class="total-row"><td>Balance due</td><td>{{ $amounts['balance_due']['display'] }}</td></tr>
+                @endunless
             </table>
         </td>
     </tr>
@@ -141,9 +135,20 @@
 </div>
 </div>
 
+@if ($isOutboundContinuous)
+    <div class="signature-area">
+@endif
 <table class="signatures">
     <tr>
         <td><div class="signature-rule">Customer</div></td>
         <td><div class="signature-rule">Cashier</div></td>
     </tr>
 </table>
+@if ($isOutboundContinuous)
+    <div class="signature-trace">
+        @if (! empty($print_context))
+            Printed: {{ $print_context['printed_at'] }} | By: {{ $print_context['printed_by'] }}@if (! empty($print_context['copy_type'])) | {{ $print_context['copy_type'] }}@endif
+        @endif
+    </div>
+</div>
+@endif
