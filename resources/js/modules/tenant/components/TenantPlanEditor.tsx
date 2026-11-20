@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import {
     parseEnabledTenantModules,
     TENANT_MODULE_CODE,
@@ -14,6 +14,7 @@ import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import { compareDecimalStrings, isNonNegativeDecimal } from '@/shared/utils/decimal';
 import { formatLimitLabel, formatPlanMoney, humanize } from '../tenantPresentation';
 import type { NamedReference, TenantPlan, TenantPlanLimits, TenantPlanRevision } from '../tenantTypes';
@@ -47,20 +48,29 @@ const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
 export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, onSubmit }: Props) {
     const { confirm, confirmDialog } = useConfirmDialog();
     const revision = plan?.latest_revision ?? null;
-    const initial = useMemo(() => ({
-        name: plan?.name ?? '',
-        slug: plan?.slug ?? '',
-        price: revision?.price ?? '0.000000',
-        currencyId: revision?.currency_id ? String(revision.currency_id) : '',
-        interval: revision?.billing_interval ?? 'month',
-        enabledModules: [...revisionModules(revision)],
-        limits: {
-            max_users: toLimitValue(revision?.limits.max_users),
-            max_organization_units: toLimitValue(revision?.limits.max_organization_units),
-            max_warehouses: toLimitValue(revision?.limits.max_warehouses),
-            max_storage_mb: toLimitValue(revision?.limits.max_storage_mb),
-        } satisfies LimitFormState,
-    }), [plan, revision]);
+    const defaultCurrency = useMemo(() => findDefaultCurrency(currencies), [currencies]);
+    const defaultCurrencyId = defaultCurrency ? String(defaultCurrency.id) : '';
+
+    const isPaidRevision = Boolean(revision && compareDecimalStrings(revision.price, '0') > 0);
+    const initial = useMemo(() => {
+        const resolvedCurrencyId = revision?.currency_id
+            ? String(revision.currency_id)
+            : (!plan || isPaidRevision ? defaultCurrencyId : '');
+        return {
+            name: plan?.name ?? '',
+            slug: plan?.slug ?? '',
+            price: revision?.price ?? '0.000000',
+            currencyId: resolvedCurrencyId,
+            interval: revision?.billing_interval ?? 'month',
+            enabledModules: [...revisionModules(revision)],
+            limits: {
+                max_users: toLimitValue(revision?.limits.max_users),
+                max_organization_units: toLimitValue(revision?.limits.max_organization_units),
+                max_warehouses: toLimitValue(revision?.limits.max_warehouses),
+                max_storage_mb: toLimitValue(revision?.limits.max_storage_mb),
+            } satisfies LimitFormState,
+        };
+    }, [plan, revision, isPaidRevision, defaultCurrencyId]);
     const [name, setName] = useState(initial.name);
     const [slug, setSlug] = useState(initial.slug);
     const [price, setPrice] = useState(initial.price);
@@ -71,6 +81,24 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
     const [enabledModules, setEnabledModules] = useState<TenantModuleCode[]>(initial.enabledModules);
     const [limits, setLimits] = useState<LimitFormState>(initial.limits);
     const [clientError, setClientError] = useState<ApiError | null>(null);
+    const currencyTouched = useRef(Boolean(revision?.currency_id));
+
+    useEffect(() => {
+        if ((!plan || isPaidRevision) && !currencyTouched.current && !currencyId && defaultCurrencyId) {
+            setCurrencyId(defaultCurrencyId);
+        }
+    }, [plan, isPaidRevision, defaultCurrencyId, currencyId]);
+
+    function handlePriceChange(event: ChangeEvent<HTMLInputElement>) {
+        const value = event.target.value;
+        setPrice(value);
+        if (!currencyTouched.current && !currencyId && defaultCurrencyId) {
+            const numeric = Number(value);
+            if (Number.isFinite(numeric) && numeric > 0) {
+                setCurrencyId(defaultCurrencyId);
+            }
+        }
+    }
     const dirty = name !== initial.name
         || slug !== initial.slug
         || price !== initial.price
@@ -163,12 +191,18 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
                 <div className="grid gap-4 md:grid-cols-2">
                     <Input label="Plan name" value={name} error={fieldError(displayError, 'name')} onChange={(event) => setName(event.target.value)} disabled={saving} required />
                     <Input label="Plan slug" value={slug} error={fieldError(displayError, 'slug')} onChange={(event) => setSlug(event.target.value.toLowerCase())} placeholder="professional" disabled={saving} required />
-                    <DecimalInput label="Price" value={price} error={fieldError(displayError, 'price')} onChange={(event) => setPrice(event.target.value)} disabled={saving} required />
+                    <DecimalInput label="Price" value={price} error={fieldError(displayError, 'price')} onChange={handlePriceChange} disabled={saving} required />
                     <Select
                         label="Billing currency"
                         value={currencyId}
-                        onChange={(event) => setCurrencyId(event.target.value)}
-                        options={currencyOptions.map((currency) => ({ value: currency.id, label: `${currency.code ?? ''} — ${currency.name}${currency.is_active === false ? ' (inactive; current only)' : ''}` }))}
+                        onChange={(event) => {
+                            currencyTouched.current = true;
+                            setCurrencyId(event.target.value);
+                        }}
+                        options={currencyOptions.map((currency) => ({
+                            value: currency.id,
+                            label: `${currency.code ?? ''} — ${currency.name}${currency.is_default ? ' (Default)' : ''}${currency.is_active === false ? ' (inactive; current only)' : ''}`,
+                        }))}
                         placeholder="Select currency for paid plans"
                         error={fieldError(displayError, 'currency_id')}
                         disabled={saving}

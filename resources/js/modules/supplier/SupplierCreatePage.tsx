@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
@@ -11,11 +11,12 @@ import { Panel } from '@/shared/components/Panel';
 import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import type { NamedResource } from '@/shared/types/common';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import { notifyError } from '@/shared/notifications/appToast';
 import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { selectWhatsAppVerificationPhone } from '@/shared/utils/whatsAppVerificationTarget';
 import { startSupplierWhatsAppVerification } from './supplierApi';
-import { createSupplier, createSupplierWithRelations } from './supplierApi';
+import { createSupplier, createSupplierWithRelations, searchCurrencies } from './supplierApi';
 import type { SupplierPayload, SupplierWithRelationsPayload } from './supplierTypes';
 import { SupplierForm } from './components/SupplierForm';
 import {
@@ -57,15 +58,46 @@ export default function SupplierCreatePage() {
     const canVerifyWhatsApp = hasPermission(auth, 'suppliers.update');
     const [supplier, setSupplier] = useState(initialSupplier);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
+    const [initialCurrencyId, setInitialCurrencyId] = useState<NamedResource['id'] | null>(null);
     const [includeRelated, setIncludeRelated] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>('basic');
     const [draft, setDraft] = useState<SupplierOneShotDraft>(emptySupplierOneShotDraft);
     const [submitting, setSubmitting] = useState(false);
     const [verifyAfterSave, setVerifyAfterSave] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const currencyTouched = useRef(false);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        searchCurrencies({ search: '', page: 1, perPage: 25, signal: controller.signal })
+            .then((result) => {
+                if (currencyTouched.current) return;
+                const def = findDefaultCurrency(result.data);
+                if (!def) return;
+                setSupplier((current) => ({
+                    ...current,
+                    default_currency_id: current.default_currency_id ?? Number(def.id),
+                }));
+                setCurrency((current) => current ?? def);
+                setInitialCurrencyId(def.id);
+            })
+            .catch(() => {});
+
+        return () => controller.abort();
+    }, []);
+
+    const handleCurrencyChange = (next: NamedResource | null) => {
+        currencyTouched.current = true;
+        setCurrency(next);
+        setSupplier((current) => ({
+            ...current,
+            default_currency_id: next ? Number(next.id) : null,
+        }));
+    };
+
     const dirty = JSON.stringify(supplier) !== JSON.stringify(initialSupplier)
         || JSON.stringify(draft) !== JSON.stringify(emptySupplierOneShotDraft)
-        || currency !== null;
+        || (currency?.id ?? null) !== initialCurrencyId;
     const confirmDiscard = useUnsavedChanges(dirty && !submitting);
     const verificationPhone = selectWhatsAppVerificationPhone(supplier.mobile, includeRelated ? draft.contacts : []);
     const shouldVerifyAfterSave = verifyAfterSave && canVerifyWhatsApp && verificationPhone !== null;
@@ -144,18 +176,18 @@ export default function SupplierCreatePage() {
                 {includeRelated ? (
                     <>
                         <TabPanel tabsId="supplier-create" tabId="basic" active={activeTab}>
-                            <SupplierForm value={supplier} onChange={setSupplier} currency={currency} onCurrencyChange={setCurrency} error={error} creating />
+                            <SupplierForm value={supplier} onChange={setSupplier} currency={currency} onCurrencyChange={handleCurrencyChange} error={error} creating />
                         </TabPanel>
                         {relatedTabs.map((tab) => (
                             <TabPanel key={tab.id} tabsId="supplier-create" tabId={tab.id} active={activeTab}>
                                 <Panel>
-                                    <SupplierOneShotBuilder section={tab.id} value={draft} onChange={setDraft} />
+                                    <SupplierOneShotBuilder section={tab.id} value={draft} onChange={setDraft} defaultCurrency={currency} />
                                 </Panel>
                             </TabPanel>
                         ))}
                     </>
                 ) : (
-                    <SupplierForm value={supplier} onChange={setSupplier} currency={currency} onCurrencyChange={setCurrency} error={error} creating />
+                    <SupplierForm value={supplier} onChange={setSupplier} currency={currency} onCurrencyChange={handleCurrencyChange} error={error} creating />
                 )}
 
                 <FormActions>

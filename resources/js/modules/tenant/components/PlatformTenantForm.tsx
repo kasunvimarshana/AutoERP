@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import type { TenantRecord } from '../tenantTypes';
 
 interface PlatformTenantFormProps {
@@ -27,16 +28,29 @@ export function PlatformTenantForm({
     onCancel,
     onSubmit,
 }: PlatformTenantFormProps) {
+    const defaultCurrency = useMemo(() => findDefaultCurrency(currencies), [currencies]);
+    const defaultCurrencyId = defaultCurrency ? String(defaultCurrency.id) : '';
+
     const initial = useMemo(() => ({
         code: tenant?.code ?? '',
         name: tenant?.name ?? '',
         slug: tenant?.slug ?? '',
-        currencyId: tenant?.base_currency_id ? String(tenant.base_currency_id) : '',
-    }), [tenant]);
+        currencyId: tenant?.base_currency_id
+            ? String(tenant.base_currency_id)
+            : (!tenant ? defaultCurrencyId : ''),
+    }), [tenant, defaultCurrencyId]);
     const [code, setCode] = useState(initial.code);
     const [name, setName] = useState(initial.name);
     const [slug, setSlug] = useState(initial.slug);
     const [currencyId, setCurrencyId] = useState(initial.currencyId);
+    const currencyTouched = useRef(Boolean(tenant?.base_currency_id));
+
+    useEffect(() => {
+        if (!tenant && !currencyTouched.current && !currencyId && defaultCurrencyId) {
+            setCurrencyId(defaultCurrencyId);
+        }
+    }, [tenant, defaultCurrencyId, currencyId]);
+
     const [logo, setLogo] = useState<File | null>(null);
     const [removeLogo, setRemoveLogo] = useState(false);
     const [logoError, setLogoError] = useState('');
@@ -120,12 +134,15 @@ export function PlatformTenantForm({
             <Select
                 label="Base accounting currency"
                 value={currencyId}
-                onChange={(event) => setCurrencyId(event.target.value)}
+                onChange={(event) => {
+                    currencyTouched.current = true;
+                    setCurrencyId(event.target.value);
+                }}
                 disabled={baseCurrencyLocked || saving}
                 error={fieldError(error, 'base_currency_id')}
                 options={currencyOptions.map((currency) => ({
                     value: currency.id,
-                    label: `${currency.code ?? ''} — ${currency.name}${currency.is_active === false ? ' (inactive; current only)' : ''}`,
+                    label: `${currency.code ?? ''} — ${currency.name}${currency.is_default ? ' (Default)' : ''}${currency.is_active === false ? ' (inactive; current only)' : ''}`,
                 }))}
                 placeholder="Select base currency"
                 hint={baseCurrencyLocked ? 'Base currency is locked after the tenant leaves draft status.' : 'Required before activation.'}

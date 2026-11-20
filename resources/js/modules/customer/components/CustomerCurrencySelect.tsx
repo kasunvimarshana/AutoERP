@@ -2,7 +2,8 @@ import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
 import { searchCurrencies } from '../customerApi';
 
-const formatCurrency = (currency: NamedResource) => `${currency.code ?? ''} - ${currency.name}${currency.symbol ? ` (${currency.symbol})` : ''}`;
+const formatCurrency = (currency: NamedResource) =>
+    `${currency.code ?? ''} - ${currency.name}${currency.symbol ? ` (${currency.symbol})` : ''}${currency.is_default ? ' (Default)' : ''}`;
 
 export function CustomerCurrencySelect({ value, onChange, error }: {
     value: NamedResource | null;

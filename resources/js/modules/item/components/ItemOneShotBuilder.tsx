@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -43,15 +43,17 @@ export const emptyOneShotDraft: OneShotDraft = {
     usageRules: [],
 };
 
-export function ItemOneShotBuilder({ section, value, onChange }: {
+export function ItemOneShotBuilder({ section, value, onChange, defaultCurrency = null, defaultUom = null }: {
     section: 'units' | 'variants' | 'bundles' | 'prices' | 'codes' | 'usage_rules';
     value: OneShotDraft;
     onChange: (value: OneShotDraft) => void;
+    defaultCurrency?: NamedResource | null;
+    defaultUom?: NamedResource | null;
 }) {
     if (section === 'units') return <UnitDraft value={value} onChange={onChange} />;
     if (section === 'variants') return <VariantDraft value={value} onChange={onChange} />;
     if (section === 'bundles') return <BundleDraft value={value} onChange={onChange} />;
-    if (section === 'prices') return <PriceDraft value={value} onChange={onChange} />;
+    if (section === 'prices') return <PriceDraft value={value} onChange={onChange} defaultCurrency={defaultCurrency} defaultUom={defaultUom} />;
     if (section === 'codes') return <CodeDraft value={value} onChange={onChange} />;
     if (section === 'usage_rules') return <UsageDraft value={value} onChange={onChange} />;
 
@@ -131,12 +133,25 @@ function BundleDraft({ value, onChange }: DraftProps) {
     </DraftSection>;
 }
 
-function PriceDraft({ value, onChange }: DraftProps) {
+function PriceDraft({ value, onChange, defaultCurrency, defaultUom }: DraftProps & { defaultCurrency?: NamedResource | null; defaultUom?: NamedResource | null }) {
     const [priceType, setPriceType] = useState('sales');
     const [amount, setAmount] = useState('0.000000');
-    const [currency, setCurrency] = useState<NamedResource | null>(null);
-    const [uom, setUom] = useState<NamedResource | null>(null);
+    const [currency, setCurrency] = useState<NamedResource | null>(defaultCurrency ?? null);
+    const [uom, setUom] = useState<NamedResource | null>(defaultUom ?? null);
     const [effectiveFrom, setEffectiveFrom] = useState('');
+
+    useEffect(() => {
+        if (!currency && defaultCurrency) {
+            setCurrency(defaultCurrency);
+        }
+    }, [defaultCurrency, currency]);
+
+    useEffect(() => {
+        if (!uom && defaultUom) {
+            setUom(defaultUom);
+        }
+    }, [defaultUom, uom]);
+
     return <DraftSection title="Initial prices" rows={value.prices.map((row) => `${row.price_type} / ${row.currency.code ?? ''} ${row.amount} / ${row.uom.code ?? ''} / ${row.effective_from}`)} remove={(index) => onChange({ ...value, prices: value.prices.filter((_, rowIndex) => rowIndex !== index) })}>
         <Select label="Price type" value={priceType} onChange={(event) => setPriceType(event.target.value)} options={options(itemPriceTypes)} />
         <Input label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
@@ -155,8 +170,8 @@ function PriceDraft({ value, onChange }: DraftProps) {
                 effective_from: effectiveFrom,
                 effective_to: null,
             }] });
-            setCurrency(null);
-            setUom(null);
+            setCurrency(defaultCurrency ?? null);
+            setUom(defaultUom ?? null);
             setEffectiveFrom('');
         }}>Add price revision</Button>
     </DraftSection>;

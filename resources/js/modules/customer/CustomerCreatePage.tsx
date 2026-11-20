@@ -167,7 +167,7 @@ export default function CustomerCreatePage() {
                         {relatedTabs.map((tab) => (
                             <TabPanel key={tab.id} tabsId="customer-create" tabId={tab.id} active={activeTab}>
                                 <Panel>
-                                    <CustomerOneShotBuilder section={tab.id} value={draft} onChange={setDraft} />
+                                    <CustomerOneShotBuilder section={tab.id} value={draft} onChange={setDraft} defaultCurrency={currency} />
                                 </Panel>
                             </TabPanel>
                         ))}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TENANT_MODULE_CODE } from '@/app/access/tenantModules';
 import { hasPermission } from '@/modules/auth/accessControl';
@@ -6,6 +6,8 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
+import { searchCurrencies } from '@/shared/api/referenceApi';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Panel } from '@/shared/components/Panel';
@@ -68,9 +70,22 @@ export default function ItemCreatePage() {
     const [draft, setDraft] = useState<OneShotDraft>(emptyOneShotDraft);
     const [laborCommission, setLaborCommission] = useState<LaborItemCommissionDraft>(emptyLaborItemCommissionDraft);
     const [createdItemId, setCreatedItemId] = useState<number | null>(null);
+    const [defaultCurrency, setDefaultCurrency] = useState<NamedResource | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(submitting);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        searchCurrencies({ search: '', page: 1, perPage: 25, signal: controller.signal })
+            .then((result) => {
+                const def = findDefaultCurrency(result.data);
+                if (def) setDefaultCurrency(def);
+            })
+            .catch(() => {});
+        return () => controller.abort();
+    }, []);
+
     const visibleTabs = useMemo(
         () => tabs.filter((entry) => {
             if (entry.id === 'bundles') return ['combo', 'package'].includes(item.item_type);
@@ -96,7 +111,7 @@ export default function ItemCreatePage() {
         {canCreate && <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
             {createdItemId === null && <Panel className="p-0"><Tabs tabs={visibleTabs} active={displayedTab} onChange={setActiveTab} /></Panel>}
             {createdItemId === null && displayedTab === 'basic' && <ItemForm value={item} onChange={(next) => { formGuard.markDirty(); setItem(next); }} category={category} onCategoryChange={(next) => { formGuard.markDirty(); setCategory(next); }} brand={brand} onBrandChange={(next) => { formGuard.markDirty(); setBrand(next); }} baseUom={baseUom} onBaseUomChange={(next) => { formGuard.markDirty(); setBaseUom(next); }} error={error} />}
-            {createdItemId === null && displayedTab !== 'basic' && displayedTab !== 'commission' && <Panel><ItemOneShotBuilder section={displayedTab} value={draft} onChange={(next) => { formGuard.markDirty(); setDraft(next); }} /></Panel>}
+            {createdItemId === null && displayedTab !== 'basic' && displayedTab !== 'commission' && <Panel><ItemOneShotBuilder section={displayedTab} value={draft} onChange={(next) => { formGuard.markDirty(); setDraft(next); }} defaultCurrency={defaultCurrency} defaultUom={baseUom} /></Panel>}
             {displayedTab === 'commission' && <LaborItemCommissionPanel value={laborCommission} onChange={(next) => { formGuard.markDirty(); setLaborCommission(next); }} disabled={submitting} />}
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => createdItemId === null ? navigate(-1) : navigate(`/items/${createdItemId}`)}>Cancel</Button>

@@ -3,7 +3,7 @@ import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
 
 const formatCurrency = (currency: NamedResource) =>
-    `${currency.code ?? ''} - ${currency.name}${currency.symbol ? ` (${currency.symbol})` : ''}`;
+    `${currency.code ?? ''} - ${currency.name}${currency.symbol ? ` (${currency.symbol})` : ''}${currency.is_default ? ' (Default)' : ''}`;
 
 export function ItemCurrencySelect({ value, onChange, error }: {
     value: NamedResource | null;

@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
+import type { ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';
 import { ApiError, fieldError, toApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -9,6 +10,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import { getTenantProfile, updateTenantProfile } from '../tenantApi';
 import type { TenantRecord } from '../tenantTypes';
 
@@ -37,13 +39,15 @@ export function TenantProfilePanel({ canManage }: TenantProfilePanelProps) {
 
 function TenantProfileEditor({ tenant, currencyOptions, loadError, canManage, onSaved }: {
     tenant: TenantRecord;
-    currencyOptions: Array<{ id: number; code?: string | null; name: string }>;
+    currencyOptions: ReferenceRecord[];
     loadError: ApiError | null;
     canManage: boolean;
     onSaved: (tenant: TenantRecord) => void;
 }) {
+    const defaultCurrency = useMemo(() => findDefaultCurrency(currencyOptions), [currencyOptions]);
+    const defaultCurrencyId = defaultCurrency ? String(defaultCurrency.id) : '';
     const [name, setName] = useState(tenant.name);
-    const [currencyId, setCurrencyId] = useState(tenant.base_currency_id ? String(tenant.base_currency_id) : '');
+    const [currencyId, setCurrencyId] = useState(tenant.base_currency_id ? String(tenant.base_currency_id) : defaultCurrencyId);
     const [logo, setLogo] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<ApiError | null>(null);
@@ -86,7 +90,7 @@ function TenantProfileEditor({ tenant, currencyOptions, loadError, canManage, on
                         error={fieldError(saveError, 'base_currency_id')}
                         onChange={(event) => setCurrencyId(event.target.value)}
                         disabled={!canManage || tenant.activated_at !== null}
-                        options={currencyOptions.map((currency) => ({ value: currency.id, label: `${currency.code ?? ''} — ${currency.name}` }))}
+                        options={currencyOptions.map((currency) => ({ value: currency.id, label: `${currency.code ?? ''} — ${currency.name}${currency.is_default ? ' (Default)' : ''}` }))}
                         placeholder="Select base currency"
                     />
                     <Input

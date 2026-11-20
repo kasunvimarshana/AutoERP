@@ -1,4 +1,5 @@
 import type { NamedResource } from '@/shared/types/common';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import { generateCustomerCode, searchCurrencies } from './customerApi';
 import type { CustomerPayload } from './customerTypes';
 
@@ -27,18 +28,20 @@ export async function loadCustomerCreationDefaults(signal: AbortSignal): Promise
     const [code, currencies] = await Promise.all([
         generateCustomerCode(signal),
         searchCurrencies({
-            search: DEFAULT_CUSTOMER_CURRENCY_CODE,
+            search: '',
             page: 1,
             perPage: 25,
             signal,
         }),
     ]);
-    const currency = currencies.data.find(
-        (candidate) => candidate.code?.toUpperCase() === DEFAULT_CUSTOMER_CURRENCY_CODE,
-    );
+    const currency = findDefaultCurrency(currencies.data)
+        ?? currencies.data.find(
+            (candidate) => candidate.code?.toUpperCase() === DEFAULT_CUSTOMER_CURRENCY_CODE,
+        )
+        ?? currencies.data[0];
 
     if (!currency) {
-        throw new Error(`${DEFAULT_CUSTOMER_CURRENCY_CODE} currency is not configured.`);
+        throw new Error('No active currencies are configured.');
     }
 
     return { code, currency };

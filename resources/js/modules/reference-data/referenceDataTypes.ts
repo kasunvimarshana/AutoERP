@@ -11,6 +11,7 @@ export interface ReferenceRecord {
     native_name?: string | null;
     current_utc_offset?: string;
     is_active: boolean;
+    is_default?: boolean;
     row_version: number;
     updated_at: string | null;
 }

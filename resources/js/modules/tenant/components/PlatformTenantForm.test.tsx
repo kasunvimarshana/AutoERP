@@ -52,4 +52,59 @@ describe('PlatformTenantForm', () => {
             name: 'Acme Holdings',
         });
     });
+
+    it('automatically selects the default configured currency when creating a new tenant', () => {
+        render(
+            <TestRouter>
+                <PlatformTenantForm
+                    tenant={null}
+                    currencies={[
+                        { id: 1, code: 'EUR', name: 'Euro', is_active: true, row_version: 1, updated_at: null },
+                        { id: 2, code: 'LKR', name: 'Sri Lankan Rupee', is_active: true, is_default: true, row_version: 1, updated_at: null },
+                    ]}
+                    saving={false}
+                    error={null}
+                    onCancel={vi.fn()}
+                    onSubmit={vi.fn()}
+                />
+            </TestRouter>,
+        );
+
+        const select = screen.getByLabelText('Base accounting currency') as HTMLSelectElement;
+        expect(select.value).toBe('2');
+    });
+
+    it('allows selecting a different currency when creating a tenant and respects the selection', async () => {
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(
+            <TestRouter>
+                <PlatformTenantForm
+                    tenant={null}
+                    currencies={[
+                        { id: 1, code: 'USD', name: 'US Dollar', is_active: true, is_default: true, row_version: 1, updated_at: null },
+                        { id: 2, code: 'GBP', name: 'British Pound', is_active: true, row_version: 1, updated_at: null },
+                    ]}
+                    saving={false}
+                    error={null}
+                    onCancel={vi.fn()}
+                    onSubmit={onSubmit}
+                />
+            </TestRouter>,
+        );
+
+        const select = screen.getByLabelText('Base accounting currency') as HTMLSelectElement;
+        expect(select.value).toBe('1');
+
+        fireEvent.change(select, { target: { value: '2' } });
+        expect(select.value).toBe('2');
+
+        fireEvent.change(screen.getByLabelText('Tenant code'), { target: { value: 'GLOBAL' } });
+        fireEvent.change(screen.getByLabelText('Tenant name'), { target: { value: 'Global Corp' } });
+        fireEvent.change(screen.getByLabelText('URL slug'), { target: { value: 'global' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create draft tenant' }));
+
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+        const payload = onSubmit.mock.calls[0][0] as FormData;
+        expect(payload.get('base_currency_id')).toBe('2');
+    });
 });

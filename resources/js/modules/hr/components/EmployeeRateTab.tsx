@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import type { NamedResource } from '@/shared/types/common';
@@ -6,6 +6,7 @@ import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Select } from '@/shared/components/Select';
 import { searchCurrencies } from '@/shared/api/referenceApi';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import { rateApi } from '../hrApi';
 import { hrPermissions } from '../hrPermissions';
 import type { EmployeeRate, EmployeeRatePayload } from '../hrTypes';
@@ -26,11 +27,36 @@ export function EmployeeRateTab({ employeeId }: { employeeId: number }) {
     const auth = useAuth();
     const canManage = hasPermission(auth, hrPermissions.employeesUpdate);
     const crud = useEmployeeRelationCrud<EmployeeRate, EmployeeRatePayload>(employeeId, rateApi);
+    const [defaultCurrency, setDefaultCurrency] = useState<NamedResource | null>(null);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [draft, setDraft] = useState<EmployeeRatePayload>(emptyRate);
 
+    useEffect(() => {
+        const controller = new AbortController();
+        searchCurrencies({ search: '', page: 1, perPage: 25, signal: controller.signal })
+            .then((result) => {
+                const def = findDefaultCurrency(result.data);
+                if (def) setDefaultCurrency(def);
+            })
+            .catch(() => {});
+        return () => controller.abort();
+    }, []);
+
+    useEffect(() => {
+        if (crud.editing) {
+            setDraft({
+                rate_type: crud.editing.rate_type,
+                amount: crud.editing.amount,
+                effective_from: crud.editing.effective_from ?? '',
+                effective_to: crud.editing.effective_to ?? '',
+                is_active: crud.editing.is_active,
+            });
+            setCurrency(crud.editing.currency ?? null);
+        }
+    }, [crud.editing]);
+
     const startCreate = () => {
-        setCurrency(null);
+        setCurrency(defaultCurrency);
         setDraft(emptyRate);
         crud.startCreate();
     };

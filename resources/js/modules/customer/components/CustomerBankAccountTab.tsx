@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -8,8 +8,9 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { FormDrawer } from '@/shared/components/Drawer';
 import { Pagination } from '@/shared/components/Pagination';
 import type { NamedResource } from '@/shared/types/common';
+import { findDefaultCurrency } from '@/shared/utils/currency';
 import { readableRelation } from '@/shared/utils/object';
-import { createCustomerBankAccount, deleteCustomerBankAccount, listCustomerBankAccounts, updateCustomerBankAccount } from '../customerApi';
+import { createCustomerBankAccount, deleteCustomerBankAccount, listCustomerBankAccounts, searchCurrencies, updateCustomerBankAccount } from '../customerApi';
 import type { CustomerBankAccount, CustomerBankAccountPayload } from '../customerTypes';
 import { CustomerCurrencySelect } from './CustomerCurrencySelect';
 import { CustomerRelationHeader } from './CustomerRelationHeader';
@@ -30,6 +31,26 @@ export default function CustomerBankAccountTab({ customerId, canManage }: { cust
 function BankForm({ row, error, submitting, onCancel, onSubmit }: { row: CustomerBankAccount | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: CustomerBankAccountPayload) => Promise<void> }) {
     const [currency, setCurrency] = useState<NamedResource | null>(row?.currency ?? null);
     const [form, setForm] = useState<CustomerBankAccountPayload>(row ? { bank_name: row.bank_name, branch_name: row.branch_name, account_name: row.account_name, account_number: row.account_number, swift_code: row.swift_code, iban: row.iban, currency_id: row.currency ? Number(row.currency.id) : null, is_primary: row.is_primary, is_active: row.is_active, notes: row.notes } : { bank_name: '', account_name: '', account_number: '', is_primary: false, is_active: true });
+
+    useEffect(() => {
+        if (!row && !currency) {
+            const controller = new AbortController();
+            searchCurrencies({ search: '', page: 1, perPage: 25, signal: controller.signal })
+                .then((result) => {
+                    const def = findDefaultCurrency(result.data);
+                    if (def) {
+                        setCurrency((current) => current ?? def);
+                        setForm((current) => ({
+                            ...current,
+                            currency_id: current.currency_id ?? Number(def.id),
+                        }));
+                    }
+                })
+                .catch(() => {});
+            return () => controller.abort();
+        }
+    }, [row, currency]);
+
     const set = <K extends keyof CustomerBankAccountPayload>(key: K, value: CustomerBankAccountPayload[K]) => setForm((current) => ({ ...current, [key]: value }));
     return <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void onSubmit(form); }}><ErrorAlert error={error} /><div className="grid gap-4 sm:grid-cols-2">
         <Input label="Bank name" value={form.bank_name} onChange={(event) => set('bank_name', event.target.value)} error={fieldError(error, 'bank_name')} required />

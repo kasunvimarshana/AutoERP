@@ -5,6 +5,7 @@ export interface NamedResource {
     code?: string | null;
     name: string;
     symbol?: string | null;
+    is_default?: boolean;
 }
 
 export type UnknownRecord = Record<string, unknown>;

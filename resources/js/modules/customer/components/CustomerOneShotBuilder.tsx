@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
@@ -30,14 +30,15 @@ export const emptyCustomerOneShotDraft: CustomerOneShotDraft = {
     creditProfile: { credit_limit: '0.000000', credit_period_days: null, warning_threshold_percent: '80.000000', credit_allowed: true, advance_allowed: true, allow_over_credit: false, allow_partial_payment: true, is_active: true },
 };
 
-export function CustomerOneShotBuilder({ section, value, onChange }: {
+export function CustomerOneShotBuilder({ section, value, onChange, defaultCurrency = null }: {
     section: 'contacts' | 'addresses' | 'bank_accounts' | 'credit_profile' | 'review';
     value: CustomerOneShotDraft;
     onChange: (value: CustomerOneShotDraft) => void;
+    defaultCurrency?: NamedResource | null;
 }) {
     if (section === 'contacts') return <ContactDraft value={value} onChange={onChange} />;
     if (section === 'addresses') return <AddressDraft value={value} onChange={onChange} />;
-    if (section === 'bank_accounts') return <BankDraft value={value} onChange={onChange} />;
+    if (section === 'bank_accounts') return <BankDraft value={value} onChange={onChange} defaultCurrency={defaultCurrency} />;
     if (section === 'credit_profile') return <CreditDraft value={value} onChange={onChange} />;
     return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Count label="Contacts" value={value.contacts.length} /><Count label="Addresses" value={value.addresses.length} /><Count label="Bank accounts" value={value.bankAccounts.length} /></div>;
 }
@@ -51,9 +52,14 @@ function AddressDraft({ value, onChange }: Props) {
     const [type, setType] = useState('registered'); const [line, setLine] = useState(''); const [city, setCity] = useState('');
     return <Draft title="Initial addresses" rows={value.addresses.map((row) => `${row.address_type} / ${row.address_line_1}`)} remove={(index) => onChange({ ...value, addresses: value.addresses.filter((_, i) => i !== index) })}><Select label="Type" value={type} onChange={(event) => setType(event.target.value)} options={options(customerAddressTypes.filter((addressType) => addressType !== GENERAL_CUSTOMER_ADDRESS_TYPE))} /><Input label="Address line 1" value={line} onChange={(event) => setLine(event.target.value)} /><Input label="City" value={city} onChange={(event) => setCity(event.target.value)} /><Button type="button" disabled={!line} onClick={() => { onChange({ ...value, addresses: [...value.addresses, { address_type: type, address_line_1: line, city: city || null, is_primary: !value.addresses.some((row) => row.address_type === type && row.is_primary), is_active: true }] }); setLine(''); setCity(''); }}>Add address</Button></Draft>;
 }
-function BankDraft({ value, onChange }: Props) {
-    const [bank, setBank] = useState(''); const [accountName, setAccountName] = useState(''); const [number, setNumber] = useState(''); const [currency, setCurrency] = useState<NamedResource | null>(null);
-    return <Draft title="Initial bank accounts" rows={value.bankAccounts.map((row) => `${row.bank_name} / ${row.account_number}${row.currency ? ` / ${row.currency.code}` : ''}`)} remove={(index) => onChange({ ...value, bankAccounts: value.bankAccounts.filter((_, i) => i !== index) })}><Input label="Bank name" value={bank} onChange={(event) => setBank(event.target.value)} /><Input label="Account name" value={accountName} onChange={(event) => setAccountName(event.target.value)} /><Input label="Account number" value={number} onChange={(event) => setNumber(event.target.value)} /><CustomerCurrencySelect value={currency} onChange={setCurrency} /><Button type="button" disabled={!bank || !accountName || !number} onClick={() => { onChange({ ...value, bankAccounts: [...value.bankAccounts, { bank_name: bank, account_name: accountName, account_number: number, currency, currency_id: currency ? Number(currency.id) : null, is_primary: value.bankAccounts.length === 0, is_active: true }] }); setBank(''); setAccountName(''); setNumber(''); setCurrency(null); }}>Add bank account</Button></Draft>;
+function BankDraft({ value, onChange, defaultCurrency }: Props & { defaultCurrency?: NamedResource | null }) {
+    const [bank, setBank] = useState(''); const [accountName, setAccountName] = useState(''); const [number, setNumber] = useState(''); const [currency, setCurrency] = useState<NamedResource | null>(defaultCurrency ?? null);
+    useEffect(() => {
+        if (!currency && defaultCurrency) {
+            setCurrency(defaultCurrency);
+        }
+    }, [defaultCurrency, currency]);
+    return <Draft title="Initial bank accounts" rows={value.bankAccounts.map((row) => `${row.bank_name} / ${row.account_number}${row.currency ? ` / ${row.currency.code}` : ''}`)} remove={(index) => onChange({ ...value, bankAccounts: value.bankAccounts.filter((_, i) => i !== index) })}><Input label="Bank name" value={bank} onChange={(event) => setBank(event.target.value)} /><Input label="Account name" value={accountName} onChange={(event) => setAccountName(event.target.value)} /><Input label="Account number" value={number} onChange={(event) => setNumber(event.target.value)} /><CustomerCurrencySelect value={currency} onChange={setCurrency} /><Button type="button" disabled={!bank || !accountName || !number} onClick={() => { onChange({ ...value, bankAccounts: [...value.bankAccounts, { bank_name: bank, account_name: accountName, account_number: number, currency, currency_id: currency ? Number(currency.id) : null, is_primary: value.bankAccounts.length === 0, is_active: true }] }); setBank(''); setAccountName(''); setNumber(''); setCurrency(defaultCurrency ?? null); }}>Add bank account</Button></Draft>;
 }
 function CreditDraft({ value, onChange }: Props) {
     const profile = value.creditProfile;
