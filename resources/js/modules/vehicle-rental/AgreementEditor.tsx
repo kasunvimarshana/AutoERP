@@ -38,7 +38,8 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
     const fieldError = (key: string) => error?.fields[key]?.[0];
-    const termKeys = visibleTermKeys(kind);
+    const allTermKeys = visibleTermKeys(kind);
+    const ratesTermKeys = allTermKeys.filter(key => key !== 'working_hours');
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!party || !currency || (kind === AgreementKind.Owner && !vehicle)) return;
@@ -54,7 +55,12 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
         }
         setSaving(true); setError(null);
         try {
-            const submittedTerms = Object.fromEntries(termKeys.map(key => [key, terms[key] ?? null])) as Partial<Record<TermKey, string | null>>;
+            const submittedTerms = Object.fromEntries(
+                allTermKeys.map(key => [
+                    key,
+                    (key === 'working_hours' && driver !== DriverMode.WithDriver) ? null : (terms[key] ?? null),
+                ]),
+            ) as Partial<Record<TermKey, string | null>>;
             await saveAgreement(kind, { reference: reference.trim() || undefined, party_id: party.id, currency_id: currency.id,
                 ...(kind === AgreementKind.Owner ? { vehicle_id: vehicle!.id } : {}), agreed_on: agreedOn, executing_on: executingOn || null, starts_on: startsOn,
                 ends_on: endsOn || null, basis, driver_mode: driver, terms: submittedTerms, notes: notes || null, expected_version: record?.row_version }, record?.id);
@@ -126,13 +132,52 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             <Input label="Start date" type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />
             <Input label="End date" type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} error={fieldError('ends_on')} hint="Leave blank if no end date has been agreed." />
             <Select label="Rental basis" options={basisOptions} value={basis} onChange={e => setBasis(e.target.value as RentalBasis)} required error={fieldError('basis')} />
-            <Select label="Driver arrangement" options={driverOptions} value={driver} onChange={e => setDriver(e.target.value as DriverMode)} required error={fieldError('driver_mode')} />
+            <Select
+                label="Driver arrangement"
+                options={driverOptions}
+                value={driver}
+                onChange={e => {
+                    const nextDriver = e.target.value as DriverMode | '';
+                    setDriver(nextDriver);
+                    if (nextDriver === DriverMode.WithDriver && !terms.working_hours) {
+                        setTerms(prev => ({ ...prev, working_hours: '8.0' }));
+                    } else if (nextDriver === DriverMode.SelfDrive) {
+                        setTerms(prev => ({ ...prev, working_hours: null }));
+                    }
+                }}
+                required
+                error={fieldError('driver_mode')}
+            />
+            {driver === DriverMode.WithDriver && (
+                <div className="sm:col-span-2 rounded-lg border border-sky-200 bg-sky-50/70 p-3 space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <label htmlFor="agreed-daily-working-hours" className="text-xs font-semibold text-slate-800 uppercase tracking-wide">
+                            {kind === AgreementKind.Owner ? 'Owner agreed daily working hours' : 'Agreed daily working hours'}
+                        </label>
+                        <span className="text-xs text-sky-700">Baseline for automatic Running Chart Overtime (OT)</span>
+                    </div>
+                    <Input
+                        id="agreed-daily-working-hours"
+                        label=""
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="24"
+                        inputMode="decimal"
+                        value={terms.working_hours ?? ''}
+                        placeholder="8.0"
+                        onChange={e => setTerms(prev => ({ ...prev, working_hours: e.target.value || null }))}
+                        error={fieldError('terms.working_hours')}
+                        hint="Standard daily working hours baseline used to automatically calculate overtime (e.g. 8.0 hrs/day). Users can manually adjust OT when logging running charts."
+                    />
+                </div>
+            )}
         </fieldset>
         <details open={Boolean(!record || (error && Object.keys(error.fields).some(key => key.startsWith('terms.'))) || Object.values(terms).some(v => v !== null && v !== ''))}>
             <summary className="cursor-pointer font-medium">Agreed rates and allowances</summary>
             <p className="my-3 text-sm text-slate-600">Enter only the terms agreed with this party. Blank means unknown; enter zero only when explicitly agreed.</p>
             <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
-                {termKeys.map(key => <Input key={key} label={termLabel(kind, key)} inputMode="decimal" value={terms[key] ?? ''} onChange={e => setTerms({ ...terms, [key]: e.target.value || null })} error={fieldError(`terms.${key}`)} />)}
+                {ratesTermKeys.map(key => <Input key={key} label={termLabel(kind, key)} inputMode="decimal" value={terms[key] ?? ''} onChange={e => setTerms({ ...terms, [key]: e.target.value || null })} error={fieldError(`terms.${key}`)} />)}
             </fieldset>
         </details>
         <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} error={fieldError('notes')} />

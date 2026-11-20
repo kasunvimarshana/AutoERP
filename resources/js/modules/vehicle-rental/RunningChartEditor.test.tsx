@@ -257,3 +257,163 @@ it('prevents submitting usage end after custody return for returned vehicles', a
     });
     expect(createChart).not.toHaveBeenCalled();
 });
+
+it('automatically calculates overtime based on agreed working hours baseline and allows manual adjustment', async () => {
+    const withDriverUse: VehicleUse = {
+        ...use,
+        customer_agreement: {
+            id: 1,
+            reference: 'AGR-WD',
+            party_name: 'Acme Corp',
+            version: 1,
+            driver_mode: 'with_driver',
+            working_hours: '8.000000',
+        },
+    };
+
+    render(<RunningChartEditor use={withDriverUse} onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByText('Working Hours & Overtime Baseline')).toBeInTheDocument();
+    const baselineInput = screen.getByTitle('Agreed standard daily working hours baseline') as HTMLInputElement;
+    expect(baselineInput.value).toBe('8');
+
+    // Enter a 10 hour trip (08:00 to 18:00)
+    fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T08:00' } });
+    fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-07T18:00' } });
+
+    // 10 hours trip with 8 hour baseline -> 2 hours = 120 minutes OT
+    await waitFor(() => {
+        expect(screen.getByText('120 mins (2 hrs)')).toBeInTheDocument();
+        expect(screen.getByText('10 hrs')).toBeInTheDocument();
+    });
+
+    // Check normal_ot_minutes input inside details
+    fireEvent.click(screen.getByText('Additional usage observations'));
+    const normalOtInput = screen.getByLabelText('Normal OT (minutes)') as HTMLInputElement;
+    expect(normalOtInput.value).toBe('120');
+    expect(screen.getByText('Equivalent: 2 hrs (2.00 hrs)')).toBeInTheDocument();
+
+    // Manually adjust the OT to 150 minutes
+    fireEvent.change(normalOtInput, { target: { value: '150' } });
+    expect(normalOtInput.value).toBe('150');
+    expect(screen.getByText('Equivalent: 2 hrs 30 mins (2.50 hrs)')).toBeInTheDocument();
+
+    await waitFor(() => {
+        expect(screen.getByText('Reset to calculated (120m)')).toBeInTheDocument();
+    });
+
+    // Click reset to calculated
+    fireEvent.click(screen.getByText('Reset to calculated (120m)'));
+    expect(normalOtInput.value).toBe('120');
+
+    // Change baseline from 8 to 9 hours -> calculated OT becomes 60 mins
+    fireEvent.change(baselineInput, { target: { value: '9' } });
+    await waitFor(() => {
+        expect(screen.getByText('60 mins (1 hr)')).toBeInTheDocument();
+        expect(normalOtInput.value).toBe('60');
+    });
+});
+
+it('calculates total physical distance from odometer readings and allows setting commercial distance', async () => {
+    render(<RunningChartEditor use={use} onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('Start odometer'), { target: { value: '1000' } });
+    fireEvent.change(screen.getByLabelText('End odometer'), { target: { value: '1075.5' } });
+
+    expect(screen.getByText(/Total physical distance:/)).toBeInTheDocument();
+    expect(screen.getByText('75.50 km')).toBeInTheDocument();
+
+    const setCommBtn = screen.getByText('Set commercial distance to 75.50 km');
+    expect(setCommBtn).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Additional usage observations'));
+    const commercialInput = screen.getByLabelText('Commercial distance (km)') as HTMLInputElement;
+    expect(commercialInput.value).toBe('');
+
+    fireEvent.click(setCommBtn);
+    expect(commercialInput.value).toBe('75.50');
+});
+
+it('recalculates overtime when editing an existing draft chart that had calculated OT', async () => {
+    const withDriverUse: VehicleUse = {
+        ...use,
+        customer_agreement: {
+            id: 1,
+            reference: 'AGR-WD',
+            party_name: 'Acme Corp',
+            version: 1,
+            driver_mode: 'with_driver',
+            working_hours: '8.000000',
+        },
+    };
+
+    const existingChart = {
+        id: 20,
+        row_version: 1,
+        reference: 'RC-2026-00020',
+        status: RunningChartStatus.Draft,
+        starts_at: '2026-09-07T08:00:00+05:30',
+        ends_at: '2026-09-07T18:00:00+05:30',
+        starts_at_input: '2026-09-07T08:00:00',
+        ends_at_input: '2026-09-07T18:00:00',
+        normal_ot_minutes: 120, // 10 hours - 8 baseline = 120 mins calculated
+        double_ot_minutes: null,
+        triple_ot_minutes: null,
+        night_outs: null,
+        ac_mode: null,
+        notes: null,
+        driver_observation: null,
+        total_km: null,
+        corrects_chart: null,
+    } as unknown as RunningChart;
+
+    render(<RunningChartEditor use={withDriverUse} chart={existingChart} onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    const normalOtInput = screen.getByLabelText('Normal OT (minutes)') as HTMLInputElement;
+    expect(normalOtInput.value).toBe('120');
+
+    // Change usage end from 18:00 (10 hrs) to 17:00 (9 hrs)
+    // Overtime should automatically update from 120 to 60 mins because it wasn't manually overridden
+    fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-07T17:00' } });
+
+    await waitFor(() => {
+        expect(screen.getByText('60 mins (1 hr)')).toBeInTheDocument();
+        expect(normalOtInput.value).toBe('60');
+    });
+});
+
+it('displays clear message when overtime is redirected to double OT without blank text artifact', async () => {
+    const withDriverUse: VehicleUse = {
+        ...use,
+        customer_agreement: {
+            id: 1,
+            reference: 'AGR-WD',
+            party_name: 'Acme Corp',
+            version: 1,
+            driver_mode: 'with_driver',
+            working_hours: '8.000000',
+        },
+    };
+
+    render(<RunningChartEditor use={withDriverUse} onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    // 10 hour trip -> 120 mins OT
+    fireEvent.change(screen.getByLabelText('Usage start'), { target: { value: '2026-09-07T08:00' } });
+    fireEvent.change(screen.getByLabelText('Usage end'), { target: { value: '2026-09-07T18:00' } });
+
+    await waitFor(() => {
+        expect(screen.getByText('Apply to Double OT')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Apply to Double OT'));
+
+    const normalOtInput = screen.getByLabelText('Normal OT (minutes)') as HTMLInputElement;
+    expect(normalOtInput.value).toBe('');
+
+    const doubleOtInput = screen.getByLabelText('Double OT (minutes)') as HTMLInputElement;
+    expect(doubleOtInput.value).toBe('120');
+
+    // Check redirection message does not contain empty '( mins vs ...)'
+    expect(screen.getByText(/Applied 120 mins to Double OT/)).toBeInTheDocument();
+    expect(screen.queryByText(/Manually adjusted \( mins/)).not.toBeInTheDocument();
+});

@@ -3,12 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { RunningChartsPanel } from './RunningChartsPanel';
-import { listCharts, transitionChart } from './runningChartApi';
+import { exportRunningChartReport, listCharts, transitionChart } from './runningChartApi';
 import { RunningChartAction, RunningChartStatus, CHART_PERMISSION, type RunningChart } from './runningCharts';
 import { VehicleUseStatus, localTimestampValue, timestampWithOffset, type VehicleUse } from './vehicleUse';
 const session = vi.hoisted(() => ({ roles: [] as string[], permissions: [] as string[], permissionsLoaded: true }));
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => session }));
-vi.mock('./runningChartApi', () => ({ listCharts: vi.fn(), transitionChart: vi.fn(), chartHistory: vi.fn(), createChart: vi.fn(), updateChart: vi.fn() }));
+vi.mock('./runningChartApi', () => ({ listCharts: vi.fn(), transitionChart: vi.fn(), chartHistory: vi.fn(), createChart: vi.fn(), updateChart: vi.fn(), exportRunningChartReport: vi.fn() }));
 const use = { id: 3, row_version: 2, status: VehicleUseStatus.InCustody, vehicle: { id: 9, label: 'CAR-1234' } } as VehicleUse;
 const chart = { id: 5, row_version: 2, reference: 'CHART-A', status: RunningChartStatus.Finalized, starts_at: '2026-09-07T09:00:15+05:30', ends_at: '2026-09-07T17:00:30+05:30', total_km: null, corrects_chart: null } as RunningChart;
 beforeEach(() => { configureBusinessTimeZone('Asia/Colombo'); vi.clearAllMocks(); session.permissions = [CHART_PERMISSION.view]; vi.mocked(listCharts).mockResolvedValue({ data: [chart] }); });
@@ -105,5 +105,26 @@ describe('Running Chart review', () => {
   expect(await screen.findByText('CHART-OVERRUN')).toBeInTheDocument();
   expect(screen.getByText('Exceeds return custody')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Finalize usage' })).toBeDisabled();
+ });
+ it('passes owner_agreement.id when printing owner sheet', async () => {
+  const ownerUse = {
+   ...use,
+   starts_at: '2026-09-07T09:00:00+05:30',
+   ends_at: '2026-09-07T18:00:00+05:30',
+   customer_agreement: { id: 10, reference: 'CUST-AGR', party_name: 'Customer Co', version: 1 },
+   owner_agreement: { id: 25, reference: 'OWNER-AGR', party_name: 'Owner LLC', version: 1 },
+  } as unknown as VehicleUse;
+  render(<RunningChartsPanel use={ownerUse} />);
+  expect(await screen.findByRole('button', { name: 'Print Owner Sheet' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Print Owner Sheet' }));
+  expect(exportRunningChartReport).toHaveBeenCalledWith(
+   expect.objectContaining({
+    agreement_id: 25,
+    sheet_mode: 'owner',
+    vehicle_use_id: ownerUse.id,
+   }),
+   'print',
+   undefined,
+  );
  });
 });

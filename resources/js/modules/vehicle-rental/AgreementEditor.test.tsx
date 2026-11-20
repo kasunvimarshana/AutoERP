@@ -71,3 +71,24 @@ it('disables save when reference is cleared while editing an existing agreement'
     fireEvent.change(screen.getByLabelText('Agreement reference'), { target: { value: '' } });
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
 });
+
+it('shows configurable agreed daily working hours input with default 8.0 when selecting with driver', () => {
+    render(<AgreementEditor kind={AgreementKind.Customer} onSaved={() => undefined} onCancel={() => undefined} />);
+
+    expect(screen.queryByLabelText('Agreed daily working hours')).not.toBeInTheDocument();
+
+    const driverSelect = screen.getByRole('combobox', { name: 'Driver arrangement' });
+    fireEvent.change(driverSelect, { target: { value: DriverMode.WithDriver } });
+
+    const whInput = screen.getByPlaceholderText('8.0') as HTMLInputElement;
+    expect(whInput).toBeInTheDocument();
+    expect(whInput.value).toBe('8.0');
+    expect(screen.getByText('Baseline for automatic Running Chart Overtime (OT)')).toBeInTheDocument();
+
+    // Rates grid does not duplicate working_hours
+    expect(screen.queryAllByPlaceholderText('8.0')).toHaveLength(1);
+
+    // Switching back to self-drive hides working hours
+    fireEvent.change(driverSelect, { target: { value: DriverMode.SelfDrive } });
+    expect(screen.queryByPlaceholderText('8.0')).not.toBeInTheDocument();
+});

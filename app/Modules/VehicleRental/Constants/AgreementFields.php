@@ -24,7 +24,7 @@ final class AgreementFields
 
     public const DEPOSIT_REQUIREMENT = 'deposit_requirement';
 
-    public const AMOUNTS = ['base_rate', 'included_km', 'excess_km_rate', 'non_ac_rate', 'front_ac_rate', 'dual_ac_rate', 'driver_rate', 'normal_ot_rate', 'double_ot_rate', 'triple_ot_rate', 'night_out_rate', self::DEPOSIT_REQUIREMENT];
+    public const AMOUNTS = ['base_rate', 'included_km', 'excess_km_rate', 'non_ac_rate', 'front_ac_rate', 'dual_ac_rate', 'driver_rate', 'normal_ot_rate', 'double_ot_rate', 'triple_ot_rate', 'night_out_rate', self::DEPOSIT_REQUIREMENT, 'working_hours'];
 
     public const MUTABLE = ['reference', 'party_id', 'vehicle_id', 'agreed_on', 'executing_on', 'starts_on', 'ends_on', 'basis', 'driver_mode', 'currency_id', 'terms', 'notes'];
 

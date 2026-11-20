@@ -12,7 +12,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { ApiError, toApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { VehicleUseStatus, localTimestampValue, type VehicleUse } from './vehicleUse';
-import { AC_LABELS, CHART_ACTION_CONFIRM_LABELS, CHART_PERMISSION, COUNT_LABELS, DISTANCE_LABELS, DriverIdentitySource, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
+import { AC_LABELS, CHART_ACTION_CONFIRM_LABELS, CHART_PERMISSION, COUNT_LABELS, DISTANCE_LABELS, DriverIdentitySource, formatMinutes, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
 import { exportRunningChartReport, listCharts, transitionChart } from './runningChartApi';
 import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartEditor } from './RunningChartEditor';
@@ -100,7 +100,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     function choose(chart: RunningChart, type: RunningChartAction) { setAction({ chart, type }); setReason(''); setError(null); }
 
     async function handlePrint(mode: 'lessee' | 'owner') {
-        const s = businessDateInputValue(new Date(use.starts_at));
+        const s = use.starts_at ? businessDateInputValue(new Date(use.starts_at)) : businessDateInputValue();
         const e = use.ends_at ? businessDateInputValue(new Date(use.ends_at)) : s;
         setPrinting(mode);
         setError(null);
@@ -110,8 +110,11 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
             preview.document.body.textContent = 'Preparing running chart…';
         }
         try {
+            const agreementId = (mode === 'owner' && use.owner_agreement?.id)
+                ? use.owner_agreement.id
+                : use.customer_agreement.id;
             await exportRunningChartReport({
-                agreement_id: use.customer_agreement.id,
+                agreement_id: agreementId,
                 start_date: s,
                 end_date: e,
                 vehicle_use_id: use.id,
@@ -195,6 +198,11 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
                     )}
                     <p className="text-sm text-slate-700">Driver: {chart.driver ? `${chart.driver.name} · ${chart.driver.reference}` : 'Not recorded'}</p>
                     <p className="text-sm text-slate-700">Total distance: {chart.total_km === null ? 'Not recorded' : <><QuantityDisplay value={chart.total_km} /> km</>}</p>
+                    {chart.normal_ot_minutes !== null && chart.normal_ot_minutes > 0 && (
+                        <p className="text-sm text-indigo-700 font-medium">
+                            Normal Overtime: {chart.normal_ot_minutes} mins ({formatMinutes(chart.normal_ot_minutes)})
+                        </p>
+                    )}
                     {chart.corrects_chart && <p className="text-xs text-blue-600 font-medium">Corrects {chart.corrects_chart.reference}</p>}
                     {chart.corrected_by_chart && <p className="text-xs text-amber-700 font-medium">Corrected by chart {chart.corrected_by_chart.reference}</p>}
                     <div className="flex flex-wrap gap-2">
@@ -239,12 +247,29 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
                                         <dd className="mt-1 font-medium text-slate-900">{chart[key as keyof typeof DISTANCE_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={chart[key as keyof typeof DISTANCE_LABELS] as string} />}</dd>
                                     </div>
                                 ))}
-                                {Object.entries(COUNT_LABELS).map(([key, label]) => (
-                                    <div key={key} className="rounded-lg bg-slate-50 p-2.5">
-                                        <dt className="text-sm text-slate-500">{label}</dt>
-                                        <dd className="mt-1 font-medium text-slate-900">{chart[key as keyof typeof COUNT_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={chart[key as keyof typeof COUNT_LABELS] as number} precision={0} />}</dd>
-                                    </div>
-                                ))}
+                                {Object.entries(COUNT_LABELS).map(([key, label]) => {
+                                    const rawVal = chart[key as keyof typeof COUNT_LABELS];
+                                    const isOt = key.includes('ot_minutes');
+                                    return (
+                                        <div key={key} className="rounded-lg bg-slate-50 p-2.5">
+                                            <dt className="text-sm text-slate-500">{label}</dt>
+                                            <dd className="mt-1 font-medium text-slate-900">
+                                                {rawVal === null ? (
+                                                    'Not recorded'
+                                                ) : isOt && typeof rawVal === 'number' && rawVal > 0 ? (
+                                                    <span>
+                                                        <QuantityDisplay value={rawVal} precision={0} /> mins{' '}
+                                                        <span className="text-xs text-slate-500 font-normal">
+                                                            ({formatMinutes(rawVal)})
+                                                        </span>
+                                                    </span>
+                                                ) : (
+                                                    <QuantityDisplay value={rawVal as number} precision={0} />
+                                                )}
+                                            </dd>
+                                        </div>
+                                    );
+                                })}
                             </dl>
                             <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
                                 <p>Air conditioning: {chart.ac_mode === null ? 'Not recorded' : AC_LABELS[chart.ac_mode]}</p>

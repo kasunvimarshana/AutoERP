@@ -19,6 +19,10 @@ export interface ChartFacts {
 }
 export interface RunningChart extends ChartFacts {
     id: number; reference: string; row_version: number; status: RunningChartStatus; total_km: string | null; corrects_chart: { id: number; reference: string } | null;
+    starts_at_input?: string;
+    ends_at_input?: string;
+    calculated_ot_minutes?: number | null;
+    agreed_baseline_hours?: string | number | null;
     corrected_by_chart?: { id: number; reference: string } | null;
     driver?: { source: DriverIdentitySource; employee_id: number | null; name: string; reference: string } | null;
 }
@@ -27,8 +31,22 @@ export interface ChartHistory { version: number; action: string; reason: string 
 export const CHART_REGISTER_PATH = '/vehicle-rental/running-charts';
 export interface ChartRegisterRow extends RunningChart {
     vehicle_use: { id: number; vehicle_label: string; version?: number; row_version?: number } & Partial<VehicleUse>;
-    customer_agreement: { id?: number; reference: string; party_name: string; driver_mode?: string };
-    owner_agreement: { id?: number; reference: string; party_name: string } | null;
+    customer_agreement: {
+        id?: number;
+        reference: string;
+        party_name: string;
+        driver_mode?: string;
+        working_hours?: string | null;
+        terms?: Record<string, string | null>;
+    };
+    owner_agreement: {
+        id?: number;
+        reference: string;
+        party_name: string;
+        driver_mode?: string;
+        working_hours?: string | null;
+        terms?: Record<string, string | null>;
+    } | null;
     replaces_vehicle: string | null;
 }
 export interface ChartRegisterFilters {
@@ -43,3 +61,43 @@ export interface ChartRegisterFilters {
 }
 
 export const AC_LABELS = { [AirConditioningMode.NonAc]: 'Non-AC', [AirConditioningMode.Front]: 'Front AC', [AirConditioningMode.Dual]: 'Dual AC' };
+
+export const DEFAULT_WORKING_HOURS_BASELINE = 8.0;
+
+export function calculateOtMinutes(
+    startsAt: string,
+    endsAt: string,
+    baselineHours: number | string | null = DEFAULT_WORKING_HOURS_BASELINE,
+): number {
+    const baseline = typeof baselineHours === 'string' ? parseFloat(baselineHours) : (baselineHours ?? 0);
+    if (!startsAt || !endsAt || isNaN(baseline) || baseline <= 0) return 0;
+    try {
+        const startMs = new Date(startsAt).getTime();
+        const endMs = new Date(endsAt).getTime();
+        if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return 0;
+        const tripMinutes = Math.floor((endMs - startMs) / 60000);
+        const baselineMinutes = Math.round(baseline * 60);
+        return Math.max(0, tripMinutes - baselineMinutes);
+    } catch {
+        return 0;
+    }
+}
+
+export function formatMinutes(totalMinutes: number | null | undefined): string {
+    if (totalMinutes === null || totalMinutes === undefined || isNaN(totalMinutes) || totalMinutes <= 0) {
+        return '0 mins';
+    }
+    const total = Math.round(totalMinutes);
+    const hours = Math.floor(total / 60);
+    const mins = total % 60;
+    if (hours === 0) return `${mins} min${mins !== 1 ? 's' : ''}`;
+    if (mins === 0) return `${hours} hr${hours !== 1 ? 's' : ''}`;
+    return `${hours} hr${hours !== 1 ? 's' : ''} ${mins} min${mins !== 1 ? 's' : ''}`;
+}
+
+export function formatMinutesDecimalHours(totalMinutes: number | null | undefined): string {
+    if (totalMinutes === null || totalMinutes === undefined || isNaN(totalMinutes) || totalMinutes <= 0) {
+        return '0.00 hrs';
+    }
+    return `${(totalMinutes / 60).toFixed(2)} hrs`;
+}

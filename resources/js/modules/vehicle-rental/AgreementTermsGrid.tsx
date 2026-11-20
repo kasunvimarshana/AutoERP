@@ -28,5 +28,6 @@ export function AgreementTermsGrid({
 function AgreementTermValue({ currency, term, value }: { currency: string; term: TermKey; value: string | null }) {
     if (value === null) return <>Not specified</>;
     if (term === 'included_km') return <><QuantityDisplay value={value} /> km</>;
+    if (term === 'working_hours') return <><QuantityDisplay value={value} /> hrs/day</>;
     return <MoneyDisplay value={value} currency={currency} />;
 }

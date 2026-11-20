@@ -18,6 +18,7 @@ final class VehicleUseResource extends JsonResource
                 'party_name' => $this->customerAgreement->party_name_snapshot,
                 'version' => $this->customer_agreement_version,
                 'driver_mode' => $this->customerAgreement->driver_mode->value,
+                'working_hours' => $this->customerAgreement->terms['working_hours'] ?? null,
             ],
             'owner_agreement' => $this->ownerAgreement === null ? null : [
                 'id' => $this->owner_agreement_id,
@@ -25,6 +26,7 @@ final class VehicleUseResource extends JsonResource
                 'party_name' => $this->ownerAgreement->party_name_snapshot,
                 'version' => $this->owner_agreement_version,
                 'driver_mode' => $this->ownerAgreement->driver_mode->value,
+                'working_hours' => $this->ownerAgreement->terms['working_hours'] ?? null,
             ],
             'vehicle' => ['id' => $this->vehicle_id, 'label' => $this->vehicle_label_snapshot],
             'replaces_use' => $this->replacesUse === null ? null : ['id' => $this->replacesUse->id, 'vehicle_label' => $this->replacesUse->vehicle_label_snapshot],

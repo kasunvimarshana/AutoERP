@@ -15,7 +15,7 @@ export const TERM_LABELS = {
     base_rate: 'Base rental rate', included_km: 'Included distance (km)', excess_km_rate: 'Excess distance rate per km',
     non_ac_rate: 'Non-AC rate', front_ac_rate: 'Front AC rate', dual_ac_rate: 'Dual AC rate', driver_rate: 'Agreed driver amount',
     normal_ot_rate: 'Normal overtime hourly rate', double_ot_rate: 'Double overtime hourly rate', triple_ot_rate: 'Triple overtime hourly rate',
-    night_out_rate: 'Night-out rate', deposit_requirement: 'Agreed security deposit',
+    night_out_rate: 'Night-out rate', working_hours: 'Agreed daily working hours (hrs/day)', deposit_requirement: 'Agreed security deposit',
 } as const;
 export type TermKey = keyof typeof TERM_LABELS;
 export const CUSTOMER_ONLY_TERM_KEYS = new Set<TermKey>(['deposit_requirement']);
@@ -31,6 +31,7 @@ const OWNER_TERM_LABEL_OVERRIDES: Partial<Record<TermKey, string>> = {
     double_ot_rate: 'Owner double overtime reimbursement hourly rate',
     triple_ot_rate: 'Owner triple overtime reimbursement hourly rate',
     night_out_rate: 'Owner night-out reimbursement rate',
+    working_hours: 'Owner agreed daily working hours (hrs/day)',
 };
 export const visibleTermKeys = (kind: AgreementKind): TermKey[] =>
     (Object.keys(TERM_LABELS) as TermKey[]).filter(key => kind === AgreementKind.Customer || !CUSTOMER_ONLY_TERM_KEYS.has(key));

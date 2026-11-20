@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
@@ -11,7 +11,17 @@ import { formatBusinessDateTimeWithSeconds, businessDateTimeInputValueWithSecond
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
-import { AirConditioningMode, COUNT_LABELS, DISTANCE_LABELS, DRIVER_EMPLOYEE_API, DriverIdentitySource, type ChartFacts, type RunningChart } from './runningCharts';
+import {
+    AirConditioningMode,
+    calculateOtMinutes,
+    COUNT_LABELS,
+    DISTANCE_LABELS,
+    DRIVER_EMPLOYEE_API,
+    DriverIdentitySource,
+    formatMinutes,
+    type ChartFacts,
+    type RunningChart,
+} from './runningCharts';
 import { localTimestampValue, operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, type VehicleUse } from './vehicleUse';
 
 const employees = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(DRIVER_EMPLOYEE_API, params)
@@ -105,21 +115,96 @@ export function RunningChartEditor({
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
 
+    const isWithDriver = use.customer_agreement?.driver_mode === 'with_driver'
+        || use.owner_agreement?.driver_mode === 'with_driver';
+
+    const agreementWorkingHours = (use.customer_agreement?.driver_mode === 'with_driver' ? use.customer_agreement.working_hours : null)
+        ?? (use.owner_agreement?.driver_mode === 'with_driver' ? use.owner_agreement.working_hours : null)
+        ?? use.customer_agreement?.working_hours
+        ?? use.customer_agreement?.terms?.working_hours
+        ?? use.owner_agreement?.working_hours
+        ?? use.owner_agreement?.terms?.working_hours
+        ?? null;
+
+    const initialBaseline = agreementWorkingHours
+        ? String(parseFloat(agreementWorkingHours))
+        : '8.0';
+
+    const [baselineHours, setBaselineHours] = useState<string>(initialBaseline);
+
+    const tripDurationMinutes = (() => {
+        if (!start || !end) return 0;
+        try {
+            const s = new Date(start).getTime();
+            const e = new Date(end).getTime();
+            if (isNaN(s) || isNaN(e) || e <= s) return 0;
+            return Math.floor((e - s) / 60000);
+        } catch {
+            return 0;
+        }
+    })();
+
+    const parsedBaseline = parseFloat(baselineHours);
+    const calculatedOtMinutes = (!isNaN(parsedBaseline) && parsedBaseline > 0 && tripDurationMinutes > 0)
+        ? Math.max(0, tripDurationMinutes - Math.round(parsedBaseline * 60))
+        : 0;
+
+    const initialCalculatedOt = calculateOtMinutes(
+        chart?.starts_at_input ?? chart?.starts_at ?? '',
+        chart?.ends_at_input ?? chart?.ends_at ?? '',
+        initialBaseline
+    );
+
+    const [isOtManuallyAdjusted, setIsOtManuallyAdjusted] = useState<boolean>(() => {
+        if (!chart || chart.normal_ot_minutes === null || chart.normal_ot_minutes === undefined) {
+            return false;
+        }
+        return chart.normal_ot_minutes !== initialCalculatedOt;
+    });
+
+    useEffect(() => {
+        if (!isOtManuallyAdjusted && start && end) {
+            if (calculatedOtMinutes > 0) {
+                setValues(v => ({ ...v, normal_ot_minutes: String(calculatedOtMinutes) }));
+            } else if (values.normal_ot_minutes && values.normal_ot_minutes !== '') {
+                setValues(v => ({ ...v, normal_ot_minutes: '' }));
+            }
+        }
+    }, [calculatedOtMinutes, isOtManuallyAdjusted, start, end]);
+
+    function applyCalculatedOt() {
+        setValues(v => ({ ...v, normal_ot_minutes: calculatedOtMinutes > 0 ? String(calculatedOtMinutes) : '' }));
+        setIsOtManuallyAdjusted(false);
+    }
+
+    function applyToDoubleOt() {
+        setValues(v => ({
+            ...v,
+            normal_ot_minutes: '',
+            double_ot_minutes: calculatedOtMinutes > 0 ? String(calculatedOtMinutes) : '',
+        }));
+        setIsOtManuallyAdjusted(true);
+        setUserToggledOpen(true);
+    }
+
+    const isOtOverridden = isOtManuallyAdjusted && (
+        (values.normal_ot_minutes || '') !== (calculatedOtMinutes > 0 ? String(calculatedOtMinutes) : '')
+    );
+
     const hasErrorInDetails = Boolean(error && Object.keys(error.fields).some(k => [
-        'garage_km', 'commercial_km', 'normal_ot_minutes', 'double_ot_minutes',
+        'garage_km', 'commercial_km', 'double_ot_minutes',
         'triple_ot_minutes', 'night_outs', 'ac_mode', 'driver_identity_source',
         'driver_employee_id', 'driver_name_snapshot', 'driver_reference_snapshot',
         'driver_observation', 'notes',
     ].includes(k)));
 
     const hasDetailsContent = Boolean(
-        use.customer_agreement?.driver_mode === 'with_driver' ||
+        isWithDriver ||
         driverSource ||
         ac ||
         initialDriver?.source ||
         values.garage_km ||
         values.commercial_km ||
-        values.normal_ot_minutes ||
         values.double_ot_minutes ||
         values.triple_ot_minutes ||
         values.night_outs ||
@@ -268,6 +353,11 @@ export function RunningChartEditor({
         } catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
 
+    const startOdo = parseFloat(values.start_odometer);
+    const endOdo = parseFloat(values.end_odometer);
+    const hasValidOdo = !isNaN(startOdo) && !isNaN(endOdo);
+    const calculatedTripDistance = hasValidOdo && endOdo >= startOdo ? (endOdo - startOdo).toFixed(2) : null;
+
     const decimal = (key: string, label: string) => (
         <Input
             key={key}
@@ -278,19 +368,37 @@ export function RunningChartEditor({
             error={error?.fields[key]?.[0]}
         />
     );
-    const count = (key: string, label: string) => (
-        <Input
-            key={key}
-            label={label}
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            value={values[key]}
-            onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))}
-            error={error?.fields[key]?.[0]}
-        />
-    );
+    const count = (key: string, label: string) => {
+        const val = values[key];
+        const num = val ? parseInt(val, 10) : 0;
+        const isOtField = key.includes('ot_minutes');
+
+        return (
+            <div key={key} className="space-y-1">
+                <Input
+                    label={label}
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={val}
+                    onChange={e => {
+                        const nextVal = e.target.value;
+                        setValues(v => ({ ...v, [key]: nextVal }));
+                        if (key === 'normal_ot_minutes') {
+                            setIsOtManuallyAdjusted(true);
+                        }
+                    }}
+                    error={error?.fields[key]?.[0]}
+                />
+                {isOtField && num > 0 && (
+                    <p className="text-[11px] text-slate-500 font-medium px-1">
+                        Equivalent: {formatMinutes(num)} ({(num / 60).toFixed(2)} hrs)
+                    </p>
+                )}
+            </div>
+        );
+    };
 
     return <form aria-label="Running Chart" onSubmit={submit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h4 className="font-semibold">{correction ? `Correct ${chart?.reference}` : chart ? 'Edit draft Running Chart' : 'Record Running Chart'}</h4>
@@ -372,24 +480,184 @@ export function RunningChartEditor({
                     This trip extends into the future. It will be saved as a draft and can be finalized as physical evidence after the trip concludes.
                 </div>
             )}
-            <div className="grid gap-3 sm:grid-cols-2">
-                {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}
-                {decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
+
+            {/* Working Hours & Overtime Baseline Calculation Card */}
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h5 className="text-sm font-semibold text-indigo-950 flex items-center gap-1.5">
+                            <span>Working Hours & Overtime Baseline</span>
+                            {isWithDriver && (
+                                <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] font-medium text-indigo-800">
+                                    With driver
+                                </span>
+                            )}
+                        </h5>
+                        <p className="text-xs text-indigo-700">
+                            Overtime is calculated automatically from actual trip duration against agreed baseline hours.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label htmlFor="rc-baseline-hours" className="text-xs font-medium text-indigo-900 whitespace-nowrap">
+                            Agreed baseline:
+                        </label>
+                        <div className="flex items-center gap-1">
+                            <input
+                                id="rc-baseline-hours"
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                max="24"
+                                value={baselineHours}
+                                onChange={e => setBaselineHours(e.target.value)}
+                                className="w-16 rounded border border-indigo-300 bg-white px-2 py-1 text-xs font-semibold text-indigo-950 shadow-sm focus:border-indigo-500 focus:outline-none"
+                                title="Agreed standard daily working hours baseline"
+                            />
+                            <span className="text-xs text-indigo-800 font-medium">hrs/day</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-xs">
+                    <div className="rounded-lg bg-white p-2.5 shadow-sm border border-indigo-100">
+                        <span className="text-slate-500 block">Trip duration</span>
+                        <span className="font-semibold text-slate-800 text-sm">
+                            {tripDurationMinutes > 0 ? formatMinutes(tripDurationMinutes) : '—'}
+                        </span>
+                    </div>
+                    <div className="rounded-lg bg-white p-2.5 shadow-sm border border-indigo-100">
+                        <span className="text-slate-500 block">Agreed baseline</span>
+                        <span className="font-semibold text-slate-800 text-sm">
+                            {!isNaN(parsedBaseline) && parsedBaseline > 0 ? `${parsedBaseline} hrs (${Math.round(parsedBaseline * 60)}m)` : 'Not set'}
+                        </span>
+                    </div>
+                    <div className="rounded-lg bg-white p-2.5 shadow-sm border border-indigo-100">
+                        <span className="text-slate-500 block">Calculated OT</span>
+                        <span className={`font-semibold text-sm ${calculatedOtMinutes > 0 ? 'text-indigo-700' : 'text-slate-600'}`}>
+                            {calculatedOtMinutes > 0 ? `${calculatedOtMinutes} mins (${formatMinutes(calculatedOtMinutes)})` : '0 mins'}
+                        </span>
+                    </div>
+                    <div className="rounded-lg bg-white p-2.5 shadow-sm border border-indigo-100">
+                        <label htmlFor="rc-normal-ot-minutes" className="text-slate-500 block font-medium">
+                            Normal OT (minutes)
+                        </label>
+                        <div className="mt-1 flex items-center gap-1.5">
+                            <input
+                                id="rc-normal-ot-minutes"
+                                type="number"
+                                min={0}
+                                step={1}
+                                inputMode="numeric"
+                                value={values.normal_ot_minutes}
+                                onChange={e => {
+                                    setValues(v => ({ ...v, normal_ot_minutes: e.target.value }));
+                                    setIsOtManuallyAdjusted(true);
+                                }}
+                                placeholder="0"
+                                className="w-20 rounded border border-indigo-300 bg-white px-2 py-0.5 text-sm font-semibold text-slate-800 shadow-sm focus:border-indigo-500 focus:outline-none"
+                            />
+                        </div>
+                        {values.normal_ot_minutes && parseInt(values.normal_ot_minutes, 10) > 0 ? (
+                            <p className="mt-1 text-[11px] text-slate-500 font-medium px-1">
+                                Equivalent: {formatMinutes(parseInt(values.normal_ot_minutes, 10))} ({(parseInt(values.normal_ot_minutes, 10) / 60).toFixed(2)} hrs)
+                            </p>
+                        ) : null}
+                        {error?.fields.normal_ot_minutes?.[0] && (
+                            <p className="mt-1 text-xs text-rose-600">{error.fields.normal_ot_minutes[0]}</p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-indigo-100 text-xs">
+                    <div className="flex items-center gap-1.5 text-indigo-800">
+                        {values.double_ot_minutes && !values.normal_ot_minutes ? (
+                            <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
+                                <span>↳</span>
+                                <span>Applied {values.double_ot_minutes} mins to Double OT (calculated OT was {calculatedOtMinutes} mins)</span>
+                            </span>
+                        ) : isOtOverridden ? (
+                            <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
+                                <span>✎</span>
+                                <span>Manually adjusted ({values.normal_ot_minutes || '0'} mins vs calculated {calculatedOtMinutes} mins)</span>
+                            </span>
+                        ) : calculatedOtMinutes > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                                <span>✓</span>
+                                <span>Applied {calculatedOtMinutes} mins OT automatically based on {parsedBaseline} hrs baseline</span>
+                            </span>
+                        ) : tripDurationMinutes > 0 ? (
+                            <span className="text-slate-600">
+                                Trip duration is within agreed baseline hours ({parsedBaseline} hrs). No overtime calculated.
+                            </span>
+                        ) : (
+                            <span className="text-slate-500">
+                                Enter usage start and end times to calculate trip duration and overtime.
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        {isOtOverridden && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="!py-0.5 !px-2 !text-xs"
+                                onClick={applyCalculatedOt}
+                            >
+                                Reset to calculated ({calculatedOtMinutes}m)
+                            </Button>
+                        )}
+                        {calculatedOtMinutes > 0 && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="!py-0.5 !px-2 !text-xs"
+                                onClick={applyToDoubleOt}
+                            >
+                                Apply to Double OT
+                            </Button>
+                        )}
+                    </div>
+                </div>
             </div>
+
+            <div className="space-y-1">
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}
+                    {decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
+                </div>
+                {calculatedTripDistance !== null && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-1">
+                        <span>
+                            Total physical distance: <strong className="text-slate-800">{calculatedTripDistance} km</strong>
+                        </span>
+                        {!values.commercial_km && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="!py-0.5 !px-2 !text-xs"
+                                onClick={() => setValues(v => ({ ...v, commercial_km: calculatedTripDistance }))}
+                            >
+                                Set commercial distance to {calculatedTripDistance} km
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
+
             <details
                 open={detailsOpen}
                 onToggle={e => setUserToggledOpen(e.currentTarget.open)}
             >
                 <summary className="cursor-pointer font-medium flex items-center justify-between">
                     <span>Additional usage observations</span>
-                    {use.customer_agreement?.driver_mode === 'with_driver' && (
+                    {isWithDriver && (
                         <span className="text-xs font-normal text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                             Agreement: With driver
                         </span>
                     )}
                 </summary>
                 <div className="space-y-3 pt-3">
-                    {use.customer_agreement?.driver_mode === 'with_driver' && !driverSource && (
+                    {isWithDriver && !driverSource && (
                         <p className="rounded-md border border-sky-200 bg-sky-50 p-2 text-xs text-sky-800">
                             This agreement includes driver services. Select Employee driver or External driver below.
                         </p>
@@ -399,7 +667,7 @@ export function RunningChartEditor({
                         {decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        {Object.entries(COUNT_LABELS).map(([key, label]) => count(key, label))}
+                        {Object.entries(COUNT_LABELS).filter(([key]) => key !== 'normal_ot_minutes').map(([key, label]) => count(key, label))}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} error={error?.fields.ac_mode?.[0]} />

@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\VehicleRental\Constants\RunningChartFields;
+use Modules\VehicleRental\Services\OvertimeCalculator;
 
 final class RunningChartResource extends JsonResource
 {
@@ -15,12 +16,19 @@ final class RunningChartResource extends JsonResource
         $facts = $this->resource->only(RunningChartFields::MUTABLE);
         $facts['driver_identity_source'] = $this->driver_identity_source?->value;
 
+        $baselineHours = $this->vehicleUse?->customerAgreement?->terms['working_hours']
+            ?? $this->vehicleUse?->ownerAgreement?->terms['working_hours']
+            ?? OvertimeCalculator::DEFAULT_BASELINE_HOURS;
+        $calculatedOtMinutes = OvertimeCalculator::calculateOtMinutes($this->starts_at, $this->ends_at, $baselineHours);
+
         return array_merge($facts, [
             'id' => $this->id,
             'row_version' => $this->row_version,
             'status' => $this->status->value,
             'starts_at' => $this->starts_at_input,
             'ends_at' => $this->ends_at_input,
+            'agreed_baseline_hours' => $baselineHours,
+            'calculated_ot_minutes' => $calculatedOtMinutes,
             'total_km' => $this->totalKm(),
             'driver' => $this->driver_identity_source === null ? null : [
                 'source' => $this->driver_identity_source->value,
