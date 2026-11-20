@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
-            $table->foreignId('customer_agreement_id');
-            $table->unsignedBigInteger('customer_agreement_version');
+            $table->foreignId('customer_agreement_id')->nullable();
+            $table->unsignedBigInteger('customer_agreement_version')->nullable();
             $table->foreignId('owner_agreement_id')->nullable();
             $table->unsignedBigInteger('owner_agreement_version')->nullable();
             $table->foreignId('vehicle_id');
@@ -39,6 +39,7 @@ return new class extends Migration
             $table->foreign(['replaces_use_id', 'tenant_id'], 'vru_replacement_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_uses')->restrictOnDelete();
             $table->index(['tenant_id', 'vehicle_id', 'status', 'starts_at'], 'vru_timeline_ix');
             $table->index(['tenant_id', 'organization_unit_id', 'customer_agreement_id'], 'vru_customer_ix');
+            $table->index(['tenant_id', 'organization_unit_id', 'owner_agreement_id'], 'vru_owner_ix');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vru_org_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['customer_agreement_id', 'tenant_id'], 'vru_customer_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_customer_agreements')->restrictOnDelete();
             $table->foreign(['customer_agreement_id', 'customer_agreement_version'], 'vru_customer_revision_fk')->references(['agreement_id', 'row_version'])->on('vehicle_rental_customer_agreements_history')->restrictOnDelete();

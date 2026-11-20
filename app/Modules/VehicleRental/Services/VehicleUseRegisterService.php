@@ -21,7 +21,7 @@ final class VehicleUseRegisterService
     public function list(AgreementContext $context, array $filters, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertUse($context, false);
-        foreach (['from', 'until', 'use_status', 'search'] as $key) {
+        foreach (['from', 'until', 'use_status', 'search', 'kind'] as $key) {
             if (isset($filters[$key]) && is_string($filters[$key]) && trim($filters[$key]) === '') {
                 $filters[$key] = null;
             }
@@ -30,6 +30,7 @@ final class VehicleUseRegisterService
             'search' => ['nullable', 'string', 'max:255'],
             'use_status' => ['nullable', Rule::enum(VehicleUseStatus::class)],
             'from' => ['nullable', 'string'], 'until' => ['nullable', 'string'],
+            'kind' => ['nullable', 'string', 'in:customer,owner,internal'],
         ])->validate();
         $from = empty($filters['from']) ? null : OperationalTime::parse($filters['from'], 'from');
         $until = empty($filters['until']) ? null : OperationalTime::parse($filters['until'], 'until');
@@ -41,6 +42,15 @@ final class VehicleUseRegisterService
         return VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)
             ->with(OperationalFields::USE_RELATIONS)
             ->when($filters['use_status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['kind'] ?? null, function ($q, $kind) {
+                if ($kind === \Modules\VehicleRental\Enums\AgreementKind::Owner->value) {
+                    $q->whereNotNull('owner_agreement_id');
+                } elseif ($kind === \Modules\VehicleRental\Enums\AgreementKind::Customer->value) {
+                    $q->whereNotNull('customer_agreement_id');
+                } elseif ($kind === 'internal') {
+                    $q->whereNull('customer_agreement_id');
+                }
+            })
             ->when($from !== null, fn ($q) => $q->where(fn ($end) => $end->whereNull('ends_at')->orWhere('ends_at', '>', OperationalTime::database($from))))
             ->when($until !== null, fn ($q) => $q->where('starts_at', '<', OperationalTime::database($until)))
             ->when($search !== '', fn ($q) => $q->where(function ($match) use ($search): void {

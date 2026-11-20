@@ -25,7 +25,7 @@ export interface VehicleUse {
     id: number; row_version: number; status: VehicleUseStatus;
     replaces_use?: { id: number; vehicle_label: string } | null;
     replaced_by_use?: { id: number; vehicle_label: string } | null;
-    customer_agreement: AgreementReference; owner_agreement: AgreementReference | null;
+    customer_agreement: AgreementReference | null; owner_agreement: AgreementReference | null;
     vehicle: { id: number; label: string }; starts_at: string; ends_at: string | null;
     handed_over_at: string | null; returned_at: string | null; handover_odometer: string | null; return_odometer: string | null; notes: string | null;
 }
@@ -52,4 +52,4 @@ export function localTimestampValue(value: string): string {
 }
 
 export const USE_REGISTER_PATH = '/vehicle-rental/vehicle-uses';
-export interface VehicleUseRegisterFilters { search?: string; use_status?: VehicleUseStatus; from?: string; until?: string }
+export interface VehicleUseRegisterFilters { search?: string; use_status?: VehicleUseStatus; from?: string; until?: string; kind?: 'customer' | 'owner' | 'internal' }

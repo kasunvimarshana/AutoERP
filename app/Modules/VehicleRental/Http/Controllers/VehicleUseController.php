@@ -32,7 +32,7 @@ final class VehicleUseController
 
     public function register(VehicleUseRegisterRequest $request, VehicleUseRegisterService $register): AnonymousResourceCollection
     {
-        return VehicleUseResource::collection($register->list($request->context(), $request->only(['search', 'use_status', 'from', 'until']), $request->perPage()));
+        return VehicleUseResource::collection($register->list($request->context(), $request->only(['search', 'use_status', 'from', 'until', 'kind']), $request->perPage()));
     }
 
     public function available(VehicleAvailabilityQueryRequest $request): JsonResponse
@@ -65,7 +65,22 @@ final class VehicleUseController
 
     public function store(AgreementRequest $request, int $agreement): JsonResponse
     {
+        $kind = $request->route('kind');
+        if ($kind === AgreementKind::Owner->value) {
+            return (new VehicleUseResource($this->uses->planOwner($request->context(), $agreement, $request->expectedVersion(), $request->only(OperationalFields::MUTABLE_USE))))->response()->setStatusCode(Response::HTTP_CREATED);
+        }
+
         return (new VehicleUseResource($this->uses->plan($request->context(), $agreement, $request->expectedVersion(), $request->only(OperationalFields::MUTABLE_USE))))->response()->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    public function storeOwner(AgreementRequest $request, int $agreement): JsonResponse
+    {
+        return (new VehicleUseResource($this->uses->planOwner($request->context(), $agreement, $request->expectedVersion(), $request->only(OperationalFields::MUTABLE_USE))))->response()->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    public function storeInternal(AgreementRequest $request): JsonResponse
+    {
+        return (new VehicleUseResource($this->uses->planInternal($request->context(), $request->only(OperationalFields::MUTABLE_USE))))->response()->setStatusCode(Response::HTTP_CREATED);
     }
 
     public function show(AgreementRequest $request, int $use): VehicleUseResource

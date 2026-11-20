@@ -18,7 +18,7 @@ final class OperationalFields
 
     public const RETURN_STATUS_REASON = 'Rental return: ';
 
-    public const MUTABLE_USE = ['vehicle_id', 'owner_agreement_id', 'starts_at', 'ends_at', 'notes'];
+    public const MUTABLE_USE = ['vehicle_id', 'owner_agreement_id', 'customer_agreement_id', 'starts_at', 'ends_at', 'notes'];
 
     public const USE_RELATIONS = ['customerAgreement', 'ownerAgreement', 'vehicle', 'replacesUse', 'replacedByUse'];
 }

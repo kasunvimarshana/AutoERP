@@ -34,7 +34,7 @@ final class RunningChartRegisterService
             'customer_agreement_id' => ['nullable', 'integer', 'min:1'],
             'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_use_id' => ['nullable', 'integer', 'min:1'],
-            'kind' => ['nullable', 'string', Rule::enum(AgreementKind::class)],
+            'kind' => ['nullable', 'string', 'in:customer,owner,internal'],
         ])->validate();
         $from = empty($filters['from']) ? null : OperationalTime::parse($filters['from'], 'from');
         $until = empty($filters['until']) ? null : OperationalTime::parse($filters['until'], 'until');
@@ -55,7 +55,9 @@ final class RunningChartRegisterService
                 if ($kind === AgreementKind::Owner->value) {
                     $q->whereHas('vehicleUse', fn ($u) => $u->whereNotNull('owner_agreement_id'));
                 } elseif ($kind === AgreementKind::Customer->value) {
-                    $q->whereHas('vehicleUse', fn ($u) => $u->whereNull('owner_agreement_id'));
+                    $q->whereHas('vehicleUse', fn ($u) => $u->whereNotNull('customer_agreement_id'));
+                } elseif ($kind === 'internal') {
+                    $q->whereHas('vehicleUse', fn ($u) => $u->whereNull('customer_agreement_id'));
                 }
             })
             ->when($search !== '', fn ($q) => $q->where(function ($match) use ($search): void {

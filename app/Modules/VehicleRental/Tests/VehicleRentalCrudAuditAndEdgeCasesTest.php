@@ -751,6 +751,9 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $this->assertCount(1, $byKindOwner);
 
         $byKindCustomer = $this->getJson(self::ROOT.'/running-charts?kind=customer')->assertOk()->json('data');
-        $this->assertCount(0, $byKindCustomer);
+        $this->assertCount(1, $byKindCustomer);
+
+        $byKindInternal = $this->getJson(self::ROOT.'/running-charts?kind=internal')->assertOk()->json('data');
+        $this->assertCount(0, $byKindInternal);
     }
 }

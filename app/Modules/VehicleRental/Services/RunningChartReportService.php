@@ -37,8 +37,8 @@ final class RunningChartReportService
     {
         $this->authorization->assertChart($context, \Modules\VehicleRental\Enums\RunningChartAction::Create, false);
 
-        if (empty($params['agreement_id'])) {
-            throw ValidationException::withMessages(['agreement_id' => ['Specify the rental agreement to generate the running chart sheet.']]);
+        if (empty($params['agreement_id']) && empty($params['vehicle_use_id'])) {
+            throw ValidationException::withMessages(['agreement_id' => ['Specify the rental agreement or vehicle use to generate the running chart sheet.']]);
         }
         if (empty($params['start_date']) || empty($params['end_date'])) {
             throw ValidationException::withMessages(['start_date' => ['Specify the start date and end date for the running chart sheet.']]);
@@ -55,43 +55,62 @@ final class RunningChartReportService
             throw ValidationException::withMessages(['end_date' => ['End date must be on or after start date.']]);
         }
 
-        $agreementId = (int) $params['agreement_id'];
+        $agreementId = (int) ($params['agreement_id'] ?? 0);
+        $selectedUseId = ! empty($params['vehicle_use_id']) ? (int) $params['vehicle_use_id'] : null;
         $sheetMode = (string) ($params['sheet_mode'] ?? 'lessee');
 
         /** @var CustomerAgreement|null $customerAgreement */
-        $customerAgreement = CustomerAgreement::query()
-            ->forContext($context->tenantId, $context->organizationUnitId)
-            ->with([
-                'customer',
-                'tenant',
-                'vehicleUses.vehicle',
-                'vehicleUses.ownerAgreement.party',
-                'vehicleUses.replacesUse.vehicle',
-            ])
-            ->find($agreementId);
-
+        $customerAgreement = null;
         /** @var OwnerAgreement|null $ownerAgreement */
         $ownerAgreement = null;
+        $primaryUse = null;
+        $useIds = [];
 
-        if ($customerAgreement === null) {
-            $ownerAgreement = OwnerAgreement::query()
+        if ($agreementId > 0) {
+            $customerAgreement = CustomerAgreement::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->with([
-                    'party',
+                    'customer',
                     'tenant',
-                    'vehicle',
+                    'vehicleUses.vehicle',
+                    'vehicleUses.ownerAgreement.party',
+                    'vehicleUses.replacesUse.vehicle',
                 ])
                 ->find($agreementId);
 
-            if ($ownerAgreement === null) {
-                throw ValidationException::withMessages(['agreement_id' => ['Specified rental agreement was not found.']]);
+            if ($customerAgreement === null) {
+                $ownerAgreement = OwnerAgreement::query()
+                    ->forContext($context->tenantId, $context->organizationUnitId)
+                    ->with([
+                        'party',
+                        'tenant',
+                        'vehicle',
+                    ])
+                    ->find($agreementId);
+
+                if ($ownerAgreement === null && $selectedUseId === null) {
+                    throw ValidationException::withMessages(['agreement_id' => ['Specified rental agreement was not found.']]);
+                }
+                $sheetMode = 'owner';
             }
-            $sheetMode = 'owner';
         }
 
-        $selectedUseId = ! empty($params['vehicle_use_id']) ? (int) $params['vehicle_use_id'] : null;
+        if ($customerAgreement === null && $ownerAgreement === null) {
+            if ($selectedUseId === null) {
+                throw ValidationException::withMessages(['agreement_id' => ['Specified rental agreement or vehicle use was not found.']]);
+            }
+            $primaryUse = VehicleUse::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->with(['customerAgreement.customer', 'ownerAgreement.party', 'vehicle'])
+                ->findOrFail($selectedUseId);
 
-        if ($customerAgreement !== null) {
+            $useIds = [$primaryUse->id];
+            $customerAgreement = $primaryUse->customerAgreement;
+            $ownerAgreement = $primaryUse->ownerAgreement;
+            if ($ownerAgreement !== null && $customerAgreement === null) {
+                $sheetMode = 'owner';
+            }
+        } elseif ($customerAgreement !== null) {
             $useIds = $selectedUseId !== null
                 ? [$selectedUseId]
                 : $customerAgreement->vehicleUses->pluck('id')->all();
@@ -128,6 +147,7 @@ final class RunningChartReportService
         }
 
         $isOwnerSheet = $sheetMode === 'owner';
+        $isInternalSheet = $customerAgreement === null && $ownerAgreement === null;
 
         // Vehicle registration label
         $agreementVehicleNo = $primaryUse?->vehicle_label_snapshot
@@ -139,23 +159,25 @@ final class RunningChartReportService
 
         // Header metadata
         $companyName = $customerAgreement?->tenant?->name ?? $ownerAgreement?->tenant?->name ?? (config('app.name') ?: 'AutoERP');
-        $reportTitle = $isOwnerSheet
-            ? "RUNNING CHART FOR VEHICLE OWNER - Monthly Basis Vehicles - With Lessee's Detail"
-            : 'RUNNING CHART FOR LESSEE - Monthly Basis Vehicles';
+        $reportTitle = $isInternalSheet
+            ? 'RUNNING CHART FOR COMPANY FLEET - Internal Operations'
+            : ($isOwnerSheet
+                ? "RUNNING CHART FOR VEHICLE OWNER - Monthly Basis Vehicles - With Lessee's Detail"
+                : 'RUNNING CHART FOR LESSEE - Monthly Basis Vehicles');
 
         $lessorParty = $ownerAgreement?->party;
         $lessorId = $lessorParty !== null
             ? ($lessorParty->code ? ($lessorParty->code.' - '.$lessorParty->name) : $lessorParty->name)
-            : 'N/A';
-        $ownerName = $lessorParty?->name ?? 'N/A';
+            : ($isInternalSheet ? 'COMPANY FLEET' : 'N/A');
+        $ownerName = $lessorParty?->name ?? ($isInternalSheet ? 'COMPANY OWNED' : 'N/A');
 
         $agreementNumber = $isOwnerSheet && $ownerAgreement !== null
             ? $ownerAgreement->reference
-            : ($customerAgreement?->reference ?? $ownerAgreement?->reference ?? 'N/A');
+            : ($customerAgreement?->reference ?? $ownerAgreement?->reference ?? ($isInternalSheet ? 'INTERNAL / FLEET' : 'N/A'));
 
         $clientName = $customerAgreement?->customer?->name
             ?? $customerAgreement?->party_name_snapshot
-            ?? 'VARIOUS LESSEES';
+            ?? ($primaryUse && $primaryUse->customer_agreement_id === null ? 'INTERNAL / COMPANY USE' : 'VARIOUS LESSEES');
 
         // Load all running chart logs in period
         $startUtc = $start->setTimezone(OperationalFields::UTC);
@@ -297,7 +319,7 @@ final class RunningChartReportService
 
                 $dayLessee = $firstChart->vehicleUse?->customerAgreement?->customer?->name
                     ?? $firstChart->vehicleUse?->customerAgreement?->party_name_snapshot
-                    ?? ($customerAgreement?->customer?->name ?? $customerAgreement?->party_name_snapshot ?? '');
+                    ?? ($customerAgreement?->customer?->name ?? $customerAgreement?->party_name_snapshot ?? ($isOwnerSheet && $firstChart->vehicleUse?->customer_agreement_id === null ? 'INTERNAL / COMPANY USE' : ''));
 
                 $rows[] = [
                     'date' => $current->format('d/m/Y'),

@@ -63,10 +63,10 @@ export default function RunningChartRegisterPage() {
         const s = new URLSearchParams(window.location.search).get('status') ?? new URLSearchParams(window.location.search).get('chart_status');
         return Object.values(RunningChartStatus).includes(s as RunningChartStatus) ? (s as RunningChartStatus) : '';
     });
-    const [kind, setKind] = useState<'customer' | 'owner' | ''>(() => {
+    const [kind, setKind] = useState<'customer' | 'owner' | 'internal' | ''>(() => {
         if (typeof window === 'undefined') return '';
         const k = new URLSearchParams(window.location.search).get('kind');
-        return k === 'customer' || k === 'owner' ? k : '';
+        return k === 'customer' || k === 'owner' || k === 'internal' ? k : '';
     });
     const [from, setFrom] = useState(() => {
         if (typeof window === 'undefined') return '';
@@ -89,7 +89,7 @@ export default function RunningChartRegisterPage() {
         if (statusParam && Object.values(RunningChartStatus).includes(statusParam as RunningChartStatus)) {
             initial.chart_status = statusParam as RunningChartStatus;
         }
-        if (kindParam === 'customer' || kindParam === 'owner') {
+        if (kindParam === 'customer' || kindParam === 'owner' || kindParam === 'internal') {
             initial.kind = kindParam;
         }
         if (fromParam) {
@@ -379,7 +379,7 @@ export default function RunningChartRegisterPage() {
         try {
             const agreementId = (mode === 'owner' && row.owner_agreement?.id)
                 ? row.owner_agreement.id
-                : row.customer_agreement.id!;
+                : (row.customer_agreement?.id ?? row.owner_agreement?.id ?? 0);
             await exportRunningChartReport({
                 agreement_id: agreementId,
                 start_date: s,
@@ -397,9 +397,10 @@ export default function RunningChartRegisterPage() {
 
     const statusOptions = Object.values(RunningChartStatus).map(value => ({ value, label: CHART_LABELS[value] }));
     const kindOptions = [
-        { value: '', label: 'All supplies' },
-        { value: 'customer', label: 'Company supply only' },
-        { value: 'owner', label: 'Owner-supplied only' },
+        { value: '', label: 'All operations' },
+        { value: 'customer', label: 'Customer rentals' },
+        { value: 'owner', label: 'Owner-leased vehicles' },
+        { value: 'internal', label: 'Internal company operations' },
     ];
 
     return (
@@ -469,7 +470,7 @@ export default function RunningChartRegisterPage() {
                                     onChange={e => setSelectedCustodyId(e.target.value ? Number(e.target.value) : '')}
                                     options={custodyUses.map(u => ({
                                         value: u.id,
-                                        label: `${u.vehicle.label} · Customer: ${u.customer_agreement.party_name} (${u.customer_agreement.reference}) [${USE_LABELS[u.status]}]${u.owner_agreement ? ` · Owner: ${u.owner_agreement.party_name}` : ' (Company supply)'}`,
+                                        label: `${u.vehicle.label} · ${u.customer_agreement ? `Customer: ${u.customer_agreement.party_name} (${u.customer_agreement.reference})` : 'Internal Company Use'} [${USE_LABELS[u.status]}]${u.owner_agreement ? ` · Owner: ${u.owner_agreement.party_name}` : ' (Company supply)'}`,
                                     }))}
                                 />
                                 <div className="flex flex-wrap gap-2">
@@ -551,7 +552,7 @@ export default function RunningChartRegisterPage() {
                         label="Commercial side"
                         options={kindOptions}
                         value={kind}
-                        onChange={event => setKind(event.target.value as 'customer' | 'owner' | '')}
+                        onChange={event => setKind(event.target.value as 'customer' | 'owner' | 'internal' | '')}
                     />
                     <div className="hidden md:block" />
                     <Input
@@ -637,14 +638,20 @@ export default function RunningChartRegisterPage() {
 
                                 <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
                                     <p>
-                                        Customer: {row.customer_agreement.party_name} ·{' '}
-                                        <Link
-                                            to={`/vehicle-rental/customer/agreements?search=${encodeURIComponent(row.customer_agreement.reference)}`}
-                                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                                            title="Review customer agreement"
-                                        >
-                                            {row.customer_agreement.reference}
-                                        </Link>
+                                        {row.customer_agreement ? (
+                                            <>
+                                                Customer: {row.customer_agreement.party_name} ·{' '}
+                                                <Link
+                                                    to={`/vehicle-rental/customer/agreements?search=${encodeURIComponent(row.customer_agreement.reference)}`}
+                                                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                    title="Review customer agreement"
+                                                >
+                                                    {row.customer_agreement.reference}
+                                                </Link>
+                                            </>
+                                        ) : (
+                                            <>Customer: <span className="font-medium text-slate-800">Internal Company Use</span></>
+                                        )}
                                     </p>
                                     <p>
                                         {row.owner_agreement ? (
@@ -694,7 +701,7 @@ export default function RunningChartRegisterPage() {
                                         {selected === row.id ? 'Hide details' : 'Review ' + row.reference}
                                     </Button>
 
-                                    {row.customer_agreement.id && (
+                                    {row.customer_agreement?.id && (
                                         <Button
                                             type="button"
                                             variant="secondary"
@@ -715,6 +722,18 @@ export default function RunningChartRegisterPage() {
                                             onClick={() => void handlePrint(row, 'owner')}
                                         >
                                             Print Owner Sheet
+                                        </Button>
+                                    )}
+
+                                    {!row.customer_agreement && !row.owner_agreement && (
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            disabled={printing !== null}
+                                            loading={printing?.id === row.id && printing.mode === 'lessee'}
+                                            onClick={() => void handlePrint(row, 'lessee')}
+                                        >
+                                            Print Fleet Sheet
                                         </Button>
                                     )}
 

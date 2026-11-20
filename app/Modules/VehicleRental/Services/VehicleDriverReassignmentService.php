@@ -140,9 +140,10 @@ final class VehicleDriverReassignmentService
             $cutoverAt = (string) ($input['cutover_at'] ?? $input['starts_at'] ?? now()->toDateTimeString());
             $returnOdometer = (string) ($input['return_odometer'] ?? $currentUse->handover_odometer ?? '0');
             $reason = (string) ($input['reason'] ?? 'Vehicle breakdown or operational swap');
-            $newVehicleId = (int) ($input['new_vehicle_id'] ?? $input['vehicle_id']);
-            $newOwnerAgreementId = ! empty($input['new_owner_agreement_id'] ?? $input['owner_agreement_id']) ? (int) ($input['new_owner_agreement_id'] ?? $input['owner_agreement_id']) : null;
-            $newHandoverOdometer = (string) ($input['new_handover_odometer'] ?? $input['handover_odometer'] ?? '0');
+            $newVehicleId = (int) (($input['new_vehicle_id'] ?? null) ?? ($input['vehicle_id'] ?? 0));
+            $rawOwnerId = ($input['new_owner_agreement_id'] ?? null) ?? ($input['owner_agreement_id'] ?? null);
+            $newOwnerAgreementId = ! empty($rawOwnerId) ? (int) $rawOwnerId : null;
+            $newHandoverOdometer = (string) (($input['new_handover_odometer'] ?? null) ?? ($input['handover_odometer'] ?? null) ?? '0');
 
             // 1. Transition previous use to Returned
             if ($currentUse->status === VehicleUseStatus::InCustody) {
@@ -155,16 +156,26 @@ final class VehicleDriverReassignmentService
             }
 
             // 2. Plan replacement vehicle use
-            $customerAgreement = $currentUse->customerAgreement()->lockForUpdate()->first();
-            $customerVersion = (int) ($customerAgreement?->row_version ?? AgreementFields::INITIAL_VERSION);
+            if ($currentUse->customer_agreement_id !== null) {
+                $customerAgreement = $currentUse->customerAgreement()->lockForUpdate()->first();
+                $customerVersion = (int) ($customerAgreement?->row_version ?? AgreementFields::INITIAL_VERSION);
 
-            $replacementUse = $this->vehicleUses->plan($context, (int) $currentUse->customer_agreement_id, $customerVersion, [
-                'vehicle_id' => $newVehicleId,
-                'owner_agreement_id' => $newOwnerAgreementId,
-                'starts_at' => $cutoverAt,
-                'ends_at' => $currentUse->ends_at_input,
-                'notes' => 'Replacement for Use #'.$currentUse->id.' · '.$reason,
-            ], $currentUse->id);
+                $replacementUse = $this->vehicleUses->plan($context, (int) $currentUse->customer_agreement_id, $customerVersion, [
+                    'vehicle_id' => $newVehicleId,
+                    'owner_agreement_id' => $newOwnerAgreementId,
+                    'starts_at' => $cutoverAt,
+                    'ends_at' => $currentUse->ends_at_input,
+                    'notes' => 'Replacement for Use #'.$currentUse->id.' · '.$reason,
+                ], $currentUse->id);
+            } else {
+                $replacementUse = $this->vehicleUses->planInternal($context, [
+                    'vehicle_id' => $newVehicleId,
+                    'owner_agreement_id' => $newOwnerAgreementId,
+                    'starts_at' => $cutoverAt,
+                    'ends_at' => $currentUse->ends_at_input,
+                    'notes' => 'Replacement for Use #'.$currentUse->id.' · '.$reason,
+                ], $currentUse->id);
+            }
 
             // 3. Automatically Handover the replacement vehicle use
             $this->vehicleUses->transition($context, $replacementUse->id, (int) $replacementUse->row_version, VehicleUseAction::Handover, [

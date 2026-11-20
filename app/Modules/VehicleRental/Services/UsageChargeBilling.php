@@ -188,7 +188,7 @@ final class UsageChargeBilling
         $chart = $this->charts->find($context, $chartId);
         $field = $kind->value.'_agreement_id';
         if ($chart->vehicleUse->$field === null) {
-            throw ValidationException::withMessages(['agreement' => ['This vehicle use has no owner agreement.']]);
+            throw ValidationException::withMessages(['agreement' => ["This vehicle use has no {$kind->value} agreement."]]);
         }
 
         return [$chart, $this->agreements->find($kind, $context, (int) $chart->vehicleUse->$field)];

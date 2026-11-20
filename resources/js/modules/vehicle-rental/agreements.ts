@@ -39,6 +39,7 @@ export const termLabel = (kind: AgreementKind, key: TermKey): string =>
     kind === AgreementKind.Owner ? OWNER_TERM_LABEL_OVERRIDES[key] ?? TERM_LABELS[key] : TERM_LABELS[key];
 export interface Agreement {
     id: number; reference: string; row_version: number; status: AgreementStatus; basis: RentalBasis; driver_mode: DriverMode;
+    kind?: AgreementKind;
     supersedes_agreement?: { id: number; reference: string } | null;
     successor_agreement?: { id: number; reference: string; status: AgreementStatus } | null;
     party: NamedResource; currency: NamedResource & { code: string }; vehicle?: { id: number; vehicle_number: string; registration_number: string | null };

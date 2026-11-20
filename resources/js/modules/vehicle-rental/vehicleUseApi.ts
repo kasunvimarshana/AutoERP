@@ -10,7 +10,19 @@ const agreementUses = (id: number, kind: AgreementKind = AgreementKind.Customer)
 export const listVehicleUses = (agreement: number, page: number, signal?: AbortSignal, kind: AgreementKind = AgreementKind.Customer) =>
     apiClient.get<ApiCollection<VehicleUse>>(agreementUses(agreement, kind), { params: { page, per_page: PAGE_SIZE }, signal }).then(r => r.data);
 export const getVehicleUse = (id: number, signal?: AbortSignal) => apiClient.get<ApiResource<VehicleUse>>(`${USE_API}/${id}`, { signal }).then(r => r.data.data);
-export const planVehicleUse = (agreement: Agreement, input: { vehicle_id: number; owner_agreement_id: number | null; starts_at: string; ends_at: string | null; notes: string | null }) => apiClient.post<ApiResource<VehicleUse>>(agreementUses(agreement.id), { ...input, expected_version: agreement.row_version }).then(r => r.data.data);
+export const planVehicleUse = (
+    agreement: Agreement,
+    input: { vehicle_id: number; owner_agreement_id: number | null; customer_agreement_id?: number | null; starts_at: string; ends_at: string | null; notes: string | null },
+    kind: AgreementKind = agreement.kind ?? AgreementKind.Customer,
+) => apiClient.post<ApiResource<VehicleUse>>(agreementUses(agreement.id, kind), { ...input, expected_version: agreement.row_version }).then(r => r.data.data);
+export const planInternalVehicleUse = (input: {
+    vehicle_id: number;
+    owner_agreement_id?: number | null;
+    customer_agreement_id?: number | null;
+    starts_at: string;
+    ends_at?: string | null;
+    notes?: string | null;
+}) => apiClient.post<ApiResource<VehicleUse>>(`${USE_API}/internal`, input).then(r => r.data.data);
 export const transitionVehicleUse = (use: VehicleUse, action: VehicleUseAction, input: { occurred_at?: string; odometer?: string | null; reason: string }) => apiClient.post<ApiResource<VehicleUse>>(`${USE_API}/${use.id}/${action}`, { ...input, expected_version: use.row_version }).then(r => r.data.data);
 export const vehicleUseHistory = (id: number, page: number, signal?: AbortSignal) => apiClient.get<ApiCollection<VehicleUseHistory>>(`${USE_API}/${id}/history`, { params: { page, per_page: PAGE_SIZE }, signal }).then(r => r.data);
 

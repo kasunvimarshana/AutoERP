@@ -36,10 +36,13 @@ final class RentalIncidentService
         $pattern = '%'.$search.'%';
 
         return VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->with('customerAgreement')
+            ->with(['customerAgreement', 'ownerAgreement'])
             ->when($search !== '', fn ($query) => $query->where(function ($match) use ($pattern): void {
                 $match->where('vehicle_label_snapshot', 'like', $pattern)
                     ->orWhereHas('customerAgreement', fn ($agreement) => $agreement
+                        ->where('reference', 'like', $pattern)
+                        ->orWhere('party_name_snapshot', 'like', $pattern))
+                    ->orWhereHas('ownerAgreement', fn ($agreement) => $agreement
                         ->where('reference', 'like', $pattern)
                         ->orWhere('party_name_snapshot', 'like', $pattern));
             }))
@@ -84,7 +87,8 @@ final class RentalIncidentService
                     ->orWhereHas('vehicleUse', function ($use) use ($pattern): void {
                         $use->where('vehicle_label_snapshot', 'like', $pattern)
                             ->orWhereHas('vehicle', fn ($v) => $v->where('vehicle_number', 'like', $pattern)->orWhere('registration_number', 'like', $pattern))
-                            ->orWhereHas('customerAgreement', fn ($agr) => $agr->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));
+                            ->orWhereHas('customerAgreement', fn ($agr) => $agr->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern))
+                            ->orWhereHas('ownerAgreement', fn ($agr) => $agr->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));
                     });
             });
         }

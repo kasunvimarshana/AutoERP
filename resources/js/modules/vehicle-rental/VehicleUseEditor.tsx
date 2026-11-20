@@ -11,13 +11,26 @@ import { Textarea } from '@/shared/components/Textarea';
 import { formatBusinessDateTime, businessDateTimeInputValueWithSeconds } from '@/shared/utils/businessDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { AGREEMENT_API, type Agreement } from './agreements';
+import { AGREEMENT_API, AgreementKind, type Agreement } from './agreements';
 import { planVehicleUse, replaceVehicleUse } from './vehicleUseApi';
 import { operationalTimeZoneLabel, timestampWithOffset, OPERATIONAL_TIME_STEP_SECONDS, type VehicleUse } from './vehicleUse';
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params).then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number || row.vehicle_number) })) }));
-export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onSaved, onCancel }: { agreement: Agreement; replacement?: VehicleUse; initialVehicleId?: number; onSaved: () => void; onCancel: () => void }) {
-    const [vehicle, setVehicle] = useState<NamedResource | null>(null);
-    const [owner, setOwner] = useState<NamedResource | null>(null);
+export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onSaved, onCancel, kind = agreement.kind ?? AgreementKind.Customer }: { agreement: Agreement; replacement?: VehicleUse; initialVehicleId?: number; onSaved: () => void; onCancel: () => void; kind?: AgreementKind }) {
+    const [vehicle, setVehicle] = useState<NamedResource | null>(() => {
+        if (kind === AgreementKind.Owner && agreement.vehicle?.id) {
+            return {
+                id: agreement.vehicle.id,
+                name: agreement.vehicle.registration_number || agreement.vehicle.vehicle_number || `Vehicle #${agreement.vehicle.id}`,
+            };
+        }
+        return null;
+    });
+    const [owner, setOwner] = useState<NamedResource | null>(() => {
+        if (kind === AgreementKind.Owner) {
+            return { id: agreement.id, name: agreement.reference };
+        }
+        return null;
+    });
     const [company, setCompany] = useState(false);
     const [sourceCount, setSourceCount] = useState<number | null>(null);
     const [oldOdometer, setOldOdometer] = useState(''); const [newOdometer, setNewOdometer] = useState('');
@@ -76,6 +89,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
         );
     }, [vehicle, start, end, agreement.id]);
     useEffect(() => {
+        if (kind === AgreementKind.Owner) return;
         if (!company && vehicle && start && !owner) {
             let active = true;
             const controller = new AbortController();
@@ -185,6 +199,8 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                     return_odometer: oldOdometer.trim() || null,
                     handover_odometer: newOdometer.trim() || null,
                 });
+            } else if (kind === AgreementKind.Owner) {
+                await planVehicleUse(agreement, input, AgreementKind.Owner);
             } else {
                 await planVehicleUse(agreement, input);
             }
@@ -192,8 +208,8 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
         }
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
-    return <form onSubmit={submit} className="space-y-4 rounded-lg border p-4" aria-label={replacement ? "Replace vehicle" : "Assign vehicle"}>
-        <h3 className="font-semibold">{replacement ? `Replace ${replacement.vehicle.label}` : `Assign a vehicle to ${agreement.reference}`}</h3>
+    return <form onSubmit={submit} className="space-y-4 rounded-lg border p-4" aria-label={replacement ? "Replace vehicle" : kind === AgreementKind.Owner ? "Deploy vehicle for internal use" : "Assign vehicle"}>
+        <h3 className="font-semibold">{replacement ? `Replace ${replacement.vehicle.label}` : kind === AgreementKind.Owner ? `Deploy vehicle for internal use · ${agreement.reference}` : `Assign a vehicle to ${agreement.reference}`}</h3>
         <ErrorAlert error={error} inline />
         <p className="text-sm text-slate-600">Times use {operationalTimeZoneLabel()}. The planned end is the handover boundary for the next use, not a billing day-count rule.</p>
         <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
@@ -246,46 +262,54 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 hint={agreement.ends_on ? `Agreement ends: ${agreement.ends_on}` : undefined}
                 error={error?.fields.ends_at?.[0]}
             />
-            <label className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><input className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" checked={company} onChange={event => { setCompany(event.target.checked); setOwner(null); setSourceCount(null); }} /><span>Company-owned vehicle</span></label>
-            {company && <p className="text-sm text-slate-600 sm:col-span-2">Vehicle ownership records must cover the entire period. No owner payable is created for company supply.</p>}
-            {!company && vehicle && !start && <p className="text-sm text-slate-600 sm:col-span-2">Enter planned handover to find owner agreements covering it.</p>}
-            {!company && vehicle && start && (
-                <div className="space-y-1 sm:col-span-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700">Owner agreement</span>
-                        {!owner && (
-                            <button
-                                type="button"
-                                className="text-xs font-medium text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
-                                onClick={async () => {
-                                    try {
-                                        const res = await sources({ search: '', page: 1, perPage: 10, signal: new AbortController().signal });
-                                        if (res.data.length > 0) {
-                                            setOwner(res.data[0]);
-                                        }
-                                    } catch {}
-                                }}
-                            >
-                                Auto-select owner agreement
-                            </button>
-                        )}
-                    </div>
-                    {!owner && sourceCount === 0 && (
-                        <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
-                            No active owner agreement covers this vehicle on the handover date. If this vehicle is owned by the company, select &quot;Company-owned vehicle&quot; above.
-                        </p>
-                    )}
-                    <LookupSelect
-                        label="Owner agreement"
-                        value={owner}
-                        onChange={setOwner}
-                        search={sources}
-                        loadOnOpen
-                        minSearchLength={0}
-                        required
-                        error={error?.fields.owner_agreement_id?.[0]}
-                    />
+            {kind === AgreementKind.Owner ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 sm:col-span-2">
+                    Vehicle supply is covered by this owner agreement ({agreement.reference} · {agreement.party.name}). No customer is required for internal operations.
                 </div>
+            ) : (
+                <>
+                    <label className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"><input className="h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" checked={company} onChange={event => { setCompany(event.target.checked); setOwner(null); setSourceCount(null); }} /><span>Company-owned vehicle</span></label>
+                    {company && <p className="text-sm text-slate-600 sm:col-span-2">Vehicle ownership records must cover the entire period. No owner payable is created for company supply.</p>}
+                    {!company && vehicle && !start && <p className="text-sm text-slate-600 sm:col-span-2">Enter planned handover to find owner agreements covering it.</p>}
+                    {!company && vehicle && start && (
+                        <div className="space-y-1 sm:col-span-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-slate-700">Owner agreement</span>
+                                {!owner && (
+                                    <button
+                                        type="button"
+                                        className="text-xs font-medium text-blue-600 hover:text-blue-800 underline disabled:opacity-50"
+                                        onClick={async () => {
+                                            try {
+                                                const res = await sources({ search: '', page: 1, perPage: 10, signal: new AbortController().signal });
+                                                if (res.data.length > 0) {
+                                                    setOwner(res.data[0]);
+                                                }
+                                            } catch {}
+                                        }}
+                                    >
+                                        Auto-select owner agreement
+                                    </button>
+                                )}
+                            </div>
+                            {!owner && sourceCount === 0 && (
+                                <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                                    No active owner agreement covers this vehicle on the handover date. If this vehicle is owned by the company, select &quot;Company-owned vehicle&quot; above.
+                                </p>
+                            )}
+                            <LookupSelect
+                                label="Owner agreement"
+                                value={owner}
+                                onChange={setOwner}
+                                search={sources}
+                                loadOnOpen
+                                minSearchLength={0}
+                                required
+                                error={error?.fields.owner_agreement_id?.[0]}
+                            />
+                        </div>
+                    )}
+                </>
             )}
             {!end && <p className="text-xs text-slate-500 sm:col-span-2">Planned return is optional. When left blank, vehicle assignment continues under the covering owner agreement until returned or replaced.</p>}
             {replacement && (
@@ -311,6 +335,6 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
             )}
             <div className="sm:col-span-2"><Textarea label={replacement ? "Replacement reason" : "Assignment notes"} required={!!replacement} value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.reason?.[0] ?? error?.fields.notes?.[0]} /></div>
         </fieldset>
-        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!vehicle || !start || (!company && !owner) || (!!replacement && !notes.trim()) || isSameReplacementVehicle}>{replacement ? "Confirm replacement" : "Save assignment"}</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!vehicle || !start || (!company && !owner && kind !== AgreementKind.Owner) || (!!replacement && !notes.trim()) || isSameReplacementVehicle}>{replacement ? "Confirm replacement" : kind === AgreementKind.Owner ? "Deploy vehicle" : "Save assignment"}</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }

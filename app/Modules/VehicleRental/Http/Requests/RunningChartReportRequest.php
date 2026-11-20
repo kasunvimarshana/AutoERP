@@ -30,7 +30,7 @@ final class RunningChartReportRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
-            'agreement_id' => ['required', 'integer', 'min:1'],
+            'agreement_id' => ['nullable', 'integer', 'min:0'],
             'start_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
             'end_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:start_date'],
             'vehicle_use_id' => ['nullable', 'integer', 'min:1'],

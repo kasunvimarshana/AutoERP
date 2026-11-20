@@ -16,6 +16,8 @@ final class IncidentVehicleUseOptionResource extends JsonResource
             'vehicle_label' => $this->vehicle_label_snapshot,
             'customer_agreement_reference' => $this->customerAgreement?->reference,
             'customer_party_name' => $this->customerAgreement?->party_name_snapshot,
+            'owner_agreement_reference' => $this->ownerAgreement?->reference,
+            'owner_party_name' => $this->ownerAgreement?->party_name_snapshot,
         ];
     }
 }

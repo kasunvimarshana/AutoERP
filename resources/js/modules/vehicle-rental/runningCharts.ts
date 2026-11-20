@@ -38,7 +38,7 @@ export interface ChartRegisterRow extends RunningChart {
         driver_mode?: string;
         working_hours?: string | null;
         terms?: Record<string, string | null>;
-    };
+    } | null;
     owner_agreement: {
         id?: number;
         reference: string;
@@ -54,7 +54,7 @@ export interface ChartRegisterFilters {
     chart_status?: RunningChartStatus;
     from?: string;
     until?: string;
-    kind?: 'customer' | 'owner';
+    kind?: 'customer' | 'owner' | 'internal';
     customer_agreement_id?: number;
     owner_agreement_id?: number;
     vehicle_use_id?: number;

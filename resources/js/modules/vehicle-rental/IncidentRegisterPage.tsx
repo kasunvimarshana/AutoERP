@@ -174,8 +174,11 @@ export default function IncidentRegisterPage() {
                         </Button>
                     )}
                 </div>
-                <Select label="Vehicle assignment" required placeholder="Select a vehicle and customer agreement"
-                    options={uses.map(use => ({ value: String(use.id), label: `${use.vehicle_label} — ${use.customer_agreement_reference ?? 'No agreement'} — ${use.customer_party_name ?? 'Unnamed party'}` }))}
+                <Select label="Vehicle assignment" required placeholder="Select a vehicle assignment"
+                    options={uses.map(use => ({
+                        value: String(use.id),
+                        label: `${use.vehicle_label} — ${use.customer_agreement_reference ? `${use.customer_agreement_reference} — ${use.customer_party_name ?? 'Unnamed party'}` : (use.owner_agreement_reference ? `Internal — Owner ${use.owner_party_name ?? ''} (${use.owner_agreement_reference})` : 'Internal Company Fleet')}`,
+                    }))}
                     value={selectedUse} disabled={usesLoading || busy} onChange={event => { setSelectedUse(event.target.value); setSelectedChart(''); setChartPage(1); }} error={error?.fields.vehicle_use_id?.[0]} />
                 {usesLoading && <LoadingState label="Finding vehicle assignments…" />}
                 <Pagination meta={useMeta} disabled={busy || usesLoading} onPageChange={next => { setSelectedUse(''); setSelectedChart(''); setChartPage(1); setVehiclePage(next); }} />
@@ -260,7 +263,7 @@ export default function IncidentRegisterPage() {
                     </div>
                     <div className="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
                         <p><span className="font-medium text-slate-900">Incident Date & Ref:</span> {formatBusinessDate(incident.occurred_on)} · {incident.reference}</p>
-                        <p><span className="font-medium text-slate-900">Agreements:</span> Customer: {incident.vehicle.customer_agreement ?? 'Not recorded'} · Owner: {incident.vehicle.owner_agreement ?? 'Company supply'}</p>
+                        <p><span className="font-medium text-slate-900">Agreements:</span> Customer: {incident.vehicle.customer_agreement ?? 'Internal Company Use'} · Owner: {incident.vehicle.owner_agreement ?? 'Company supply'}</p>
                         <p><span className="font-medium text-slate-900">Evidence Doc:</span> {incident.evidence_reference}</p>
                         {incident.running_chart && <p><span className="font-medium text-slate-900">Running Chart:</span> {incident.running_chart}</p>}
                     </div>

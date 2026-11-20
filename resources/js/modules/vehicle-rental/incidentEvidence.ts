@@ -74,6 +74,8 @@ export interface IncidentVehicleUseOption {
     vehicle_label: string;
     customer_agreement_reference: string | null;
     customer_party_name: string | null;
+    owner_agreement_reference?: string | null;
+    owner_party_name?: string | null;
 }
 
 export interface IncidentFormData {

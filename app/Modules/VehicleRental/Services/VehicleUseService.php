@@ -111,6 +111,82 @@ final class VehicleUseService
         return VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->with(OperationalFields::USE_RELATIONS)->findOrFail($id);
     }
 
+    public function planInternal(AgreementContext $context, array $input, ?int $replaces = null): VehicleUse
+    {
+        $this->authorization->assertUse($context, true);
+        $this->validation->assertContext($context);
+        $data = $this->validatePlanInput($input);
+        [$start, $end] = OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at'] ?? null);
+
+        return DB::transaction(function () use ($context, $data, $start, $end, $replaces): VehicleUse {
+            $vehicle = $this->lockVehicle($context, (int) $data['vehicle_id']);
+            $owner = null;
+            if (! empty($data['owner_agreement_id'])) {
+                $owner = OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($data['owner_agreement_id']);
+                if (isset($data['expected_owner_version'])) {
+                    $this->version($owner->row_version, (int) $data['expected_owner_version']);
+                }
+                if ((int) $owner->vehicle_id !== (int) $vehicle->id) {
+                    throw ValidationException::withMessages(['vehicle_id' => ['Owner agreement must cover the selected vehicle.']]);
+                }
+                $this->coveragePeriod($owner, $context, $start, $end);
+            } else {
+                $companyEnd = $end !== null ? OperationalTime::database($end) : null;
+                if (! $this->companyCoverage->covers($context->tenantId, (int) $vehicle->id, OperationalTime::database($start), $companyEnd)) {
+                    throw ValidationException::withMessages(['vehicle_id' => ['Select an owner agreement that covers this vehicle, or record valid company ownership in Vehicle for the full planned period.']]);
+                }
+            }
+
+            $customer = null;
+            if (! empty($data['customer_agreement_id'])) {
+                $customer = CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($data['customer_agreement_id']);
+                if (isset($data['expected_customer_version'])) {
+                    $this->version($customer->row_version, (int) $data['expected_customer_version']);
+                }
+                $this->coveragePeriod($customer, $context, $start, $end);
+            }
+
+            $this->assertAvailable($context, (int) $vehicle->id, OperationalTime::database($start), ($end === null ? null : OperationalTime::database($end)));
+            if ($replaces !== null) {
+                $previous = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($replaces);
+                if ($previous->status !== VehicleUseStatus::Returned || (int) $previous->vehicle_id === (int) $vehicle->id || $previous->returned_at?->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT) !== OperationalTime::database($start)) {
+                    throw ValidationException::withMessages(['replacement' => ['Replacement must continue the assignment at the actual return boundary using a different vehicle.']]);
+                }
+            }
+
+            $record = new VehicleUse;
+            $record->forceFill([
+                'tenant_id' => $context->tenantId,
+                'organization_unit_id' => $context->organizationUnitId,
+                'customer_agreement_id' => $customer?->id,
+                'customer_agreement_version' => $customer?->row_version,
+                'owner_agreement_id' => $owner?->id,
+                'owner_agreement_version' => $owner?->row_version,
+                'vehicle_id' => $vehicle->id,
+                'replaces_use_id' => $replaces,
+                'vehicle_label_snapshot' => $vehicle->registration_number ?: $vehicle->vehicle_number,
+                'starts_at' => OperationalTime::database($start),
+                'ends_at' => ($end === null ? null : OperationalTime::database($end)),
+                'starts_at_input' => $data['starts_at'],
+                'ends_at_input' => $data['ends_at'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'row_version' => AgreementFields::INITIAL_VERSION,
+                'status' => VehicleUseStatus::Planned,
+            ])->save();
+            $this->record($record, $context, VehicleUseAction::Plan);
+
+            return $record->load(OperationalFields::USE_RELATIONS);
+        });
+    }
+
+    public function planOwner(AgreementContext $context, int $ownerAgreement, int $expectedAgreementVersion, array $input, ?int $replaces = null): VehicleUse
+    {
+        $input['owner_agreement_id'] = $ownerAgreement;
+        $input['expected_owner_version'] = $expectedAgreementVersion;
+
+        return $this->planInternal($context, $input, $replaces);
+    }
+
     public function plan(AgreementContext $context, int $customerAgreement, int $expectedAgreementVersion, array $input, ?int $replaces = null): VehicleUse
     {
         $this->authorization->assertUse($context, true);
@@ -181,7 +257,7 @@ final class VehicleUseService
         return DB::transaction(function () use ($context, $id, $expectedVersion, $action, $data): VehicleUse {
             $snapshot = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
             $vehicle = Vehicle::query()->withTrashed()->where('tenant_id', $context->tenantId)->lockForUpdate()->findOrFail($snapshot->vehicle_id);
-            $customer = CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($snapshot->customer_agreement_id);
+            $customer = $snapshot->customer_agreement_id !== null ? CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($snapshot->customer_agreement_id) : null;
             $owner = $snapshot->owner_agreement_id === null ? null : OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($snapshot->owner_agreement_id);
             $record = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
             $this->version($record->row_version, $expectedVersion);
@@ -197,19 +273,24 @@ final class VehicleUseService
                 if ($record->ends_at !== null && $at >= $record->ends_at) {
                     throw ValidationException::withMessages(['occurred_at' => ['Record an actual handover before the planned return.']]);
                 }
-                $this->coverageInstant($customer, $context, $at);
+                if ($customer !== null) {
+                    $this->coverageInstant($customer, $context, $at);
+                }
                 if ($owner !== null) {
                     $this->coverageInstant($owner, $context, $at);
                 }
                 $this->assertAvailable($context, (int) $record->vehicle_id, OperationalTime::database($at), $record->ends_at?->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), (int) $record->id);
                 $companyHandoverEnd = $record->ends_at !== null
                     ? $record->ends_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT)
-                    : ($customer->ends_on !== null ? OperationalTime::database(CarbonImmutable::parse($customer->ends_on->toDateString().' 23:59:59')) : null);
+                    : ($customer?->ends_on !== null ? OperationalTime::database(CarbonImmutable::parse($customer->ends_on->toDateString().' 23:59:59')) : null);
                 if ($owner === null && ! $this->companyCoverage->covers($context->tenantId, (int) $record->vehicle_id, OperationalTime::database($at), $companyHandoverEnd)) {
                     throw ValidationException::withMessages(['owner_agreement_id' => ['Company ownership no longer covers this use. Review the source before handover.']]);
                 }
                 $this->odometerContinuity->assertReading($context->tenantId, (int) $record->vehicle_id, OperationalTime::database($at), $data['odometer'] ?? null);
-                app(VehicleStatusService::class)->changeTo($vehicle, VehicleStatus::Rented, $context->actorId, OperationalFields::HANDOVER_STATUS_REASON.$customer->reference);
+                $handoverReason = $customer !== null
+                    ? OperationalFields::HANDOVER_STATUS_REASON.$customer->reference
+                    : ($owner !== null ? OperationalFields::HANDOVER_STATUS_REASON.'Owner '.$owner->reference : 'Internal vehicle deployment');
+                app(VehicleStatusService::class)->changeTo($vehicle, VehicleStatus::Rented, $context->actorId, $handoverReason);
                 $record->status = VehicleUseStatus::InCustody;
                 $record->handed_over_at = OperationalTime::database($at);
                 $record->handover_odometer = $data['odometer'] ?? null;
@@ -235,7 +316,10 @@ final class VehicleUseService
                 }
                 $this->odometerContinuity->assertReading($context->tenantId, (int) $record->vehicle_id, OperationalTime::database($at), $data['odometer'] ?? null);
                 if ($vehicle->status === VehicleStatus::Rented) {
-                    app(VehicleStatusService::class)->changeTo($vehicle, VehicleStatus::Active, $context->actorId, OperationalFields::RETURN_STATUS_REASON.$customer->reference);
+                    $returnReason = $customer !== null
+                        ? OperationalFields::RETURN_STATUS_REASON.$customer->reference
+                        : ($owner !== null ? OperationalFields::RETURN_STATUS_REASON.'Owner '.$owner->reference : 'Internal vehicle return');
+                    app(VehicleStatusService::class)->changeTo($vehicle, VehicleStatus::Active, $context->actorId, $returnReason);
                 }
                 $record->status = VehicleUseStatus::Returned;
                 $record->returned_at = OperationalTime::database($at);
@@ -339,8 +423,12 @@ final class VehicleUseService
                 throw ValidationException::withMessages($messages);
             }
 
-            $customer = CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($previous->customer_agreement_id);
-            $next = $this->plan($context, (int) $customer->id, $customer->row_version, $data, (int) $previous->id);
+            $customer = $previous->customer_agreement_id !== null
+                ? CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($previous->customer_agreement_id)
+                : null;
+            $next = $customer !== null
+                ? $this->plan($context, (int) $customer->id, $customer->row_version, $data, (int) $previous->id)
+                : $this->planInternal($context, $data, (int) $previous->id);
 
             try {
                 return $this->transition($context, (int) $next->id, $next->row_version, VehicleUseAction::Handover, [
@@ -424,6 +512,9 @@ final class VehicleUseService
         if (array_key_exists('owner_agreement_id', $input) && ($input['owner_agreement_id'] === '' || $input['owner_agreement_id'] === null)) {
             $input['owner_agreement_id'] = null;
         }
+        if (array_key_exists('customer_agreement_id', $input) && ($input['customer_agreement_id'] === '' || $input['customer_agreement_id'] === null)) {
+            $input['customer_agreement_id'] = null;
+        }
         if (array_key_exists('ends_at', $input) && ($input['ends_at'] === '' || (is_string($input['ends_at']) && trim($input['ends_at']) === ''))) {
             $input['ends_at'] = null;
         }
@@ -433,6 +524,7 @@ final class VehicleUseService
 
         $validated = Validator::make($input, $this->planRules())->validate();
         $validated['owner_agreement_id'] = empty($validated['owner_agreement_id']) ? null : (int) $validated['owner_agreement_id'];
+        $validated['customer_agreement_id'] = empty($validated['customer_agreement_id']) ? null : (int) $validated['customer_agreement_id'];
         $validated['ends_at'] = empty($validated['ends_at']) ? null : $validated['ends_at'];
         $validated['notes'] = empty($validated['notes']) ? null : $validated['notes'];
 
@@ -444,6 +536,7 @@ final class VehicleUseService
         return [
             'vehicle_id' => ['required', 'integer', 'min:1'],
             'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'customer_agreement_id' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['required', 'string'],
             'ends_at' => ['sometimes', 'nullable', 'string'],
             'notes' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH],

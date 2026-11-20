@@ -112,7 +112,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
         try {
             const agreementId = (mode === 'owner' && use.owner_agreement?.id)
                 ? use.owner_agreement.id
-                : use.customer_agreement.id;
+                : (use.customer_agreement?.id ?? use.owner_agreement?.id ?? 0);
             await exportRunningChartReport({
                 agreement_id: agreementId,
                 start_date: s,
@@ -133,13 +133,17 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
             <div className="grow">
                 <h4 className="font-semibold text-slate-900">Running Charts · {use.vehicle.label}</h4>
                 <div className="flex flex-wrap gap-x-3 text-xs text-slate-600">
-                    {use.customer_agreement?.party_name && (
+                    {use.customer_agreement?.party_name ? (
                         <span>Customer: <strong className="text-slate-800">{use.customer_agreement.party_name}</strong> ({use.customer_agreement.reference})</span>
+                    ) : (
+                        <span>Usage: <strong className="text-slate-800">Internal company operations</strong></span>
                     )}
                     <span>{use.owner_agreement ? <>Owner: <strong className="text-slate-800">{use.owner_agreement.party_name}</strong> ({use.owner_agreement.reference})</> : 'Company supply'}</span>
                 </div>
             </div>
-            <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'lessee'} onClick={() => void handlePrint('lessee')}>Print Sheet</Button>
+            {use.customer_agreement !== null && (
+                <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'lessee'} onClick={() => void handlePrint('lessee')}>Print Sheet</Button>
+            )}
             {use.owner_agreement !== null && <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'owner'} onClick={() => void handlePrint('owner')}>Print Owner Sheet</Button>}
             <Button variant="secondary" disabled={loading || saving || !!editor} onClick={reload}>Reload charts</Button>
             {canManage && [VehicleUseStatus.Planned, VehicleUseStatus.InCustody, VehicleUseStatus.Returned].includes(use.status) && <Button disabled={loading || saving || !!editor || !!action} onClick={() => setEditor({})}>Record usage</Button>}

@@ -15,7 +15,7 @@ final class VehicleUseRegisterRequest extends TenantScopedRequest
         parent::prepareForValidation();
 
         $merges = [];
-        foreach (['search', 'use_status', 'from', 'until', 'per_page', 'page'] as $field) {
+        foreach (['search', 'use_status', 'from', 'until', 'kind', 'per_page', 'page'] as $field) {
             if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
                 $merges[$field] = null;
             }
@@ -33,6 +33,7 @@ final class VehicleUseRegisterRequest extends TenantScopedRequest
             'use_status' => ['nullable', 'string'],
             'from' => ['nullable', 'string'],
             'until' => ['nullable', 'string'],
+            'kind' => ['nullable', 'string', 'in:customer,owner,internal'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
