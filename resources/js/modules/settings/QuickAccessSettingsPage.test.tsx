@@ -277,4 +277,101 @@ describe('QuickAccessSettingsPage', () => {
         expect(within(table).getByText('Service Job List')).toBeInTheDocument();
         expect(getStoredQuickAccessItems()).toEqual(DEFAULT_QUICK_ACCESS_ITEMS);
     });
+
+    it('displays restricted count badge and labels when items point to inaccessible modules', () => {
+        // One accessible item, one restricted item
+        window.localStorage.setItem(QUICK_ACCESS_STORAGE_KEY, JSON.stringify([
+            { id: 'selling-list', label: 'Selling List', to: '/selling', group: 'Selling', icon: 'list', enabled: true, order: 1 },
+            { id: 'deleted-item', label: 'Old Unknown Feature', to: '/discontinued/feature', group: 'Legacy', icon: 'list', enabled: true, order: 2 },
+        ]));
+
+        render(
+            <TestRouter>
+                <QuickAccessSettingsPage />
+            </TestRouter>
+        );
+
+        // Total: 2, Visible: 1, Restricted: 1
+        expect(screen.getByText('Total:')).toBeInTheDocument();
+        expect(screen.getByText('Visible:')).toBeInTheDocument();
+        expect(screen.getByText('Restricted:')).toBeInTheDocument();
+        expect(screen.getByText('Restricted in workspace')).toBeInTheDocument();
+    });
+
+    it('includes workspace modules like Vehicle Rental and Human Resources in preset options', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter>
+                <QuickAccessSettingsPage />
+            </TestRouter>
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Add Shortcut' }));
+        const modal = screen.getByRole('dialog', { name: 'Add Quick Access Shortcut' });
+
+        const presetSelect = within(modal).getByLabelText(/Quick Presets/i);
+        // Verify Vehicle Rental preset exists and can be selected
+        await user.selectOptions(presetSelect, 'rental-reservations');
+        expect(within(modal).getByLabelText(/Label \/ Title/i)).toHaveValue('Reservations');
+        expect(within(modal).getByLabelText(/Route \/ URL Path/i)).toHaveValue('/vehicle-rental/reservations');
+        expect(within(modal).getByLabelText(/Group Name/i)).toHaveValue('Vehicle Rental');
+
+        // Verify Human Resources preset exists and can be selected
+        await user.selectOptions(presetSelect, 'hr-employees');
+        expect(within(modal).getByLabelText(/Label \/ Title/i)).toHaveValue('Employees');
+        expect(within(modal).getByLabelText(/Route \/ URL Path/i)).toHaveValue('/hr/employees?view=employees');
+        expect(within(modal).getByLabelText(/Group Name/i)).toHaveValue('Human Resources');
+    });
+
+    it('restores defaults with confirmation from the empty state view', async () => {
+        const user = userEvent.setup();
+        window.localStorage.setItem(QUICK_ACCESS_STORAGE_KEY, JSON.stringify([]));
+
+        render(
+            <TestRouter>
+                <QuickAccessSettingsPage />
+            </TestRouter>
+        );
+
+        expect(screen.getByText('No shortcuts configured')).toBeInTheDocument();
+        const restoreBtn = screen.getByRole('button', { name: 'Restore Defaults' });
+        await user.click(restoreBtn);
+
+        const confirmModal = screen.getByRole('dialog', { name: 'Reset to Default Shortcuts' });
+        expect(confirmModal).toBeInTheDocument();
+        await user.click(within(confirmModal).getByRole('button', { name: 'Reset Defaults' }));
+
+        const table = screen.getByRole('table');
+        expect(within(table).getByText('Create Service Job')).toBeInTheDocument();
+        expect(within(table).getByText('Service Job List')).toBeInTheDocument();
+        expect(getStoredQuickAccessItems()).toEqual(DEFAULT_QUICK_ACCESS_ITEMS);
+    });
+
+    it('guarantees unique IDs when adding shortcuts with existing IDs', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter>
+                <QuickAccessSettingsPage />
+            </TestRouter>
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Add Shortcut' }));
+        const modal = screen.getByRole('dialog', { name: 'Add Quick Access Shortcut' });
+
+        const presetSelect = within(modal).getByLabelText(/Quick Presets/i);
+        // Select an existing preset that shares an ID with a default item
+        await user.selectOptions(presetSelect, 'selling-list');
+        // Edit route path to avoid duplicate path validation
+        const routeInput = within(modal).getByLabelText(/Route \/ URL Path/i);
+        await user.clear(routeInput);
+        await user.type(routeInput, '/selling/orders');
+
+        await user.click(within(modal).getByRole('button', { name: 'Save Shortcut' }));
+
+        const stored = getStoredQuickAccessItems();
+        const ids = stored.map((i) => i.id);
+        const uniqueIds = new Set(ids);
+        expect(uniqueIds.size).toBe(ids.length);
+        expect(stored.some((i) => i.to === '/selling/orders')).toBe(true);
+    });
 });

@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { NavigationIcon } from '@/app/navigation/NavigationIcon';
-import type { NavigationIconName, NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
-import { findNavigationMatch } from '@/app/navigation/navigationUtils';
+import type { NavigationIconName, NavigationSection } from '@/app/navigation/navigationTypes';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { fetchQuickAccessSettings } from '@/modules/settings/quickAccessApi';
 import {
     getStoredQuickAccessItems,
     getQuickAccessStorageKey,
+    getVersionKeyFromStorageKey,
     saveQuickAccessItems,
     parseRawItems,
     stripQuery,
+    isQuickAccessItemAccessible,
     QUICK_ACCESS_UPDATE_EVENT,
     type QuickAccessItemConfig,
 } from '@/modules/settings/quickAccessService';
@@ -41,8 +42,16 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
             setConfiguredItems(getStoredQuickAccessItems(storageKey));
         };
 
+        const handleStorageEvent = (event: StorageEvent) => {
+            const versionKey = getVersionKeyFromStorageKey(storageKey);
+            if (event.key && event.key !== storageKey && event.key !== versionKey) {
+                return;
+            }
+            handleUpdate();
+        };
+
         window.addEventListener(QUICK_ACCESS_UPDATE_EVENT, handleUpdate);
-        window.addEventListener('storage', handleUpdate);
+        window.addEventListener('storage', handleStorageEvent);
 
         let isMounted = true;
         const controller = new AbortController();
@@ -65,23 +74,9 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
             isMounted = false;
             controller.abort();
             window.removeEventListener(QUICK_ACCESS_UPDATE_EVENT, handleUpdate);
-            window.removeEventListener('storage', handleUpdate);
+            window.removeEventListener('storage', handleStorageEvent);
         };
     }, [storageKey, auth?.tenant?.id, auth?.user?.id]);
-
-    const allLinks = sections.flatMap((section) =>
-        section.items.flatMap((item) => (item.type === 'link' ? [item] : item.children))
-    );
-    const visibleLinksById = new Map<string, NavigationLinkItem>(allLinks.map((item) => [item.id, item]));
-    const visibleLinksByPath = new Map<string, NavigationLinkItem>();
-    for (const link of allLinks) {
-        visibleLinksByPath.set(stripQuery(link.to), link);
-        if (link.match) {
-            for (const candidate of link.match) {
-                visibleLinksByPath.set(stripQuery(candidate), link);
-            }
-        }
-    }
 
     // Group active configured items that pass navigation permissions
     const groups: Array<{ label: string; links: Array<{ id: string; label: string; to: string; icon: NavigationIconName }> }> = [];
@@ -90,12 +85,8 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
     for (const item of configuredItems) {
         if (!item.enabled) continue;
 
-        // Check if accessible in the permitted sections (by ID, by direct path/match, or navigation hierarchy)
-        const itemPath = stripQuery(item.to);
-        const isAccessible = visibleLinksById.has(item.id)
-            || visibleLinksByPath.has(itemPath)
-            || Boolean(findNavigationMatch(itemPath, '', sections));
-        if (!isAccessible) continue;
+        // Verify that the shortcut is permitted in the active workspace
+        if (!isQuickAccessItemAccessible(item, sections)) continue;
 
         let group = groupMap.get(item.group);
         if (!group) {

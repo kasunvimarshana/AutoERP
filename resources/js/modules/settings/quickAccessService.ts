@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { NavigationIconName, NavigationSection } from '@/app/navigation/navigationTypes';
-import { tenantNavigationSections } from '@/app/navigation/navigationConfig';
+import { tenantWorkspaceNavigationSections } from '@/app/navigation/tenantWorkspaceNavigation';
 import { findNavigationMatch } from '@/app/navigation/navigationUtils';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import {
@@ -112,11 +112,11 @@ export function normalizePath(path: string): string {
 }
 
 /**
- * Centrally and dynamically extracts available actions and routes from registered navigation sections.
- * Any new module or route added to tenantNavigationSections is automatically available for Quick Access.
+ * Centrally and dynamically extracts available actions and routes from registered workspace navigation sections.
+ * Any new module or route added to tenantWorkspaceNavigationSections is automatically available for Quick Access.
  */
 export function getAvailablePresets(sections?: readonly NavigationSection[]): SystemPresetItem[] {
-    const sourceSections = sections ?? tenantNavigationSections;
+    const sourceSections = sections ?? tenantWorkspaceNavigationSections;
     const presets: SystemPresetItem[] = [];
     const seenPaths = new Set<string>();
 
@@ -152,32 +152,89 @@ export function getAvailablePresets(sections?: readonly NavigationSection[]): Sy
         }
     }
 
-    // Common operational deep-links with query parameters
-    const queryPresets: SystemPresetItem[] = [
-        { id: 'service-invoices', label: 'Service Invoices', to: '/invoices?view=service', group: 'Vehicle Service', icon: 'invoice' },
-        { id: 'service-payments', label: 'Customer Receipts (Service)', to: '/payments?view=service', group: 'Vehicle Service', icon: 'payment' },
-        { id: 'selling-returns', label: 'Sales Returns', to: '/selling/returns', group: 'Selling', icon: 'purchase' },
-    ];
-
-    for (const extra of queryPresets) {
-        const pathOnly = stripQuery(extra.to);
-        const isAccessible = seenPaths.has(pathOnly)
-            || Boolean(findNavigationMatch(pathOnly, '', sourceSections as NavigationSection[]));
-        if (!isAccessible) {
-            continue;
-        }
-
-        const normalized = normalizePath(extra.to);
-        if (!seenPaths.has(normalized)) {
-            seenPaths.add(normalized);
-            presets.push(extra);
-        }
-    }
-
     return presets;
 }
 
 export const SYSTEM_PRESET_ITEMS: readonly SystemPresetItem[] = getAvailablePresets();
+
+/**
+ * Single source of truth for evaluating whether a configured Quick Access shortcut
+ * is accessible given the user's active, permission-filtered workspace navigation sections.
+ */
+export function isQuickAccessItemAccessible(
+    item: QuickAccessItemConfig,
+    sections: readonly NavigationSection[],
+    allSystemSections: readonly NavigationSection[] = tenantWorkspaceNavigationSections,
+): boolean {
+    const permittedLinks = sections.flatMap((section) =>
+        section.items.flatMap((i) => (i.type === 'link' ? [i] : i.children))
+    );
+
+    // 1. Direct ID match against permitted navigation link items
+    if (permittedLinks.some((link) => link.id === item.id)) {
+        return true;
+    }
+
+    const itemPath = normalizePath(item.to);
+    const itemPathOnly = stripQuery(itemPath);
+
+    // 2. Exact route match against permitted link routes or candidates
+    for (const link of permittedLinks) {
+        if (normalizePath(link.to) === itemPath) {
+            return true;
+        }
+        if (link.match) {
+            for (const candidate of link.match) {
+                if (normalizePath(candidate) === itemPath) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 3. Registered specific link check:
+    // If the system defines a registered specific navigation item matching this shortcut's ID
+    // or exact target route (e.g. /invoices?view=service or /inventory?tab=adjustments),
+    // and that registered link is NOT in permittedLinks, then the user's workspace explicitly lacks access.
+    const allRegisteredLinks = allSystemSections.flatMap((section) =>
+        section.items.flatMap((i) => (i.type === 'link' ? [i] : i.children))
+    );
+
+    const isRegisteredSystemItem = allRegisteredLinks.some(
+        (link) => link.id === item.id || normalizePath(link.to) === itemPath
+    );
+
+    if (isRegisteredSystemItem) {
+        return false;
+    }
+
+    // 4. For custom shortcuts or generic query parameters not registered as distinct system items:
+    // Fall back to matching the base route or candidate match in permittedLinks.
+    for (const link of permittedLinks) {
+        if (normalizePath(stripQuery(link.to)) === itemPathOnly) {
+            return true;
+        }
+        if (link.match) {
+            for (const candidate of link.match) {
+                if (normalizePath(candidate) === itemPathOnly) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 5. Router hierarchy check for nested sub-routes (e.g. /customers/create)
+    const queryIdx = item.to.indexOf('?');
+    const pathname = queryIdx !== -1 ? item.to.slice(0, queryIdx) : item.to;
+    const search = queryIdx !== -1 ? item.to.slice(queryIdx) : '';
+
+    const systemMatch = findNavigationMatch(pathname, search, allSystemSections as NavigationSection[]);
+    if (systemMatch) {
+        return permittedLinks.some((link) => link.id === systemMatch.item.id);
+    }
+
+    return false;
+}
 
 export function getQuickAccessStorageKey(
     tenantId?: number | string | null,
@@ -187,6 +244,10 @@ export function getQuickAccessStorageKey(
         return `${QUICK_ACCESS_STORAGE_KEY}.${tenantId}.${userId}`;
     }
     return QUICK_ACCESS_STORAGE_KEY;
+}
+
+export function getVersionKeyFromStorageKey(storageKey: string): string {
+    return storageKey.replace(QUICK_ACCESS_STORAGE_KEY, QUICK_ACCESS_ROW_VERSION_KEY);
 }
 
 export function getQuickAccessVersionKey(
@@ -254,7 +315,7 @@ export function getStoredRowVersion(storageKey: string = QUICK_ACCESS_STORAGE_KE
         return null;
     }
     try {
-        const versionKey = storageKey.replace(QUICK_ACCESS_STORAGE_KEY, QUICK_ACCESS_ROW_VERSION_KEY);
+        const versionKey = getVersionKeyFromStorageKey(storageKey);
         const raw = window.localStorage.getItem(versionKey);
         return raw !== null && !Number.isNaN(Number(raw)) ? Number(raw) : null;
     } catch {
@@ -275,7 +336,7 @@ export function saveQuickAccessItems(
     if (typeof window !== 'undefined' && window.localStorage) {
         try {
             window.localStorage.setItem(storageKey, JSON.stringify(sorted));
-            const versionKey = storageKey.replace(QUICK_ACCESS_STORAGE_KEY, QUICK_ACCESS_ROW_VERSION_KEY);
+            const versionKey = getVersionKeyFromStorageKey(storageKey);
             if (rowVersion !== undefined && rowVersion !== null) {
                 window.localStorage.setItem(versionKey, String(rowVersion));
             } else if (rowVersion === null) {
@@ -294,7 +355,7 @@ export function resetQuickAccessItems(storageKey: string = QUICK_ACCESS_STORAGE_
     const defaults = [...DEFAULT_QUICK_ACCESS_ITEMS];
     if (typeof window !== 'undefined' && window.localStorage) {
         try {
-            const versionKey = storageKey.replace(QUICK_ACCESS_STORAGE_KEY, QUICK_ACCESS_ROW_VERSION_KEY);
+            const versionKey = getVersionKeyFromStorageKey(storageKey);
             window.localStorage.removeItem(versionKey);
         } catch {
             // ignore
@@ -324,8 +385,6 @@ export function useQuickAccessConfig() {
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-
-    const isInitialMount = useRef(true);
 
     const refreshFromServer = useCallback(async (signal?: AbortSignal) => {
         setIsLoading(true);
@@ -367,13 +426,21 @@ export function useQuickAccessConfig() {
             setRowVersion(getStoredRowVersion(storageKey));
         };
 
+        const handleStorageEvent = (event: StorageEvent) => {
+            const versionKey = getVersionKeyFromStorageKey(storageKey);
+            if (event.key && event.key !== storageKey && event.key !== versionKey) {
+                return;
+            }
+            handleLocalUpdate();
+        };
+
         window.addEventListener(QUICK_ACCESS_UPDATE_EVENT, handleLocalUpdate);
-        window.addEventListener('storage', handleLocalUpdate);
+        window.addEventListener('storage', handleStorageEvent);
 
         return () => {
             abortController.abort();
             window.removeEventListener(QUICK_ACCESS_UPDATE_EVENT, handleLocalUpdate);
-            window.removeEventListener('storage', handleLocalUpdate);
+            window.removeEventListener('storage', handleStorageEvent);
         };
     }, [storageKey, refreshFromServer]);
 
@@ -389,7 +456,8 @@ export function useQuickAccessConfig() {
             setRowVersion(response.row_version);
             setIsDefault(response.is_default);
             // Confirm cache with server row version
-            saveQuickAccessItems(response.items, storageKey, response.row_version);
+            const updated = saveQuickAccessItems(response.items, storageKey, response.row_version);
+            setItems(updated);
             return { success: true };
         } catch (err: unknown) {
             const apiErr = err as { status?: number; message?: string };

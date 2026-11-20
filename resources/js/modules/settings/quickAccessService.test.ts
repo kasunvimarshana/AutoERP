@@ -5,8 +5,10 @@ import {
     QUICK_ACCESS_UPDATE_EVENT,
     getAvailablePresets,
     getQuickAccessStorageKey,
+    getVersionKeyFromStorageKey,
     getStoredQuickAccessItems,
     getStoredRowVersion,
+    isQuickAccessItemAccessible,
     normalizePath,
     parseRawItems,
     resetQuickAccessItems,
@@ -190,5 +192,134 @@ describe('quickAccessService', () => {
 
         saveQuickAccessItems(DEFAULT_QUICK_ACCESS_ITEMS, key, 3);
         expect(getStoredRowVersion(key)).toBe(3);
+    });
+
+    it('correctly maps storage keys to row version keys using getVersionKeyFromStorageKey', () => {
+        expect(getVersionKeyFromStorageKey(QUICK_ACCESS_STORAGE_KEY)).toBe('autoerp.quick_access_row_version');
+        expect(getVersionKeyFromStorageKey('autoerp.quick_access_items.1.42')).toBe('autoerp.quick_access_row_version.1.42');
+    });
+
+    it('includes workspace modules (Rental, HR, UOM) in default available presets', () => {
+        const presets = getAvailablePresets();
+        // Vehicle Rental
+        expect(presets.some((p) => p.id === 'rental-reservations' && p.group === 'Vehicle Rental')).toBe(true);
+        // Human Resources
+        expect(presets.some((p) => p.id === 'hr-employees' && p.group === 'Human Resources')).toBe(true);
+        // Units of Measure
+        expect(presets.some((p) => p.id === 'uom-list' && p.group === 'Units of Measure')).toBe(true);
+    });
+
+    it('strictly filters presets when sections omit a module, ensuring no inaccessible preset leakage', () => {
+        // Sections that only contain Customers and Selling (Vehicle Service is disabled)
+        const restrictedSections = [
+            {
+                id: 'operations',
+                label: 'Operations',
+                items: [
+                    {
+                        id: 'selling',
+                        type: 'module' as const,
+                        label: 'Selling',
+                        icon: 'purchase' as const,
+                        children: [
+                            { id: 'selling-list', type: 'link' as const, label: 'Selling List', to: '/selling' },
+                        ],
+                    },
+                ],
+            },
+        ];
+
+        const presets = getAvailablePresets(restrictedSections);
+        expect(presets.some((p) => p.to.startsWith('/vehicle-service'))).toBe(false);
+        expect(presets.some((p) => p.id === 'service-invoices')).toBe(false);
+        expect(presets.some((p) => p.id === 'service-payments')).toBe(false);
+        expect(presets.some((p) => p.id === 'selling-list')).toBe(true);
+    });
+
+    it('correctly validates item accessibility with isQuickAccessItemAccessible', () => {
+        const activeSections = [
+            {
+                id: 'operations',
+                label: 'Operations',
+                items: [
+                    {
+                        id: 'customers-module',
+                        type: 'module' as const,
+                        label: 'Customers',
+                        icon: 'customer' as const,
+                        children: [
+                            { id: 'customer-list', type: 'link' as const, label: 'Customer List', to: '/customers' },
+                        ],
+                    },
+                    {
+                        id: 'invoices',
+                        type: 'link' as const,
+                        label: 'Invoices',
+                        to: '/invoices',
+                        icon: 'invoice' as const,
+                    },
+                ],
+            },
+        ];
+
+        // Accessible item by ID and path
+        const accessibleItem: QuickAccessItemConfig = {
+            id: 'customer-list',
+            label: 'All Customers',
+            to: '/customers',
+            group: 'Customers',
+            icon: 'customer',
+            enabled: true,
+            order: 1,
+        };
+        expect(isQuickAccessItemAccessible(accessibleItem, activeSections)).toBe(true);
+
+        // Accessible with query parameter on existing route
+        const queryItem: QuickAccessItemConfig = {
+            id: 'custom-invoices',
+            label: 'Recent Invoices',
+            to: '/invoices?tab=recent',
+            group: 'Finance',
+            icon: 'invoice',
+            enabled: true,
+            order: 2,
+        };
+        expect(isQuickAccessItemAccessible(queryItem, activeSections)).toBe(true);
+
+        // Inaccessible item from disabled vehicle-service module even if base /invoices route is accessible
+        const inaccessibleVehicleServiceInvoiceItem: QuickAccessItemConfig = {
+            id: 'service-invoices',
+            label: 'Service Invoices',
+            to: '/invoices?view=service',
+            group: 'Vehicle Service',
+            icon: 'invoice',
+            enabled: true,
+            order: 3,
+        };
+        expect(isQuickAccessItemAccessible(inaccessibleVehicleServiceInvoiceItem, activeSections)).toBe(false);
+
+        // Inaccessible item from disabled vehicle-service module
+        const inaccessibleItem: QuickAccessItemConfig = {
+            id: 'create-service-job',
+            label: 'Create Service Job',
+            to: '/vehicle-service/jobs/create',
+            group: 'Vehicle Service',
+            icon: 'service',
+            enabled: true,
+            order: 4,
+        };
+        expect(isQuickAccessItemAccessible(inaccessibleItem, activeSections)).toBe(false);
+
+        // Inaccessible item for non-existent route
+        const nonExistentItem: QuickAccessItemConfig = {
+            id: 'deleted-page',
+            label: 'Old Page',
+            to: '/completely/nonexistent/page',
+            group: 'General',
+            icon: 'list',
+            enabled: true,
+            order: 5,
+        };
+        expect(isQuickAccessItemAccessible(nonExistentItem, activeSections)).toBe(false);
     });
 });

@@ -394,6 +394,40 @@ final class UserQuickAccessApiTest extends TestCase
         self::assertSame('first', $items[0]['id']);
     }
 
+    public function test_duplicate_item_ids_are_disambiguated_by_service(): void
+    {
+        $context = $this->createAuthContext();
+
+        $response = $this->withAuth($context)
+            ->putJson('/api/v1/user/quick-access', [
+                'items' => [
+                    [
+                        'id' => 'shared-id',
+                        'label' => 'Customers',
+                        'to' => '/customers',
+                        'group' => 'CRM',
+                        'icon' => 'customer',
+                        'enabled' => true,
+                    ],
+                    [
+                        'id' => 'shared-id',
+                        'label' => 'Invoices',
+                        'to' => '/invoices',
+                        'group' => 'Finance',
+                        'icon' => 'invoice',
+                        'enabled' => true,
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $items = $response->json('data.items');
+        self::assertCount(2, $items);
+        self::assertSame('shared-id', $items[0]['id']);
+        self::assertSame('shared-id-2', $items[1]['id']);
+        self::assertNotSame($items[0]['id'], $items[1]['id']);
+    }
+
     public function test_unauthenticated_requests_are_rejected(): void
     {
         $this->getJson('/api/v1/user/quick-access')->assertUnauthorized();

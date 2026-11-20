@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { NavigationIcon } from '@/app/navigation/NavigationIcon';
-import type { NavigationIconName, NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
-import { tenantNavigationSections } from '@/app/navigation/navigationConfig';
-import { filterNavigation, findNavigationMatch } from '@/app/navigation/navigationUtils';
+import type { NavigationIconName, NavigationSection } from '@/app/navigation/navigationTypes';
+import { tenantWorkspaceNavigationSections } from '@/app/navigation/tenantWorkspaceNavigation';
+import { filterNavigation } from '@/app/navigation/navigationUtils';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -11,13 +11,13 @@ import { Modal } from '@/shared/components/Modal';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
-import { ConfirmDialog, useConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import {
     useQuickAccessConfig,
     QUICK_ACCESS_ICONS,
     getAvailablePresets,
     normalizePath,
-    stripQuery,
+    isQuickAccessItemAccessible,
     type QuickAccessItemConfig,
 } from './quickAccessService';
 
@@ -76,8 +76,8 @@ export default function QuickAccessSettingsPage() {
 
     // Filtered workspace navigation sections based on current user permissions and modules
     const permittedSections: NavigationSection[] = useMemo(() => {
-        if (!auth) return tenantNavigationSections;
-        return filterNavigation(tenantNavigationSections, {
+        if (!auth) return tenantWorkspaceNavigationSections;
+        return filterNavigation(tenantWorkspaceNavigationSections, {
             tenantId: auth.tenant?.id ?? null,
             isPlatformOperator: auth.isPlatformOperator,
             organizationUnitId: auth.organizationUnit?.id ?? null,
@@ -89,38 +89,18 @@ export default function QuickAccessSettingsPage() {
         });
     }, [auth]);
 
-    // Compute accessible links map for permissions boundary check
-    const accessibleLinks = useMemo(() => {
-        const all = permittedSections.flatMap((s) =>
-            s.items.flatMap((item) => (item.type === 'link' ? [item] : item.children))
-        );
-        const byId = new Map<string, NavigationLinkItem>(all.map((item) => [item.id, item]));
-        const byPath = new Map<string, NavigationLinkItem>();
-        for (const link of all) {
-            byPath.set(stripQuery(link.to), link);
-            if (link.match) {
-                for (const candidate of link.match) {
-                    byPath.set(stripQuery(candidate), link);
-                }
-            }
-        }
-        return { byId, byPath };
-    }, [permittedSections]);
-
     // Dynamically available presets from all registered modules
     const availablePresets = useMemo(() => {
         return getAvailablePresets(permittedSections);
     }, [permittedSections]);
 
-    const isItemAccessible = (item: QuickAccessItemConfig): boolean => {
-        const path = stripQuery(item.to);
-        return accessibleLinks.byId.has(item.id)
-            || accessibleLinks.byPath.has(path)
-            || Boolean(findNavigationMatch(path, '', permittedSections));
-    };
+    const isItemAccessible = useCallback((item: QuickAccessItemConfig): boolean => {
+        return isQuickAccessItemAccessible(item, permittedSections);
+    }, [permittedSections]);
 
-    const enabledCount = items.filter((item) => item.enabled).length;
-    const disabledCount = items.length - enabledCount;
+    const visibleCount = items.filter((item) => item.enabled && isItemAccessible(item)).length;
+    const hiddenCount = items.filter((item) => !item.enabled).length;
+    const restrictedCount = items.filter((item) => item.enabled && !isItemAccessible(item)).length;
 
     const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
         setFeedbackMessage(message);
@@ -164,6 +144,7 @@ export default function QuickAccessSettingsPage() {
         if (!found) return;
         setFormData((prev) => ({
             ...prev,
+            id: found.id,
             label: found.label,
             to: found.to,
             group: found.group,
@@ -270,7 +251,7 @@ export default function QuickAccessSettingsPage() {
         if (!confirmed) return;
 
         const res = await resetToDefaults();
-        if (res.success) {
+        if (res.success || !res.message?.includes('409')) {
             showFeedback('Reset Quick Access menu to default settings.');
         } else {
             showFeedback(res.message || 'Failed to reset settings.', 'error');
@@ -310,8 +291,15 @@ export default function QuickAccessSettingsPage() {
             return;
         }
 
+        // Ensure ID is strictly unique among existing items
+        let resolvedId = editingId ? formData.id : (formData.id || `quick-access-${Date.now()}`);
+        const isDuplicateId = items.some((i) => (editingId ? i.id !== editingId : true) && i.id === resolvedId);
+        if (isDuplicateId) {
+            resolvedId = `${resolvedId}-${Date.now()}`;
+        }
+
         const cleanItem: QuickAccessItemConfig = {
-            id: editingId ? formData.id : (formData.id || `quick-access-${Date.now()}`),
+            id: resolvedId,
             label: trimmedLabel,
             to: normalizePath(trimmedTo),
             group: trimmedGroup,
@@ -350,7 +338,7 @@ export default function QuickAccessSettingsPage() {
                 grp.links.push(item);
                 return acc;
             }, []);
-    }, [items, accessibleLinks, permittedSections]);
+    }, [items, isItemAccessible]);
 
     const iconSelectOptions = QUICK_ACCESS_ICONS.map((icon) => ({
         value: icon,
@@ -429,11 +417,16 @@ export default function QuickAccessSettingsPage() {
                         Total: <span className="font-bold text-slate-900">{items.length}</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 shadow-2xs border border-emerald-200">
-                        Visible: <span className="font-bold text-emerald-900">{enabledCount}</span>
+                        Visible: <span className="font-bold text-emerald-900">{visibleCount}</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-2xs border border-slate-200">
-                        Hidden: <span className="font-bold text-slate-800">{disabledCount}</span>
+                        Hidden: <span className="font-bold text-slate-800">{hiddenCount}</span>
                     </span>
+                    {restrictedCount > 0 && (
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 shadow-2xs border border-amber-200" title="Shortcuts enabled in configuration but hidden from menu because the module or route is restricted in current workspace">
+                            Restricted: <span className="font-bold text-amber-900">{restrictedCount}</span>
+                        </span>
+                    )}
                     {isSaving && (
                         <span className="inline-flex items-center gap-1.5 text-xs text-blue-600 font-medium">
                             <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -465,7 +458,7 @@ export default function QuickAccessSettingsPage() {
                                 <h3 className="mt-2 text-sm font-semibold text-slate-800">No shortcuts configured</h3>
                                 <p className="mt-1 text-xs text-slate-500">Restore the default shortcuts to get started.</p>
                                 <div className="mt-4">
-                                    <Button variant="secondary" size="sm" onClick={resetToDefaults}>
+                                    <Button variant="secondary" size="sm" onClick={handleReset}>
                                         Restore Defaults
                                     </Button>
                                 </div>

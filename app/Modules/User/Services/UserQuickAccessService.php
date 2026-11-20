@@ -84,6 +84,7 @@ final class UserQuickAccessService
     {
         $sanitized = [];
         $seenPaths = [];
+        $seenIds = [];
         $order = 1;
         foreach ($rawItems as $item) {
             if (! is_array($item)) {
@@ -112,8 +113,15 @@ final class UserQuickAccessService
             }
             $seenPaths[$cleanTo] = true;
 
+            $rawId = trim((string) ($item['id'] ?? 'item-'.$order));
+            $resolvedId = $rawId !== '' ? $rawId : 'item-'.$order;
+            if (isset($seenIds[$resolvedId])) {
+                $resolvedId = $resolvedId.'-'.$order;
+            }
+            $seenIds[$resolvedId] = true;
+
             $sanitized[] = [
-                'id' => trim((string) ($item['id'] ?? 'item-'.$order)),
+                'id' => $resolvedId,
                 'label' => trim((string) ($item['label'] ?? '')),
                 'to' => $cleanTo,
                 'group' => trim((string) ($item['group'] ?? 'General')),
