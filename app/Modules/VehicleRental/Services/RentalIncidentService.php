@@ -60,11 +60,19 @@ final class RentalIncidentService
             ->paginate($perPage);
     }
 
-    public function list(AgreementContext $context, int $perPage, ?string $search = null): LengthAwarePaginator
+    public function list(AgreementContext $context, int $perPage, ?string $search = null, ?IncidentStatus $status = null, ?IncidentType $type = null): LengthAwarePaginator
     {
         $this->authorization->assertIncident($context, IncidentPermission::View);
         $query = RentalIncident::query()->forContext($context->tenantId, $context->organizationUnitId)
             ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart', 'attachments']);
+
+        if ($status !== null) {
+            $query->where('status', $status);
+        }
+
+        if ($type !== null) {
+            $query->where('incident_type', $type);
+        }
 
         $search = trim($search ?? '');
         if ($search !== '') {

@@ -194,6 +194,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::prefix('billing-cycles')->group(function (): void {
         Route::get('/', [BillingCycleController::class, 'index']);
         Route::get('{cycle}', [BillingCycleController::class, 'show'])->whereNumber('cycle');
+        Route::delete('{cycle}', [BillingCycleController::class, 'destroy'])->whereNumber('cycle');
+        Route::post('{cycle}/cancel', [BillingCycleController::class, 'cancel'])->whereNumber('cycle');
         Route::get('{cycle}/eligible-charts', [BillingCycleController::class, 'eligibleCharts'])->whereNumber('cycle');
         Route::get('{cycle}/export/{format}', [BillingCycleController::class, 'export'])->whereNumber('cycle')->whereIn('format', ['pdf', 'print', 'html']);
         Route::post('{cycle}/charts', [BillingCycleController::class, 'attachCharts'])->whereNumber('cycle');
@@ -210,6 +212,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('/', [AgreementAdjustmentController::class, 'index']);
         Route::post('/', [AgreementAdjustmentController::class, 'store']);
         Route::get('{adjustment}', [AgreementAdjustmentController::class, 'show'])->whereNumber('adjustment');
+        Route::post('{adjustment}/void', [AgreementAdjustmentController::class, 'void'])->whereNumber('adjustment');
+        Route::delete('{adjustment}', [AgreementAdjustmentController::class, 'destroy'])->whereNumber('adjustment');
     });
 
     Route::prefix('reassignments')->group(function (): void {

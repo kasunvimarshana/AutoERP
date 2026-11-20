@@ -14,7 +14,7 @@ final class BillingCycleRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
-        $requiresVersion = $this->isMethod('POST') && ! str_ends_with($this->path(), 'billing-cycles') && ! str_ends_with($this->path(), 'preview');
+        $requiresVersion = (($this->isMethod('POST') && ! str_ends_with($this->path(), 'billing-cycles') && ! str_ends_with($this->path(), 'preview')) || $this->isMethod('DELETE'));
 
         return [
             'expected_version' => $requiresVersion
@@ -34,6 +34,7 @@ final class BillingCycleRequest extends TenantScopedRequest
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'driver_employee_id' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'reason' => ['nullable', 'string', 'max:1000'],
             'issue_initial_invoice' => ['sometimes', 'boolean'],
             'invoice_date' => ['sometimes', 'date'],
             'due_date' => ['nullable', 'date'],

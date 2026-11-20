@@ -6,11 +6,13 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Enums\IncidentReviewAction;
-use Modules\VehicleRental\Http\Requests\AgreementRequest;
-use Modules\VehicleRental\Http\Resources\RentalIncidentResource;
-use Modules\VehicleRental\Http\Resources\RentalIncidentHistoryResource;
-use Modules\VehicleRental\Http\Resources\IncidentVehicleUseOptionResource;
+use Modules\VehicleRental\Enums\IncidentStatus;
+use Modules\VehicleRental\Enums\IncidentType;
+use Modules\VehicleRental\Http\Requests\RentalIncidentRequest;
 use Modules\VehicleRental\Http\Resources\IncidentRunningChartOptionResource;
+use Modules\VehicleRental\Http\Resources\IncidentVehicleUseOptionResource;
+use Modules\VehicleRental\Http\Resources\RentalIncidentHistoryResource;
+use Modules\VehicleRental\Http\Resources\RentalIncidentResource;
 use Modules\VehicleRental\Services\RentalIncidentService;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
@@ -19,52 +21,58 @@ final class RentalIncidentController
 {
     public function __construct(private readonly RentalIncidentService $incidents) {}
 
-    public function vehicleUseOptions(AgreementRequest $request): AnonymousResourceCollection
+    public function vehicleUseOptions(RentalIncidentRequest $request): AnonymousResourceCollection
     {
         return IncidentVehicleUseOptionResource::collection($this->incidents->vehicleUseOptions(
-            $request->context(), $request->validated('search'), $request->perPage(),
+            $request->context(), $request->input('search'), $request->perPage(),
         ));
     }
 
-    public function runningChartOptions(AgreementRequest $request, int $use): AnonymousResourceCollection
+    public function runningChartOptions(RentalIncidentRequest $request, int $use): AnonymousResourceCollection
     {
         return IncidentRunningChartOptionResource::collection($this->incidents->runningChartOptions(
             $request->context(), $use, $request->perPage(),
         ));
     }
 
-    public function index(AgreementRequest $request): AnonymousResourceCollection
+    public function index(RentalIncidentRequest $request): AnonymousResourceCollection
     {
+        $status = $request->input('status') !== null ? IncidentStatus::tryFrom((string) $request->input('status')) : null;
+        $type = $request->input('incident_type') !== null ? IncidentType::tryFrom((string) $request->input('incident_type')) : null;
+
         return RentalIncidentResource::collection($this->incidents->list(
             $request->context(),
             $request->perPage(),
-            $request->validated('search'),
+            $request->input('search'),
+            $status,
+            $type,
         ));
     }
 
-    public function store(AgreementRequest $request): JsonResponse
+    public function store(RentalIncidentRequest $request): JsonResponse
     {
         $data = $request->only([
             'vehicle_use_id', 'expected_use_version', 'running_chart_id', 'incident_type',
             'occurred_on', 'evidence_reference', 'description',
         ]);
+
         return (new RentalIncidentResource($this->incidents->create($request->context(), $data)))
             ->response()->setStatusCode(Response::HTTP_CREATED);
     }
 
-    public function show(AgreementRequest $request, int $incident): RentalIncidentResource
+    public function show(RentalIncidentRequest $request, int $incident): RentalIncidentResource
     {
         return new RentalIncidentResource($this->incidents->find($request->context(), $incident));
     }
 
-    public function history(AgreementRequest $request, int $incident): AnonymousResourceCollection
+    public function history(RentalIncidentRequest $request, int $incident): AnonymousResourceCollection
     {
         return RentalIncidentHistoryResource::collection($this->incidents->history(
             $request->context(), $incident, $request->perPage(),
         ));
     }
 
-    public function review(AgreementRequest $request, int $incident, string $action): RentalIncidentResource
+    public function review(RentalIncidentRequest $request, int $incident, string $action): RentalIncidentResource
     {
         return new RentalIncidentResource($this->incidents->review(
             $request->context(),

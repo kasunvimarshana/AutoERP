@@ -4,16 +4,39 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Controllers;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Http\Requests\BillingCycleRequest;
 use Modules\VehicleRental\Models\BillingCycle;
+use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\TwoStageInvoicingService;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class BillingCycleController
 {
-    public function __construct(private readonly TwoStageInvoicingService $invoicingService) {}
+    public function __construct(
+        private readonly TwoStageInvoicingService $invoicingService,
+        private readonly RentalAuthorization $authorization,
+    ) {}
+
+    public function destroy(): JsonResponse
+    {
+        throw new MethodNotAllowedHttpException([], 'Billing cycles cannot be deleted to preserve financial audit history. Cancel the cycle instead.');
+    }
+
+    public function cancel(BillingCycleRequest $request, int $cycle): JsonResponse
+    {
+        $record = $this->invoicingService->cancelCycle(
+            $request->context(),
+            $cycle,
+            $request->expectedVersion(),
+            $request->input('reason') ? (string) $request->input('reason') : null,
+        );
+
+        return response()->json(['data' => $record]);
+    }
 
     public function index(BillingCycleRequest $request): JsonResponse
     {
@@ -26,11 +49,37 @@ final class BillingCycleController
             ->with(['initialInvoice', 'finalInvoice', 'supplementaryInvoice', 'customerAgreement', 'ownerAgreement'])
             ->orderByDesc('id');
 
+        if ($kind === 'owner') {
+            $this->authorization->assertCycleView($context, AgreementKind::Owner);
+            $query->whereNotNull('owner_agreement_id');
+        } elseif ($kind === 'customer') {
+            $this->authorization->assertCycleView($context, AgreementKind::Customer);
+            $query->whereNotNull('customer_agreement_id');
+        } else {
+            $canCust = $this->authorization->canViewOrBillCycle($context, AgreementKind::Customer);
+            $canOwn = $this->authorization->canViewOrBillCycle($context, AgreementKind::Owner);
+
+            if (! $canCust && ! $canOwn) {
+                throw new AuthorizationException('This Rental action requires agreement view or billing permission.');
+            }
+
+            if ($canCust && ! $canOwn) {
+                $query->whereNotNull('customer_agreement_id');
+            } elseif (! $canCust && $canOwn) {
+                $query->whereNotNull('owner_agreement_id');
+            }
+        }
+
         if ($agreementId !== null) {
             if ($kind === 'owner') {
                 $query->where('owner_agreement_id', (int) $agreementId);
-            } else {
+            } elseif ($kind === 'customer') {
                 $query->where('customer_agreement_id', (int) $agreementId);
+            } else {
+                $query->where(function ($q) use ($agreementId): void {
+                    $q->where('customer_agreement_id', (int) $agreementId)
+                        ->orWhere('owner_agreement_id', (int) $agreementId);
+                });
             }
         }
 
@@ -76,6 +125,9 @@ final class BillingCycleController
                 'ownerAgreement.supplier',
             ])
             ->findOrFail($cycle);
+
+        $kind = $record->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
+        $this->authorization->assertCycleView($context, $kind);
 
         return response()->json(['data' => $record]);
     }

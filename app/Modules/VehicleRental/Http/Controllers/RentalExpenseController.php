@@ -112,15 +112,33 @@ final class RentalExpenseController extends Controller
 
         $alloc = RentalExpenseAllocation::query()
             ->forTenant($context->tenantId)
+            ->where('organization_unit_id', $context->organizationUnitId)
             ->findOrFail($allocation);
 
         $updated = $this->service->unlinkCancelledInvoice($alloc, $context);
+        $updated->load(['invoice', 'customer', 'supplier', 'targetCustomerAgreement', 'targetOwnerAgreement']);
 
-        return response()->json([
+        $payload = [
             'id' => $updated->id,
             'row_version' => $updated->row_version,
+            'sequence' => $updated->sequence,
+            'allocation_type' => $updated->allocation_type->value,
+            'allocation_type_label' => $updated->allocation_type->label(),
+            'net_amount' => (string) $updated->net_amount,
+            'tax_amount' => (string) $updated->tax_amount,
+            'total_amount' => (string) $updated->total_amount,
+            'status' => $updated->status->value,
             'invoice_id' => $updated->invoice_id,
-        ]);
+            'invoice' => $updated->invoice ? [
+                'id' => $updated->invoice->id,
+                'invoice_number' => $updated->invoice->invoice_number,
+                'status' => (string) $updated->invoice->status,
+            ] : null,
+            'customer' => $updated->customer ? ['id' => $updated->customer->id, 'name' => $updated->customer->name] : null,
+            'supplier' => $updated->supplier ? ['id' => $updated->supplier->id, 'name' => $updated->supplier->name] : null,
+        ];
+
+        return response()->json(array_merge($payload, ['data' => $payload]));
     }
 
     public function destroy(): JsonResponse

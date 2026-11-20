@@ -33,6 +33,11 @@ final class AgreementAdjustment extends TenantOwnedModel
         ]);
     }
 
+    public function getReferenceAttribute(): string
+    {
+        return 'ADJ-'.str_pad((string) $this->id, 5, '0', STR_PAD_LEFT);
+    }
+
     public function scopeForContext(Builder $query, int $tenant, int $organization): Builder
     {
         return $query->forTenant($tenant)->where('organization_unit_id', $organization);

@@ -18,13 +18,17 @@ use Modules\VehicleRental\Http\Resources\AgreementResource;
 use Modules\VehicleRental\Services\AgreementFinancialSummaryService;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\BaseRentPreview;
+use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalChargeDocuments;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 final class AgreementController
 {
-    public function __construct(private readonly AgreementService $agreements) {}
+    public function __construct(
+        private readonly AgreementService $agreements,
+        private readonly RentalAuthorization $authorization,
+    ) {}
 
     public function destroy(AgreementRequest $request, string $kind, int $agreement): JsonResponse
     {
@@ -86,6 +90,7 @@ final class AgreementController
     {
         $context = $request->context();
         $agreementKind = AgreementKind::from($kind);
+        $this->authorization->assertBilling($context, $agreementKind);
         $data = $documents->adjustmentInput($request->all());
 
         return DB::transaction(function () use ($agreementKind, $context, $agreement, $data, $documents): JsonResponse {

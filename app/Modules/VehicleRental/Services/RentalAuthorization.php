@@ -110,6 +110,23 @@ class RentalAuthorization
         }
     }
 
+    public function canViewOrBillCycle(AgreementContext $context, AgreementKind $kind): bool
+    {
+        $viewPerm = $kind === AgreementKind::Customer ? self::CUSTOMER_VIEW : self::OWNER_VIEW;
+        $billPerm = $kind === AgreementKind::Customer ? self::CUSTOMER_BILL : self::OWNER_BILL;
+
+        return $this->access->can($context->actorId, $context->tenantId, $viewPerm)
+            || $this->access->can($context->actorId, $context->tenantId, $billPerm);
+    }
+
+    public function assertCycleView(AgreementContext $context, AgreementKind $kind): void
+    {
+        if (! $this->canViewOrBillCycle($context, $kind)) {
+            $viewPerm = $kind === AgreementKind::Customer ? self::CUSTOMER_VIEW : self::OWNER_VIEW;
+            throw new AuthorizationException('This Rental action requires permission: '.$viewPerm);
+        }
+    }
+
     public function assertUse(AgreementContext $context, bool $write): void
     {
         $permission = $write ? self::USE_MANAGE : self::USE_VIEW;

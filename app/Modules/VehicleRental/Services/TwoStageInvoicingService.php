@@ -88,7 +88,7 @@ final class TwoStageInvoicingService
         int $agreementId,
         array $input
     ): BillingCycle {
-        $this->authorization->assertBilling($context, $kind, true);
+        $this->authorization->assertBilling($context, $kind);
 
         $periodFrom = (string) ($input['period_from'] ?? '');
         $periodUntil = (string) ($input['period_until'] ?? '');
@@ -195,7 +195,7 @@ final class TwoStageInvoicingService
             ->findOrFail($cycleId);
 
         $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
-        $this->authorization->assertBilling($context, $kind, false);
+        $this->authorization->assertBilling($context, $kind);
 
         $attachedChartIds = $cycle->charts->pluck('running_chart_id')->all();
         $agreementId = $cycle->customer_agreement_id ?? $cycle->owner_agreement_id;
@@ -215,7 +215,14 @@ final class TwoStageInvoicingService
             ->where('tenant_id', $context->tenantId)
             ->where('billing_cycle_id', '!=', $cycle->id)
             ->whereIn('running_chart_id', $charts->pluck('id')->all())
-            ->whereHas('billingCycle', fn ($q) => $q->where('status', BillingCycleStatus::Finalized))
+            ->whereHas('billingCycle', function ($q) use ($cycle) {
+                $q->where('status', BillingCycleStatus::Finalized);
+                if ($cycle->customer_agreement_id !== null) {
+                    $q->whereNotNull('customer_agreement_id');
+                } else {
+                    $q->whereNotNull('owner_agreement_id');
+                }
+            })
             ->pluck('running_chart_id')
             ->flip()
             ->all();
@@ -264,7 +271,7 @@ final class TwoStageInvoicingService
             $this->assertCycleVersion($cycle, $expectedVersion);
 
             $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
-            $this->authorization->assertBilling($context, $kind, true);
+            $this->authorization->assertBilling($context, $kind);
 
             if ($cycle->status === BillingCycleStatus::Finalized || $cycle->status === BillingCycleStatus::Cancelled) {
                 throw ValidationException::withMessages(['cycle' => ['Cannot attach running charts to a finalized or cancelled cycle.']]);
@@ -298,12 +305,19 @@ final class TwoStageInvoicingService
                 }
             }
 
-            // Assert none are already finalized in another billing cycle
+            // Assert none are already finalized in another billing cycle of the same commercial kind
             $alreadyFinalized = BillingCycleChart::query()
                 ->where('tenant_id', $context->tenantId)
                 ->where('billing_cycle_id', '!=', $cycle->id)
                 ->whereIn('running_chart_id', $chartIds)
-                ->whereHas('billingCycle', fn ($q) => $q->where('status', BillingCycleStatus::Finalized))
+                ->whereHas('billingCycle', function ($q) use ($cycle) {
+                    $q->where('status', BillingCycleStatus::Finalized);
+                    if ($cycle->customer_agreement_id !== null) {
+                        $q->whereNotNull('customer_agreement_id');
+                    } else {
+                        $q->whereNotNull('owner_agreement_id');
+                    }
+                })
                 ->exists();
 
             if ($alreadyFinalized) {
@@ -511,7 +525,7 @@ final class TwoStageInvoicingService
             $this->assertCycleVersion($cycle, $expectedVersion);
 
             $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
-            $this->authorization->assertBilling($context, $kind, true);
+            $this->authorization->assertBilling($context, $kind);
 
             if ($cycle->status === BillingCycleStatus::Finalized || $cycle->status === BillingCycleStatus::Cancelled) {
                 throw ValidationException::withMessages(['cycle' => ['Cannot add items to a finalized or cancelled cycle.']]);
@@ -561,7 +575,7 @@ final class TwoStageInvoicingService
             $this->assertCycleVersion($cycle, $expectedVersion);
 
             $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
-            $this->authorization->assertBilling($context, $kind, true);
+            $this->authorization->assertBilling($context, $kind);
 
             if ($cycle->status === BillingCycleStatus::Finalized || $cycle->status === BillingCycleStatus::Cancelled) {
                 throw ValidationException::withMessages(['cycle' => ['Cannot remove items from a finalized or cancelled cycle.']]);
@@ -587,8 +601,12 @@ final class TwoStageInvoicingService
             ->with(['charts.runningChart', 'charts.vehicle', 'items.vehicle', 'items.driver', 'initialInvoice.balance'])
             ->findOrFail($cycleId);
 
+        if ($cycle->status === BillingCycleStatus::Cancelled) {
+            throw ValidationException::withMessages(['cycle' => ['Cannot preview final stage of a cancelled billing cycle.']]);
+        }
+
         $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
-        $this->authorization->assertBilling($context, $kind, false);
+        $this->authorization->assertBilling($context, $kind);
 
         $agreement = $cycle->customerAgreement ?? $cycle->ownerAgreement;
         $terms = $agreement?->terms ?? [];
@@ -1077,7 +1095,7 @@ final class TwoStageInvoicingService
             ->findOrFail($cycleId);
 
         $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
-        $this->authorization->assertBilling($context, $kind, false);
+        $this->authorization->assertBilling($context, $kind);
 
         $preview = $this->previewFinalStage($context, $cycleId);
         $agreement = $cycle->customerAgreement ?? $cycle->ownerAgreement;
@@ -1225,10 +1243,36 @@ final class TwoStageInvoicingService
             $this->assertCycleVersion($cycle, $expectedVersion);
 
             $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
-            $this->authorization->assertBilling($context, $kind, true);
+            $this->authorization->assertBilling($context, $kind);
+
+            if ($cycle->status === BillingCycleStatus::Cancelled) {
+                throw ValidationException::withMessages(['cycle' => ['Cannot finalize a cancelled billing cycle.']]);
+            }
 
             if ($cycle->status === BillingCycleStatus::Finalized) {
                 throw ValidationException::withMessages(['cycle' => ['Billing cycle is already finalized.']]);
+            }
+
+            // Assert none of the attached charts have already been finalized in another cycle
+            $attachedChartIds = $cycle->charts()->pluck('running_chart_id')->all();
+            if (! empty($attachedChartIds)) {
+                $alreadyFinalized = BillingCycleChart::query()
+                    ->where('tenant_id', $context->tenantId)
+                    ->where('billing_cycle_id', '!=', $cycle->id)
+                    ->whereIn('running_chart_id', $attachedChartIds)
+                    ->whereHas('billingCycle', function ($q) use ($cycle) {
+                        $q->where('status', BillingCycleStatus::Finalized);
+                        if ($cycle->customer_agreement_id !== null) {
+                            $q->whereNotNull('customer_agreement_id');
+                        } else {
+                            $q->whereNotNull('owner_agreement_id');
+                        }
+                    })
+                    ->exists();
+
+                if ($alreadyFinalized) {
+                    throw ValidationException::withMessages(['cycle' => ['One or more running charts attached to this billing cycle have already been finalized in another billing cycle.']]);
+                }
             }
 
             $rawFinalMode = (string) ($data['finalization_mode'] ?? $cycle->finalization_mode->value);
@@ -1329,6 +1373,64 @@ final class TwoStageInvoicingService
             $cycle->save();
 
             return $cycle->load(['customerAgreement', 'ownerAgreement', 'initialInvoice', 'finalInvoice', 'supplementaryInvoice']);
+        });
+    }
+
+    public function cancelCycle(
+        AgreementContext $context,
+        int $cycleId,
+        int $expectedVersion,
+        ?string $reason = null
+    ): BillingCycle {
+        return DB::transaction(function () use ($context, $cycleId, $expectedVersion, $reason): BillingCycle {
+            $cycle = BillingCycle::query()
+                ->forContext($context->tenantId, $context->organizationUnitId)
+                ->lockForUpdate()
+                ->findOrFail($cycleId);
+
+            $this->assertCycleVersion($cycle, $expectedVersion);
+
+            $kind = $cycle->customer_agreement_id !== null ? AgreementKind::Customer : AgreementKind::Owner;
+            $this->authorization->assertBilling($context, $kind);
+
+            if ($cycle->status === BillingCycleStatus::Cancelled) {
+                return $cycle;
+            }
+
+            if ($cycle->status === BillingCycleStatus::Finalized) {
+                throw ValidationException::withMessages(['cycle' => ['Finalized billing cycles cannot be cancelled directly. Cancel the generated billing document instead.']]);
+            }
+
+            if ($cycle->initial_invoice_id !== null) {
+                $initInvoice = Invoice::query()->find($cycle->initial_invoice_id);
+                if ($initInvoice && ! in_array($initInvoice->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true)) {
+                    throw ValidationException::withMessages(['cycle' => ["This billing cycle has an active initial invoice ({$initInvoice->invoice_number}). Cancel the invoice instead."]]);
+                }
+            }
+
+            if ($cycle->supplementary_invoice_id !== null) {
+                $suppInvoice = Invoice::query()->find($cycle->supplementary_invoice_id);
+                if ($suppInvoice && ! in_array($suppInvoice->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true)) {
+                    throw ValidationException::withMessages(['cycle' => ["This billing cycle has an active supplementary invoice ({$suppInvoice->invoice_number}). Cancel the invoice instead."]]);
+                }
+            }
+
+            if ($cycle->final_invoice_id !== null) {
+                $finalInvoice = Invoice::query()->find($cycle->final_invoice_id);
+                if ($finalInvoice && ! in_array($finalInvoice->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true)) {
+                    throw ValidationException::withMessages(['cycle' => ["This billing cycle has an active final invoice ({$finalInvoice->invoice_number}). Cancel the invoice instead."]]);
+                }
+            }
+
+            $cycle->charts()->delete();
+            $cycle->status = BillingCycleStatus::Cancelled;
+            if ($reason) {
+                $cycle->notes = trim(($cycle->notes ?? '')."\n[Cancelled]: {$reason}");
+            }
+            $cycle->row_version += 1;
+            $cycle->save();
+
+            return $cycle->load(['customerAgreement', 'ownerAgreement']);
         });
     }
 
@@ -3024,7 +3126,7 @@ final class TwoStageInvoicingService
 
     public function previewCustomerQuotation(AgreementContext $context, array $input): array
     {
-        $this->authorization->assertBilling($context, AgreementKind::Customer, false);
+        $this->authorization->assertBilling($context, AgreementKind::Customer);
 
         if (! empty($input['billing_cycle_id'])) {
             $cycleId = (int) $input['billing_cycle_id'];

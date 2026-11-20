@@ -676,6 +676,7 @@ final class RentalBillingDocumentService
                 $invoice->notes = $data['notes'];
             }
 
+            $invoice->row_version += 1;
             $invoice->save();
 
             return $this->getDocumentDetail($context, $invoice->id);
@@ -1320,7 +1321,7 @@ final class RentalBillingDocumentService
 
     public function previewQuotation(AgreementContext $context, array $input): array
     {
-        $this->authorization->assertBilling($context, AgreementKind::Customer, false);
+        $this->authorization->assertBilling($context, AgreementKind::Customer);
 
         if (! empty($input['billing_cycle_id'])) {
             return $this->invoicingService->previewQuotationDocument($context, (int) $input['billing_cycle_id']);
@@ -1691,7 +1692,7 @@ final class RentalBillingDocumentService
 
     public function previewOwnerBill(AgreementContext $context, array $input): array
     {
-        $this->authorization->assertBilling($context, AgreementKind::Owner, false);
+        $this->authorization->assertBilling($context, AgreementKind::Owner);
 
         $ownerAgreementId = (int) ($input['owner_agreement_id'] ?? $input['agreement_id'] ?? 0);
         if ($ownerAgreementId <= 0) {

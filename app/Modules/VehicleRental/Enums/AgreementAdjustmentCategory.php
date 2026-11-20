@@ -11,4 +11,15 @@ enum AgreementAdjustmentCategory: string
     case DamageChargeback = 'damage_chargeback';
     case TrafficFine = 'traffic_fine';
     case Other = 'other';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::CommercialRebate => 'Commercial Rebate',
+            self::DowntimeCompensation => 'Downtime Compensation',
+            self::DamageChargeback => 'Damage Chargeback',
+            self::TrafficFine => 'Traffic Fine',
+            self::Other => 'Other Adjustment',
+        };
+    }
 }

@@ -18,6 +18,11 @@ final class OwnerAgreement extends Agreement
         return $this->belongsTo(Supplier::class, 'supplier_id')->withTrashed();
     }
 
+    public function supplier(): BelongsTo
+    {
+        return $this->party();
+    }
+
     public function history(): HasMany
     {
         return $this->hasMany(OwnerAgreementHistory::class, 'agreement_id')->orderBy('row_version');

@@ -570,6 +570,12 @@ export const finalizeBillingCycle = (cycleId: number, payload: {
         expected_version: expectedVersion,
     }).then(r => r.data.data);
 
+export const cancelBillingCycle = (cycleId: number, expectedVersion: number, reason?: string) =>
+    apiClient.post<ApiResource<BillingCycle>>(`${AGREEMENT_API}/billing-cycles/${cycleId}/cancel`, {
+        expected_version: expectedVersion,
+        reason,
+    }).then(r => r.data.data);
+
 export const reassignRunningChartDriver = (chartId: number, driverEmployeeId: number, reason: string, expectedVersion: number) =>
     apiClient.post<ApiResource<ReassignmentRecord>>(`${AGREEMENT_API}/running-charts/${chartId}/reassign-driver`, {
         driver_employee_id: driverEmployeeId,
@@ -614,3 +620,63 @@ export const generateOwnerSettlementBill = (payload: {
     due_date?: string | null;
 }) =>
     apiClient.post<ApiResource<{ id: number; invoice_number: string }>>(`${AGREEMENT_API}/owner-settlement-bill`, payload).then(r => r.data.data);
+
+// -------------------------------------------------------------------------
+// Agreement Adjustments
+// -------------------------------------------------------------------------
+
+export interface AgreementAdjustmentItem {
+    id: number;
+    row_version: number;
+    reference: string;
+    customer_agreement_id?: number | null;
+    owner_agreement_id?: number | null;
+    invoice_id?: number | null;
+    adjustment_type: 'credit_note' | 'debit_note';
+    adjustment_type_label: string;
+    category: string;
+    category_label: string;
+    status: string;
+    amount: string;
+    original_amount: string;
+    tax_amount: string;
+    reason: string;
+    customer_agreement?: { id: number; reference: string; party_name?: string } | null;
+    owner_agreement?: { id: number; reference: string; party_name?: string } | null;
+    invoice?: { id: number; invoice_number: string; status: string } | null;
+    authorized_by?: { id: number; name: string } | null;
+    authorized_at?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    history?: Array<{
+        id: number;
+        from_status: string;
+        to_status: string;
+        reason: string;
+        user?: { id: number; name: string } | null;
+        created_at: string;
+    }>;
+}
+
+export const listAgreementAdjustments = (params?: { agreement_id?: number; kind?: 'customer' | 'owner'; status?: string; search?: string; page?: number; per_page?: number }) =>
+    apiClient.get<ApiCollection<AgreementAdjustmentItem>>(`${AGREEMENT_API}/adjustments`, { params }).then(r => r.data);
+
+export const getAgreementAdjustment = (adjustmentId: number) =>
+    apiClient.get<ApiResource<AgreementAdjustmentItem>>(`${AGREEMENT_API}/adjustments/${adjustmentId}`).then(r => r.data.data);
+
+export const createAgreementAdjustment = (payload: {
+    customer_agreement_id?: number | null;
+    owner_agreement_id?: number | null;
+    invoice_id?: number | null;
+    adjustment_type: 'credit_note' | 'debit_note';
+    category: string;
+    amount: string;
+    reason: string;
+}) =>
+    apiClient.post<ApiResource<AgreementAdjustmentItem>>(`${AGREEMENT_API}/adjustments`, payload).then(r => r.data.data);
+
+export const voidAgreementAdjustment = (adjustmentId: number, expectedVersion: number, reason: string) =>
+    apiClient.post<ApiResource<AgreementAdjustmentItem>>(`${AGREEMENT_API}/adjustments/${adjustmentId}/void`, {
+        expected_version: expectedVersion,
+        reason,
+    }).then(r => r.data.data);

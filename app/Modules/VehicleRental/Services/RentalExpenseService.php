@@ -345,6 +345,7 @@ final class RentalExpenseService
             $invoice = $this->invoices->create($prepared);
 
             $lockedAlloc->invoice_id = $invoice->id;
+            $lockedAlloc->status = RentalExpenseAllocationStatus::Invoiced;
             $lockedAlloc->row_version = $lockedAlloc->row_version + 1;
             $lockedAlloc->save();
 
@@ -370,6 +371,7 @@ final class RentalExpenseService
             }
 
             $lockedAlloc->invoice_id = null;
+            $lockedAlloc->status = RentalExpenseAllocationStatus::Confirmed;
             $lockedAlloc->row_version = $lockedAlloc->row_version + 1;
             $lockedAlloc->save();
 
