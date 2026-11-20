@@ -1,21 +1,21 @@
 # AutoERP Vehicle Rental Module: Complete Technical & Operational Guide
 
-**Status:** Canonical Master Technical Specification, Architecture Manual & Onboarding Guide  
+**Status:** Canonical Master Technical Specification, Architecture Manual & Developer Guide
 **Module Directory (Backend):** [`app/Modules/VehicleRental`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental)  
 **Frontend Directory:** [`resources/js/modules/vehicle-rental`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental)  
 **Timezone Standard:** `Asia/Colombo` (Operational Civil Business Calendar)  
 **Precision Arithmetic:** Arbitrary-Precision String Math via [`DecimalMath`](file:///d:/project-new/AutoERP/app/Modules/Core/Services/DecimalMath.php) (BCMath, scale 6)  
-**Test Suite Coverage:** 306 Backend PHPUnit Tests (2,477 Assertions) · 33 Frontend Vitest Suites (154 Tests) · TypeScript Strict (0 Errors)  
+**Test Suite Coverage:** 344 Backend PHPUnit Tests (2,948 Assertions) · 38 Frontend Vitest Suites (181 Tests) · TypeScript Strict (0 Errors)
 
 > [!TIP]
-> **Operator Handbook:** For a beginner-friendly, step-by-step user manual with UI walkthroughs, diagrams, and daily business workflows (dispatchers, billing clerks, cashiers, fleet officers), see the companion [Vehicle Rental User Guide](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md).
+> **Operator Handbook:** For a beginner-friendly, step-by-step user manual with UI walkthroughs, screenshots, and daily business workflows designed for dispatchers, billing clerks, cashiers, and fleet officers, see the companion [Vehicle Rental User Guide](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md).
 
 ---
 
 ## Table of Contents
 
 1. [Executive Overview & Business Mission](#1-executive-overview--business-mission)
-   - 1.1 [Core Business Architecture: Dual-Track Operational Decoupling](#11-core-business-architecture-dual-track-operational-decoupling)
+   - 1.1 [Core Business Architecture: Multi-Track Operational Decoupling](#11-core-business-architecture-multi-track-operational-decoupling)
    - 1.2 [Fundamental Architectural Invariants](#12-fundamental-architectural-invariants)
    - 1.3 [High-Level Architecture Diagram](#13-high-level-architecture-diagram)
    - 1.4 [Directory & Codebase Layout](#14-directory--codebase-layout)
@@ -29,14 +29,14 @@
    - 3.1 [Rental Reservations & Booking Inquiries](#31-rental-reservations--booking-inquiries)
    - 3.2 [Customer Commercial Agreements & Successor Lineage](#32-customer-commercial-agreements--successor-lineage)
    - 3.3 [Vehicle Owner Lease Agreements & Sourcing](#33-vehicle-owner-lease-agreements--sourcing)
-   - 3.4 [Vehicle Physical Custody (`VehicleUse`)](#34-vehicle-physical-custody-vehicleuse)
+   - 3.4 [Vehicle Physical Custody (`VehicleUse`) & Internal Deployments](#34-vehicle-physical-custody-vehicleuse--internal-deployments)
    - 3.5 [Mid-Lease Atomic Vehicle Swaps (Replacements)](#35-mid-lease-atomic-vehicle-swaps-replacements)
    - 3.6 [Driver Assignments & Reassignments](#36-driver-assignments--reassignments)
-   - 3.7 [Daily Running Charts & Telematics Tracking](#37-daily-running-charts--telematics-tracking)
+   - 3.7 [Daily Running Charts, Telematics & Baseline Overtime Engine](#37-daily-running-charts-telematics--baseline-overtime-engine)
    - 3.8 [Fleet Operating Expenses & 4-Way Allocation Matrix](#38-fleet-operating-expenses--4-way-allocation-matrix)
    - 3.9 [Damage Incidents & Private Proofs](#39-damage-incidents--private-proofs)
    - 3.10 [Vehicle Finance & Bank Leasing Contracts](#310-vehicle-finance--bank-leasing-contracts)
-   - 3.11 [Agreement Financial Adjustments](#311-agreement-financial-adjustments)
+   - 3.11 [Agreement Financial Adjustments & Voiding Lifecycle](#311-agreement-financial-adjustments--voiding-lifecycle)
 4. [The Two-Stage Invoicing Engine](#4-the-two-stage-invoicing-engine)
    - 4.1 [Why Two-Stage Invoicing?](#41-why-two-stage-invoicing)
    - 4.2 [Stage 1: Advance / Provisional Base Rent Invoicing](#42-stage-1-advance--provisional-base-rent-invoicing)
@@ -44,8 +44,9 @@
    - 4.4 [Stage 2: Supplementary Usage Invoicing (Mode A)](#44-stage-2-supplementary-usage-invoicing-mode-a)
    - 4.5 [Negative Delta Handling & Credit Notes](#45-negative-delta-handling--credit-notes)
    - 4.6 [Consolidated Revision Invoicing (Mode B)](#46-consolidated-revision-invoicing-mode-b)
-   - 4.7 [Cancellation & Source Restoration Engine](#47-cancellation--source-restoration-engine)
-   - 4.8 [Complete End-to-End Invoicing Numeric Case Study](#48-complete-end-to-end-invoicing-numeric-case-study)
+   - 4.7 [Billing Cycle Cancellation Workflow & Date Lock Release](#47-billing-cycle-cancellation-workflow--date-lock-release)
+   - 4.8 [Document Cancellation & Source Restoration Engine](#48-document-cancellation--source-restoration-engine)
+   - 4.9 [Complete End-to-End Invoicing Numeric Case Study](#49-complete-end-to-end-invoicing-numeric-case-study)
 5. [Owner Settlement AP Billing & Disbursements](#5-owner-settlement-ap-billing--disbursements)
    - 5.1 [Commercial Workflow of Fleet Sourcing](#51-commercial-workflow-of-fleet-sourcing)
    - 5.2 [Gross Lease Earnings & Operational Usage Reimbursement](#52-gross-lease-earnings--operational-usage-reimbursement)
@@ -72,8 +73,8 @@
    - 9.3 [Agreements Management Workspace](#93-agreements-management-workspace)
    - 9.4 [Vehicle Custody & Running Chart Registers](#94-vehicle-custody--running-chart-registers)
    - 9.5 [UI/UX Invariants & Design Principles](#95-uiux-invariants--design-principles)
-   - 9.6 [End-to-End User Journeys](#96-end-to-end-user-journeys)
-10. [Complete REST API Specification (65+ Endpoints)](#10-complete-rest-api-specification-65-endpoints)
+   - 9.6 [End-to-End User Journeys (4 Operational Roles)](#96-end-to-end-user-journeys-4-operational-roles)
+10. [Complete REST API Specification (70+ Endpoints)](#10-complete-rest-api-specification-70-endpoints)
 11. [Developer Verification, Testing & Extension Guide](#11-developer-verification-testing--extension-guide)
 
 ---
@@ -82,9 +83,9 @@
 
 The **Vehicle Rental** module (`VehicleRental`) is AutoERP's high-throughput operational and commercial management engine for vehicle rental operators, corporate chauffeur transport services, commercial fleet leasing, and private car-hire businesses.
 
-### 1.1 Core Business Architecture: Dual-Track Operational Decoupling
+### 1.1 Core Business Architecture: Multi-Track Operational Decoupling
 
-A real-world commercial vehicle rental company does not simply purchase cars and rent them to retail customers. Commercial fleet operations involve two entirely independent operational and accounting realities:
+A real-world commercial vehicle rental enterprise does not simply purchase cars and rent them to retail customers. Commercial fleet operations involve distinct, interacting operational and accounting realities:
 
 1. **Customer Track (Debtor / Accounts Receivable - AR):**
    - Corporate clients rent vehicles on a monthly, weekly, or daily basis.
@@ -95,38 +96,42 @@ A real-world commercial vehicle rental company does not simply purchase cars and
    - Rental companies frequently lease vehicles from private vehicle owners or external fleet suppliers to satisfy client demand without massive balance-sheet capital expenditure.
    - Liability costs comprise **Lessor Lease Rent**, **Agreed Usage Mileage**, **Driver Salary Reimbursements**, minus **Statutory 10% Withholding Tax (WHT)** and **Fleet Maintenance Chargebacks**.
 
-3. **Fleet Custody Track (The Physical Bridge):**
+3. **Internal Company Fleet Operations Track:**
+   - Companies maintain vehicles for their own operational needs (executive transport, internal logistics, site visits) without a customer agreement.
+   - Internal deployments support both **Company-Owned Fleet** vehicles and **Third-Party Owner-Leased** vehicles deployed for internal business operations.
+
+4. **Fleet Custody Track (The Physical Bridge):**
    - The customer agreement terms **never** dictate owner agreement costs; the owner's payable rates **never** dictate customer billing.
-   - The two commercial sides are decoupled and unified strictly at the point of **Physical Vehicle Custody** (`vehicle_rental_uses`) and **Daily Running Charts** (`vehicle_rental_running_charts`).
+   - The commercial sides are decoupled and unified strictly at the point of **Physical Vehicle Custody** (`vehicle_rental_uses`) and **Daily Running Charts** (`vehicle_rental_running_charts`).
 
 ```
-+---------------------------------------------------------------------------------+
-|                       AutoERP Dual-Track Architecture                           |
-|                                                                                 |
-|   [ Customer (Lessee) ]                     [ Vehicle Owner (Lessor) ]          |
-|            |                                            |                       |
-|   Customer Agreement (Revenue)               Owner Agreement (Lease Cost)       |
-|            \                                            /                       |
-|             \                                          /                        |
-|              +--> [ Physical Vehicle Custody ] <------+                         |
-|                   [     (VehicleUse)         ]                                  |
-|                             |                                                   |
-|                             v                                                   |
-|                   [ Daily Running Charts ]                                      |
-|                   (Trip Sheets & Telematics)                                    |
-|                             |                                                   |
-|              +--------------+--------------+                                    |
-|              |                             |                                    |
-|              v                             v                                    |
-|   [ Customer Billing ]            [ Owner Settlements ]                         |
-|   Stage 1 Base Rent Invoice       Gross Lease Rent                              |
-|   Stage 2 Usage Invoice           + Usage Charges                               |
-|   (Excess KM, OT, Tolls)          - 10% Statutory WHT                           |
-|                                   - Fleet Maintenance Chargebacks               |
-|              |                             |                                    |
-|              v                             v                                    |
-|   AR Ledger (Sales)               AP Ledger (Supplier Bills)                    |
-+---------------------------------------------------------------------------------+
++---------------------------------------------------------------------------------------------------+
+|                                 AutoERP Multi-Track Architecture                                  |
+|                                                                                                   |
+|   [ Customer (Lessee) ]           [ Vehicle Owner (Lessor) ]          [ Internal Company Fleet ]  |
+|            |                                  |                                   |               |
+|   Customer Agreement (AR)            Owner Agreement (AP)                Company Fleet Vehicle    |
+|            \                                  |                                   /               |
+|             \                                 |                                  /                |
+|              +----------------> [ Physical Vehicle Custody ] <------------------+                 |
+|                                 [     (VehicleUse)         ]                                      |
+|                                               |                                                   |
+|                                               v                                                   |
+|                                     [ Daily Running Charts ]                                      |
+|                                     (Trip Sheets & Telematics)                                    |
+|                                               |                                                   |
+|                 +-----------------------------+-----------------------------+                     |
+|                 |                                                           |                     |
+|                 v                                                           v                     |
+|      [ Customer Billing ]                                        [ Owner Settlements ]            |
+|      Stage 1 Base Rent Invoice                                   Gross Lease Rent                 |
+|      Stage 2 Usage Invoice                                       + Usage Charges                  |
+|      (Excess KM, OT, Tolls)                                      - 10% Statutory WHT              |
+|                                                                  - Maintenance Chargebacks        |
+|                 |                                                           |                     |
+|                 v                                                           v                     |
+|      AR Ledger (Sales)                                           AP Ledger (Supplier Bills)       |
++---------------------------------------------------------------------------------------------------+
 ```
 
 ### 1.2 Fundamental Architectural Invariants
@@ -153,14 +158,14 @@ Every service, controller, and database operation in `VehicleRental` enforces th
 
 ```mermaid
 flowchart TD
-    subgraph CustomerCommercial["Customer Commercial Track"]
+    subgraph CustomerCommercial["Customer Commercial Track (AR)"]
         RES["Rental Reservation<br/>(Inquiry & Booking)"]
         CA["Customer Agreement<br/>(Terms JSON & Deposit)"]
         RES -->|convert| CA
         CYCLE["Billing Cycle<br/>(Monthly / Custom Period)"]
         CA --> CYCLE
         INV1["Stage 1 Provisional<br/>Base Rent Invoice"]
-        INV2["Stage 2 Supplementary<br/>Usage Invoice"]
+        INV2["Stage 2 Supplementary<br/>Usage Invoice (Mode A)"]
         INV_REV["Mode B Consolidated<br/>Revision Invoice"]
         CN["Credit Note Invoice<br/>(Downtime Rebates)"]
         CYCLE -->|Stage 1| INV1
@@ -172,6 +177,8 @@ flowchart TD
     subgraph PhysicalFleet["Physical Fleet Custody Track"]
         VU["Vehicle Use<br/>(Assignment & Custody)"]
         CA -->|assign vehicle| VU
+        VU_INTERNAL["Internal Deployment<br/>(Company Operations)"]
+        VU_INTERNAL -.->|custody| VU
         VU_SWAP["Atomic Replacement<br/>(Mid-Lease Vehicle Swap)"]
         VU -.->|breakdown / service| VU_SWAP
         VU_SWAP -.->|continue custody| VU
@@ -181,9 +188,10 @@ flowchart TD
         RC -.->|driver swap| REASSIGN
     end
 
-    subgraph OwnerCommercial["Owner Lease Track"]
+    subgraph OwnerCommercial["Owner Lease Track (AP)"]
         OA["Owner Agreement<br/>(Vehicle Lease Terms)"]
         OA -.->|source vehicle| VU
+        OA -.->|internal lease| VU_INTERNAL
         SETTLE["Owner Settlement Bill<br/>(Itemized AP Bill)"]
         OA --> SETTLE
         WHT["Statutory 10% WHT<br/>(:3305-000 Deduction)"]
@@ -215,22 +223,21 @@ AutoERP
 │   ├── Constants/                     # AgreementFields, OperationalFields, IncidentFields
 │   ├── Data/                          # AgreementContext DTO
 │   ├── Database/Migrations/           # 28 Core Table Migrations
-│   ├── Database/UpgradeMigrations/    # Schema hardening & indexing migrations
+│   ├── Database/UpgradeMigrations/    # 6 Schema hardening & indexing migrations
 │   ├── Enums/                         # 38 Strict PHP 8.2 Backed Enums
 │   ├── Http/
 │   │   ├── Controllers/               # 21 Specialized REST API Controllers
 │   │   ├── Requests/                  # FormRequest validation & OCC assertions
 │   │   └── Resources/                 # JSON API Serialization Resources
-│   ├── Models/                        # 30 Eloquent Models with audit relations
-│   ├── Policies/                      # Fine-grained authorization policies
+│   ├── Models/                        # 31 Eloquent Models with audit relations
 │   ├── Routes/api.php                 # Route definitions and middleware gates
-│   ├── Services/                      # 38 High-cohesion domain services
-│   └── Tests/                         # 41 PHPUnit Test Classes (306 Tests)
+│   ├── Services/                      # 44 High-cohesion domain services (including RentalAuthorization)
+│   └── Tests/                         # 47 PHPUnit Test Classes (344 Tests, 2,948 Assertions)
 └── resources/js/modules/vehicle-rental/
-    ├── api clients/                   # agreementApi.ts, rentalBillingApi.ts, etc.
-    ├── components/                    # Modal wizards, history panels, grids
-    ├── pages/                         # Dedicated register and report pages
-    └── reports/                       # 7 Interactive report page views
+    ├── api clients/                   # agreementApi.ts, rentalBillingApi.ts, vehicleRentalApi.ts
+    ├── components/                    # Modal wizards, history panels, grids, editors
+    ├── pages/                         # Dedicated register, billing, and management pages
+    └── reports/                       # 7 Dedicated interactive analytical report pages
 ```
 
 ---
@@ -249,8 +256,10 @@ erDiagram
     vehicle_rental_customer_agreements ||--o{ vehicle_rental_customer_usage_charges : incurs
     vehicle_rental_customer_agreements ||--o{ vehicle_rental_billing_cycles : bills
     vehicle_rental_customer_agreements ||--o{ vehicle_rental_agreement_adjustments : adjusts
+    vehicle_rental_customer_agreements ||--o{ vehicle_rental_reassignments : tracks
 
     vehicle_rental_owner_agreements ||--o{ vehicle_rental_owner_agreements_history : audits
+    vehicle_rental_owner_agreements ||--o{ vehicle_rental_uses : sources
     vehicle_rental_owner_agreements ||--o{ vehicle_rental_owner_base_charges : incurs
     vehicle_rental_owner_agreements ||--o{ vehicle_rental_owner_usage_charges : incurs
     vehicle_rental_owner_agreements ||--o{ vehicle_rental_billing_cycles : bills
@@ -259,9 +268,11 @@ erDiagram
     vehicle_rental_uses ||--o{ vehicle_rental_use_history : audits
     vehicle_rental_uses ||--o{ vehicle_rental_running_charts : records
     vehicle_rental_uses ||--o{ vehicle_rental_uses : "replaces / replaced_by"
+    vehicle_rental_uses ||--o{ vehicle_rental_reassignments : swaps
 
     vehicle_rental_running_charts ||--o{ vehicle_rental_running_chart_history : audits
     vehicle_rental_running_charts ||--o{ vehicle_rental_billing_cycle_charts : attaches
+    vehicle_rental_running_charts ||--o{ vehicle_rental_reassignments : reassigns
 
     vehicle_rental_billing_cycles ||--o{ vehicle_rental_billing_cycle_charts : contains
     vehicle_rental_billing_cycles ||--o{ vehicle_rental_billing_cycle_items : itemizes
@@ -270,6 +281,8 @@ erDiagram
 
     vehicle_rental_incidents ||--o{ vehicle_rental_incident_events : tracks
     vehicle_rental_incidents ||--o{ vehicle_rental_incident_attachments : attaches
+
+    vehicle_rental_reservations ||--o{ vehicle_rental_reservation_histories : audits
 
     vehicle_rental_finance_agreements ||--o{ vehicle_rental_finance_installments : amortizes
     vehicle_rental_finance_agreements ||--o{ vehicle_rental_finance_status_histories : tracks
@@ -287,19 +300,27 @@ Stores commercial contracts with customers (lessees).
 | `id` | `bigint unsigned` | No | PK, Auto Inc | Unique identifier |
 | `tenant_id` | `bigint unsigned` | No | Index | Multi-tenant company identifier |
 | `organization_unit_id`| `bigint unsigned` | No | Index | Operating branch / business unit |
-| `customer_id` | `bigint unsigned` | No | FK | Customer party ID (`parties.id`) |
+| `customer_id` | `bigint unsigned` | No | FK | Customer party ID (`parties.id` / `customers.id`) |
 | `reference` | `varchar(100)` | No | Unique index | Agreement contract reference code |
-| `rental_basis` | `varchar(32)` | No | `monthly` | `daily`, `weekly`, `monthly`, `calendar_month` |
+| `party_name_snapshot` | `varchar(255)` | No | | Customer name at time of contract creation |
+| `party_code_snapshot` | `varchar(50)` | Yes | Nullable | Customer code snapshot |
+| `currency_id` | `bigint unsigned` | No | FK | Contract billing currency |
+| `currency_code_snapshot`| `varchar(10)` | No | | 3-letter currency code snapshot (e.g. `LKR`) |
+| `agreed_on` | `date` | No | | Commercial contract agreement date |
+| `executing_on` | `date` | Yes | Nullable | Legal signing date |
 | `starts_on` | `date` | No | Index | Lease commencement date |
 | `ends_on` | `date` | Yes | Nullable | Contract expiry date (`null` = open-ended) |
-| `executing_date` | `date` | Yes | Nullable | Legal signing date |
+| `basis` | `varchar(32)` | No | `monthly` | `daily`, `monthly` (`RentalBasis`) |
+| `driver_mode` | `varchar(32)` | No | `with_driver` | `with_driver`, `self_drive` (`DriverMode`) |
+| `status` | `varchar(32)` | No | `draft` | `draft`, `active`, `closed` (`AgreementStatus`) |
+| `terms` | `json` | No | `{}` | JSON terms schema (base rate, km, OT, working hours) |
+| `notes` | `text` | Yes | Nullable | Internal contractual notes |
+| `activated_at` | `timestamp` | Yes | Nullable | Exact timestamp of contract activation |
 | `closed_at` | `timestamp` | Yes | Nullable | Exact timestamp of agreement closure |
-| `status` | `varchar(32)` | No | `draft` | `draft`, `active`, `closed` |
-| `terms` | `json` | No | `{}` | 12-key JSON terms schema (base rate, km, OT, etc.) |
-| `currency_id` | `bigint unsigned` | No | FK | Contract billing currency |
+| `closed_on` | `date` | Yes | Nullable | Tenant civil calendar closure date |
 | `predecessor_agreement_id` | `bigint unsigned` | Yes | FK | Lineage pointer to previous contract |
 | `successor_agreement_id` | `bigint unsigned` | Yes | FK | Lineage pointer to successor contract |
-| `row_version` | `int unsigned` | No | `1` | Optimistic Concurrency Control counter |
+| `row_version` | `bigint unsigned` | No | `1` | Optimistic Concurrency Control counter |
 | `created_at` / `updated_at` | `timestamps` | No | | Record audit timestamps |
 
 #### 2. `vehicle_rental_owner_agreements`
@@ -310,40 +331,59 @@ Stores fleet sourcing lease contracts with external vehicle owners / suppliers.
 | `id` | `bigint unsigned` | No | PK, Auto Inc | Unique identifier |
 | `tenant_id` | `bigint unsigned` | No | Index | Multi-tenant company identifier |
 | `organization_unit_id`| `bigint unsigned` | No | Index | Operating branch identifier |
-| `supplier_id` | `bigint unsigned` | No | FK | Owner supplier party ID (`parties.id`) |
+| `supplier_id` | `bigint unsigned` | No | FK | Owner supplier party ID (`parties.id` / `suppliers.id`) |
 | `vehicle_id` | `bigint unsigned` | No | FK | Specific physical vehicle sourced (`vehicles.id`) |
 | `reference` | `varchar(100)` | No | Unique index | Owner lease agreement reference code |
-| `rental_basis` | `varchar(32)` | No | `monthly` | `daily`, `weekly`, `monthly`, `calendar_month` |
+| `party_name_snapshot` | `varchar(255)` | No | | Owner party name snapshot |
+| `party_code_snapshot` | `varchar(50)` | Yes | Nullable | Owner supplier code snapshot |
+| `vehicle_number_snapshot`| `varchar(50)` | No | | Vehicle plate number snapshot |
+| `vehicle_registration_snapshot`| `varchar(50)`| Yes | Nullable | Vehicle registration document snapshot |
+| `currency_id` | `bigint unsigned` | No | FK | Contract payable currency |
+| `currency_code_snapshot`| `varchar(10)` | No | | 3-letter currency code snapshot |
+| `agreed_on` | `date` | No | | Sourcing agreement date |
+| `executing_on` | `date` | Yes | Nullable | Legal signing date |
 | `starts_on` | `date` | No | Index | Sourcing start date |
 | `ends_on` | `date` | Yes | Nullable | Sourcing end date |
-| `status` | `varchar(32)` | No | `draft` | `draft`, `active`, `closed` |
+| `basis` | `varchar(32)` | No | `monthly` | `daily`, `monthly` (`RentalBasis`) |
+| `driver_mode` | `varchar(32)` | No | `with_driver` | `with_driver`, `self_drive` (`DriverMode`) |
+| `status` | `varchar(32)` | No | `draft` | `draft`, `active`, `closed` (`AgreementStatus`) |
 | `terms` | `json` | No | `{}` | JSON terms schema (deposit prohibited) |
-| `currency_id` | `bigint unsigned` | No | FK | Contract payable currency |
-| `row_version` | `int unsigned` | No | `1` | OCC version counter |
+| `notes` | `text` | Yes | Nullable | Commercial sourcing notes |
+| `activated_at` | `timestamp` | Yes | Nullable | Activation timestamp |
+| `closed_at` | `timestamp` | Yes | Nullable | Closure timestamp |
+| `closed_on` | `date` | Yes | Nullable | Tenant civil calendar closure date |
+| `predecessor_agreement_id` | `bigint unsigned` | Yes | FK | Lineage pointer to previous contract |
+| `successor_agreement_id` | `bigint unsigned` | Yes | FK | Lineage pointer to successor contract |
+| `row_version` | `bigint unsigned` | No | `1` | OCC version counter |
 
 #### 3. `vehicle_rental_uses`
-Tracks physical custody, assignment, key handover, and vehicle returns.
+Tracks physical custody, assignment, key handover, vehicle returns, and internal deployments.
 
 | Column | Type | Nullable | Key / Default | Description |
 | :--- | :--- | :---: | :---: | :--- |
 | `id` | `bigint unsigned` | No | PK, Auto Inc | Unique identifier |
 | `tenant_id` | `bigint unsigned` | No | Index | Multi-tenant company identifier |
 | `organization_unit_id`| `bigint unsigned` | No | Index | Operating branch identifier |
-| `customer_agreement_id` | `bigint unsigned` | No | FK | Associated customer contract |
+| `customer_agreement_id` | `bigint unsigned` | **Yes** | FK | Associated customer contract (`null` for internal use) |
+| `customer_agreement_version`| `bigint unsigned`| Yes | FK | Agreement audit revision locked at planning |
 | `owner_agreement_id` | `bigint unsigned` | Yes | FK | Sourcing agreement (`null` if company owned) |
+| `owner_agreement_version`| `bigint unsigned` | Yes | FK | Owner agreement revision locked at planning |
 | `vehicle_id` | `bigint unsigned` | No | FK | Physical vehicle identifier |
-| `driver_mode` | `varchar(32)` | No | `with_driver` | `with_driver`, `self_drive` |
-| `driver_employee_id` | `bigint unsigned` | Yes | FK | Default chauffeur (`hr_employees.id`) |
-| `status` | `varchar(32)` | No | `planned` | `planned`, `in_custody`, `returned`, `cancelled` |
-| `starts_at` | `timestamp` | No | Index | Planned assignment start timestamp |
-| `ends_at` | `timestamp` | Yes | Nullable | Planned assignment end timestamp |
-| `handed_over_at` | `timestamp` | Yes | Nullable | Actual physical key handover timestamp |
-| `returned_at` | `timestamp` | Yes | Nullable | Actual physical vehicle check-in timestamp |
-| `handover_odometer` | `decimal(12,2)` | Yes | Nullable | Odometer reading at vehicle collection |
-| `return_odometer` | `decimal(12,2)` | Yes | Nullable | Odometer reading at vehicle check-in |
-| `replaces_use_id` | `bigint unsigned` | Yes | FK | If replacement: points to original custody use |
-| `replaced_by_use_id`| `bigint unsigned` | Yes | FK | If replaced: points to replacement custody use |
-| `row_version` | `int unsigned` | No | `1` | OCC version counter |
+| `vehicle_label_snapshot`| `varchar(255)` | No | | Preserved vehicle registration / label string |
+| `status` | `varchar(32)` | No | `planned` | `planned`, `in_custody`, `returned`, `cancelled` (`VehicleUseStatus`) |
+| `starts_at` | `dateTime` | No | Index | Planned assignment start timestamp |
+| `ends_at` | `dateTime` | Yes | Nullable | Planned assignment end timestamp |
+| `starts_at_input` | `varchar(255)` | No | | Original user input string for start date |
+| `ends_at_input` | `varchar(255)` | Yes | Nullable | Original user input string for end date |
+| `handed_over_at` | `dateTime` | Yes | Nullable | Actual physical key handover timestamp |
+| `returned_at` | `dateTime` | Yes | Nullable | Actual physical vehicle check-in timestamp |
+| `handover_odometer` | `decimal(20,6)` | Yes | Nullable | Odometer reading at vehicle collection |
+| `return_odometer` | `decimal(20,6)` | Yes | Nullable | Odometer reading at vehicle check-in |
+| `notes` | `text` | Yes | Nullable | Operational notes & instructions |
+| `replaces_use_id` | `bigint unsigned` | Yes | FK, Unique | If replacement: points to original custody use |
+| `row_version` | `bigint unsigned` | No | `1` | OCC version counter |
+
+*Note on Relations:* If a vehicle is replaced, the successor custody row sets `replaces_use_id = $oldUse->id`. The predecessor accesses its replacement via Eloquent `hasOne(VehicleUse::class, 'replaces_use_id')` (`replacedByUse`). Chauffeurs are assigned at the duty shift level on `vehicle_rental_running_charts`.
 
 #### 4. `vehicle_rental_running_charts`
 Master daily trip log recording telematics, shift hours, and distance.
@@ -352,26 +392,34 @@ Master daily trip log recording telematics, shift hours, and distance.
 | :--- | :--- | :---: | :---: | :--- |
 | `id` | `bigint unsigned` | No | PK, Auto Inc | Unique identifier |
 | `tenant_id` | `bigint unsigned` | No | Index | Multi-tenant company identifier |
+| `organization_unit_id`| `bigint unsigned` | No | Index | Operating branch identifier |
 | `vehicle_use_id` | `bigint unsigned` | No | FK | Associated vehicle custody record |
-| `driver_employee_id` | `bigint unsigned` | Yes | FK | Operating chauffeur employee ID |
+| `vehicle_use_version` | `bigint unsigned` | No | FK | Vehicle use revision locked at chart creation |
 | `reference` | `varchar(100)` | No | Unique index | Trip sheet serial / reference number |
-| `chart_date` | `date` | No | Index | Operational duty date |
-| `starts_at` / `ends_at` | `timestamp` | No | | Duty start and end timestamps |
-| `start_odometer` | `decimal(12,2)` | No | | Duty departure odometer |
-| `end_odometer` | `decimal(12,2)` | No | | Duty arrival odometer |
-| `commercial_km` | `decimal(12,2)` | No | `0.00` | Billable customer business kilometers |
-| `private_km` | `decimal(12,2)` | No | `0.00` | Non-billable private kilometers |
-| `total_km` | `decimal(12,2)` | No | `0.00` | Total kilometers (`commercial + private`) |
-| `ac_mode` | `varchar(32)` | No | `front` | `non_ac`, `front`, `dual` |
-| `normal_ot_minutes` | `int unsigned` | No | `0` | Standard 1.5x overtime minutes |
-| `double_ot_minutes` | `int unsigned` | No | `0` | Holiday / Weekend 2.0x overtime minutes |
-| `triple_ot_minutes` | `int unsigned` | No | `0` | Midnight / Special 3.0x overtime minutes |
-| `night_outs` | `int unsigned` | No | `0` | Outstation overnight stay count |
-| `status` | `varchar(32)` | No | `draft` | `draft`, `finalized`, `reversed` |
+| `status` | `varchar(32)` | No | `draft` | `draft`, `finalized`, `reversed` (`RunningChartStatus`) |
+| `starts_at` / `ends_at` | `dateTime` | No | Index | Duty shift departure and arrival timestamps |
+| `starts_at_input` / `ends_at_input` | `varchar(255)` | No | | Raw input strings for duty shift timestamps |
+| `start_odometer` | `decimal(20,6)` | Yes | Nullable | Duty departure odometer reading |
+| `end_odometer` | `decimal(20,6)` | Yes | Nullable | Duty arrival odometer reading |
+| `commercial_km` | `decimal(20,6)` | Yes | `0.000000` | Billable customer business kilometers |
+| `garage_km` | `decimal(20,6)` | Yes | `0.000000` | Dead-mileage between depot and client pickup |
+| `ac_mode` | `varchar(32)` | Yes | Nullable | `non_ac`, `front`, `dual` (`AirConditioningMode`) |
+| `normal_ot_minutes` | `unsigned int` | Yes | `0` | Standard 1.5x overtime minutes |
+| `double_ot_minutes` | `unsigned int` | Yes | `0` | Holiday / Weekend 2.0x overtime minutes |
+| `triple_ot_minutes` | `unsigned int` | Yes | `0` | Midnight / Special 3.0x overtime minutes |
+| `night_outs` | `unsigned int` | Yes | `0` | Outstation overnight stay count |
+| `driver_identity_source`| `varchar(32)` | Yes | Nullable | `employee`, `external` (`DriverIdentitySource`) |
+| `driver_employee_id` | `bigint unsigned` | Yes | FK | Operating chauffeur employee ID (`hr_employees.id`) |
 | `driver_name_snapshot` | `varchar(255)`| Yes | Nullable | Chauffeur name preserved at finalization |
 | `driver_reference_snapshot`| `varchar(100)`| Yes | Nullable | Chauffeur employee number snapshot |
 | `driver_observation` | `text` | Yes | Nullable | Vehicle condition / mechanical notes |
-| `row_version` | `int unsigned` | No | `1` | OCC version counter |
+| `notes` | `text` | Yes | Nullable | Trip purpose / route notes |
+| `corrects_chart_id` | `bigint unsigned` | Yes | FK, Unique | Linked prior chart if this chart is a correction |
+| `finalized_at` | `dateTime` | Yes | Nullable | Timestamp of chart finalization |
+| `reversed_at` | `dateTime` | Yes | Nullable | Timestamp of chart reversal |
+| `row_version` | `bigint unsigned` | No | `1` | OCC version counter |
+
+*Distance Calculation Rule:* Total physical kilometers run during the duty shift is evaluated as $\text{Total KM} = \text{end\_odometer} - \text{start\_odometer} = \text{commercial\_km} + \text{garage\_km}$.
 
 #### 5. `vehicle_rental_billing_cycles`
 Two-Stage periodic invoicing lifecycle record.
@@ -380,27 +428,37 @@ Two-Stage periodic invoicing lifecycle record.
 | :--- | :--- | :---: | :---: | :--- |
 | `id` | `bigint unsigned` | No | PK, Auto Inc | Unique identifier |
 | `tenant_id` | `bigint unsigned` | No | Index | Multi-tenant company identifier |
+| `organization_unit_id`| `bigint unsigned` | No | Index | Operating branch identifier |
+| `cycle_number` | `varchar(64)` | No | Unique index | Cycle identifier (e.g. `CYCLE-2026-0001`) |
 | `customer_agreement_id` | `bigint unsigned` | Yes | FK | Associated customer contract |
 | `owner_agreement_id` | `bigint unsigned` | Yes | FK | Associated owner contract |
-| `cycle_number` | `varchar(100)` | No | Unique index | Cycle number (e.g. `CYCLE-2026-0001`) |
+| `customer_base_charge_id`| `bigint unsigned`| Yes | FK | Linked provisional base rent charge |
+| `owner_base_charge_id` | `bigint unsigned` | Yes | FK | Linked owner base lease charge |
 | `period_from` / `period_until`| `date` | No | Index | Billing cycle calendar coverage |
-| `status` | `varchar(32)` | No | `draft` | `draft`, `stage1_generated`, `stage2_attached`, `finalized`, `cancelled` |
-| `billing_mode` | `varchar(32)` | No | `with_running_chart`| `with_running_chart`, `without_running_chart` |
-| `finalization_mode`| `varchar(32)` | No | `supplementary_invoice`| `supplementary_invoice` (Mode A), `consolidated_revision` (Mode B) |
-| `base_rent_amount` | `decimal(15,6)` | No | `0.000000` | Prorated base hire rent |
-| `excess_km_amount` | `decimal(15,6)` | No | `0.000000` | Usage excess distance charges |
-| `overtime_amount` | `decimal(15,6)` | No | `0.000000` | Multi-tier chauffeur overtime charges |
-| `night_out_amount` | `decimal(15,6)` | No | `0.000000` | Chauffeur outstation night allowances |
-| `tolls_amount` | `decimal(15,6)` | No | `0.000000` | Reimbursable expressway tolls |
-| `additions_amount` | `decimal(15,6)` | No | `0.000000` | Ad-hoc additions subtotal |
-| `deductions_amount`| `decimal(15,6)` | No | `0.000000` | Ad-hoc deductions subtotal |
-| `net_subtotal` | `decimal(15,6)` | No | `0.000000` | Net cycle subtotal before taxes |
-| `tax_amount` | `decimal(15,6)` | No | `0.000000` | Total billed tax |
-| `total_billed_amount`| `decimal(15,6)` | No | `0.000000` | Total billed amount across all invoices |
+| `status` | `varchar(32)` | No | `draft` | `draft`, `stage1_generated`, `stage2_attached`, `finalized`, `cancelled` (`BillingCycleStatus`) |
+| `billing_mode` | `varchar(32)` | No | `without_running_chart`| `without_running_chart`, `with_running_chart` (`BillingCycleMode`) |
+| `finalization_mode`| `varchar(32)` | No | `supplementary_invoice`| `supplementary_invoice` (Mode A), `consolidated_revision` (Mode B) (`BillingFinalizationMode`) |
 | `initial_invoice_id`| `bigint unsigned` | Yes | FK | Linked Stage 1 Provisional Invoice |
 | `supplementary_invoice_id`| `bigint unsigned`| Yes| FK | Linked Stage 2 Mode A Supplementary Invoice |
 | `final_invoice_id` | `bigint unsigned` | Yes | FK | Linked Stage 2 Mode B Consolidated Invoice |
-| `row_version` | `int unsigned` | No | `1` | OCC version counter |
+| `base_rent_amount` | `decimal(20,6)` | No | `0.000000` | Prorated base hire rent |
+| `excess_km_amount` | `decimal(20,6)` | No | `0.000000` | Usage excess distance charges |
+| `overtime_amount` | `decimal(20,6)` | No | `0.000000` | Multi-tier chauffeur overtime charges |
+| `night_out_amount` | `decimal(20,6)` | No | `0.000000` | Chauffeur outstation night allowances |
+| `tolls_amount` | `decimal(20,6)` | No | `0.000000` | Reimbursable expressway tolls |
+| `additions_amount` | `decimal(20,6)` | No | `0.000000` | Ad-hoc additions subtotal |
+| `deductions_amount`| `decimal(20,6)` | No | `0.000000` | Ad-hoc deductions subtotal |
+| `net_subtotal` | `decimal(20,6)` | No | `0.000000` | Net cycle subtotal before taxes |
+| `tax_amount` | `decimal(20,6)` | No | `0.000000` | Total billed tax |
+| `total_billed_amount`| `decimal(20,6)` | No | `0.000000` | Total billed amount across all invoices |
+| `total_paid_amount` | `decimal(20,6)` | No | `0.000000` | Cumulative customer payments received |
+| `currency_id` | `bigint unsigned` | No | FK | Billing cycle currency |
+| `exchange_rate` | `decimal(20,6)` | No | `1.000000` | Currency exchange rate |
+| `notes` | `text` | Yes | Nullable | Invoicing notes and instructions |
+| `created_by` | `bigint unsigned` | Yes | FK | User who initiated cycle |
+| `finalized_by` | `bigint unsigned` | Yes | FK | User who finalized cycle |
+| `finalized_at` | `dateTime` | Yes | Nullable | Finalization timestamp |
+| `row_version` | `bigint unsigned` | No | `1` | OCC version counter |
 
 #### 6. `vehicle_rental_reassignments`
 Immutable audit register of mid-contract driver replacements and atomic vehicle swaps.
@@ -409,36 +467,40 @@ Immutable audit register of mid-contract driver replacements and atomic vehicle 
 | :--- | :--- | :---: | :---: | :--- |
 | `id` | `bigint unsigned` | No | PK, Auto Inc | Unique identifier |
 | `tenant_id` | `bigint unsigned` | No | Index | Multi-tenant company identifier |
-| `reassignment_type` | `varchar(32)` | No | | `vehicle_replacement`, `driver_reassignment` |
+| `reassignment_type` | `varchar(32)` | No | Index | `vehicle_replacement`, `driver_reassignment`, `combined` (`ReassignmentType`) |
 | `customer_agreement_id`| `bigint unsigned`| Yes| FK | Associated customer contract |
 | `vehicle_use_id` | `bigint unsigned` | Yes | FK | Associated vehicle custody record |
 | `running_chart_id` | `bigint unsigned` | Yes | FK | Associated running chart (for driver swap) |
 | `previous_vehicle_id` | `bigint unsigned` | Yes | FK | Replaced physical vehicle |
 | `new_vehicle_id` | `bigint unsigned` | Yes | FK | Replacement physical vehicle |
+| `previous_owner_agreement_id`| `bigint unsigned`| Yes| FK | Sourcing agreement for replaced vehicle |
+| `new_owner_agreement_id`| `bigint unsigned`| Yes| FK | Sourcing agreement for replacement vehicle |
 | `previous_driver_employee_id` | `bigint unsigned` | Yes | FK | Relieved chauffeur |
 | `new_driver_employee_id` | `bigint unsigned` | Yes | FK | Assigned chauffeur |
-| `occurred_at` | `timestamp` | No | Index | Physical swap / handover timestamp |
-| `reason` | `text` | Yes | Nullable | Reason for replacement / reassignment |
-| `financial_status` | `varchar(32)` | No | `pending` | `pending`, `settled`, `waived` |
-| `financial_delta_amount` | `decimal(15,6)`| No | `0.000000`| Rate differential incurred by swap |
+| `financial_status` | `varchar(32)` | No | `pending` | `pending`, `settled`, `none` (`ReassignmentFinancialStatus`) |
+| `financial_delta_amount` | `decimal(20,6)`| No | `0.000000`| Rate differential incurred by swap |
+| `reason` | `text` | No | | Traceable justification for replacement / reassignment |
+| `occurred_at` | `dateTime` | No | Index | Physical swap / handover timestamp |
+| `user_id` | `bigint unsigned` | Yes | FK | Operating user who authorized swap |
 
 ### 2.3 Immutable History & Event Tables
 
-Business history is strictly preserved. When an agreement, vehicle use, running chart, or incident changes state, an immutable audit record is created via the [`ImmutableRentalHistory`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/ImmutableRentalHistory.php) trait:
+Business history is strictly preserved. When an agreement, vehicle use, running chart, reservation, or incident changes state, an immutable audit record is created via dedicated history tables:
 
 | Main Model | History Table | Captured Audit Data |
 | :--- | :--- | :--- |
-| `CustomerAgreement` | `vehicle_rental_customer_agreements_history` | `row_version`, `status`, complete `terms` JSON snapshot, `recorded_by`, `recorded_at`, `reason` |
-| `OwnerAgreement` | `vehicle_rental_owner_agreements_history` | `row_version`, `status`, `terms` JSON snapshot, `recorded_by`, `recorded_at`, `reason` |
+| `CustomerAgreement` | `vehicle_rental_customer_agreements_history` | `row_version`, `status`, complete `terms` JSON snapshot, `actor_id`, `created_at`, `reason` |
+| `OwnerAgreement` | `vehicle_rental_owner_agreements_history` | `row_version`, `status`, `terms` JSON snapshot, `actor_id`, `created_at`, `reason` |
 | `VehicleUse` | `vehicle_rental_use_history` | `row_version`, `status`, `handed_over_at`, `returned_at`, `handover_odometer`, `return_odometer`, `reason` |
-| `RunningChart` | `vehicle_rental_running_chart_history` | `row_version`, `status`, `start_odometer`, `end_odometer`, `commercial_km`, `normal_ot_minutes`, `recorded_by` |
+| `RunningChart` | `vehicle_rental_running_chart_history` | `row_version`, `status`, `start_odometer`, `end_odometer`, `commercial_km`, `garage_km`, `normal_ot_minutes`, `actor_id` |
+| `RentalReservation` | `vehicle_rental_reservation_histories` | `reservation_id`, `from_status`, `to_status`, `reason`, `changed_by`, `changed_at` |
 | `RentalIncident` | `vehicle_rental_incident_events` | `incident_id`, `event_type`, `old_status`, `new_status`, `comment`, `created_by` |
-| `AgreementAdjustment` | `vehicle_rental_agreement_adjustments_history` | `adjustment_id`, `old_status`, `new_status`, `changed_by`, `reason` |
-| `VehicleFinanceAgreement`| `vehicle_rental_finance_status_histories` | `finance_agreement_id`, `old_status`, `new_status`, `changed_by`, `reason` |
+| `AgreementAdjustment` | `vehicle_rental_agreement_adjustments_history` | `adjustment_id`, `from_status`, `to_status`, `reason`, `user_id` |
+| `VehicleFinanceAgreement`| `vehicle_rental_finance_status_histories` | `finance_agreement_id`, `old_status`, `new_status`, `reason`, `changed_by`, `changed_at` |
 
 ### 2.4 The Agreement Terms JSON Schema
 
-All monetary and operational rates are maintained in the agreement's `terms` JSON column. The schema defines 12 standard decimal string keys (scaled to 6 decimal places via BCMath):
+All monetary and operational rates are maintained in the agreement's `terms` JSON column. The schema defines 13 standard decimal string keys (scaled to 6 decimal places via BCMath, precision 20):
 
 ```json
 {
@@ -453,56 +515,59 @@ All monetary and operational rates are maintained in the agreement's `terms` JSO
   "double_ot_rate": "600.000000",
   "triple_ot_rate": "900.000000",
   "night_out_rate": "2500.000000",
-  "deposit_requirement": "50000.000000"
+  "deposit_requirement": "50000.000000",
+  "working_hours": "8.000000"
 }
 ```
 
-*Crucial Business Rule:* `deposit_requirement` is permitted **strictly on Customer Agreements**. Attempting to pass `deposit_requirement` on an Owner Agreement triggers a `ValidationException`.
+*Crucial Business Rules:*
+1. `deposit_requirement` is permitted **strictly on Customer Agreements**. Attempting to pass `deposit_requirement` on an Owner Agreement triggers a `ValidationException`.
+2. `working_hours` specifies the agreed daily working baseline hours (defaults to `8.0`). Duty exceeding this baseline automatically triggers overtime calculation via [`OvertimeCalculator`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/OvertimeCalculator.php).
 
 ### 2.5 Complete Domain Enums Catalog (38 Enums)
 
-The module enforces strict PHP 8.2 backed enums across all domain transitions:
+The module enforces strict PHP 8.2 backed enums across all domain transitions, maintaining exact alignment between database values, backend type safety, and frontend contract definitions:
 
-| Enum Name | Backed Type | Values | Domain Purpose |
+| Enum Name | Backed Type | Exact Backed Values (Source Code) | Domain Purpose |
 | :--- | :---: | :--- | :--- |
-| `AgreementAction` | `string` | `activate`, `close` | Lifecycle transitions for agreements |
-| `AgreementAdjustmentCategory` | `string` | `rate_correction`, `penalty`, `rebate`, `compensation`, `other` | Contractual adjustment classifications |
-| `AgreementAdjustmentStatus` | `string` | `draft`, `authorized`, `applied`, `cancelled` | Adjustment lifecycle |
-| `AgreementAdjustmentType` | `string` | `debit_note`, `credit_note` | Financial direction of adjustment |
+| `AgreementAction` | `string` | `create`, `update`, `activate`, `close`, `supersede` | Agreement lifecycle actions and successor creation |
+| `AgreementAdjustmentCategory` | `string` | `commercial_rebate`, `downtime_compensation`, `damage_chargeback`, `traffic_fine`, `other` | Contractual adjustment classifications |
+| `AgreementAdjustmentStatus` | `string` | `draft`, `authorized`, `applied`, `voided` | Adjustment financial lifecycle |
+| `AgreementAdjustmentType` | `string` | `credit_note`, `debit_note` | Financial direction of adjustment |
 | `AgreementKind` | `string` | `customer`, `owner` | Decoupled commercial track identifier |
 | `AgreementStatus` | `string` | `draft`, `active`, `closed` | Core agreement contract states |
-| `AirConditioningMode` | `string` | `non_ac`, `front`, `dual` | Climate control mode for differential rates |
-| `BaseChargeSource` | `string` | `schedule`, `manual`, `billing_cycle` | Provenance of base hire charge |
-| `BaseRentPolicy` | `string` | `advance`, `arrears` | Timing policy for provisional rent |
-| `BillingCycleItemCategory` | `string` | `fuel_differential`, `driver_salary`, `toll_reimbursement`, `damage_charge`, `downtime_rebate`, `other` | Ad-hoc addition/deduction items |
+| `AirConditioningMode` | `string` | `non_ac`, `front`, `dual` | Climate control mode for differential rate assessment |
+| `BaseChargeSource` | `string` | `vehicle_rental_customer_base_charge`, `vehicle_rental_owner_base_charge` | Provenance of base hire charge records |
+| `BaseRentPolicy` | `string` | `actual_calendar_days_v1` | Proration algorithm based on tenant civil calendar days |
+| `BillingCycleItemCategory` | `string` | `driver_salary`, `driver_allowance`, `overtime`, `excess_km`, `toll_charge`, `toll`, `fuel_charge`, `fuel`, `night_out`, `night_out_allowance`, `damage_recharge`, `goodwill_discount`, `downtime_rebate`, `deduction`, `other` | 15 Ad-hoc addition/deduction line classifications |
 | `BillingCycleItemType` | `string` | `addition`, `deduction` | Mathematical effect on billing subtotal |
-| `BillingCycleMode` | `string` | `with_running_chart`, `without_running_chart` | Operational telemetry attachment model |
+| `BillingCycleMode` | `string` | `without_running_chart`, `with_running_chart` | Operational telemetry attachment model |
 | `BillingCycleStatus` | `string` | `draft`, `stage1_generated`, `stage2_attached`, `finalized`, `cancelled` | Master Two-Stage Invoicing lifecycle |
-| `BillingFinalizationMode` | `string` | `supplementary_invoice`, `consolidated_revision` | Mode A (Supplementary) vs Mode B (Consolidated) |
-| `DriverIdentitySource` | `string` | `employee`, `external`, `snapshot` | Provenance of driver name & code |
-| `DriverMode` | `string` | `with_driver`, `self_drive` | Chauffeur-driven vs self-drive hire |
-| `IncidentPermission` | `string` | `view`, `record`, `review` | Permission mapping keys |
-| `IncidentReviewAction` | `string` | `confirm`, `reject` | Investigation approval transitions |
-| `IncidentStatus` | `string` | `reported`, `under_investigation`, `insurance_claimed`, `resolved`, `closed` | Incident resolution pipeline |
-| `IncidentType` | `string` | `accident`, `breakdown`, `theft`, `traffic_violation`, `customer_complaint`, `other` | Physical fleet incident categories |
-| `MileagePolicy` | `string` | `included_allowance`, `unlimited`, `per_km_only` | Distance consumption policy |
-| `ReassignmentFinancialStatus` | `string` | `pending`, `settled`, `waived` | Financial settlement of swap differential |
-| `ReassignmentType` | `string` | `vehicle_replacement`, `driver_reassignment` | Fleet mid-contract reallocation type |
-| `RentalBasis` | `string` | `daily`, `weekly`, `monthly`, `calendar_month` | Periodic recurrence basis |
-| `RentalExpenseAllocationStatus` | `string` | `pending`, `confirmed`, `invoiced`, `reversed` | Expense allocation lifecycle |
-| `RentalExpenseAllocationType` | `string` | `company_fleet`, `customer_recovery`, `owner_deduction`, `shared` | 4-Way fleet expense distribution matrix |
-| `RentalExpenseStatus` | `string` | `draft`, `submitted`, `approved`, `rejected`, `allocated`, `reversed` | Operating expense authorization state |
-| `RentalExpenseType` | `string` | `fuel`, `toll`, `repair`, `maintenance`, `insurance`, `fine`, `other` | Fleet expense operational categories |
+| `BillingFinalizationMode` | `string` | `supplementary_invoice`, `consolidated_revision` | Mode A (Supplementary) vs Mode B (Consolidated Revision) |
+| `DriverIdentitySource` | `string` | `employee`, `external` | Origin of operating chauffeur record |
+| `DriverMode` | `string` | `self_drive`, `with_driver` | Self-drive hire vs chauffeur-driven deployment |
+| `IncidentPermission` | `string` | `vehicle-rental.incidents.view`, `vehicle-rental.incidents.record`, `vehicle-rental.incidents.review` | Security authorization keys for incident evidence |
+| `IncidentReviewAction` | `string` | `confirm`, `reject` | Incident investigation approval actions |
+| `IncidentStatus` | `string` | `recorded`, `confirmed`, `rejected` | Fleet incident verification pipeline |
+| `IncidentType` | `string` | `fuel`, `toll`, `parking`, `repair`, `maintenance`, `accident_damage`, `penalty`, `cleaning`, `other` | Physical fleet incident evidence categories |
+| `MileagePolicy` | `string` | `commercial_calendar_cycles_v1` | Excess distance consumption calculation policy |
+| `ReassignmentFinancialStatus` | `string` | `pending`, `settled`, `none` | Financial reconciliation status of swap differentials |
+| `ReassignmentType` | `string` | `vehicle_replacement`, `driver_reassignment`, `combined` | Mid-contract fleet resource replacement classification |
+| `RentalBasis` | `string` | `daily`, `monthly` | Periodic agreement recurrence basis |
+| `RentalExpenseAllocationStatus` | `string` | `draft`, `confirmed`, `invoiced`, `reversed` | Expense allocation reconciliation lifecycle |
+| `RentalExpenseAllocationType` | `string` | `company_cost`, `customer_recovery`, `owner_deduction`, `employee_reimbursement` | 4-Way fleet operating cost distribution matrix |
+| `RentalExpenseStatus` | `string` | `draft`, `submitted`, `approved`, `allocated`, `rejected`, `reversed` | Operating expense authorization state machine |
+| `RentalExpenseType` | `string` | `fuel`, `toll`, `maintenance`, `fine`, `other` | Fleet expense operational categories |
 | `RentalReservationStatus` | `string` | `draft`, `pending`, `confirmed`, `converted`, `cancelled`, `expired` | Booking inquiry state machine |
-| `RunningChartAction` | `string` | `finalize`, `reverse` | Daily trip log lifecycle actions |
+| `RunningChartAction` | `string` | `create`, `update`, `finalize`, `reverse` | Daily trip log lifecycle actions |
 | `RunningChartStatus` | `string` | `draft`, `finalized`, `reversed` | Daily trip log state machine |
-| `UsageChargeComponent` | `string` | `excess_mileage`, `overtime_normal`, `overtime_double`, `overtime_triple`, `night_out`, `toll` | Component item types for usage |
-| `UsageChargePolicy` | `string` | `tier_standard`, `tier_express`, `custom` | Telematics rate assessment policy |
-| `UsageChargeSource` | `string` | `running_chart`, `manual_assessment` | Origin of usage charge data |
-| `VehicleFinanceAgreementStatus` | `string` | `draft`, `active`, `settled`, `cancelled` | Bank leasing contract states |
-| `VehicleFinanceInstallmentStatus`| `string` | `pending`, `payable_created`, `paid`, `defaulted`| Amortization schedule status |
-| `VehicleUseAction` | `string` | `handover`, `return`, `cancel` | Custody transition actions |
-| `VehicleUseStatus` | `string` | `planned`, `in_custody`, `returned`, `cancelled` | Physical custody state machine |
+| `UsageChargeComponent` | `string` | `normal_ot`, `double_ot`, `triple_ot`, `night_out` | Telematics rate component types |
+| `UsageChargePolicy` | `string` | `recorded_minutes_and_nights_v1` | Telematics rate assessment formula |
+| `UsageChargeSource` | `string` | `vehicle_rental_customer_usage_charge`, `vehicle_rental_owner_usage_charge` | Origin of usage charge financial records |
+| `VehicleFinanceAgreementStatus` | `string` | `draft`, `active`, `settled`, `defaulted`, `cancelled` | Bank leasing contract states |
+| `VehicleFinanceInstallmentStatus`| `string` | `scheduled`, `due`, `overdue`, `partially_paid`, `paid`, `waived`, `reversed` | Amortization installment schedule status |
+| `VehicleUseAction` | `string` | `plan`, `handover`, `return`, `cancel` | Custody transition actions |
+| `VehicleUseStatus` | `string` | `planned`, `in_custody`, `returned`, `cancelled` | Physical vehicle custody state machine |
 
 ---
 
@@ -545,7 +610,7 @@ stateDiagram-v2
   "notes": "VIP Corporate Guest Airport Shuttle"
 }
 ```
-- **Convert to Customer Agreement (`POST /api/v1/vehicle-rental/reservations/12/convert`):**
+- **Convert to Customer Agreement (`POST /api/v1/vehicle-rental/reservations/{id}/convert`):**
   - Atomically creates an active `CustomerAgreement` copying rates and dates.
   - Returns the newly created agreement object and updates reservation status to `converted`.
 
@@ -569,8 +634,8 @@ stateDiagram-v2
 
 #### Contract Successor Lineage:
 When renegotiating rates or renewing expiring agreements:
-1. Operator calls `POST /api/v1/vehicle-rental/customer/agreements/15/successor`.
-2. System creates a Draft successor agreement linked to `predecessor_agreement_id = 15`.
+1. Operator calls `POST /api/v1/vehicle-rental/customer/agreements/{id}/successor`.
+2. System creates a Draft successor agreement linked to `predecessor_agreement_id = {id}`.
 3. Predecessor contract remains active and continues billing without disruption.
 4. When the successor is activated (`POST .../activate`), the predecessor agreement is atomically closed on the exact boundary date (`closed_at`), ensuring seamless legal continuity without gaps.
 
@@ -595,18 +660,19 @@ Owner agreements represent the sourcing supply contracts for vehicles leased fro
     "normal_ot_rate": "350.000000",
     "double_ot_rate": "500.000000",
     "triple_ot_rate": "750.000000",
-    "night_out_rate": "2000.000000"
+    "night_out_rate": "2000.000000",
+    "working_hours": "8.000000"
   }
 }
 ```
 
-### 3.4 Vehicle Physical Custody (`VehicleUse`)
+### 3.4 Vehicle Physical Custody (`VehicleUse`) & Internal Deployments
 
-`VehicleUse` represents the real-world physical custody of a vehicle assigned to a customer agreement.
+`VehicleUse` represents the real-world physical custody of a vehicle assigned to a customer agreement OR deployed for internal company operations.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Planned: User plans assignment
+    [*] --> Planned: User plans assignment / internal use
     Planned --> InCustody: POST /{id}/handover (Key Handover)
     Planned --> Cancelled: POST /{id}/cancel
     InCustody --> Returned: POST /{id}/return (Vehicle Check-in)
@@ -617,20 +683,36 @@ stateDiagram-v2
 - **Service:** [`VehicleUseService.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/VehicleUseService.php)
 - **Controller:** [`VehicleUseController.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Http/Controllers/VehicleUseController.php)
 
+#### Internal Company Deployments (`planInternal`):
+Organizations deploy company-owned vehicles (validated via `CompanyVehicleCoverageService`) or third-party owner-leased vehicles for internal business operations without requiring a customer agreement.
+- **API Endpoint:** `POST /api/v1/vehicle-rental/vehicle-uses/internal`
+- **Request Payload (`OperationalFields::MUTABLE_USE`):**
+```json
+{
+  "vehicle_id": 5,
+  "starts_at": "2026-11-20 08:00:00",
+  "ends_at": "2026-11-30 18:00:00",
+  "notes": "Internal executive transport for factory audit"
+}
+```
+- **Scope Filters in Registers:**
+  Registers support `kind=customer` (`customer_agreement_id IS NOT NULL`), `kind=owner` (`owner_agreement_id IS NOT NULL`), and `kind=internal` (`customer_agreement_id IS NULL`), allowing operators to view and filter company deployments instantly.
+
 #### Key Operational Validations:
-1. **Clock Drift Tolerance:** Validates that `occurred_at` does not exceed 10 minutes into the future (`CLOCK_DRIFT_TOLERANCE_MINUTES`).
+1. **Clock Drift Tolerance:** Validates that `occurred_at` does not exceed 2 minutes into the future (`OperationalFields::CLOCK_DRIFT_TOLERANCE_MINUTES = 2`).
 2. **Odometer Continuity:** `handover_odometer` must be equal to or greater than the vehicle's last recorded odometer reading.
 3. **Return Integrity:** `returned_at` must be strictly after `handed_over_at`, and `return_odometer >= handover_odometer`. It verifies that no finalized running charts have odometers exceeding the return odometer.
 
 ### 3.5 Mid-Lease Atomic Vehicle Swaps (Replacements)
 
-When a vehicle breaks down, requires maintenance, or is recalled during an active lease:
+When a vehicle breaks down, requires maintenance, or is recalled during an active lease (customer or internal deployment):
 - The operator calls `POST /api/v1/vehicle-rental/vehicle-uses/{id}/replace`.
 - In a single atomic database transaction:
   1. Closes existing custody (`Returned`) at `replacement_time` with `return_odometer`.
   2. Creates replacement custody use record with `replaces_use_id = $oldUse->id`, `status = InCustody`, and `handed_over_at = replacement_time`.
-  3. Records entry in `vehicle_rental_reassignments` with `reassignment_type = vehicle_replacement`.
-  4. The Two-Stage Invoicing engine prorates base rent across both vehicles based on exact physical custody days without double-counting the swap date.
+  3. Supports replacement on both customer agreements and internal company deployments (where `customer_agreement_id` is null).
+  4. Records entry in `vehicle_rental_reassignments` with `reassignment_type = vehicle_replacement`.
+  5. The Two-Stage Invoicing engine prorates base rent across both vehicles based on exact physical custody days without double-counting the swap date.
 
 ### 3.6 Driver Assignments & Reassignments
 
@@ -643,37 +725,51 @@ Drivers are assigned to vehicle uses or individual daily running charts.
   - Updates snapshots (`driver_employee_id`, `driver_name_snapshot`, `driver_reference_snapshot`).
   - Writes a traceable record in `vehicle_rental_reassignments`.
 
-### 3.7 Daily Running Charts & Telematics Tracking
+### 3.7 Daily Running Charts, Telematics & Baseline Overtime Engine
 
 Running charts are daily trip manifests recording real-world vehicle duty.
 - **Service:** [`RunningChartService.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RunningChartService.php)
 - **Controller:** [`RunningChartController.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Http/Controllers/RunningChartController.php)
+- **Overtime Engine:** [`OvertimeCalculator.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/OvertimeCalculator.php)
 
-#### Metrics Tracked:
+#### Automatic Baseline Overtime Engine:
+1. Agreements define agreed working hours per day via `working_hours` (e.g. `8.0` hours).
+2. When duty shift start and end times are recorded (e.g., 08:00 to 19:30 = 11.5 hours), `OvertimeCalculator` determines:
+   $$\text{Trip Minutes} = 11.5 \times 60 = 690\text{ minutes}$$
+   $$\text{Baseline Minutes} = 8.0 \times 60 = 480\text{ minutes}$$
+   $$\text{Overtime Minutes} = \max(0, 690 - 480) = 210\text{ minutes (3 hrs 30 mins)}$$
+3. In `RunningChartEditor.tsx`, the reactive Overtime Baseline Card displays the calculated overtime in real time, with quick actions to:
+   - "Apply Baseline OT" (populates `normal_ot_minutes`).
+   - "Route Excess to Double OT" (for weekend or special shift hours).
+   - "Reset OT" (returns values to zero).
+
+#### Telematics Metrics Tracked:
 - `start_odometer` and `end_odometer` (must satisfy `end_odometer >= start_odometer`)
-- `commercial_km` + `private_km` (asserts `commercial_km + private_km === total_km`)
+- `commercial_km` (Billable customer kilometers) + `garage_km` (Depot dead-mileage) = $\text{end\_odometer} - \text{start\_odometer}$
 - `normal_ot_minutes` (Standard 1.5x overtime)
 - `double_ot_minutes` (Sunday / Poya / Holiday 2.0x overtime)
 - `triple_ot_minutes` (Midnight / Special holiday 3.0x overtime)
 - `night_outs` (Driver overnight outstation allowances)
 - `ac_mode` (`non_ac`, `front`, `dual`)
-- **Immutability:** Finalized charts cannot be edited or deleted. Errors are corrected by transitioning to `Reversed` and logging a replacement chart.
+- **Immutability:** Finalized charts cannot be edited or deleted (`MethodNotAllowedHttpException`). Errors are corrected by transitioning to `Reversed` and logging a replacement chart via `corrects_chart_id`.
 
 ### 3.8 Fleet Operating Expenses & 4-Way Allocation Matrix
 
 Fleet expenses (fuel, highway tolls, replacement tires, servicing) are logged in `vehicle_rental_expenses`.
 - **Service:** [`RentalExpenseService.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalExpenseService.php)
-- **The 4-Way Allocation Matrix:**
-  1. `company_fleet`: Tenant company absorbs the expense as operating overhead.
+- **The 4-Way Allocation Matrix (`RentalExpenseAllocationType`):**
+  1. `company_cost`: Tenant company absorbs the expense as operating fleet overhead.
   2. `customer_recovery`: Expense is billed to the customer (e.g. expressway tolls, damaged tire replacement) via a Sales Invoice or Debit Note.
   3. `owner_deduction`: Expense is deducted from the vehicle owner's monthly settlement bill (e.g. routine mechanical servicing performed on a lessor vehicle).
-  4. `shared`: Proportional split between tenant and customer/owner.
+  4. `employee_reimbursement`: Chauffeur or employee out-of-pocket outlay reimbursed by company.
+- **Organization Unit Scoping:** Unlinking allocations enforces strict branch isolation, preventing cross-organization state leakage.
 
 ### 3.9 Damage Incidents & Private Proofs
 
 Accidents and damage events require legal and insurance documentation.
 - **Service:** [`RentalIncidentService.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalIncidentService.php)
 - **Attachments Service:** [`RentalIncidentAttachmentService.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalIncidentAttachmentService.php)
+- **Candidate Options:** `GET /api/v1/vehicle-rental/incidents/vehicle-use-options` and `GET .../running-chart-options` allow operators to link incidents to active assignments (displaying customer agreement or owner party name for internal deployments).
 - **Evidence Storage:** Photos, police accident reports, and third-party repair estimates are uploaded via `RentalIncidentAttachmentController.php` to private tenant-scoped storage.
 - **Financial Rule:** Incidents do not invent money. Repair bills and insurance recoveries are created through `AgreementAdjustment`, `BillingCycleItem` (Damage Charge), or `RentalExpense` customer recovery allocations.
 
@@ -685,11 +781,15 @@ For fleet vehicles financed via bank loans or hire-purchase leases:
 - Generates amortization schedules (`vehicle_rental_finance_installments`) dividing monthly installments into principal, interest, and finance charges.
 - Calling `POST /api/v1/vehicle-rental/finance-agreements/installments/{id}/payable` generates an authentic AP Purchase Invoice in `Modules\Invoice` payable to the bank.
 
-### 3.11 Agreement Financial Adjustments
+### 3.11 Agreement Financial Adjustments & Voiding Lifecycle
 
 Ad-hoc contractual revisions (rate adjustments, early termination penalties, goodwill discounts) are managed via `vehicle_rental_agreement_adjustments`.
 - **Controller:** [`AgreementAdjustmentController.php`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Http/Controllers/AgreementAdjustmentController.php)
-- **Lifecycle:** `Draft` -> `Authorized` -> `Applied` (linked to an invoice or owner settlement bill) -> `Cancelled`.
+- **Lifecycle:** `Draft` -> `Authorized` -> `Applied` (linked to an invoice or owner settlement bill) -> `Voided`.
+- **Immutability Guarantee:** Direct deletion (`DELETE /adjustments/{id}`) is strictly prohibited (`MethodNotAllowedHttpException`) to preserve legal audit trails.
+- **Voiding Endpoint:** `POST /api/v1/vehicle-rental/adjustments/{id}/void` allows authorized billing managers to void draft or authorized adjustments, updating status to `Voided` with an immutable audit entry in `vehicle_rental_agreement_adjustments_history`.
+- **Restoration Safety:** If an invoice or owner bill containing an adjustment is cancelled, the adjustment status is restored back to `Authorized` and unlinked from the invoice, preventing stranded adjustments.
+- **Voiding Endpoint:** `POST /api/v1/vehicle-rental/adjustments/{id}/void` allows authorized billing managers to void draft or unapplied adjustments, updating status to `Voided` with an immutable audit entry.
 - **Restoration Safety:** If an invoice or owner bill containing an adjustment is cancelled, the adjustment status is restored back to `Authorized` and unlinked from the invoice, preventing stranded adjustments.
 
 ---
@@ -734,7 +834,7 @@ When creating a billing cycle via `POST /api/v1/vehicle-rental/{kind}/agreements
 ### 4.3 Running Chart Attachment & Operational Rate Calculations
 
 When trip sheets are finalized, the operator calls `POST /api/v1/vehicle-rental/billing-cycles/{id}/charts`:
-1. **Running Chart Validation:** Validates that each chart belongs to the agreement, is in `Finalized` status, and is not already locked in another finalized cycle.
+1. **Running Chart Validation:** Validates that each chart belongs to the agreement, is in `Finalized` status, and is not already locked in another active or finalized cycle (preventing double-billing race conditions).
 2. **Operational Tallying:**
    - **Excess Kilometers:**
      $$\text{Excess KM} = \max(0, \text{Total Commercial KM} - \text{Included Free KM})$$
@@ -770,7 +870,7 @@ If a vehicle suffered substantial downtime during the month and contractual reba
 - $\text{Delta Subtotal} < 0$
 - Rather than throwing an error or generating a corrupt negative invoice, the engine automatically issues an authentic **Credit Note Invoice** (`InvoiceType::Credit`) for the absolute delta amount ($\text{abs}(\text{Delta Subtotal})$).
 - Emits itemized deduction lines on the credit note.
-- If the Stage 1 invoice has an unpaid remaining balance, calls `InvoiceBalanceUpdater::allocateCredit()` to automatically offset the credit note against the open Stage 1 invoice!
+- If the Stage 1 invoice has an unpaid remaining balance, calls `InvoiceBalanceUpdater::allocateCredit()` to automatically offset the credit note against the open Stage 1 invoice.
 
 ### 4.6 Consolidated Revision Invoicing (Mode B)
 
@@ -780,9 +880,21 @@ Certain corporate lessees refuse multiple invoices and demand a single consolida
 3. Automatically transitions the consolidated invoice to `Approved` and `Posted`.
 4. If a Stage 1 invoice was previously issued:
    - Cancels the Stage 1 invoice.
-   - Calls `PaymentAllocationReversalService` to transfer any customer payments or deposits tendered on Stage 1 over to the new consolidated invoice!
+   - Calls `PaymentAllocationReversalService` to transfer any customer payments or deposits tendered on Stage 1 over to the new consolidated invoice.
 
-### 4.7 Cancellation & Source Restoration Engine
+### 4.7 Billing Cycle Cancellation Workflow & Date Lock Release
+
+If a draft or attached billing cycle must be cancelled prior to finalization:
+- **API Endpoint:** `POST /api/v1/vehicle-rental/billing-cycles/{id}/cancel`
+- **Actions Executed:**
+  1. Checks authorization via `RentalAuthorization::authorizeBillingAction`.
+  2. Prohibits cancelling already finalized cycles.
+  3. Releases all date locks on the agreement for the period.
+  4. Detaches all attached running charts (`vehicle_rental_billing_cycle_charts`), unlocking them so they can be included in a subsequent or corrected billing cycle.
+  5. Updates billing cycle status to `Cancelled`.
+  6. Subsequent attempts to finalize or preview the cancelled cycle are rejected immediately.
+
+### 4.8 Document Cancellation & Source Restoration Engine
 
 If an operator cancels an issued rental invoice via `POST /api/v1/vehicle-rental/billing/documents/{id}/cancel`:
 - [`RentalBillingDocumentService::cancelDocument()`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalBillingDocumentService.php) executes full bidirectional restoration:
@@ -799,7 +911,7 @@ If an operator cancels an issued rental invoice via `POST /api/v1/vehicle-rental
      - Unlinks `RentalExpenseAllocation` maintenance chargebacks so they can be re-settled.
      - Restores unbilled owner billing cycles back to `Stage2Attached`/`Draft`.
 
-### 4.8 Complete End-to-End Invoicing Numeric Case Study
+### 4.9 Complete End-to-End Invoicing Numeric Case Study
 
 To see how the calculations work in practice, let us follow a complete 30-day corporate rental cycle:
 
@@ -815,6 +927,7 @@ To see how the calculations work in practice, let us follow a complete 30-day co
   - Double Overtime (2.0x): LKR 600.00 / hour
   - Triple Overtime (3.0x): LKR 900.00 / hour
   - Night Out Allowance: LKR 2,500.00 / night
+  - Daily Working Hours Baseline: 8.0 hours
   - VAT: 15% Standard Rated
 
 #### Step 1: Day 1 — Stage 1 Provisional Invoicing
@@ -1071,7 +1184,7 @@ Reports Directory: app/Modules/VehicleRental/Services/
 ├── OwnerDisbursementReportService.php         # Detail I & II Lessor settlement statements
 ├── VehicleProfitabilityReportService.php      # Dual-sided vehicle P&L analysis
 ├── RentalIncidentReportService.php            # Damage, repair costs & insurance claims
-└── RunningChartReportService.php              # 31-day physical trip log matrix
+└── RunningChartReportService.php              # 31-day physical trip log matrix & fleet print
 ```
 
 1. **Fleet Utilization Report:** Computes total active fleet days, days under customer lease, days in workshop maintenance, and fleet utilization rate ($$\frac{\text{Rented Days}}{\text{Total Available Days}} \times 100$$).
@@ -1084,7 +1197,7 @@ Reports Directory: app/Modules/VehicleRental/Services/
    $$\text{Direct Cost} = \text{Owner Lease Rent} + \text{Owner Usage} + \text{Fleet Maintenance} + \text{Bank Finance Interest}$$
    $$\text{Net Profit} = \text{Revenue} - \text{Direct Cost} \quad \text{and} \quad \text{Profit Margin \%}$$
 7. **Damage Incidents Summary Report:** Overview of accidents, damage claims, third-party liability, estimated vs actual repair costs, and insurance settlement statuses.
-8. **Running Chart Sheet Report:** 31-day operational trip sheet matrix for a specific vehicle and month, reproducing the official regulatory transport logbook.
+8. **Running Chart Sheet Report:** 31-day operational trip sheet matrix for a specific vehicle and month. Supports customer rentals, owner sourcing agreements, and **company fleet internal operations** (generating the official Company Fleet Running Sheet without requiring an agreement ID).
 
 ---
 
@@ -1111,6 +1224,8 @@ App Routing
   ├── /vehicle-rental/billing            -> RentalInvoicesAndBillsPage.tsx
   │     ├── BillingCycleWizardModal.tsx
   │     ├── OwnerSettlementModal.tsx
+  │     ├── RentalQuotationPreviewModal.tsx
+  │     ├── RentalOwnerBillPreviewModal.tsx
   │     └── RentalBillingDocumentDetailModal.tsx
   ├── /vehicle-rental/payments           -> RentalPaymentsPage.tsx
   ├── /vehicle-rental/expenses           -> RentalExpensesPage.tsx (RentalExpenseEditorModal.tsx)
@@ -1127,7 +1242,7 @@ App Routing
   - **Dual Operational Tabs:** AR tab (Customer Invoices, Outbound) and AP tab (Owner Bills, Inbound), dynamically gated by user permissions.
   - **Financial KPI Cards:** Real-time Gross Invoiced, Total Paid, and Balance Due metric badges.
   - **Comprehensive Filters:** Search by reference, party, or vehicle registration; filter by document status (`draft`, `approved`, `posted`, `partially_paid`, `paid`, `cancelled`) or balance status (`unpaid`, `partially_paid`, `paid`, `overdue`).
-  - **Action Hub:** Launch Billing Cycle Wizard, Direct Base Rent Invoice, or Generate Owner Settlement Bill.
+  - **Action Hub:** Launch Billing Cycle Wizard, Direct Base Rent Invoice, Generate Owner Settlement Bill, or Preview Pro-Forma Quotations / Bills.
   - **Detail Modal:** [`RentalBillingDocumentDetailModal.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/RentalBillingDocumentDetailModal.tsx) opens an operational summary strip (KM, OT, Nights), itemized charges with discount columns, financial totals card, and action buttons for Print, PDF, Telematics Statement, and Document Cancellation.
 
 ### 9.3 Agreements Management Workspace
@@ -1135,7 +1250,7 @@ App Routing
 - **Page Component:** [`AgreementsPage.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/AgreementsPage.tsx)
 - **Routes:** `/vehicle-rental/customer/agreements` and `/vehicle-rental/owner/agreements`
 - **Sub-Panels:**
-  - `AgreementEditor.tsx`: Term builder with strict decimal regex validations.
+  - `AgreementEditor.tsx`: Term builder with strict decimal regex validations, baseline working hours input, and date control safeguards.
   - `AgreementFinancialSummaryPanel.tsx`: Live financial status displaying invoiced totals, payments received, credit notes, and net balance due.
   - `AgreementPaymentModal.tsx`: Tender payments directly with cross-agreement settlement toggles.
   - `AgreementSuccessorForm.tsx`: Create versioned successor contracts.
@@ -1143,8 +1258,17 @@ App Routing
 
 ### 9.4 Vehicle Custody & Running Chart Registers
 
-- **Vehicle Use Register (`VehicleUseRegisterPage.tsx`):** View all planned, in-custody, and returned vehicles across the company fleet. Filter by customer, vehicle, or date range. Trigger handovers, returns, or mid-lease replacements.
-- **Running Chart Register (`RunningChartRegisterPage.tsx`):** Search daily trip sheets by reference, driver, or notes. Review odometer readings, overtime minutes, and AC modes. Trigger finalization or reversal.
+- **Vehicle Use Register (`VehicleUseRegisterPage.tsx`):**
+  - View all planned, in-custody, and returned vehicles across the company fleet.
+  - Scope dropdown filters: **All**, **Customer rentals**, **Owner-leased vehicles**, and **Internal company operations**.
+  - Direct row-level action buttons: Handover key, Record return, Cancel planned assignment, or Mid-lease vehicle swap.
+  - Quick action modal: "Deploy vehicle for internal use" to immediately plan company operations without needing an agreement.
+- **Running Chart Register (`RunningChartRegisterPage.tsx`):**
+  - Search daily trip sheets by reference, driver, or notes.
+  - Scope dropdown filters: **All**, **Customer rentals**, **Owner-leased vehicles**, and **Internal company operations**.
+  - Quick Dispatch shortcut: Select active vehicle custody, prefill chart editor, and record trip logs.
+  - Overtime Baseline Card in [`RunningChartEditor.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/RunningChartEditor.tsx): Live calculation comparing shift duration with agreed working hours, with quick apply/reset buttons.
+  - Print Fleet Sheet shortcut: Generate the official 31-day regulatory logbook for any vehicle and month.
 
 ### 9.5 UI/UX Invariants & Design Principles
 
@@ -1156,25 +1280,33 @@ App Routing
 3. **Speed and Clarity Over Information Overload:**
    - Primary action modals display only required operational fields. Advanced analytics, history audits, and document logs are housed in secondary tabs or expandable drawers.
 4. **Explicit Feedback & Safety Confirmation:**
-   - Irreversible actions (cancelling an invoice, reversing a payment, returning a vehicle) require explicit confirmation dialogs explaining the downstream accounting and custody impact.
+   - Irreversible actions (cancelling an invoice, reversing a payment, returning a vehicle, voiding an adjustment) require explicit confirmation dialogs explaining the downstream accounting and custody impact.
 
-### 9.6 End-to-End User Journeys
+### 9.6 End-to-End User Journeys (4 Operational Roles)
 
 #### User Journey 1: Fleet Dispatcher
 1. Opens `/vehicle-rental/customer/agreements` and navigates to the active agreement.
 2. Clicks "Assign Vehicle", selects vehicle `CAS-4912`, driver `EMP-0104`, and planned custody dates.
 3. On vehicle handover, clicks "Handover", records actual start time and odometer reading (e.g. 45,200 km). Vehicle status updates to `Rented`.
-4. Daily: Opens `/vehicle-rental/running-charts`, clicks "New Running Chart", enters trip odometers, overtime minutes, AC mode, and highway toll amounts. Clicks "Finalize Chart".
+4. Daily: Opens `/vehicle-rental/running-charts`, clicks "New Running Chart", enters trip odometers, review baseline OT calculation in the Overtime Card, confirms AC mode and highway toll amounts. Clicks "Finalize Chart".
 5. On lease completion, clicks "Return Vehicle", enters return odometer (e.g. 48,620 km). Vehicle status returns to `Active`.
 
-#### User Journey 2: Billing Specialist
+#### User Journey 2: Internal Fleet Operations Officer
+1. Opens `/vehicle-rental/vehicle-uses`.
+2. Clicks "Deploy vehicle for internal use".
+3. Selects company vehicle `WP-CAE-8821`, default driver `EMP-0205`, start time, and operational notes (e.g. "HQ Senior Management inspection tour").
+4. Clicks "Deploy Vehicle". The vehicle is immediately planned for internal operations.
+5. Performs key handover. Chauffeur logs daily running charts under `kind=internal`.
+6. Prints the official Company Fleet Running Sheet at month end via `GET /reports/running-chart-sheet` without needing a commercial agreement.
+
+#### User Journey 3: Billing Specialist
 1. Opens `/vehicle-rental/billing` on the 1st of the month.
 2. Clicks "New Billing Cycle", selects customer agreement, sets period (e.g. Oct 1 to Oct 31), checks "Issue Stage 1 Initial Invoice", and confirms. Stage 1 Base Rent invoice is issued.
 3. At month end, clicks "Attach Running Charts". System detects 31 finalized trip sheets, tallies excess km and overtime, and advances cycle to `Stage2Attached`.
 4. Clicks "Finalize Cycle" in Mode A. System generates the Supplementary Usage Invoice.
 5. Clicks "View Statement" to generate the printable Telematics Statement with PDF export for the client.
 
-#### User Journey 3: Financial Accountant
+#### User Journey 4: Financial Accountant
 1. Opens `/vehicle-rental/billing` and switches to the "Owner Bills (AP)" tab.
 2. Clicks "Generate Owner Settlement Bill", selects owner agreement and month. System calculates gross lease rent, overtime reimbursement, 10% WHT, and maintenance chargebacks within capacity.
 3. Clicks "Save Bill". An AP Purchase Invoice is created in `Modules\Invoice`.
@@ -1182,148 +1314,176 @@ App Routing
 
 ---
 
-## 10. Complete REST API Specification (65+ Endpoints)
+## 10. Complete REST API Specification (70+ Endpoints)
 
 All routes are prefixed with `/api/v1/vehicle-rental` and require authentication and the `vehicle_rental` tenant feature.
 
-| Method | Endpoint | Permission Required | Purpose |
+## 10. Complete REST API Specification (70+ Endpoints)
+
+All routes are prefixed with `/api/v1/vehicle-rental`, require tenant authentication, active organization branch context, and the `vehicle_rental` tenant feature gate.
+
+> [!IMPORTANT]
+> **Immutability Architecture & HTTP 405 Protections:**
+> In accordance with AutoERP's audit trail and legal compliance invariants, **physical and financial deletion is strictly prohibited** across all active and historical rental entities. Registered `DELETE` routes on business resources (`/reservations/{id}`, `/finance-agreements/{id}`, `/expenses/{id}`, `/incidents/{id}`, `/{kind}/agreements/{id}`, `/vehicle-uses/{id}`, `/running-charts/{id}`, `/billing-cycles/{id}`, `/adjustments/{id}`) explicitly return `405 Method Not Allowed` (`MethodNotAllowedHttpException`) by design.
+> Operators must always use non-destructive lifecycle state transitions instead:
+> - Reservations $\rightarrow$ `PATCH .../transition` (`action=cancel`)
+> - Finance Contracts $\rightarrow$ `PATCH .../cancel`
+> - Fleet Expenses $\rightarrow$ `PATCH .../transition` (`action=reject` or `action=reverse`)
+> - Damage Incidents $\rightarrow$ `POST .../reject`
+> - Commercial Agreements $\rightarrow$ `POST .../close`
+> - Vehicle Custody Uses $\rightarrow$ `POST .../cancel` (if planned) or `POST .../return` (if in custody)
+> - Daily Running Charts $\rightarrow$ `POST .../reverse` (with optional correction chart logging)
+> - Billing Cycles $\rightarrow$ `POST .../cancel` (which releases date locks and unlocks trip sheets)
+> - Financial Adjustments $\rightarrow$ `POST .../void`
+
+| Method | Endpoint | Exact Permission Required | Functional Purpose & Behavior |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/dashboard` | `vehicle_rental.dashboard.view` | Rental KPI summary and alerts |
-| `GET` | `/driver-employees` | `vehicle_rental.use.view` | Directory of available company chauffeurs |
+| `GET` | `/dashboard` | `vehicle-rental.dashboard.view` | Rental KPI summary metrics and operational alerts |
+| `GET` | `/driver-employees` | `vehicle-rental.vehicle-use.view` | Directory of available company chauffeurs (`hr_employees`) |
 | **Reservations Group** | | | |
-| `GET` | `/reservations` | `vehicle_rental.reservation.view` | List booking inquiries with filters |
-| `POST` | `/reservations` | `vehicle_rental.reservation.manage` | Create new rental reservation |
-| `GET` | `/reservations/{id}` | `vehicle_rental.reservation.view` | View reservation detail |
-| `PUT` | `/reservations/{id}` | `vehicle_rental.reservation.manage` | Update reservation details |
-| `DELETE`| `/reservations/{id}` | `vehicle_rental.reservation.manage` | Delete draft reservation |
-| `PATCH`| `/reservations/{id}/transition` | `vehicle_rental.reservation.manage` | Advance reservation status |
-| `POST` | `/reservations/{id}/convert` | `vehicle_rental.reservation.manage` | Convert reservation to customer agreement |
+| `GET` | `/reservations` | `vehicle-rental.reservations.view` | List booking inquiries with filters and pagination |
+| `POST` | `/reservations` | `vehicle-rental.reservations.manage` | Create new rental reservation inquiry |
+| `GET` | `/reservations/{id}` | `vehicle-rental.reservations.view` | View reservation detail and lifecycle history |
+| `PUT` | `/reservations/{id}` | `vehicle-rental.reservations.manage` | Update editable reservation parameters |
+| `DELETE`| `/reservations/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design to preserve inquiry history; use cancel transition |
+| `PATCH`| `/reservations/{id}/transition` | `vehicle-rental.reservations.manage` | Advance reservation status (`confirm`, `cancel`, `expire`) |
+| `POST` | `/reservations/{id}/convert` | `vehicle-rental.reservations.manage` | Convert confirmed reservation to an active customer agreement |
 | **Finance Agreements Group** | | | |
-| `GET` | `/finance-agreements` | `vehicle_rental.finance.view` | List vehicle finance contracts |
-| `POST` | `/finance-agreements` | `vehicle_rental.finance.manage` | Create hire-purchase finance agreement |
-| `GET` | `/finance-agreements/{id}` | `vehicle_rental.finance.view` | View finance contract & installments |
-| `DELETE`| `/finance-agreements/{id}` | `vehicle_rental.finance.manage` | Delete draft finance agreement |
-| `PATCH`| `/finance-agreements/{id}/activate` | `vehicle_rental.finance.manage` | Activate finance contract |
-| `PATCH`| `/finance-agreements/{id}/cancel` | `vehicle_rental.finance.manage` | Cancel finance contract |
-| `POST` | `/finance-agreements/installments/{id}/payable` | `vehicle_rental.finance.manage` | Create AP bill voucher for installment |
-| `PATCH`| `/finance-agreements/installments/refresh-due-statuses` | `vehicle_rental.finance.manage` | Refresh due status of installments |
+| `GET` | `/finance-agreements` | `vehicle-rental.finance.view` | List vehicle hire-purchase/finance contracts |
+| `POST` | `/finance-agreements` | `vehicle-rental.finance.manage` | Create new vehicle finance agreement with amortization |
+| `GET` | `/finance-agreements/{id}` | `vehicle-rental.finance.view` | View finance contract details and installment schedules |
+| `DELETE`| `/finance-agreements/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design to preserve audit lineage; use cancel |
+| `PATCH`| `/finance-agreements/{id}/activate` | `vehicle-rental.finance.manage` | Activate finance contract and generate installment schedule |
+| `PATCH`| `/finance-agreements/{id}/cancel` | `vehicle-rental.finance.manage` | Cancel finance contract |
+| `POST` | `/finance-agreements/installments/{id}/payable` | `vehicle-rental.finance.manage` | Create AP purchase bill in `Modules\Invoice` for installment |
+| `PATCH`| `/finance-agreements/installments/refresh-due-statuses` | `vehicle-rental.finance.manage` | Refresh due/overdue status of scheduled installments |
 | **Fleet Expenses Group** | | | |
-| `GET` | `/expenses` | `vehicle_rental.expense.view` | List fleet expenses |
-| `POST` | `/expenses` | `vehicle_rental.expense.manage` | Create operational fleet expense |
-| `GET` | `/expenses/{id}` | `vehicle_rental.expense.view` | View expense details & allocations |
-| `DELETE`| `/expenses/{id}` | `vehicle_rental.expense.manage` | Delete draft expense |
-| `PATCH`| `/expenses/{id}/transition` | `vehicle_rental.expense.manage` | Advance expense status |
-| `POST` | `/expenses/allocations/{id}/bill` | `customer.bill` | Bill customer recovery allocation |
-| `POST` | `/expenses/allocations/{id}/unlink-invoice` | `customer.bill` | Unlink allocation from cancelled bill |
+| `GET` | `/expenses` | `vehicle-rental.expenses.view` | List fleet operating expenses with type and status filters |
+| `POST` | `/expenses` | `vehicle-rental.expenses.manage` | Create operational fleet expense (fuel, toll, repair) |
+| `GET` | `/expenses/{id}` | `vehicle-rental.expenses.view` | View expense details, tax groups, and 4-way allocations |
+| `DELETE`| `/expenses/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design; use reject or reverse transition |
+| `PATCH`| `/expenses/{id}/transition` | `vehicle-rental.expenses.manage` | Advance expense status (`submit`, `approve`, `reject`, `reverse`) |
+| `POST` | `/expenses/allocations/{id}/bill` | `vehicle-rental.customer-agreements.bill` | Bill customer recovery allocation via Sales Invoice |
+| `POST` | `/expenses/allocations/{id}/unlink-invoice` | `vehicle-rental.customer-agreements.bill` | Unlink allocation from cancelled invoice |
 | **Damage Incidents Group** | | | |
-| `GET` | `/incidents` | `vehicle_rental.incident.view` | Master register of damage incidents |
-| `POST` | `/incidents` | `vehicle_rental.incident.record` | Record damage incident |
-| `GET` | `/incidents/{id}` | `vehicle_rental.incident.view` | View incident details |
-| `DELETE`| `/incidents/{id}` | `vehicle_rental.incident.record` | Delete draft incident |
-| `GET` | `/incidents/{id}/history` | `vehicle_rental.incident.view` | View incident audit history |
-| `POST` | `/incidents/{id}/attachments` | `vehicle_rental.incident.record` | Upload private file proof attachment |
-| `GET` | `/incidents/{id}/attachments/{att}` | `vehicle_rental.incident.view` | Download incident attachment proof |
-| `GET` | `/incidents/vehicle-use-options` | `vehicle_rental.incident.view` | Query candidate custody uses |
-| `GET` | `/incidents/vehicle-uses/{use}/running-chart-options` | `vehicle_rental.incident.view` | Query candidate running charts |
-| `POST` | `/incidents/{id}/{action}` | `vehicle_rental.incident.review` | Review incident (`confirm`, `reject`) |
+| `GET` | `/incidents` | `vehicle-rental.incidents.view` | Master register of vehicle incidents and damage evidence |
+| `POST` | `/incidents` | `vehicle-rental.incidents.record` | Record immutable damage incident against active vehicle custody |
+| `GET` | `/incidents/{id}` | `vehicle-rental.incidents.view` | View incident details and attached evidence |
+| `DELETE`| `/incidents/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design to preserve legal evidence; use review reject |
+| `GET` | `/incidents/{id}/history` | `vehicle-rental.incidents.view` | View incident audit event trail |
+| `POST` | `/incidents/{id}/attachments` | `vehicle-rental.incidents.record` | Upload private file proof attachment (photos, police reports) |
+| `GET` | `/incidents/{id}/attachments/{att}` | `vehicle-rental.incidents.view` | Download private incident attachment proof |
+| `GET` | `/incidents/vehicle-use-options` | `vehicle-rental.incidents.view` | Query candidate custody uses for incident linking |
+| `GET` | `/incidents/vehicle-uses/{use}/running-chart-options` | `vehicle-rental.incidents.view` | Query candidate running charts for incident linking |
+| `POST` | `/incidents/{id}/{action}` | `vehicle-rental.incidents.review` | Review incident evidence (`action = confirm \| reject`) |
 | **Agreements Group ({kind} = customer \| owner)** | | | |
-| `GET` | `/{kind}/agreements` | `customer.view` / `owner.view` | List customer or owner agreements |
-| `POST` | `/{kind}/agreements` | `customer.manage` / `owner.manage` | Create commercial agreement |
-| `GET` | `/{kind}/agreements/{id}` | `customer.view` / `owner.view` | View agreement details & terms |
-| `PUT` | `/{kind}/agreements/{id}` | `customer.manage` / `owner.manage` | Update draft agreement terms |
-| `DELETE`| `/{kind}/agreements/{id}` | `customer.manage` / `owner.manage` | Delete draft agreement |
-| `POST` | `/{kind}/agreements/{id}/successor` | `customer.manage` / `owner.manage` | Create successor contract lineage |
-| `GET` | `/{kind}/agreements/{id}/history` | `customer.view` / `owner.view` | View agreement revision history |
-| `GET` | `/{kind}/agreements/{id}/financial-summary`| `invoice.view` | Invoiced, paid, and balance metrics |
-| `POST` | `/{kind}/agreements/{id}/financial-adjustments` | `customer.manage` | Create agreement debit/credit note |
-| `POST` | `/{kind}/agreements/{id}/base-rent-preview` | `customer.bill` | Preview base rent calculation |
-| `POST` | `/{kind}/agreements/{id}/{action}` | `customer.manage` / `owner.manage` | Transition agreement (`activate`, `close`) |
-| `GET` | `/{kind}/agreements/{id}/base-charges` | `customer.view` / `owner.view` | Direct base rent charge schedule |
-| `POST` | `/{kind}/agreements/{id}/base-charges` | `customer.bill` / `owner.bill` | Create direct base charge |
-| `POST` | `/{kind}/agreements/{id}/base-charges/{c}/void` | `customer.bill` | Void direct base charge |
-| `POST` | `/{kind}/agreements/{id}/base-charges/{c}/reissue`| `customer.bill` | Reissue direct base charge |
+| `GET` | `/{kind}/agreements` | `vehicle-rental.{kind}-agreements.view` | List commercial customer or owner agreements |
+| `POST` | `/{kind}/agreements` | `vehicle-rental.{kind}-agreements.manage` | Create draft commercial agreement with rate terms JSON |
+| `GET` | `/{kind}/agreements/{id}` | `vehicle-rental.{kind}-agreements.view` | View agreement details, terms, and successor pointers |
+| `PUT` | `/{kind}/agreements/{id}` | `vehicle-rental.{kind}-agreements.manage` | Update draft agreement terms (asserts optimistic row version) |
+| `DELETE`| `/{kind}/agreements/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design to preserve legal history; use close |
+| `POST` | `/{kind}/agreements/{id}/successor` | `vehicle-rental.{kind}-agreements.manage` | Create versioned successor contract lineage |
+| `GET` | `/{kind}/agreements/{id}/history` | `vehicle-rental.{kind}-agreements.view` | View complete terms and status audit history |
+| `GET` | `/{kind}/agreements/{id}/financial-summary`| `vehicle-rental.{kind}-agreements.view` | Invoiced totals, payments received, and balance due metrics |
+| `POST` | `/{kind}/agreements/{id}/financial-adjustments` | `vehicle-rental.{kind}-agreements.manage` | Create contractual debit or credit note adjustment |
+| `POST` | `/{kind}/agreements/{id}/base-rent-preview` | `vehicle-rental.{kind}-agreements.bill` | Preview provisional base rent calculation for period |
+| `POST` | `/{kind}/agreements/{id}/{action}` | `vehicle-rental.{kind}-agreements.manage` | Transition agreement (`action = activate \| close`) |
+| `GET` | `/{kind}/agreements/{id}/base-charges` | `vehicle-rental.{kind}-agreements.view` | View direct base rent charge schedule |
+| `POST` | `/{kind}/agreements/{id}/base-charges` | `vehicle-rental.{kind}-agreements.bill` | Assess direct base rent charge and issue invoice |
+| `POST` | `/{kind}/agreements/{id}/base-charges/{c}/void` | `vehicle-rental.{kind}-agreements.bill` | Void direct base rent charge |
+| `POST` | `/{kind}/agreements/{id}/base-charges/{c}/reissue`| `vehicle-rental.{kind}-agreements.bill` | Reissue direct base rent charge |
 | **Payments & Deposits Group** | | | |
-| `GET` | `/{kind}/agreements/{id}/payments` | `payments.view` | List payments for agreement |
-| `POST` | `/{kind}/agreements/{id}/payments` | `payments.create` | Tender payment on single agreement |
-| `POST` | `/{kind}/agreements/{id}/payments/{p}/allocate` | `payments.create` | Allocate payment to open invoice |
-| `POST` | `/{kind}/agreements/{id}/payments/{p}/reverse` | `payments.create` | Reverse payment |
-| `POST` | `/{kind}/agreements/{id}/payments/{p}/refund` | `payments.create` | Refund unapplied payment balance |
-| `GET` | `/{kind}/parties/{partyId}/open-documents` | `payments.view` | Open invoices across ALL agreements |
-| `POST` | `/{kind}/parties/{partyId}/payments` | `payments.create` | Multi-agreement payment tender |
-| `POST` | `/{kind}/parties/{partyId}/payments/{p}/allocate` | `payments.create` | Party-wide advance allocation |
-| `GET` | `/customer/agreements/{id}/deposits` | `payments.view` | List customer security deposits |
-| `POST` | `/customer/agreements/{id}/deposits` | `payments.create` | Record customer deposit receipt |
-| `POST` | `/customer/agreements/{id}/deposits/allocate` | `payments.create` | Allocate deposit against invoice |
+| `GET` | `/{kind}/agreements/{id}/payments` | `payments.view` + agreement view | List payments and allocations for specific agreement |
+| `POST` | `/{kind}/agreements/{id}/payments` | `payments.create` + agreement manage | Tender payment or disbursement on single agreement |
+| `POST` | `/{kind}/agreements/{id}/payments/{p}/allocate` | `payments.allocate` + agreement view | Allocate unapplied payment to open invoice |
+| `POST` | `/{kind}/agreements/{id}/payments/{p}/reverse` | `payments.reverse` + agreement view | Reverse posted payment and restore invoice balances |
+| `POST` | `/{kind}/agreements/{id}/payments/{p}/refund` | `payments.refund` + agreement view | Issue refund voucher against unapplied payment surplus |
+| `GET` | `/{kind}/parties/{partyId}/open-documents` | `payments.view` | Query open invoices across ALL agreements of the party |
+| `POST` | `/{kind}/parties/{partyId}/payments` | `payments.create` | Tender multi-agreement lump sum party settlement |
+| `POST` | `/{kind}/parties/{partyId}/payments/{p}/allocate` | `payments.allocate` | Allocate party-wide advance to new invoices |
+| `GET` | `/customer/agreements/{id}/deposits` | `payments.view` + agreement view | List customer security deposits |
+| `POST` | `/customer/agreements/{id}/deposits` | `payments.create` + agreement manage | Record customer security deposit receipt |
+| `POST` | `/customer/agreements/{id}/deposits/allocate` | `payments.allocate` + agreement view | Allocate security deposit against outstanding invoice |
 | **Vehicle Custody Group** | | | |
-| `GET` | `/vehicle-uses` | `vehicle_rental.use.view` | Master register of vehicle custody uses |
-| `GET` | `/customer/agreements/{id}/vehicles` | `vehicle_rental.use.view` | Custody uses for specific agreement |
-| `POST` | `/customer/agreements/{id}/vehicles` | `vehicle_rental.use.manage` | Plan vehicle assignment |
-| `GET` | `/vehicles/{vehicle}/sources` | `vehicle_rental.use.view` | Query sourcing owner agreements |
-| `GET` | `/vehicle-uses/{id}` | `vehicle_rental.use.view` | View custody use record |
-| `DELETE`| `/vehicle-uses/{id}` | `vehicle_rental.use.manage` | Cancel planned assignment |
-| `POST` | `/vehicle-uses/{id}/replace` | `vehicle_rental.use.manage` | Mid-lease atomic vehicle swap |
-| `POST` | `/vehicle-uses/{id}/replace-vehicle` | `vehicle_rental.use.manage` | Alternative vehicle replacement route |
-| `POST` | `/vehicle-uses/{id}/reassign-driver` | `vehicle_rental.use.manage` | Change chauffeur on custody use |
-| `GET` | `/vehicle-uses/{id}/history` | `vehicle_rental.use.view` | Custody handover/return history |
-| `POST` | `/vehicle-uses/{id}/{action}` | `vehicle_rental.use.manage` | Transition use (`handover`, `return`, `cancel`) |
-| `GET` | `/vehicles/available` | `vehicle_rental.use.view` | Query unblocked vehicles for dates |
+| `GET` | `/vehicle-uses` | `vehicle-rental.vehicle-use.view` | Master register of vehicle custody uses with scope filters |
+| `POST` | `/vehicle-uses/internal` | `vehicle-rental.vehicle-use.manage` | Deploy company fleet or owner vehicle for internal operations |
+| `GET` | `/customer/agreements/{id}/vehicles` | `vehicle-rental.vehicle-use.view` | Custody uses assigned to specific customer agreement |
+| `GET` | `/owner/agreements/{id}/vehicles` | `vehicle-rental.vehicle-use.view` | Custody uses sourced under specific owner agreement |
+| `POST` | `/customer/agreements/{id}/vehicles` | `vehicle-rental.vehicle-use.manage` | Plan vehicle assignment for customer agreement |
+| `POST` | `/owner/agreements/{id}/vehicles` | `vehicle-rental.vehicle-use.manage` | Plan vehicle deployment for owner agreement |
+| `GET` | `/vehicles/{vehicle}/sources` | `vehicle-rental.vehicle-use.view` | Query covering owner sourcing agreements for a vehicle |
+| `GET` | `/vehicle-uses/{id}` | `vehicle-rental.vehicle-use.view` | View custody use record with handover and return odometers |
+| `DELETE`| `/vehicle-uses/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design; use transition cancel or return |
+| `POST` | `/vehicle-uses/{id}/replace` | `vehicle-rental.vehicle-use.manage` | Execute atomic mid-lease vehicle replacement swap |
+| `POST` | `/vehicle-uses/{id}/replace-vehicle` | `vehicle-rental.vehicle-use.manage` | Alternative vehicle replacement swap endpoint |
+| `POST` | `/vehicle-uses/{id}/reassign-driver` | `vehicle-rental.vehicle-use.manage` | Reassign default chauffeur on custody record |
+| `GET` | `/vehicle-uses/{id}/history` | `vehicle-rental.vehicle-use.view` | Custody handover, return, and swap audit history |
+| `POST` | `/vehicle-uses/{id}/{action}` | `vehicle-rental.vehicle-use.manage` | Transition custody (`action = handover \| return \| cancel`) |
+| `GET` | `/vehicles/available` | `vehicle-rental.vehicle-use.view` | Query unblocked available vehicles for dates and category |
 | **Daily Running Charts Group** | | | |
-| `GET` | `/running-charts` | `vehicle_rental.chart.view` | Master register of daily trip sheets |
-| `GET` | `/vehicle-uses/{use}/running-charts` | `vehicle_rental.chart.view` | Trip sheets for specific custody use |
-| `POST` | `/vehicle-uses/{use}/running-charts` | `vehicle_rental.chart.manage` | Create daily running chart |
-| `GET` | `/running-charts/{id}` | `vehicle_rental.chart.view` | View running chart detail |
-| `PUT` | `/running-charts/{id}` | `vehicle_rental.chart.manage` | Update draft running chart |
-| `DELETE`| `/running-charts/{id}` | `vehicle_rental.chart.manage` | Delete draft running chart |
-| `GET` | `/running-charts/{id}/history` | `vehicle_rental.chart.view` | View running chart audit history |
-| `POST` | `/running-charts/{id}/{action}` | `chart.finalize` / `chart.reverse` | Finalize or reverse running chart |
-| `POST` | `/running-charts/{id}/reassign-driver` | `vehicle_rental.chart.manage` | Reassign chauffeur on running chart |
-| `GET` | `/running-charts/{id}/{kind}/charges` | `invoice.view` | Direct usage charges on running chart |
-| `GET` | `/running-charts/{id}/{kind}/charges/mileage`| `invoice.view` | Preview direct mileage calculation |
-| `POST` | `/running-charts/{id}/{kind}/charges/mileage`| `customer.bill` | Assess direct mileage charge |
-| `POST` | `/running-charts/{id}/{kind}/charges` | `customer.bill` / `owner.bill` | Create direct usage charge |
-| `POST` | `/running-charts/{id}/{kind}/charges/{c}/void` | `customer.bill` | Void direct usage charge |
-| `POST` | `/running-charts/{id}/{kind}/charges/{c}/reissue`| `customer.bill` | Reissue direct usage charge |
+| `GET` | `/running-charts` | `vehicle-rental.running-charts.view` | Master register of daily trip sheets with kind & text search |
+| `GET` | `/vehicle-uses/{use}/running-charts` | `vehicle-rental.running-charts.view` | Trip sheets recorded under specific custody use |
+| `POST` | `/vehicle-uses/{use}/running-charts` | `vehicle-rental.running-charts.manage` | Create daily running chart (trip log) |
+| `GET` | `/running-charts/{id}` | `vehicle-rental.running-charts.view` | View trip sheet details and telematics metrics |
+| `PUT` | `/running-charts/{id}` | `vehicle-rental.running-charts.manage` | Update draft running chart odometers and shift times |
+| `DELETE`| `/running-charts/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design to preserve trip evidence; use reverse |
+| `GET` | `/running-charts/{id}/history` | `vehicle-rental.running-charts.view` | View running chart audit revision trail |
+| `POST` | `/running-charts/{id}/finalize` | `vehicle-rental.running-charts.finalize` | Finalize running chart (locks odometers & telematics) |
+| `POST` | `/running-charts/{id}/reverse` | `vehicle-rental.running-charts.reverse` | Reverse finalized running chart to unlock correction |
+| `POST` | `/running-charts/{id}/reassign-driver` | `vehicle-rental.running-charts.manage` | Reassign duty chauffeur on trip sheet with audit trail |
+| `GET` | `/running-charts/{id}/{kind}/charges` | `vehicle-rental.{kind}-agreements.view` | View direct usage charges assessed on running chart |
+| `GET` | `/running-charts/{id}/{kind}/charges/mileage`| `vehicle-rental.{kind}-agreements.view` | Preview direct excess distance charge calculation |
+| `POST` | `/running-charts/{id}/{kind}/charges/mileage`| `vehicle-rental.{kind}-agreements.bill` | Assess direct excess distance charge |
+| `POST` | `/running-charts/{id}/{kind}/charges` | `vehicle-rental.{kind}-agreements.bill` | Create direct usage charge (OT, night-out) |
+| `POST` | `/running-charts/{id}/{kind}/charges/{c}/void` | `vehicle-rental.{kind}-agreements.bill` | Void direct usage charge |
+| `POST` | `/running-charts/{id}/{kind}/charges/{c}/reissue`| `vehicle-rental.{kind}-agreements.bill` | Reissue direct usage charge |
 | **Two-Stage Billing Cycles Group** | | | |
-| `GET` | `/billing-cycles` | `customer.bill` / `owner.bill` | List periodic billing cycles |
-| `POST` | `/{kind}/agreements/{id}/billing-cycles` | `customer.bill` / `owner.bill` | Create Two-Stage billing cycle |
-| `GET` | `/billing-cycles/{id}` | `customer.bill` / `owner.bill` | View billing cycle details |
-| `GET` | `/billing-cycles/{id}/eligible-charts` | `customer.bill` / `owner.bill` | Query candidate running charts |
-| `POST` | `/billing-cycles/{id}/charts` | `customer.bill` / `owner.bill` | Attach running charts to cycle |
-| `POST` | `/billing-cycles/{id}/items` | `customer.bill` / `owner.bill` | Add ad-hoc addition or deduction item |
-| `DELETE`| `/billing-cycles/{id}/items/{itemId}` | `customer.bill` / `owner.bill` | Remove ad-hoc addition/deduction item |
-| `GET` | `/billing-cycles/{id}/preview` | `customer.bill` / `owner.bill` | Preview final stage & vehicle attributions|
-| `POST` | `/billing-cycles/{id}/finalize` | `customer.bill` / `owner.bill` | Finalize cycle & issue Mode A/B invoice |
-| `GET` | `/billing-cycles/{id}/export/{format}` | `customer.bill` | Export cycle summary (PDF, print, HTML) |
+| `GET` | `/billing-cycles` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | List periodic billing cycles with status and period filters |
+| `POST` | `/{kind}/agreements/{id}/billing-cycles` | `vehicle-rental.{kind}-agreements.bill` | Create Two-Stage billing cycle (optional Stage 1 initial invoice) |
+| `GET` | `/billing-cycles/{id}` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | View billing cycle details, attached charts, and item lines |
+| `DELETE`| `/billing-cycles/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design to preserve audit history; use cancel |
+| `POST` | `/billing-cycles/{id}/cancel` | `vehicle-rental.customer-agreements.bill` / `owner-agreements.bill` | Cancel billing cycle, release date locks, and detach charts |
+| `GET` | `/billing-cycles/{id}/eligible-charts` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | Query candidate finalized charts for cycle period |
+| `POST` | `/billing-cycles/{id}/charts` | `vehicle-rental.{kind}-agreements.bill` | Attach finalized running charts to billing cycle |
+| `POST` | `/billing-cycles/{id}/items` | `vehicle-rental.{kind}-agreements.bill` | Add ad-hoc addition or deduction line item |
+| `DELETE`| `/billing-cycles/{id}/items/{itemId}` | `vehicle-rental.{kind}-agreements.bill` | Remove unfinalized ad-hoc addition/deduction line item |
+| `GET` | `/billing-cycles/{id}/preview` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | Preview final stage billing totals and vehicle attributions |
+| `POST` | `/billing-cycles/{id}/finalize` | `vehicle-rental.{kind}-agreements.bill` | Finalize cycle: issues Stage 2 Mode A/B invoice or credit note |
+| `GET` | `/billing-cycles/{id}/export/{format}` | `vehicle-rental.customer-agreements.view` | Export billing cycle summary (format = `pdf` \| `print` \| `html`) |
 | **Adjustments & Reassignments Registers** | | | |
-| `GET` | `/adjustments` | `customer.view` / `owner.view` | List agreement financial adjustments |
-| `POST` | `/adjustments` | `customer.manage` / `owner.manage` | Create agreement financial adjustment |
-| `GET` | `/adjustments/{id}` | `customer.view` / `owner.view` | View adjustment detail |
-| `GET` | `/reassignments` | `vehicle_rental.use.view` | Register of driver & vehicle swaps |
+| `GET` | `/adjustments` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | List agreement financial adjustments |
+| `POST` | `/adjustments` | `vehicle-rental.customer-agreements.manage` / `owner-agreements.manage` | Create and authorize contractual adjustment |
+| `GET` | `/adjustments/{id}` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | View adjustment detail and status history |
+| `POST` | `/adjustments/{id}/void` | `vehicle-rental.customer-agreements.manage` / `owner-agreements.manage` | Void draft or authorized adjustment |
+| `DELETE`| `/adjustments/{id}` | *HTTP 405 Method Not Allowed* | Rejected by design to preserve financial history; use void |
+| `GET` | `/reassignments` | `vehicle-rental.vehicle-use.view` | Master audit register of driver reassignments and vehicle swaps |
 | **Dedicated Rental Invoices and Owner Bills Workspace** | | | |
-| `GET` | `/billing/documents` | `invoice.view` | Rental invoices & bills register |
-| `GET` | `/billing/summary` | `invoice.view` | Dedicated billing KPI summary metrics |
-| `GET` | `/billing/documents/{id}` | `invoice.view` | Detailed document with telematics breakdown|
-| `GET` | `/billing/documents/{id}/statement` | `invoice.view` | Telematics statement (HTML, Print, PDF) |
-| `PUT` | `/billing/documents/{id}` | `customer.bill` / `owner.bill` | Update due date or notes on document |
-| `POST` | `/billing/documents/{id}/cancel` | `invoice.void` | Cancel invoice & restore billing cycles |
-| `POST` | `/owner-settlement-bill` | `vehicle_rental.owner.bill` | Generate itemized owner settlement AP bill|
+| `GET` | `/billing/documents` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | Rental invoices & bills register with balance and status filters |
+| `GET` | `/billing/summary` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | Dedicated billing KPI summary metrics (Invoiced, Paid, Due) |
+| `POST` | `/billing/quotation-preview` | `vehicle-rental.customer-agreements.bill` | Calculate pro-forma rental quotation preview (zero DB rows persisted) |
+| `POST` | `/billing/owner-bill-preview` | `vehicle-rental.owner-agreements.bill` | Calculate pro-forma owner settlement preview (zero DB rows persisted) |
+| `GET` | `/billing/documents/{id}` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | Detailed document view with telematics metrics and itemized lines |
+| `GET` | `/billing/documents/{id}/statement` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | Telematics Statement of Account (HTML, Print, PDF) |
+| `PUT` | `/billing/documents/{id}` | `vehicle-rental.customer-agreements.bill` / `owner-agreements.bill` | Update due date or notes on editable document |
+| `POST` | `/billing/documents/{id}/cancel` | `vehicle-rental.customer-agreements.bill` / `owner-agreements.bill` | Cancel invoice & bidirectionally restore source billing cycles |
+| `POST` | `/owner-settlement-bill` | `vehicle-rental.owner-agreements.bill` | Generate itemized owner settlement AP bill (10% WHT & deductions) |
 | **Analytical Reports & Telematics Exports** | | | |
-| `GET` | `/reports/running-chart-sheet` | `vehicle_rental.dashboard.view` | 31-day running chart sheet log report |
-| `GET` | `/reports/running-chart-sheet/export/{f}`| `vehicle_rental.dashboard.view` | Export running chart sheet (PDF, print, HTML)|
-| `GET` | `/reports/fleet-utilization` | `vehicle_rental.dashboard.view` | Fleet utilization % report |
-| `GET` | `/reports/fleet-utilization/export/{f}` | `vehicle_rental.dashboard.view` | Export fleet utilization report |
-| `GET` | `/reports/revenue-licenses` | `vehicle_rental.dashboard.view` | Compliance & license expiry report |
-| `GET` | `/reports/revenue-licenses/export/{f}` | `vehicle_rental.dashboard.view` | Export revenue license report |
-| `GET` | `/reports/rental-revenue` | `vehicle_rental.dashboard.view` | Customer rental revenue report |
-| `GET` | `/reports/rental-revenue/export/{f}` | `vehicle_rental.dashboard.view` | Export rental revenue report |
-| `GET` | `/reports/lessee-outstanding` | `vehicle_rental.dashboard.view` | AR aging & outstanding balance report |
-| `GET` | `/reports/lessee-outstanding/export/{f}`| `vehicle_rental.dashboard.view` | Export lessee outstanding report |
-| `GET` | `/reports/owner-disbursements` | `vehicle_rental.dashboard.view` | Owner settlement disbursement report |
-| `GET` | `/reports/owner-disbursements/export/{f}`| `vehicle_rental.dashboard.view`| Export owner disbursement report |
-| `GET` | `/reports/vehicle-profitability` | `vehicle_rental.dashboard.view` | Dual-sided vehicle P&L report |
-| `GET` | `/reports/vehicle-profitability/export/{f}`| `vehicle_rental.dashboard.view`| Export vehicle profitability report |
-| `GET` | `/reports/incidents-summary` | `vehicle_rental.dashboard.view` | Incidents & damage claims summary |
-| `GET` | `/reports/incidents-summary/export/{f}`| `vehicle_rental.dashboard.view` | Export incidents summary report |
+| `GET` | `/reports/running-chart-sheet` | `vehicle-rental.reports.view` | 31-day running chart matrix sheet (customer, owner, or fleet) |
+| `GET` | `/reports/running-chart-sheet/export/{format}` | `vehicle-rental.reports.view` | Export running chart sheet (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/fleet-utilization` | `vehicle-rental.reports.view` | Fleet utilization rate % report |
+| `GET` | `/reports/fleet-utilization/export/{format}` | `vehicle-rental.reports.view` | Export fleet utilization report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/revenue-licenses` | `vehicle-rental.reports.view` | Regulatory compliance and license expiry monitoring report |
+| `GET` | `/reports/revenue-licenses/export/{format}` | `vehicle-rental.reports.view` | Export revenue license report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/rental-revenue` | `vehicle-rental.reports.view` | Customer rental revenue report grouped by client account |
+| `GET` | `/reports/rental-revenue/export/{format}` | `vehicle-rental.reports.view` | Export rental revenue report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/lessee-outstanding` | `vehicle-rental.reports.view` | Accounts Receivable aging (Current, 30, 60, 90+ days) report |
+| `GET` | `/reports/lessee-outstanding/export/{format}` | `vehicle-rental.reports.view` | Export lessee outstanding report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/owner-disbursements` | `vehicle-rental.reports.view` | Lessor earnings and disbursement report (Detail I & II statements) |
+| `GET` | `/reports/owner-disbursements/export/{format}` | `vehicle-rental.reports.view` | Export owner disbursement report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/vehicle-profitability` | `vehicle-rental.reports.view` | Dual-sided vehicle profitability (P&L) analysis report |
+| `GET` | `/reports/vehicle-profitability/export/{format}` | `vehicle-rental.reports.view` | Export vehicle profitability report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/incidents-summary` | `vehicle-rental.reports.view` | Damage claims, repair costs, and insurance recovery report |
+| `GET` | `/reports/incidents-summary/export/{format}` | `vehicle-rental.reports.view` | Export incidents summary report (format = `pdf` \| `print` \| `html`) |
 
 ---
 
@@ -1334,7 +1494,7 @@ All routes are prefixed with `/api/v1/vehicle-rental` and require authentication
 Before deploying changes to `VehicleRental`, developers must run the test suites to ensure zero regressions:
 
 ```bash
-# 1. Run all VehicleRental backend feature and unit tests (306 tests, 2,477 assertions)
+# 1. Run all VehicleRental backend feature and unit tests (344 tests, 2,948 assertions)
 php artisan test app/Modules/VehicleRental/Tests/
 
 # 2. Run Invoice module tests (42 tests)
@@ -1346,7 +1506,7 @@ php artisan test app/Modules/Payment/Tests/
 # 4. Run Architectural integrity suite (12 tests)
 php artisan test tests/Unit/Architecture/
 
-# 5. Run Frontend Vitest suites for vehicle rental (33 test suites, 154 tests)
+# 5. Run Frontend Vitest suites for vehicle rental (38 test suites, 181 tests)
 npx vitest run resources/js/modules/vehicle-rental/
 
 # 6. Run TypeScript compiler strict typecheck (must pass with 0 errors)
@@ -1365,7 +1525,9 @@ When extending or maintaining `VehicleRental`, developers must follow these engi
    - `VehicleRental` creates semantic commercial facts and passes them to `Modules\Invoice` and `Modules\Payment`. Do not write raw SQL inserts into `invoices` or `payments` tables.
 4. **Preserve Bidirectional Restoration:**
    - If introducing a new billing item or charge allocation, ensure [`RentalBillingDocumentService::restoreSourcesOnCancellation()`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalBillingDocumentService.php) properly restores its source status upon invoice cancellation.
-5. **Always Update Shared Memory:**
+5. **Enforce Temporal Causality & Boundary Rules:**
+   - Ensure actual physical events (key handover, check-in return) follow temporal order, odometer continuity, and respect the workspace civil calendar (`Asia/Colombo`).
+6. **Always Update Shared Memory:**
    - After completing any modification, record an append-only change document in [`docs/changes/`](file:///d:/project-new/AutoERP/docs/changes) describing what was changed, why, and the verification evidence. Never edit or delete historical change records.
 
 ---

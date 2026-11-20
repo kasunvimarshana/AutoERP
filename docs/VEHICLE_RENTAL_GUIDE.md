@@ -10,7 +10,7 @@
 **Frontend Directory:** [`resources/js/modules/vehicle-rental`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental)  
 **Timezone Standard:** `Asia/Colombo` (Operational Civil Business Calendar)  
 **Arithmetic Standard:** Arbitrary-Precision String Math via [`DecimalMath`](file:///d:/project-new/AutoERP/app/Modules/Core/Services/DecimalMath.php) (BCMath)  
-**Test Suite:** 234 Backend PHPUnit Tests (2,007 Assertions) · 29 Frontend Vitest Suites (138 Tests)  
+**Test Suite:** 344 Backend PHPUnit Tests (2,948 Assertions) · 38 Frontend Vitest Suites (181 Tests) · TypeScript Strict (0 Errors)
 
 ---
 
@@ -156,12 +156,12 @@ The module is structured into 10 decoupled subsystems:
 | Subsystem | Core Model | Service | Primary Role |
 |---|---|---|---|
 | **Reservations** | [`RentalReservation`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/RentalReservation.php) | [`RentalReservationService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalReservationService.php) | Inquiry lead capture, quote estimation, booking confirmation, and one-click conversion. |
-| **Agreements** | [`CustomerAgreement`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/CustomerAgreement.php) / [`OwnerAgreement`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/OwnerAgreement.php) | [`CustomerAgreementService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/CustomerAgreementService.php) | Commercial terms, rate cards, successor contracts, closure cutovers. |
+| **Agreements** | [`CustomerAgreement`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/CustomerAgreement.php) / [`OwnerAgreement`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/OwnerAgreement.php) | [`AgreementService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/AgreementService.php) | Commercial terms, rate cards, successor contracts, closure cutovers. |
 | **Vehicle Custody** | [`VehicleUse`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/VehicleUse.php) | [`VehicleUseService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/VehicleUseService.php) | Physical possession, odometers, handover/return, atomic vehicle replacement. |
 | **Availability** | *In-memory checker* | [`VehicleUseAvailabilityBlocker`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/VehicleUseAvailabilityBlocker.php) | Half-open interval conflict detection, workshop service blocking. |
 | **Running Charts** | [`RunningChart`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/RunningChart.php) | [`RunningChartService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RunningChartService.php) | Daily trip logging, duty ON/OFF times, comparative/cumulative KM, overtime tiers, toll passes. |
-| **Base Billing** | [`CustomerBaseCharge`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/CustomerBaseCharge.php) | [`CustomerBaseRentBillingService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/CustomerBaseRentBillingService.php) | Civil calendar base rent proration (`actual_calendar_days_v1`) and invoice creation. |
-| **Usage Billing** | [`CustomerUsageCharge`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/CustomerUsageCharge.php) | [`UsageChargeService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/UsageChargeService.php) & [`MileageAssessmentService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/MileageAssessmentService.php) | Excess distance calculations, overtime hours billing, night-out and pass billing. |
+| **Base Billing** | [`CustomerBaseCharge`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/CustomerBaseCharge.php) | [`BaseRentBilling`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/BaseRentBilling.php) | Civil calendar base rent proration (`actual_calendar_days_v1`) and invoice creation. |
+| **Usage Billing** | [`CustomerUsageCharge`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/CustomerUsageCharge.php) | [`UsageChargeBilling`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/UsageChargeBilling.php) | Excess distance calculations, overtime hours billing, night-out and pass billing. |
 | **Owner Settlements** | [`OwnerBaseCharge`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/OwnerBaseCharge.php) / [`OwnerUsageCharge`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/OwnerUsageCharge.php) | [`OwnerDisbursementReportService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/OwnerDisbursementReportService.php) | Vertical Statement Detail I, Horizontal Matrix Detail II, Statutory 10% WHT ledger `:3305-000`. |
 | **Fleet Expenses** | [`RentalExpense`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/RentalExpense.php) | [`RentalExpenseService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalExpenseService.php) | Direct operating costs and 4-way allocation matrix (`Company`, `Customer`, `Owner`, `HR`). |
 | **Bank Leasing** | [`VehicleFinanceAgreement`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Models/VehicleFinanceAgreement.php) | [`VehicleFinanceService`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/VehicleFinanceService.php) | Amortization schedules, status sync (`scheduled`/`due`/`overdue`), AP payable generation. |
@@ -459,34 +459,40 @@ flowchart TD
 
 ---
 
-## 8. Database Schema Reference (22 Tables)
+## 8. Database Schema Reference (28 Tables)
 
-The module defines 22 explicit database tables (strictly one table per migration file, following KISS + Explicit):
+The module defines 28 explicit database tables (strictly one table per migration file, following KISS + Explicit):
 
 | Table Name | Entity Represented | Primary Keys & Foreign Keys | Key Columns |
 |---|---|---|---|
-| `vehicle_rental_customer_agreements` | Customer Agreement | `id` (PK), `tenant_id`, `organization_unit_id`, `customer_id` | `reference`, `basis`, `driver_mode`, `starts_at`, `ends_at`, `status`, `row_version` |
+| `vehicle_rental_customer_agreements` | Customer Agreement | `id` (PK), `tenant_id`, `organization_unit_id`, `customer_id` | `reference`, `basis`, `driver_mode`, `starts_on`, `ends_on`, `status`, `row_version` |
 | `vehicle_rental_customer_agreements_history` | Customer Agreement Audit | `id` (PK), `agreement_id` (FK) | `action`, `actor_id`, `narrative_reason`, `snapshot_diff`, `created_at` |
-| `vehicle_rental_owner_agreements` | Owner Agreement | `id` (PK), `tenant_id`, `supplier_id`, `vehicle_id` | `reference`, `basis`, `starts_at`, `ends_at`, `owner_base_rate`, `status`, `row_version` |
+| `vehicle_rental_owner_agreements` | Owner Agreement | `id` (PK), `tenant_id`, `supplier_id`, `vehicle_id` | `reference`, `basis`, `driver_mode`, `starts_on`, `ends_on`, `status`, `row_version` |
 | `vehicle_rental_owner_agreements_history` | Owner Agreement Audit | `id` (PK), `agreement_id` (FK) | `action`, `actor_id`, `narrative_reason`, `snapshot_diff`, `created_at` |
-| `vehicle_rental_uses` | Physical Vehicle Custody | `id` (PK), `customer_agreement_id`, `owner_agreement_id`, `vehicle_id` | `status`, `planned_starts_at`, `planned_ends_at`, `handover_at`, `start_odometer`, `return_at`, `end_odometer`, `replaced_use_id`, `row_version` |
-| `vehicle_rental_use_history` | Vehicle Use Audit | `id` (PK), `use_id` (FK) | `action`, `actor_id`, `snapshot_diff`, `created_at` |
-| `vehicle_rental_running_charts` | Daily Trip Log Sheet | `id` (PK), `vehicle_use_id`, `driver_employee_id` | `trip_date`, `duty_on`, `duty_off`, `start_odometer`, `end_odometer`, `comparative_mileage`, `cumulative_mileage`, `normal_ot_minutes`, `double_ot_minutes`, `triple_ot_minutes`, `night_out_count`, `pass_amount`, `status`, `row_version` |
+| `vehicle_rental_uses` | Physical Vehicle Custody | `id` (PK), `customer_agreement_id`, `owner_agreement_id`, `vehicle_id` | `status`, `starts_at`, `ends_at`, `handed_over_at`, `handover_odometer`, `returned_at`, `return_odometer`, `replaces_use_id`, `row_version` |
+| `vehicle_rental_use_history` | Vehicle Use Audit | `id` (PK), `vehicle_use_id` (FK) | `action`, `actor_id`, `snapshot_diff`, `created_at` |
+| `vehicle_rental_running_charts` | Daily Trip Log Sheet | `id` (PK), `vehicle_use_id`, `driver_employee_id` | `starts_at`, `ends_at`, `start_odometer`, `end_odometer`, `commercial_km`, `garage_km`, `normal_ot_minutes`, `double_ot_minutes`, `triple_ot_minutes`, `night_outs`, `status`, `row_version` |
 | `vehicle_rental_running_chart_history` | Running Chart Audit | `id` (PK), `running_chart_id` (FK) | `action`, `actor_id`, `narrative_reason`, `snapshot_diff`, `created_at` |
 | `vehicle_rental_customer_base_charges` | Base Rent Charges | `id` (PK), `customer_agreement_id`, `invoice_id` | `cycle_start`, `cycle_end`, `billed_days`, `charge_amount`, `status`, `row_version` |
 | `vehicle_rental_owner_base_charges` | Owner Lease Charges | `id` (PK), `owner_agreement_id`, `invoice_id` | `cycle_start`, `cycle_end`, `billed_days`, `charge_amount`, `status`, `row_version` |
 | `vehicle_rental_customer_usage_charges` | Usage Charges (KM/OT) | `id` (PK), `customer_agreement_id`, `running_chart_id`, `invoice_id` | `charge_type`, `quantity`, `unit_rate`, `total_amount`, `status`, `row_version` |
 | `vehicle_rental_owner_usage_charges` | Owner Usage Settlements | `id` (PK), `owner_agreement_id`, `running_chart_id`, `invoice_id` | `charge_type`, `quantity`, `unit_rate`, `total_amount`, `status`, `row_version` |
 | `vehicle_rental_incidents` | Fleet Incident Register | `id` (PK), `vehicle_id`, `vehicle_use_id`, `running_chart_id` | `incident_type`, `incident_date`, `description`, `police_report_number`, `status`, `row_version` |
-| `vehicle_rental_incident_events` | Incident Review Audit | `id` (PK), `incident_id` (FK) | `action`, `actor_id`, `narrative_reason`, `created_at` |
+| `vehicle_rental_incident_events` | Incident Review Audit | `id` (PK), `incident_id` (FK) | `event_type`, `old_status`, `new_status`, `comment`, `created_by` |
 | `vehicle_rental_incident_attachments` | Proof File Attachments | `id` (PK), `incident_id` (FK) | `file_path`, `file_name`, `mime_type`, `file_size`, `sha256_checksum`, `created_at` |
-| `vehicle_rental_reservations` | Booking Inquiries | `id` (PK), `customer_id`, `vehicle_id`, `category_id` | `reservation_number`, `planned_starts_at`, `planned_ends_at`, `estimated_rent`, `status`, `row_version` |
-| `vehicle_rental_reservation_histories` | Reservation Audit | `id` (PK), `reservation_id` (FK) | `action`, `actor_id`, `snapshot_diff`, `created_at` |
+| `vehicle_rental_reservations` | Booking Inquiries | `id` (PK), `customer_id`, `vehicle_id`, `category_id` | `reservation_number`, `starts_on`, `ends_on`, `estimated_rent`, `status`, `row_version` |
+| `vehicle_rental_reservation_histories` | Reservation Audit | `id` (PK), `reservation_id` (FK) | `from_status`, `to_status`, `reason`, `changed_by`, `changed_at` |
 | `vehicle_rental_finance_agreements` | Bank Leases | `id` (PK), `supplier_id`, `vehicle_id` | `contract_number`, `principal_amount`, `interest_rate`, `calculation_method`, `tenor_months`, `status`, `row_version` |
 | `vehicle_rental_finance_installments` | Amortization Schedule | `id` (PK), `finance_agreement_id`, `invoice_id` | `installment_number`, `due_date`, `principal_due`, `interest_due`, `total_due`, `status`, `row_version` |
-| `vehicle_rental_finance_status_histories`| Finance Agreement Audit | `id` (PK), `finance_agreement_id` (FK) | `action`, `actor_id`, `snapshot_diff`, `created_at` |
-| `vehicle_rental_expenses` | Fleet Operating Expenses | `id` (PK), `vehicle_id`, `vehicle_use_id` | `expense_category`, `expense_date`, `total_amount`, `odometer_reading`, `status`, `row_version` |
-| `vehicle_rental_expense_allocations` | 4-Way Cost Allocations | `id` (PK), `expense_id`, `target_id` | `destination`, `allocated_amount`, `invoice_id`, `status`, `row_version` |
+| `vehicle_rental_finance_status_histories`| Finance Agreement Audit | `id` (PK), `finance_agreement_id` (FK) | `old_status`, `new_status`, `reason`, `changed_by`, `changed_at` |
+| `vehicle_rental_expenses` | Fleet Operating Expenses | `id` (PK), `vehicle_id`, `vehicle_use_id` | `expense_type`, `expense_date`, `net_amount`, `tax_amount`, `gross_amount`, `status`, `row_version` |
+| `vehicle_rental_expense_allocations` | 4-Way Cost Allocations | `id` (PK), `expense_id`, `target_customer_agreement_id` | `allocation_type`, `net_amount`, `total_amount`, `invoice_id`, `status`, `row_version` |
+| `vehicle_rental_agreement_adjustments` | Contract Adjustments | `id` (PK), `customer_agreement_id`, `owner_agreement_id` | `adjustment_type`, `category`, `amount`, `status`, `row_version` |
+| `vehicle_rental_agreement_adjustments_history` | Adjustment Audit | `id` (PK), `adjustment_id` (FK) | `from_status`, `to_status`, `reason`, `user_id` |
+| `vehicle_rental_billing_cycles` | Periodic Billing Cycles | `id` (PK), `customer_agreement_id`, `owner_agreement_id` | `cycle_number`, `period_from`, `period_until`, `status`, `billing_mode`, `finalization_mode` |
+| `vehicle_rental_billing_cycle_charts` | Attached Charts Junction | `id` (PK), `billing_cycle_id`, `running_chart_id` | Junction binding finalized trip sheets to cycles |
+| `vehicle_rental_billing_cycle_items` | Ad-hoc Invoicing Items | `id` (PK), `billing_cycle_id` | `item_type`, `category`, `description`, `amount` |
+| `vehicle_rental_reassignments` | Driver & Vehicle Swaps | `id` (PK), `vehicle_use_id`, `previous_vehicle_id`, `new_vehicle_id` | `reassignment_type`, `occurred_at`, `reason`, `financial_status`, `financial_delta_amount` |
 
 ---
 
@@ -595,8 +601,8 @@ The frontend SPA in [`resources/js/modules/vehicle-rental`](file:///d:/project-n
 - [`AgreementEditor.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/AgreementEditor.tsx): Form editor for customer and owner agreement terms.
 - [`VehicleUsePanel.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/VehicleUsePanel.tsx): Vehicle dispatch, handover, return, and replacement dialogs.
 - [`RunningChartEditor.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/RunningChartEditor.tsx): Trip sheet data entry modal.
-- [`OwnerDisbursementReportPage.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/OwnerDisbursementReportPage.tsx): Multi-tab settlement viewer (Summary, Detail I, Detail II, WHT Ledger).
-- [`RentalRevenueReportPage.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/RentalRevenueReportPage.tsx): Commercial revenue summaries and All Invoice Listing.
+- [`OwnerDisbursementReportPage.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/reports/OwnerDisbursementReportPage.tsx): Multi-tab settlement viewer (Summary, Detail I, Detail II, WHT Ledger).
+- [`RentalRevenueReportPage.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/reports/RentalRevenueReportPage.tsx): Commercial revenue summaries and All Invoice Listing.
 - [`RentalRunningChartReportPage.tsx`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental/RentalRunningChartReportPage.tsx): Landscape 31-day running chart matrix sheet viewer.
 
 ---
