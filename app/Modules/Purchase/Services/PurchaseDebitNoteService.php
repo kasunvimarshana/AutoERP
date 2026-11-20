@@ -111,6 +111,10 @@ final class PurchaseDebitNoteService
             throw new InvalidArgumentException('Purchase return already has a debit note.');
         }
 
+        if ($purchaseReturn->return_date !== null && $data->debitNoteDate < $purchaseReturn->return_date->toDateString()) {
+            throw new InvalidArgumentException('Purchase debit note date cannot be before the purchase return date.');
+        }
+
         return $purchaseReturn;
     }
 

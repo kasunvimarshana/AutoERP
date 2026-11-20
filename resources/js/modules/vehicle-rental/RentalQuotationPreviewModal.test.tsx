@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { RentalQuotationPreviewModal } from './RentalQuotationPreviewModal';
 import * as rentalBillingApi from './rentalBillingApi';
-import * as agreementApi from './agreementApi';
 
 vi.mock('./rentalBillingApi', () => ({
     previewRentalQuotation: vi.fn(),

@@ -47,6 +47,18 @@ final class InvoiceValidationService
             throw new InvalidArgumentException('Invoice date is required.');
         }
 
+        if ($data->dueDate !== null && trim($data->dueDate) !== '') {
+            if ((string) $data->dueDate < (string) $data->invoiceDate) {
+                throw new InvalidArgumentException('Invoice due date cannot be earlier than invoice date.');
+            }
+        }
+
+        if ($data->supplyPeriodStart !== null && $data->supplyPeriodEnd !== null) {
+            if ((string) $data->supplyPeriodEnd < (string) $data->supplyPeriodStart) {
+                throw new InvalidArgumentException('Invoice supply period end date cannot be earlier than start date.');
+            }
+        }
+
         $this->assertPositive($data->exchangeRate, 'Invoice exchange rate');
     }
 

@@ -38,6 +38,8 @@ interface OpenInvoiceDoc {
     grand_total: string;
     paid_total: string;
     balance_due: string;
+    agreement_reference?: string | null;
+    vehicle_registration?: string | null;
 }
 
 interface Props {
@@ -101,12 +103,12 @@ export function AgreementPaymentModal({
     const paymentMethods = methodsApi.data?.data ?? [];
 
     const partyDocsApi = useApi(
-        signal => getPartyOpenRentalDocuments(kind, agreement.party.id),
+        signal => getPartyOpenRentalDocuments(kind, agreement.party.id, signal),
         [kind, agreement.party.id],
         open && showCrossAgreement
     );
 
-    const crossInvoices: Array<OpenInvoiceDoc & { agreement_reference?: string | null; vehicle_registration?: string | null }> = (partyDocsApi.data?.documents ?? []).map((doc: PartyOpenDocument) => ({
+    const crossInvoices: OpenInvoiceDoc[] = (partyDocsApi.data?.documents ?? []).map((doc: PartyOpenDocument) => ({
         id: doc.id,
         invoice_number: doc.invoice_number,
         invoice_date: doc.invoice_date ?? '',
@@ -287,7 +289,7 @@ export function AgreementPaymentModal({
                     exchange_rate: exchangeRate,
                     reference_number: referenceNumber.trim() || null,
                     notes: notes.trim() || null,
-                    lines: lineData as any,
+                    lines: lineData,
                     allocations: allocationItems.length > 0 ? allocationItems : undefined,
                 };
 
@@ -440,12 +442,12 @@ export function AgreementPaymentModal({
                                                     </td>
                                                     {showCrossAgreement && (
                                                         <td className="px-3 py-2 font-semibold text-blue-700">
-                                                            {(inv as any).agreement_reference || '—'}
+                                                            {inv.agreement_reference || '—'}
                                                         </td>
                                                     )}
                                                     {showCrossAgreement && (
                                                         <td className="px-3 py-2 text-slate-600">
-                                                            {(inv as any).vehicle_registration || '—'}
+                                                            {inv.vehicle_registration || '—'}
                                                         </td>
                                                     )}
                                                     <td className="px-3 py-2 text-slate-600">

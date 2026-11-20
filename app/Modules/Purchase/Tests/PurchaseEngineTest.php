@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Tests;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\PostingContext;
@@ -24,6 +26,7 @@ use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
@@ -70,8 +73,8 @@ use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseReturnLine;
-use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
+use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseDebitNoteService;
 use Modules\Purchase\Services\PurchaseFinancePreparationService;
 use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
@@ -81,6 +84,8 @@ use Modules\Purchase\Services\PurchaseRelatedDocumentService;
 use Modules\Purchase\Services\PurchaseReturnService;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class PurchaseEngineTest extends TestCase
@@ -1210,7 +1215,7 @@ final class PurchaseEngineTest extends TestCase
 
         // The unique index must also reject concurrent/direct writes that skip
         // the service-level check. Manual notes with no source remain possible.
-        $this->expectException(\Illuminate\Database\QueryException::class);
+        $this->expectException(QueryException::class);
         DB::table('purchase_debit_notes')->insert([
             'tenant_id' => $tenantId,
             'purchase_return_id' => $return->getKey(),
@@ -1262,6 +1267,88 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame((int) $order->supplier_id, (int) $return->supplier_id);
         $this->assertFalse((bool) $return->approval_required);
         $this->assertTrue((bool) $return->affects_supplier_balance);
+    }
+
+    public function test_goods_receipt_rejects_received_date_before_purchase_order_date(): void
+    {
+        [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
+        $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
+            tenantId: $tenantId,
+            purchaseOrderDate: '2026-06-15',
+            supplierType: 'supplier',
+            supplierId: $supplierId,
+            warehouseId: $warehouseId,
+            lines: [new PurchaseOrderLineData(
+                itemId: (int) $item->getKey(),
+                orderedQuantity: '10.000000',
+                unitPrice: '100.000000',
+                uomId: $uomId,
+            )],
+        ));
+        $order = $this->approveOrder($order);
+        $line = $order->lines->first();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Goods receipt date cannot be before the purchase order date.');
+
+        $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
+            tenantId: $tenantId,
+            receivedDate: '2026-06-10',
+            warehouseId: $warehouseId,
+            purchaseOrderId: (int) $order->getKey(),
+            lines: [new GoodsReceiptNoteLineData((int) $item->getKey(), '10.000000', '10.000000', '100.000000', purchaseOrderLineId: (int) $line->getKey())],
+        ));
+    }
+
+    public function test_purchase_return_rejects_return_date_before_goods_receipt_date(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grnOne] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Purchase return date cannot be before the goods receipt date.');
+
+        $this->createPurchaseReturn(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-01',
+            warehouseId: $warehouseId,
+            lines: [
+                new PurchaseReturnLineData('goods_receipt_note_line', (int) $grnOne->lines->first()->getKey(), '1.000000'),
+            ],
+        ));
+    }
+
+    public function test_purchase_debit_note_rejects_date_before_purchase_return_date(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        [$grnOne] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
+
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
+            tenantId: $tenantId,
+            returnDate: '2026-06-08',
+            warehouseId: $warehouseId,
+            lines: [
+                new PurchaseReturnLineData('goods_receipt_note_line', (int) $grnOne->lines->first()->getKey(), '1.000000'),
+            ],
+        ));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Purchase debit note date cannot be before the purchase return date.');
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $return): void {
+            app(PurchaseDebitNoteService::class)->create(new CreatePurchaseDebitNoteData(
+                tenantId: $tenantId,
+                debitNoteDate: '2026-06-05',
+                amount: '10.000000',
+                reason: 'Premature debit note',
+                supplierId: (int) $return->supplier_id,
+                purchaseReturnId: (int) $return->getKey(),
+                sourceType: 'purchase_return',
+                sourceId: (int) $return->getKey(),
+            ));
+        });
     }
 
     public function test_partial_return_prorates_line_discount_tax_and_charge(): void
@@ -1420,7 +1507,7 @@ final class PurchaseEngineTest extends TestCase
                 ->orderBy('id')
                 ->get(),
         );
-        $math = app(\Modules\Core\Services\DecimalMath::class);
+        $math = app(DecimalMath::class);
 
         $this->assertSame('30.000000', $math->sum($returnLines->pluck('base_amount')->map(fn ($value): string => (string) $value)->all()));
         $this->assertSame('1.000000', $math->sum($returnLines->pluck('discount_amount')->map(fn ($value): string => (string) $value)->all()));
@@ -1599,7 +1686,7 @@ final class PurchaseEngineTest extends TestCase
     {
         $tenantId = $this->createTenant('AUTHA');
         $otherTenantId = $this->createTenant('AUTHB');
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Purchase',
             'last_name' => 'Auth',
@@ -1626,7 +1713,7 @@ final class PurchaseEngineTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $otherUserId = (int) \Tests\Support\TenantUserFixture::create([
+        $otherUserId = (int) TenantUserFixture::create([
             'tenant_id' => $otherTenantId,
             'first_name' => 'Other',
             'last_name' => 'Auth',
@@ -1752,11 +1839,11 @@ final class PurchaseEngineTest extends TestCase
         );
     }
 
-    private function createSupplierInvoice(CreatePurchaseInvoiceData $data): \Modules\Invoice\Models\Invoice
+    private function createSupplierInvoice(CreatePurchaseInvoiceData $data): Invoice
     {
         return $this->withTenantExecutionContext(
             $data->tenantId,
-            fn (): \Modules\Invoice\Models\Invoice => app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice($data),
+            fn (): Invoice => app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice($data),
         );
     }
 
@@ -1926,9 +2013,9 @@ final class PurchaseEngineTest extends TestCase
         return [$tenantId, $warehouseId, $item, $supplierId, $uomId];
     }
 
-    private function postInvoice(\Modules\Invoice\Models\Invoice $invoice): \Modules\Invoice\Models\Invoice
+    private function postInvoice(Invoice $invoice): Invoice
     {
-        return $this->withTenantExecutionContext((int) $invoice->tenant_id, function () use ($invoice): \Modules\Invoice\Models\Invoice {
+        return $this->withTenantExecutionContext((int) $invoice->tenant_id, function () use ($invoice): Invoice {
             $statuses = app(InvoiceStatusService::class);
             $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
 
@@ -2035,7 +2122,7 @@ final class PurchaseEngineTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'row_version' => 1,
             'name' => $name,

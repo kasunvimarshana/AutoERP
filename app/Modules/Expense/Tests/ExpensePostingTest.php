@@ -138,6 +138,49 @@ final class ExpensePostingTest extends TestCase
         self::assertSame('0.000000', $reversedExpenseReport['summary']['net_amount']);
     }
 
+    public function test_expense_reversal_rejects_reversal_date_before_expense_date(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        FinancePostingFixture::seedExpensePaymentProfile($tenantId, $organizationUnitId);
+
+        $typeId = (int) DB::table('expense_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'TEST-EXP',
+            'name' => 'Test Expense',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $methodId = $this->paymentMethod($tenantId);
+
+        $expense = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ExpensePostingService::class)->createAndPost(new CreateExpenseData(
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                expenseTypeId: $typeId,
+                paymentMethodId: $methodId,
+                expenseDate: '2026-09-22',
+                amount: '50.000000',
+                idempotencyKey: (string) Str::uuid(),
+            )),
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Expense reversal date cannot be before the expense date.');
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ExpenseReversalService::class)->reverse(
+                $expense,
+                (int) $expense->row_version,
+                '2026-09-10',
+                'Premature reversal',
+                null,
+            ),
+        );
+    }
+
     /** @return array{int, int} */
     private function scope(): array
     {

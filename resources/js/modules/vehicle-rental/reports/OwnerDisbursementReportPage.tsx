@@ -5,7 +5,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Panel } from '@/shared/components/Panel';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
-import { Tabs, type TabItem } from '@/shared/components/Tabs';
+import { Tabs } from '@/shared/components/Tabs';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';

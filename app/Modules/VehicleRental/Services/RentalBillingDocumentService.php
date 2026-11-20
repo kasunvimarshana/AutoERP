@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Enums\AdjustmentEffect;
 use Modules\Invoice\Enums\AdjustmentType;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
@@ -69,13 +70,13 @@ final class RentalBillingDocumentService
                     $sq->where('source_type', 'like', 'vehicle_rental_%')
                         ->orWhere('source_type', 'like', 'rental_%');
                 })
-                ->orWhereExists(function ($sub): void {
-                    $sub->selectRaw(1)
-                        ->from('vehicle_rental_billing_cycles')
-                        ->whereColumn('vehicle_rental_billing_cycles.initial_invoice_id', 'invoices.id')
-                        ->orWhereColumn('vehicle_rental_billing_cycles.supplementary_invoice_id', 'invoices.id')
-                        ->orWhereColumn('vehicle_rental_billing_cycles.final_invoice_id', 'invoices.id');
-                });
+                    ->orWhereExists(function ($sub): void {
+                        $sub->selectRaw(1)
+                            ->from('vehicle_rental_billing_cycles')
+                            ->whereColumn('vehicle_rental_billing_cycles.initial_invoice_id', 'invoices.id')
+                            ->orWhereColumn('vehicle_rental_billing_cycles.supplementary_invoice_id', 'invoices.id')
+                            ->orWhereColumn('vehicle_rental_billing_cycles.final_invoice_id', 'invoices.id');
+                    });
             });
     }
 
@@ -141,19 +142,19 @@ final class RentalBillingDocumentService
                             ->where('source_id', $agreementId);
                     });
                 })
-                ->orWhereExists(function ($sub) use ($agreementId): void {
-                    $sub->selectRaw(1)
-                        ->from('vehicle_rental_billing_cycles')
-                        ->where(function ($w) use ($agreementId): void {
-                            $w->where('customer_agreement_id', $agreementId)
-                                ->orWhere('owner_agreement_id', $agreementId);
-                        })
-                        ->where(function ($w): void {
-                            $w->whereColumn('vehicle_rental_billing_cycles.initial_invoice_id', 'invoices.id')
-                                ->orWhereColumn('vehicle_rental_billing_cycles.supplementary_invoice_id', 'invoices.id')
-                                ->orWhereColumn('vehicle_rental_billing_cycles.final_invoice_id', 'invoices.id');
-                        });
-                });
+                    ->orWhereExists(function ($sub) use ($agreementId): void {
+                        $sub->selectRaw(1)
+                            ->from('vehicle_rental_billing_cycles')
+                            ->where(function ($w) use ($agreementId): void {
+                                $w->where('customer_agreement_id', $agreementId)
+                                    ->orWhere('owner_agreement_id', $agreementId);
+                            })
+                            ->where(function ($w): void {
+                                $w->whereColumn('vehicle_rental_billing_cycles.initial_invoice_id', 'invoices.id')
+                                    ->orWhereColumn('vehicle_rental_billing_cycles.supplementary_invoice_id', 'invoices.id')
+                                    ->orWhereColumn('vehicle_rental_billing_cycles.final_invoice_id', 'invoices.id');
+                            });
+                    });
             });
         }
 
@@ -190,8 +191,8 @@ final class RentalBillingDocumentService
             'adjustments',
             'sources',
         ])
-        ->orderByDesc('invoice_date')
-        ->orderByDesc('id');
+            ->orderByDesc('invoice_date')
+            ->orderByDesc('id');
 
         $paginated = $query->paginate($perPage);
 
@@ -392,7 +393,7 @@ final class RentalBillingDocumentService
             'id' => $adj->id,
             'name' => $adj->name,
             'adjustment_type' => $adj->adjustment_type instanceof AdjustmentType ? $adj->adjustment_type->value : (string) $adj->adjustment_type,
-            'effect' => $adj->effect instanceof \Modules\Invoice\Enums\AdjustmentEffect ? $adj->effect->value : (string) $adj->effect,
+            'effect' => $adj->effect instanceof AdjustmentEffect ? $adj->effect->value : (string) $adj->effect,
             'amount' => (string) $adj->amount,
             'rate_snapshot' => $adj->rate_snapshot !== null ? (string) $adj->rate_snapshot : null,
         ])->values()->all();
@@ -670,6 +671,9 @@ final class RentalBillingDocumentService
             $this->authorization->assertBilling($context, $kind);
 
             if (array_key_exists('due_date', $data)) {
+                if ($data['due_date'] !== null && $invoice->invoice_date !== null && (string) $data['due_date'] < $invoice->invoice_date->toDateString()) {
+                    throw ValidationException::withMessages(['due_date' => ['Due date must be on or after the invoice date.']]);
+                }
                 $invoice->due_date = $data['due_date'];
             }
             if (array_key_exists('notes', $data)) {
@@ -789,7 +793,7 @@ final class RentalBillingDocumentService
             $adj->row_version += 1;
             $adj->save();
 
-            $history = new AgreementAdjustmentHistory();
+            $history = new AgreementAdjustmentHistory;
             $history->tenant_id = $context->tenantId;
             $history->adjustment_id = $adj->id;
             $history->from_status = $fromStatus;
@@ -1034,7 +1038,7 @@ final class RentalBillingDocumentService
     /**
      * Bulk resolves agreement, vehicle, and driver details for invoices without N+1 queries.
      *
-     * @param Collection<int, Invoice> $invoices
+     * @param  Collection<int, Invoice>  $invoices
      * @return array<int, array{agreement: ?array, vehicle: ?array, driver_name: ?string}>
      */
     public function bulkLoadRentalContexts(AgreementContext $context, Collection $invoices): array

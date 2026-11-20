@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
@@ -41,14 +40,11 @@ use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Models\AgreementAdjustment;
 use Modules\VehicleRental\Models\BillingCycle;
-use Modules\VehicleRental\Models\BillingCycleChart;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\CustomerBaseCharge;
-use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
 use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RentalExpenseAllocation;
-use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\BaseRentBilling;
 use Modules\VehicleRental\Services\OwnerSettlementBillingService;
@@ -83,7 +79,7 @@ final class RentalBillingDocumentTest extends TestCase
             $invoiceService = app(InvoiceCreationService::class);
 
             // 1. Create Customer AR Invoice
-            $baseCharge = new CustomerBaseCharge();
+            $baseCharge = new CustomerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $custAg->id;
@@ -131,7 +127,7 @@ final class RentalBillingDocumentTest extends TestCase
             ));
 
             // 2. Create Owner AP Bill via settlement service
-            $ownerBaseCharge = new OwnerBaseCharge();
+            $ownerBaseCharge = new OwnerBaseCharge;
             $ownerBaseCharge->tenant_id = $context->tenantId;
             $ownerBaseCharge->organization_unit_id = $context->organizationUnitId;
             $ownerBaseCharge->agreement_id = $ownAg->id;
@@ -425,6 +421,15 @@ final class RentalBillingDocumentTest extends TestCase
         $updated = $updateRes->json('data');
         $this->assertSame('2026-09-25', $updated['due_date']);
         $this->assertSame('Updated terms for rental', $updated['notes']);
+
+        // 3. Reject Due Date Before Invoice Date
+        $invalidDateRes = $this->putJson("/api/v1/vehicle-rental/billing/documents/{$invoiceId}", [
+            'expected_version' => $updated['row_version'] ?? ($rowVersion + 1),
+            'due_date' => '2026-08-15',
+            'notes' => 'Attempting past due date before invoice date',
+        ]);
+        $invalidDateRes->assertUnprocessable();
+        $invalidDateRes->assertJsonValidationErrors(['due_date']);
     }
 
     public function test_cancel_draft_document_with_audit_reason(): void
@@ -963,7 +968,7 @@ final class RentalBillingDocumentTest extends TestCase
             $cycleId = $cycle->id;
 
             // Create authorized AgreementAdjustment
-            $adj = new AgreementAdjustment();
+            $adj = new AgreementAdjustment;
             $adj->tenant_id = $context->tenantId;
             $adj->organization_unit_id = $context->organizationUnitId;
             $adj->owner_agreement_id = $ownerAg->id;
@@ -1041,7 +1046,7 @@ final class RentalBillingDocumentTest extends TestCase
             $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
-            $baseCharge = new OwnerBaseCharge();
+            $baseCharge = new OwnerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $ownerAg->id;
@@ -1052,7 +1057,7 @@ final class RentalBillingDocumentTest extends TestCase
             $baseCharge->actor_id = $context->actorId;
             $baseCharge->save();
 
-            $expense = new RentalExpense();
+            $expense = new RentalExpense;
             $expense->tenant_id = $context->tenantId;
             $expense->organization_unit_id = $context->organizationUnitId;
             $expense->expense_number = 'EXP-CANCEL-001';
@@ -1071,7 +1076,7 @@ final class RentalBillingDocumentTest extends TestCase
             $expense->created_by = $context->actorId;
             $expense->save();
 
-            $alloc = new RentalExpenseAllocation();
+            $alloc = new RentalExpenseAllocation;
             $alloc->tenant_id = $context->tenantId;
             $alloc->organization_unit_id = $context->organizationUnitId;
             $alloc->expense_id = $expense->id;

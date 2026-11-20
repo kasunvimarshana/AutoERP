@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Tenancy\TenantFeature;
+use Illuminate\Validation\ValidationException;
 use Modules\Invoice\Enums\InvoiceDirection;
-use Modules\Invoice\Models\Invoice;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementAdjustmentCategory;
@@ -23,7 +20,6 @@ use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Models\AgreementAdjustment;
 use Modules\VehicleRental\Models\BillingCycle;
-use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
 use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RentalExpenseAllocation;
@@ -52,7 +48,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
             // Record a posted base charge for the lessor
-            $baseCharge = new OwnerBaseCharge();
+            $baseCharge = new OwnerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $ownerAg->id;
@@ -96,7 +92,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
             // Base charge of 50,000
-            $baseCharge = new OwnerBaseCharge();
+            $baseCharge = new OwnerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $ownerAg->id;
@@ -108,7 +104,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $baseCharge->save();
 
             // Record an approved expense allocation for vehicle repair of 8,000
-            $expense = new RentalExpense();
+            $expense = new RentalExpense;
             $expense->tenant_id = $context->tenantId;
             $expense->organization_unit_id = $context->organizationUnitId;
             $expense->expense_number = 'EXP-TEST-001';
@@ -127,7 +123,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $expense->created_by = $context->actorId;
             $expense->save();
 
-            $alloc = new RentalExpenseAllocation();
+            $alloc = new RentalExpenseAllocation;
             $alloc->tenant_id = $context->tenantId;
             $alloc->organization_unit_id = $context->organizationUnitId;
             $alloc->expense_id = $expense->id;
@@ -172,7 +168,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
-            $baseCharge = new OwnerBaseCharge();
+            $baseCharge = new OwnerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $ownerAg->id;
@@ -212,7 +208,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
-            $baseCharge = new OwnerBaseCharge();
+            $baseCharge = new OwnerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $ownerAg->id;
@@ -224,7 +220,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $baseCharge->save();
 
             // Maintenance deduction of 60,000 (exceeds 50,000 gross - 5,000 WHT = 45,000 available)
-            $expense = new RentalExpense();
+            $expense = new RentalExpense;
             $expense->tenant_id = $context->tenantId;
             $expense->organization_unit_id = $context->organizationUnitId;
             $expense->expense_number = 'EXP-TEST-OVER';
@@ -243,7 +239,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $expense->created_by = $context->actorId;
             $expense->save();
 
-            $alloc = new RentalExpenseAllocation();
+            $alloc = new RentalExpenseAllocation;
             $alloc->tenant_id = $context->tenantId;
             $alloc->organization_unit_id = $context->organizationUnitId;
             $alloc->expense_id = $expense->id;
@@ -295,7 +291,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
             // Create an unbilled owner BillingCycle for September
-            $cycle = new BillingCycle();
+            $cycle = new BillingCycle;
             $cycle->tenant_id = $context->tenantId;
             $cycle->organization_unit_id = $context->organizationUnitId;
             $cycle->cycle_number = 'BC-OWNER-SEP';
@@ -345,7 +341,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
-            $baseCharge = new OwnerBaseCharge();
+            $baseCharge = new OwnerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $ownerAg->id;
@@ -357,7 +353,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $baseCharge->save();
 
             // Approved DebitNote adjustment: +3,000 lessor addition (e.g. bonus allowance)
-            $debitAdj = new AgreementAdjustment();
+            $debitAdj = new AgreementAdjustment;
             $debitAdj->tenant_id = $context->tenantId;
             $debitAdj->organization_unit_id = $context->organizationUnitId;
             $debitAdj->owner_agreement_id = $ownerAg->id;
@@ -375,7 +371,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $debitAdj->save();
 
             // Approved CreditNote adjustment: -5,000 lessor deduction (e.g. downtime compensation)
-            $creditAdj = new AgreementAdjustment();
+            $creditAdj = new AgreementAdjustment;
             $creditAdj->tenant_id = $context->tenantId;
             $creditAdj->organization_unit_id = $context->organizationUnitId;
             $creditAdj->owner_agreement_id = $ownerAg->id;
@@ -432,7 +428,7 @@ final class OwnerSettlementBillingTest extends TestCase
             $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
             $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
 
-            $baseCharge = new OwnerBaseCharge();
+            $baseCharge = new OwnerBaseCharge;
             $baseCharge->tenant_id = $context->tenantId;
             $baseCharge->organization_unit_id = $context->organizationUnitId;
             $baseCharge->agreement_id = $ownerAg->id;
@@ -454,12 +450,36 @@ final class OwnerSettlementBillingTest extends TestCase
             $this->assertNotNull($bill);
 
             // Attempting to generate another overlapping bill for the same period must be rejected
-            $this->expectException(\Illuminate\Validation\ValidationException::class);
+            $this->expectException(ValidationException::class);
             $settlementService->generateOwnerSettlementBill($context, $ownerAg->id, [
                 'start_date' => '2026-09-15',
                 'end_date' => '2026-10-15',
                 'wht_rate' => '0.000000',
                 'invoice_date' => '2026-10-15',
+            ]);
+        });
+    }
+
+    public function test_owner_settlement_rejects_due_date_before_invoice_date(): void
+    {
+        [$context, $customerData, $ownerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $ownerData): void {
+            $ownerData['starts_on'] = '2026-09-01';
+            $ownerData['ends_on'] = '2026-09-30';
+            $agreements = app(AgreementService::class);
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
+            $ownerAg = $agreements->change(AgreementKind::Owner, $context, $ownerAg->id, $ownerAg->row_version, AgreementAction::Activate);
+
+            $settlementService = app(OwnerSettlementBillingService::class);
+
+            $this->expectException(ValidationException::class);
+            $settlementService->generateOwnerSettlementBill($context, $ownerAg->id, [
+                'start_date' => '2026-09-01',
+                'end_date' => '2026-09-30',
+                'invoice_date' => '2026-09-30',
+                'due_date' => '2026-09-15',
             ]);
         });
     }

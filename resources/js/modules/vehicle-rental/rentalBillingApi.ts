@@ -189,7 +189,16 @@ export async function listRentalBillingDocuments(
     params: RentalBillingQueryParams,
     signal?: AbortSignal
 ): Promise<PaginatedBillingDocuments> {
-    const res = await apiClient.get<any>(`${RENTAL_BILLING_API}/documents`, { params, signal });
+    const res = await apiClient.get<{
+        data?: RentalBillingDocument[];
+        meta?: PaginatedBillingDocuments['meta'];
+        current_page?: number;
+        last_page?: number;
+        per_page?: number;
+        total?: number;
+        from?: number;
+        to?: number;
+    }>(`${RENTAL_BILLING_API}/documents`, { params, signal });
     const raw = res.data;
     if (raw.meta) {
         return { data: raw.data ?? [], meta: raw.meta };

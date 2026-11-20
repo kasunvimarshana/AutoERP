@@ -37,7 +37,7 @@ final class BillingCycleRequest extends TenantScopedRequest
             'reason' => ['nullable', 'string', 'max:1000'],
             'issue_initial_invoice' => ['sometimes', 'boolean'],
             'invoice_date' => ['sometimes', 'date'],
-            'due_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'exchange_rate' => ['sometimes', 'numeric', 'gt:0'],
         ];
     }

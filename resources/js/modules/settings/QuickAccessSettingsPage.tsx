@@ -51,9 +51,6 @@ export default function QuickAccessSettingsPage() {
     const auth = useAuthSafe();
     const {
         items,
-        rowVersion,
-        isDefault,
-        isLoading,
         isSaving,
         error: configError,
         updateItems,

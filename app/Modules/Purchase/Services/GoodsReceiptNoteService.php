@@ -179,6 +179,9 @@ final class GoodsReceiptNoteService
                 }
                 $order = $lockedOrder;
                 $order->setRelation('lines', $lockedOrderLines->values());
+                if ($order->purchase_order_date !== null && $data->receivedDate < $order->purchase_order_date->toDateString()) {
+                    throw new InvalidArgumentException('Goods receipt date cannot be before the purchase order date.');
+                }
             }
 
             $calculation = $this->calculator->calculate($this->receiptLinesAsOrderLines($data, $sourceLines), []);

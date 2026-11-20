@@ -79,4 +79,29 @@ final class HistoricalPaymentReversalTest extends TestCase
             }
         });
     }
+
+    public function test_payment_reversal_rejects_reversal_date_before_payment_date(): void
+    {
+        $tenantId = (int) DB::table('tenants')->insertGetId([
+            'uuid' => (string) Str::uuid(), 'code' => 'HIST-PAY-2', 'name' => 'Historical Payment 2',
+            'slug' => 'historical-payment-2', 'status' => 'active', 'status_changed_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $paymentId = (int) DB::table('payments')->insertGetId([
+            'tenant_id' => $tenantId, 'payment_number' => 'HIST-PAY-2', 'payment_type' => 'customer_receipt',
+            'direction' => 'inbound', 'payment_date' => '2026-07-15', 'document_status' => 'approved',
+            'posting_status' => 'posted', 'allocation_status' => 'unallocated', 'instrument_status' => 'settled',
+            'total_amount' => '400.000000', 'allocated_amount' => '0.000000',
+            'finance_posting_reference' => 'JRN-HIST-2',
+        ]);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($paymentId): void {
+            $this->expectException(\InvalidArgumentException::class);
+            $this->expectExceptionMessage('Payment reversal date cannot be before the payment date.');
+
+            app(PaymentReversalService::class)->reverse(new PaymentReversalData(
+                $paymentId, 1, '2026-07-10', 'Early reversal',
+            ));
+        });
+    }
 }

@@ -106,6 +106,7 @@ final class OwnerSettlementBillingService
                             if (preg_match('/^\d{2}-\d{2}-\d{4}$/', $d)) {
                                 return CarbonImmutable::createFromFormat('d-m-Y', $d);
                             }
+
                             return CarbonImmutable::parse($d);
                         };
                         $exStart = $parseDate($m[1])->startOfDay();
@@ -237,6 +238,9 @@ final class OwnerSettlementBillingService
 
             $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
             $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+            if ($dueDate !== null && $dueDate < $invoiceDate) {
+                throw ValidationException::withMessages(['due_date' => ['Due date must be on or after invoice date.']]);
+            }
             $exchangeRate = (string) ($input['exchange_rate'] ?? '1.000000');
 
             $sourceType = 'vehicle_rental_owner_settlement';
@@ -555,7 +559,7 @@ final class OwnerSettlementBillingService
                 $adj->row_version += 1;
                 $adj->save();
 
-                $history = new AgreementAdjustmentHistory();
+                $history = new AgreementAdjustmentHistory;
                 $history->tenant_id = $context->tenantId;
                 $history->adjustment_id = $adj->id;
                 $history->from_status = AgreementAdjustmentStatus::Authorized;

@@ -16,7 +16,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { AgreementKind, agreementPermissions } from './agreements';
+import { AgreementKind } from './agreements';
 import { BILLING_PERMISSION } from './baseRentBillingApi';
 import {
     listRentalBillingDocuments,
@@ -51,7 +51,6 @@ const BALANCE_STATUS_OPTIONS = [
 
 export default function CustomerInvoicesPage() {
     const auth = useAuth();
-    const canCustomerView = hasPermission(auth, agreementPermissions.customer.view);
     const canCustomerBill = hasPermission(auth, BILLING_PERMISSION[AgreementKind.Customer]);
 
     // Financial Summary

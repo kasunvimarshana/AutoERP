@@ -18,7 +18,6 @@ import { BILLING_PERMISSION } from './baseRentBillingApi';
 import {
     listRentalBillingDocuments,
     getRentalBillingSummary,
-    type RentalBillingDocument,
     type RentalBillingSummary,
     type PaginatedBillingDocuments,
 } from './rentalBillingApi';
@@ -64,7 +63,6 @@ export default function RentalInvoicesAndBillsPage() {
 
     // Summary metrics
     const [summary, setSummary] = useState<RentalBillingSummary | null>(null);
-    const [loadingSummary, setLoadingSummary] = useState(false);
 
     // List and pagination
     const [paginated, setPaginated] = useState<PaginatedBillingDocuments>({
@@ -91,14 +89,11 @@ export default function RentalInvoicesAndBillsPage() {
     const [ownerBillPreviewOpen, setOwnerBillPreviewOpen] = useState(false);
 
     const loadSummary = useCallback(async (signal?: AbortSignal) => {
-        setLoadingSummary(true);
         try {
             const data = await getRentalBillingSummary(signal);
             setSummary(data);
         } catch {
             // Non-critical, ignore summary error
-        } finally {
-            setLoadingSummary(false);
         }
     }, []);
 

@@ -92,4 +92,53 @@ final class InvoiceCalculationServiceTest extends TestCase
 
         app(InvoiceValidationService::class)->validateForCreation($data);
     }
+
+    public function test_it_rejects_due_date_earlier_than_invoice_date(): void
+    {
+        $data = new CreateInvoiceData(
+            tenantId: 100,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-29',
+            dueDate: '2026-06-20',
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Service',
+                    quantity: '1.000000',
+                    unitPrice: '100.000000',
+                ),
+            ],
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invoice due date cannot be earlier than invoice date.');
+
+        app(InvoiceValidationService::class)->validateForCreation($data);
+    }
+
+    public function test_it_rejects_supply_period_end_earlier_than_start(): void
+    {
+        $data = new CreateInvoiceData(
+            tenantId: 100,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-29',
+            supplyPeriodStart: '2026-06-20',
+            supplyPeriodEnd: '2026-06-10',
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Service',
+                    quantity: '1.000000',
+                    unitPrice: '100.000000',
+                ),
+            ],
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invoice supply period end date cannot be earlier than start date.');
+
+        app(InvoiceValidationService::class)->validateForCreation($data);
+    }
 }

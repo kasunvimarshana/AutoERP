@@ -17,7 +17,7 @@ final class OwnerSettlementBillRequest extends TenantScopedRequest
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'invoice_date' => ['sometimes', 'date'],
-            'due_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'wht_rate' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'exchange_rate' => ['sometimes', 'numeric', 'gt:0'],
         ];

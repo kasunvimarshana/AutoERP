@@ -61,6 +61,11 @@ final class PaymentReversalService
             }
             $this->assertNoActiveRefunds($payment);
 
+            $paymentDate = $payment->payment_date?->toDateString();
+            if ($paymentDate !== null && $data->reversalDate < $paymentDate) {
+                throw new InvalidArgumentException('Payment reversal date cannot be before the payment date.');
+            }
+
             $financeReversal = $this->financeReversals->reversePayment(
                 (int) $payment->tenant_id,
                 $payment->organization_unit_id,

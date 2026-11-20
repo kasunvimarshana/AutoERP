@@ -264,29 +264,29 @@ export interface PartyOpenDocumentsResponse {
     documents: PartyOpenDocument[];
 }
 
-export const getPartyOpenRentalDocuments = (kind: AgreementKind, partyId: number) =>
-    apiClient.get<{ data: PartyOpenDocumentsResponse }>(`${AGREEMENT_API}/${kind}/parties/${partyId}/open-documents`).then(r => r.data.data);
+export const getPartyOpenRentalDocuments = (kind: AgreementKind, partyId: number, signal?: AbortSignal) =>
+    apiClient.get<{ data: PartyOpenDocumentsResponse }>(`${AGREEMENT_API}/${kind}/parties/${partyId}/open-documents`, { signal }).then(r => r.data.data);
 
 export const recordPartyRentalPayment = (kind: AgreementKind, partyId: number, payload: RecordRentalPaymentPayload) =>
-    apiClient.post<ApiResource<any>>(`${AGREEMENT_API}/${kind}/parties/${partyId}/payments`, payload).then(r => r.data.data);
+    apiClient.post<ApiResource<AgreementPayment>>(`${AGREEMENT_API}/${kind}/parties/${partyId}/payments`, payload).then(r => r.data.data);
 
 export const allocatePartyRentalPayment = (kind: AgreementKind, partyId: number, paymentId: number, payload: AllocateRentalPaymentPayload) =>
-    apiClient.post<ApiResource<any>>(`${AGREEMENT_API}/${kind}/parties/${partyId}/payments/${paymentId}/allocate`, payload).then(r => r.data.data);
+    apiClient.post<ApiResource<AgreementPayment>>(`${AGREEMENT_API}/${kind}/parties/${partyId}/payments/${paymentId}/allocate`, payload).then(r => r.data.data);
 
 export const listAgreementPayments = (kind: AgreementKind, agreementId: number) =>
     apiClient.get<{ data: AgreementPayment[] }>(`${url(kind)}/${agreementId}/payments`).then(r => r.data.data);
 
 export const recordAgreementPayment = (kind: AgreementKind, agreementId: number, payload: RecordRentalPaymentPayload) =>
-    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments`, payload).then(r => r.data.data);
+    apiClient.post<ApiResource<AgreementPayment>>(`${url(kind)}/${agreementId}/payments`, payload).then(r => r.data.data);
 
 export const allocateAgreementPayment = (kind: AgreementKind, agreementId: number, paymentId: number, payload: AllocateRentalPaymentPayload) =>
-    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments/${paymentId}/allocate`, payload).then(r => r.data.data);
+    apiClient.post<ApiResource<AgreementPayment>>(`${url(kind)}/${agreementId}/payments/${paymentId}/allocate`, payload).then(r => r.data.data);
 
 export const reverseAgreementPayment = (kind: AgreementKind, agreementId: number, paymentId: number, payload: ReverseRentalPaymentPayload) =>
-    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments/${paymentId}/reverse`, payload).then(r => r.data.data);
+    apiClient.post<ApiResource<AgreementPayment>>(`${url(kind)}/${agreementId}/payments/${paymentId}/reverse`, payload).then(r => r.data.data);
 
 export const refundAgreementPayment = (kind: AgreementKind, agreementId: number, paymentId: number, payload: RefundRentalPaymentPayload) =>
-    apiClient.post<ApiResource<any>>(`${url(kind)}/${agreementId}/payments/${paymentId}/refund`, payload).then(r => r.data.data);
+    apiClient.post<ApiResource<AgreementPayment>>(`${url(kind)}/${agreementId}/payments/${paymentId}/refund`, payload).then(r => r.data.data);
 
 export const getPaymentReceiptPrintUrl = (paymentId: number) => `/api/v1/payments/${paymentId}/receipt`;
 

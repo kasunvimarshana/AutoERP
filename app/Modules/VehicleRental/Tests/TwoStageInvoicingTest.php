@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Modules\Core\Tenancy\TenantFeature;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceStatusService;
@@ -39,9 +37,7 @@ use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Models\AgreementAdjustment;
 use Modules\VehicleRental\Models\BillingCycle;
-use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\RentalExpense;
-use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RunningChartService;
@@ -266,6 +262,33 @@ final class TwoStageInvoicingTest extends TestCase
             $this->assertNotNull($suppInvoice);
             // Supplementary invoice bills exactly the delta of 10,000
             $this->assertEqualsWithDelta(10000.0, (float) $suppInvoice->grand_total, 0.01);
+        });
+    }
+
+    public function test_two_stage_invoicing_rejects_due_date_earlier_than_invoice_date(): void
+    {
+        [$context, $customerData] = $this->fixture();
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData): void {
+            $customerData['starts_on'] = '2026-09-01';
+            $customerData['agreed_on'] = '2026-09-01';
+            $customerData['terms'] = ['base_rate' => '20000.000000'];
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $customerAg = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
+
+            $invoicing = app(TwoStageInvoicingService::class);
+
+            // Rejects creating cycle with invalid due_date < invoice_date
+            $this->expectException(ValidationException::class);
+            $invoicing->createCycle(AgreementKind::Customer, $context, $customerAg->id, [
+                'period_from' => '2026-09-01',
+                'period_until' => '2026-09-30',
+                'issue_initial_invoice' => true,
+                'invoice_date' => '2026-09-15',
+                'due_date' => '2026-09-10',
+            ]);
         });
     }
 
@@ -1001,7 +1024,7 @@ final class TwoStageInvoicingTest extends TestCase
             // Add line items with specific vehicle and driver attribution
             $invoicing->addItem($context, $cycle->id, [
                 'item_type' => BillingCycleItemType::Addition->value,
-                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::FuelCharge->value,
+                'category' => BillingCycleItemCategory::FuelCharge->value,
                 'description' => 'Vehicle Fuel Surcharge',
                 'quantity' => '1.000000',
                 'unit_rate' => '4500.000000',
@@ -1011,7 +1034,7 @@ final class TwoStageInvoicingTest extends TestCase
 
             $invoicing->addItem($context, $cycle->id, [
                 'item_type' => BillingCycleItemType::Addition->value,
-                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::DriverAllowance->value,
+                'category' => BillingCycleItemCategory::DriverAllowance->value,
                 'description' => 'Driver Outstation Allowance',
                 'quantity' => '1.000000',
                 'unit_rate' => '2500.000000',
@@ -1021,7 +1044,7 @@ final class TwoStageInvoicingTest extends TestCase
 
             $invoicing->addItem($context, $cycle->id, [
                 'item_type' => BillingCycleItemType::Deduction->value,
-                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::Other->value,
+                'category' => BillingCycleItemCategory::Other->value,
                 'description' => 'Driver Late Penalty',
                 'quantity' => '1.000000',
                 'unit_rate' => '500.000000',
@@ -1715,7 +1738,7 @@ final class TwoStageInvoicingTest extends TestCase
             $chart = $charts->change($context, $chart->id, (int) $chart->row_version, RunningChartAction::Finalize, reason: 'Completed');
 
             // Create Toll RentalExpense for this running chart
-            $expense = new RentalExpense();
+            $expense = new RentalExpense;
             $expense->tenant_id = $context->tenantId;
             $expense->organization_unit_id = $context->organizationUnitId ?? 1;
             $expense->expense_number = 'EXP-TOLL-01';
@@ -1867,7 +1890,7 @@ final class TwoStageInvoicingTest extends TestCase
             // Add two deduction items: 8,000 and 6,000 (total deductions = 14,000 > 10,000 initial invoice)
             $invoicing->addItem($context, $cycle->id, [
                 'item_type' => BillingCycleItemType::Deduction->value,
-                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::DowntimeRebate->value,
+                'category' => BillingCycleItemCategory::DowntimeRebate->value,
                 'description' => 'Breakdown Compensation',
                 'quantity' => '1.000000',
                 'unit_rate' => '8000.000000',
@@ -1876,7 +1899,7 @@ final class TwoStageInvoicingTest extends TestCase
             $cycle->refresh();
             $invoicing->addItem($context, $cycle->id, [
                 'item_type' => BillingCycleItemType::Deduction->value,
-                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::Other->value,
+                'category' => BillingCycleItemCategory::Other->value,
                 'description' => 'Fuel Rebate Credit',
                 'quantity' => '1.000000',
                 'unit_rate' => '6000.000000',
@@ -1962,7 +1985,7 @@ final class TwoStageInvoicingTest extends TestCase
             $cycle->refresh();
             $invoicing->addItem($context, $cycle->id, [
                 'item_type' => BillingCycleItemType::Addition->value,
-                'category' => \Modules\VehicleRental\Enums\BillingCycleItemCategory::Other->value,
+                'category' => BillingCycleItemCategory::Other->value,
                 'description' => 'Unassigned Parking Fee',
                 'quantity' => '1.000000',
                 'unit_rate' => '1500.000000',

@@ -47,9 +47,9 @@ use Modules\VehicleRental\Enums\BillingCycleItemType;
 use Modules\VehicleRental\Enums\BillingCycleMode;
 use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\BillingFinalizationMode;
+use Modules\VehicleRental\Enums\RentalBasis;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
-use Modules\VehicleRental\Enums\RentalBasis;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\AgreementAdjustment;
@@ -149,7 +149,7 @@ final class TwoStageInvoicingService
             $exchangeRate = (string) ($input['exchange_rate'] ?? '1.000000');
             $cycleNumber = $this->cycleNumberService->next($context, $periodFrom);
 
-            $cycle = new BillingCycle();
+            $cycle = new BillingCycle;
             $cycle->tenant_id = $context->tenantId;
             $cycle->organization_unit_id = $context->organizationUnitId;
             $cycle->cycle_number = $cycleNumber;
@@ -376,7 +376,7 @@ final class TwoStageInvoicingService
                     unset($tollExpensesByUse[$chart->vehicle_use_id]);
                 }
 
-                $chartAttachment = new BillingCycleChart();
+                $chartAttachment = new BillingCycleChart;
                 $chartAttachment->tenant_id = $context->tenantId;
                 $chartAttachment->billing_cycle_id = $cycle->id;
                 $chartAttachment->running_chart_id = $chart->id;
@@ -443,7 +443,7 @@ final class TwoStageInvoicingService
                     $chartKm = (string) ($chart->commercial_km ?? '0.000000');
                     $chartDiffAmount = $this->math->mul($chartKm, $diffRate, 6);
                     if ($this->math->compare($chartDiffAmount, '0.000000') > 0) {
-                        $acItem = new BillingCycleItem();
+                        $acItem = new BillingCycleItem;
                         $acItem->tenant_id = $context->tenantId;
                         $acItem->billing_cycle_id = $cycle->id;
                         $acItem->item_type = BillingCycleItemType::Addition;
@@ -459,7 +459,7 @@ final class TwoStageInvoicingService
 
             // Defect 10: Driver Rate
             if ($this->math->compare($driverRate, '0.000000') > 0) {
-                $drvItem = new BillingCycleItem();
+                $drvItem = new BillingCycleItem;
                 $drvItem->tenant_id = $context->tenantId;
                 $drvItem->billing_cycle_id = $cycle->id;
                 $drvItem->item_type = BillingCycleItemType::Addition;
@@ -539,7 +539,7 @@ final class TwoStageInvoicingService
             $vehicleId = ! empty($data['vehicle_id']) ? (int) $data['vehicle_id'] : null;
             $driverEmployeeId = ! empty($data['driver_employee_id']) ? (int) $data['driver_employee_id'] : null;
 
-            $item = new BillingCycleItem();
+            $item = new BillingCycleItem;
             $item->tenant_id = $context->tenantId;
             $item->billing_cycle_id = $cycle->id;
             $item->item_type = $itemType;
@@ -1567,6 +1567,20 @@ final class TwoStageInvoicingService
         $cycle->total_billed_amount = $net;
     }
 
+    /** @return array{0: string, 1: ?string} */
+    private function resolveInvoiceAndDueDate(array $input): array
+    {
+        $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
+        $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+        if ($dueDate !== null && $dueDate < $invoiceDate) {
+            throw ValidationException::withMessages([
+                'due_date' => ['The due date cannot be earlier than the invoice date.'],
+            ]);
+        }
+
+        return [$invoiceDate, $dueDate];
+    }
+
     private function issueStage1Invoice(
         AgreementKind $kind,
         AgreementContext $context,
@@ -1580,8 +1594,7 @@ final class TwoStageInvoicingService
         $direction = $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound;
         $partyType = $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value;
         $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
-        $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
-        $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+        [$invoiceDate, $dueDate] = $this->resolveInvoiceAndDueDate($input);
 
         $sourceType = 'vehicle_rental_billing_cycle';
         $sourceId = (int) $cycle->id;
@@ -1648,8 +1661,7 @@ final class TwoStageInvoicingService
         $direction = $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound;
         $partyType = $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value;
         $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
-        $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
-        $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+        [$invoiceDate, $dueDate] = $this->resolveInvoiceAndDueDate($input);
 
         $sourceType = 'vehicle_rental_billing_cycle_supplementary';
         $sourceId = (int) $cycle->id;
@@ -1716,8 +1728,7 @@ final class TwoStageInvoicingService
         $direction = $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound;
         $partyType = $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value;
         $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
-        $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
-        $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+        [$invoiceDate, $dueDate] = $this->resolveInvoiceAndDueDate($input);
 
         $sourceType = 'vehicle_rental_billing_cycle_consolidated';
         $sourceId = (int) $cycle->id;
@@ -1863,7 +1874,7 @@ final class TwoStageInvoicingService
         $cycle->total_paid_amount = $transferredPaymentTotal;
 
         // 3. Record Credit Note adjustment offsetting initial invoice
-        $adjustment = new AgreementAdjustment();
+        $adjustment = new AgreementAdjustment;
         $adjustment->tenant_id = $context->tenantId;
         $adjustment->organization_unit_id = $context->organizationUnitId;
         if ($cycle->customer_agreement_id !== null) {
@@ -1885,7 +1896,7 @@ final class TwoStageInvoicingService
         $adjustment->row_version = AgreementFields::INITIAL_VERSION;
         $adjustment->save();
 
-        $history = new AgreementAdjustmentHistory();
+        $history = new AgreementAdjustmentHistory;
         $history->tenant_id = $context->tenantId;
         $history->adjustment_id = $adjustment->id;
         $history->from_status = AgreementAdjustmentStatus::Draft;
@@ -1939,8 +1950,7 @@ final class TwoStageInvoicingService
         $direction = $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound;
         $partyType = $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value;
         $partyId = $customer ? $agreement->customer_id : $agreement->supplier_id;
-        $invoiceDate = (string) ($input['invoice_date'] ?? now()->toDateString());
-        $dueDate = ! empty($input['due_date']) ? (string) $input['due_date'] : null;
+        [$invoiceDate, $dueDate] = $this->resolveInvoiceAndDueDate($input);
 
         $sourceType = 'vehicle_rental_billing_cycle_credit_note';
         $sourceId = (int) $cycle->id;

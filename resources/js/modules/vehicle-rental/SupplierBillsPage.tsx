@@ -16,7 +16,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { AgreementKind, agreementPermissions } from './agreements';
+import { AgreementKind } from './agreements';
 import { BILLING_PERMISSION } from './baseRentBillingApi';
 import {
     listRentalBillingDocuments,
@@ -51,7 +51,6 @@ const BALANCE_STATUS_OPTIONS = [
 
 export default function SupplierBillsPage() {
     const auth = useAuth();
-    const canOwnerView = hasPermission(auth, agreementPermissions.owner.view);
     const canOwnerBill = hasPermission(auth, BILLING_PERMISSION[AgreementKind.Owner]);
 
     // Financial Summary
@@ -429,9 +428,6 @@ export default function SupplierBillsPage() {
                             {paginated.data.map(doc => {
                                 const isDraft = doc.status === 'draft';
                                 const ownerName = doc.party?.name || 'Owner / Lessor';
-                                const vehicleLabel = doc.vehicle
-                                    ? trim(`${doc.vehicle.registration_number || ''} ${doc.vehicle.make_model || ''}`)
-                                    : 'Fleet Vehicle';
 
                                 return (
                                     <tr key={doc.id} className="hover:bg-slate-50/70 transition-colors">
@@ -682,8 +678,4 @@ export default function SupplierBillsPage() {
             )}
         </div>
     );
-}
-
-function trim(str: string): string {
-    return str.replace(/^\s+|\s+$/g, '');
 }

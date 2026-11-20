@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\User\Services\UserAccessResolver;
 use Modules\VehicleRental\Enums\AgreementAdjustmentCategory;
 use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 use Modules\VehicleRental\Enums\AgreementAdjustmentType;
@@ -23,16 +25,12 @@ use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\RunningChartAction;
-use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Models\AgreementAdjustment;
-use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Models\BillingCycleChart;
-use Modules\VehicleRental\Models\RentalExpenseAllocation;
-use Modules\VehicleRental\Models\RunningChart;
-use Modules\VehicleRental\Models\VehicleUse;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalExpenseService;
+use Modules\VehicleRental\Services\RentalIncidentService;
 use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\TwoStageInvoicingService;
 use Modules\VehicleRental\Services\VehicleUseService;
@@ -48,25 +46,25 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
 
     private function activate(string $kind, array $input): array
     {
-        $path = self::ROOT . '/' . $kind . '/agreements';
+        $path = self::ROOT.'/'.$kind.'/agreements';
         $draft = $this->postJson($path, $input)->assertCreated()->json('data');
 
-        return $this->postJson($path . '/' . $draft['id'] . '/activate', ['expected_version' => $draft['row_version']])->assertOk()->json('data');
+        return $this->postJson($path.'/'.$draft['id'].'/activate', ['expected_version' => $draft['row_version']])->assertOk()->json('data');
     }
 
     public function test_adjustment_endpoints_require_permissions(): void
     {
         // 1. Unauthenticated user gets 401
-        $this->getJson(self::ROOT . '/adjustments')
+        $this->getJson(self::ROOT.'/adjustments')
             ->assertUnauthorized();
 
         // 2. User without adjustment/customer permissions gets 403 Forbidden
         $this->loginFixture(permissions: [RentalAuthorization::DASHBOARD_VIEW]);
 
-        $this->getJson(self::ROOT . '/adjustments')
+        $this->getJson(self::ROOT.'/adjustments')
             ->assertForbidden();
 
-        $this->postJson(self::ROOT . '/adjustments', [
+        $this->postJson(self::ROOT.'/adjustments', [
             'customer_agreement_id' => 1,
             'adjustment_type' => 'credit_note',
             'category' => 'commercial_rebate',
@@ -82,7 +80,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $ownerAg = $this->activate('owner', $ownerData);
 
         // 1. Create Customer Adjustment (Debit Note)
-        $res = $this->postJson(self::ROOT . '/adjustments', [
+        $res = $this->postJson(self::ROOT.'/adjustments', [
             'customer_agreement_id' => $customerAg['id'],
             'adjustment_type' => AgreementAdjustmentType::DebitNote->value,
             'category' => AgreementAdjustmentCategory::DamageChargeback->value,
@@ -92,14 +90,14 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
 
         $adjId = $res->json('data.id');
         $this->assertSame(AgreementAdjustmentStatus::Authorized->value, $res->json('data.status'));
-        $this->assertSame('ADJ-' . str_pad((string) $adjId, 5, '0', STR_PAD_LEFT), $res->json('data.reference'));
+        $this->assertSame('ADJ-'.str_pad((string) $adjId, 5, '0', STR_PAD_LEFT), $res->json('data.reference'));
         $this->assertSame('Debit Note', $res->json('data.adjustment_type_label'));
         $this->assertSame('Damage Chargeback', $res->json('data.category_label'));
         $this->assertSame('4500.000000', $res->json('data.amount'));
         $this->assertSame($customerAg['reference'], $res->json('data.customer_agreement.reference'));
 
         // 2. Create Owner Adjustment (Credit Note)
-        $ownerRes = $this->postJson(self::ROOT . '/adjustments', [
+        $ownerRes = $this->postJson(self::ROOT.'/adjustments', [
             'owner_agreement_id' => $ownerAg['id'],
             'adjustment_type' => AgreementAdjustmentType::CreditNote->value,
             'category' => AgreementAdjustmentCategory::DowntimeCompensation->value,
@@ -113,31 +111,31 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $this->assertSame($ownerAg['reference'], $ownerRes->json('data.owner_agreement.reference'));
 
         // 3. Index Customer Adjustments
-        $listRes = $this->getJson(self::ROOT . '/adjustments?kind=customer&agreement_id=' . $customerAg['id'])
+        $listRes = $this->getJson(self::ROOT.'/adjustments?kind=customer&agreement_id='.$customerAg['id'])
             ->assertOk();
         $this->assertCount(1, $listRes->json('data'));
         $this->assertSame($adjId, $listRes->json('data.0.id'));
 
         // 4. Index Owner Adjustments
-        $ownerListRes = $this->getJson(self::ROOT . '/adjustments?kind=owner&agreement_id=' . $ownerAg['id'])
+        $ownerListRes = $this->getJson(self::ROOT.'/adjustments?kind=owner&agreement_id='.$ownerAg['id'])
             ->assertOk();
         $this->assertCount(1, $ownerListRes->json('data'));
         $this->assertSame($ownerAdjId, $ownerListRes->json('data.0.id'));
 
         // 5. Show Detail
-        $showRes = $this->getJson(self::ROOT . '/adjustments/' . $adjId)
+        $showRes = $this->getJson(self::ROOT.'/adjustments/'.$adjId)
             ->assertOk();
         $this->assertSame($adjId, $showRes->json('data.id'));
         $this->assertCount(1, $showRes->json('data.history'));
 
         // 6. Void Adjustment with stale version fails
-        $this->postJson(self::ROOT . '/adjustments/' . $adjId . '/void', [
+        $this->postJson(self::ROOT.'/adjustments/'.$adjId.'/void', [
             'expected_version' => 99,
             'reason' => 'Mistaken entry',
         ])->assertStatus(409);
 
         // 7. Void Adjustment successfully
-        $voidRes = $this->postJson(self::ROOT . '/adjustments/' . $adjId . '/void', [
+        $voidRes = $this->postJson(self::ROOT.'/adjustments/'.$adjId.'/void', [
             'expected_version' => 1,
             'reason' => 'Assessment recalculated, voiding old adjustment',
         ])->assertOk();
@@ -146,13 +144,13 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $this->assertCount(2, $voidRes->json('data.history'));
 
         // 8. Re-voiding fails
-        $this->postJson(self::ROOT . '/adjustments/' . $adjId . '/void', [
+        $this->postJson(self::ROOT.'/adjustments/'.$adjId.'/void', [
             'expected_version' => 2,
             'reason' => 'Voiding again',
         ])->assertStatus(409);
 
         // 9. Destroy is prohibited
-        $this->deleteJson(self::ROOT . '/adjustments/' . $adjId)
+        $this->deleteJson(self::ROOT.'/adjustments/'.$adjId)
             ->assertStatus(405);
     }
 
@@ -163,7 +161,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $ownerAg = $this->activate('owner', $ownerData);
 
         // A. Missing amount -> 422
-        $this->postJson(self::ROOT . '/adjustments', [
+        $this->postJson(self::ROOT.'/adjustments', [
             'customer_agreement_id' => $customerAg['id'],
             'adjustment_type' => 'debit_note',
             'category' => 'damage_chargeback',
@@ -171,7 +169,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['amount']);
 
         // B. Missing reason -> 422
-        $this->postJson(self::ROOT . '/adjustments', [
+        $this->postJson(self::ROOT.'/adjustments', [
             'customer_agreement_id' => $customerAg['id'],
             'adjustment_type' => 'debit_note',
             'category' => 'damage_chargeback',
@@ -179,7 +177,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['reason']);
 
         // C. Both agreements supplied -> 422 (prohibits)
-        $this->postJson(self::ROOT . '/adjustments', [
+        $this->postJson(self::ROOT.'/adjustments', [
             'customer_agreement_id' => $customerAg['id'],
             'owner_agreement_id' => $ownerAg['id'],
             'adjustment_type' => 'debit_note',
@@ -189,7 +187,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         ])->assertStatus(422);
 
         // D. Neither agreement supplied -> 422 (required_without)
-        $this->postJson(self::ROOT . '/adjustments', [
+        $this->postJson(self::ROOT.'/adjustments', [
             'adjustment_type' => 'debit_note',
             'category' => 'damage_chargeback',
             'amount' => '100.00',
@@ -205,7 +203,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $customerAg = $this->activate('customer', $customerData);
 
         // 1. Create a Draft billing cycle without initial invoice
-        $cycleRes = $this->postJson(self::ROOT . "/customer/agreements/{$customerAg['id']}/billing-cycles", [
+        $cycleRes = $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/billing-cycles", [
             'period_from' => '2026-09-01',
             'period_until' => '2026-09-30',
             'issue_initial_invoice' => false,
@@ -216,14 +214,14 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $this->assertSame(BillingCycleStatus::Draft->value, $cycleRes->json('data.status'));
 
         // 2. Attempting to create an overlapping cycle fails
-        $this->postJson(self::ROOT . "/customer/agreements/{$customerAg['id']}/billing-cycles", [
+        $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/billing-cycles", [
             'period_from' => '2026-09-15',
             'period_until' => '2026-10-15',
             'issue_initial_invoice' => false,
         ])->assertStatus(422);
 
         // 3. Cancel the draft billing cycle
-        $cancelRes = $this->postJson(self::ROOT . "/billing-cycles/{$cycleId}/cancel", [
+        $cancelRes = $this->postJson(self::ROOT."/billing-cycles/{$cycleId}/cancel", [
             'expected_version' => 1,
             'reason' => 'User chose incorrect cycle dates',
         ])->assertOk();
@@ -232,7 +230,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $this->assertSame(2, $cancelRes->json('data.row_version'));
 
         // 4. Now creating a cycle covering the EXACT same dates succeeds!
-        $newCycleRes = $this->postJson(self::ROOT . "/customer/agreements/{$customerAg['id']}/billing-cycles", [
+        $newCycleRes = $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/billing-cycles", [
             'period_from' => '2026-09-01',
             'period_until' => '2026-09-30',
             'issue_initial_invoice' => false,
@@ -242,7 +240,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $this->assertSame(BillingCycleStatus::Draft->value, $newCycleRes->json('data.status'));
 
         // 5. Delete cycle returns 405 MethodNotAllowed
-        $this->deleteJson(self::ROOT . "/billing-cycles/{$cycleId}")
+        $this->deleteJson(self::ROOT."/billing-cycles/{$cycleId}")
             ->assertStatus(405);
     }
 
@@ -343,11 +341,11 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         [$context, $customerData, $ownerData] = $this->loginFixture();
 
         // 1. Filter incidents with status and type query params without validation error
-        $this->getJson(self::ROOT . '/incidents?status=' . IncidentStatus::Recorded->value . '&incident_type=' . IncidentType::Fuel->value)
+        $this->getJson(self::ROOT.'/incidents?status='.IncidentStatus::Recorded->value.'&incident_type='.IncidentType::Fuel->value)
             ->assertOk();
 
         // 2. Destroy incident returns 405 MethodNotAllowed
-        $this->deleteJson(self::ROOT . '/incidents/1')
+        $this->deleteJson(self::ROOT.'/incidents/1')
             ->assertStatus(405);
     }
 
@@ -356,20 +354,20 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         [$context, $customerData] = $this->loginFixture();
 
         // 1. Agreement delete -> 405
-        $this->deleteJson(self::ROOT . '/customer/agreements/1')->assertStatus(405);
-        $this->deleteJson(self::ROOT . '/owner/agreements/1')->assertStatus(405);
+        $this->deleteJson(self::ROOT.'/customer/agreements/1')->assertStatus(405);
+        $this->deleteJson(self::ROOT.'/owner/agreements/1')->assertStatus(405);
 
         // 2. Billing cycle delete -> 405
-        $this->deleteJson(self::ROOT . '/billing-cycles/1')->assertStatus(405);
+        $this->deleteJson(self::ROOT.'/billing-cycles/1')->assertStatus(405);
 
         // 3. Adjustment delete -> 405
-        $this->deleteJson(self::ROOT . '/adjustments/1')->assertStatus(405);
+        $this->deleteJson(self::ROOT.'/adjustments/1')->assertStatus(405);
 
         // 4. Incident delete -> 405
-        $this->deleteJson(self::ROOT . '/incidents/1')->assertStatus(405);
+        $this->deleteJson(self::ROOT.'/incidents/1')->assertStatus(405);
 
         // 5. Expense delete -> 405
-        $this->deleteJson(self::ROOT . '/expenses/1')->assertStatus(405);
+        $this->deleteJson(self::ROOT.'/expenses/1')->assertStatus(405);
     }
 
     public function test_rental_expense_allocation_billing_lifecycle_and_status_transitions(): void
@@ -441,11 +439,11 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
 
     private function setUserPermissions($context, array $permissionNames): void
     {
-        \Illuminate\Support\Facades\DB::table('user_permissions')->where('user_id', $context->actorId)->delete();
+        DB::table('user_permissions')->where('user_id', $context->actorId)->delete();
         foreach ($permissionNames as $name) {
-            $permId = \Illuminate\Support\Facades\DB::table('permissions')->where('tenant_id', $context->tenantId)->where('name', $name)->value('id');
+            $permId = DB::table('permissions')->where('tenant_id', $context->tenantId)->where('name', $name)->value('id');
             if ($permId) {
-                \Illuminate\Support\Facades\DB::table('user_permissions')->insert([
+                DB::table('user_permissions')->insert([
                     'tenant_id' => $context->tenantId,
                     'user_id' => $context->actorId,
                     'permission_id' => $permId,
@@ -455,7 +453,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
                 ]);
             }
         }
-        app(\Modules\User\Services\UserAccessResolver::class)->forgetForUserTenant($context->actorId, $context->tenantId);
+        app(UserAccessResolver::class)->forgetForUserTenant($context->actorId, $context->tenantId);
     }
 
     public function test_rental_incident_request_validates_review_and_attachment_routes_properly(): void
@@ -474,7 +472,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
                 'ends_at' => '2026-09-30T18:00:00+05:30',
             ]);
 
-            return app(\Modules\VehicleRental\Services\RentalIncidentService::class)->create($context, [
+            return app(RentalIncidentService::class)->create($context, [
                 'vehicle_use_id' => $use->id,
                 'expected_use_version' => $use->row_version,
                 'incident_type' => IncidentType::AccidentDamage->value,
@@ -485,12 +483,12 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         });
 
         // Review without expected_version returns validation error on expected_version (NOT on vehicle_use_id!)
-        $this->postJson(self::ROOT . "/incidents/{$incident->id}/confirm", [
+        $this->postJson(self::ROOT."/incidents/{$incident->id}/confirm", [
             'reason' => 'Confirmed without version',
         ])->assertStatus(422)->assertJsonValidationErrors(['expected_version']);
 
         // Attachment without expected_version and file returns validation error on expected_version and file
-        $this->postJson(self::ROOT . "/incidents/{$incident->id}/attachments", [])
+        $this->postJson(self::ROOT."/incidents/{$incident->id}/attachments", [])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['expected_version', 'file']);
     }
@@ -503,7 +501,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $customerAg = $this->activate('customer', $customerData);
 
         // 1. Create a Draft billing cycle
-        $cycleRes = $this->postJson(self::ROOT . "/customer/agreements/{$customerAg['id']}/billing-cycles", [
+        $cycleRes = $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/billing-cycles", [
             'period_from' => '2026-09-01',
             'period_until' => '2026-09-30',
             'issue_initial_invoice' => false,
@@ -513,19 +511,19 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $cycleId = $cycleRes->json('data.id');
 
         // 2. Cancel the billing cycle
-        $this->postJson(self::ROOT . "/billing-cycles/{$cycleId}/cancel", [
+        $this->postJson(self::ROOT."/billing-cycles/{$cycleId}/cancel", [
             'expected_version' => 1,
             'reason' => 'Testing cancelled finalization protection',
         ])->assertOk();
 
         // 3. Attempting to finalize cancelled cycle throws validation exception
-        $this->postJson(self::ROOT . "/billing-cycles/{$cycleId}/finalize", [
+        $this->postJson(self::ROOT."/billing-cycles/{$cycleId}/finalize", [
             'expected_version' => 2,
             'invoice_date' => '2026-09-30',
         ])->assertStatus(422)->assertJsonValidationErrors(['cycle']);
 
         // 4. Attempting to preview final stage on cancelled cycle throws validation exception
-        $this->getJson(self::ROOT . "/billing-cycles/{$cycleId}/preview")
+        $this->getJson(self::ROOT."/billing-cycles/{$cycleId}/preview")
             ->assertStatus(422)->assertJsonValidationErrors(['cycle']);
     }
 
@@ -610,7 +608,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $this->setUserPermissions($context, [RentalAuthorization::CUSTOMER_VIEW]);
 
         // Attempt to create financial adjustment with only view permission gets 403 Forbidden
-        $this->postJson(self::ROOT . "/customer/agreements/{$customerAg['id']}/financial-adjustments", [
+        $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/financial-adjustments", [
             'expected_version' => $customerAg['row_version'],
             'adjustment_type' => 'credit_note',
             'amount' => '1000.000000',
@@ -627,7 +625,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $customerData['starts_on'] = '2026-09-01';
         $customerAg = $this->activate('customer', $customerData);
 
-        $cycleRes = $this->postJson(self::ROOT . "/customer/agreements/{$customerAg['id']}/billing-cycles", [
+        $cycleRes = $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/billing-cycles", [
             'period_from' => '2026-09-01',
             'period_until' => '2026-09-30',
             'issue_initial_invoice' => false,
@@ -638,10 +636,10 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         // Drop permissions to dashboard view only (no customer view / billing permissions)
         $this->setUserPermissions($context, [RentalAuthorization::DASHBOARD_VIEW]);
 
-        $this->getJson(self::ROOT . '/billing-cycles')
+        $this->getJson(self::ROOT.'/billing-cycles')
             ->assertForbidden();
 
-        $this->getJson(self::ROOT . "/billing-cycles/{$cycleId}")
+        $this->getJson(self::ROOT."/billing-cycles/{$cycleId}")
             ->assertForbidden();
     }
 
@@ -651,7 +649,7 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $customerAg = $this->activate('customer', $customerData);
 
         $adj = $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerAg) {
-            $record = new AgreementAdjustment();
+            $record = new AgreementAdjustment;
             $record->tenant_id = $context->tenantId;
             $record->organization_unit_id = $context->organizationUnitId;
             $record->customer_agreement_id = $customerAg['id'];
@@ -670,11 +668,35 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         });
 
         // Voiding draft adjustment succeeds
-        $res = $this->postJson(self::ROOT . "/adjustments/{$adj->id}/void", [
+        $res = $this->postJson(self::ROOT."/adjustments/{$adj->id}/void", [
             'expected_version' => 1,
             'reason' => 'Voiding draft adjustment prior to authorization',
         ])->assertOk();
 
         $this->assertSame(AgreementAdjustmentStatus::Voided->value, $res->json('data.status'));
+    }
+
+    public function test_billing_cycle_finalize_endpoint_rejects_due_date_before_invoice_date(): void
+    {
+        [$context, $customerData] = $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $customerData['starts_on'] = '2026-09-01';
+        $customerData['terms']['base_rate'] = '3000';
+        $customerAg = $this->activate('customer', $customerData);
+
+        $cycleRes = $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/billing-cycles", [
+            'period_from' => '2026-09-01',
+            'period_until' => '2026-09-30',
+            'issue_initial_invoice' => false,
+        ])->assertCreated()->json('data');
+
+        // Finalize with due_date before invoice_date
+        $res = $this->postJson(self::ROOT."/billing-cycles/{$cycleRes['id']}/finalize", [
+            'expected_version' => $cycleRes['row_version'],
+            'invoice_date' => '2026-09-30',
+            'due_date' => '2026-09-15',
+        ]);
+
+        $res->assertUnprocessable();
+        $res->assertJsonValidationErrors(['due_date']);
     }
 }

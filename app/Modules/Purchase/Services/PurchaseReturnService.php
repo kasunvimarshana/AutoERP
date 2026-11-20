@@ -391,9 +391,9 @@ final class PurchaseReturnService
 
         $lineIds = [];
         foreach ($data->lines as $index => $line) {
-                if (! $line instanceof PurchaseReturnLineData || $line->sourceLineType !== 'goods_receipt_note_line' || $line->sourceLineId === null) {
-                    throw new InvalidArgumentException('Normal purchase returns require a goods receipt note line source.');
-                }
+            if (! $line instanceof PurchaseReturnLineData || $line->sourceLineType !== 'goods_receipt_note_line' || $line->sourceLineId === null) {
+                throw new InvalidArgumentException('Normal purchase returns require a goods receipt note line source.');
+            }
             $this->validator->assertPositiveQuantity($line->returnedQuantity);
             if (isset($lineIds[$line->sourceLineId])) {
                 throw new InvalidArgumentException('Duplicate goods receipt note line selected for return.');
@@ -470,6 +470,10 @@ final class PurchaseReturnService
 
         if (! $sourceHeader instanceof GoodsReceiptNote) {
             throw new InvalidArgumentException('Purchase return source goods receipt note was not found.');
+        }
+
+        if ($sourceHeader->received_date !== null && $data->returnDate < $sourceHeader->received_date->toDateString()) {
+            throw new InvalidArgumentException('Purchase return date cannot be before the goods receipt date.');
         }
 
         return ['header' => $sourceHeader, 'lines' => $resolvedLines];

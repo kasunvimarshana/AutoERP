@@ -37,6 +37,11 @@ final class ExpenseReversalService
                 throw new InvalidArgumentException('Expense reversal reason is required.');
             }
 
+            $expenseDate = $locked->expense_date?->toDateString();
+            if ($expenseDate !== null && $reversalDate < $expenseDate) {
+                throw new InvalidArgumentException('Expense reversal date cannot be before the expense date.');
+            }
+
             $result = $this->finance->reverseSource(
                 (int) $locked->tenant_id,
                 (int) $locked->organization_unit_id,

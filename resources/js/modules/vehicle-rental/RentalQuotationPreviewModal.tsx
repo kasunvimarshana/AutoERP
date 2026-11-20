@@ -67,7 +67,6 @@ export function RentalQuotationPreviewModal({
     const [error, setError] = useState<ApiError | null>(null);
 
     const activeAgreementId = initialAgreementId ?? selectedAgreement?.id;
-    const handleProceed = onProceedToCreateInvoice ?? onCreateInvoice;
 
     useEffect(() => {
         if (!open) {

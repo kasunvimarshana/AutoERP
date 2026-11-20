@@ -399,7 +399,7 @@ export function useQuickAccessConfig() {
             setRowVersion(data.row_version);
             setIsDefault(Boolean(data.is_default));
             return parsed;
-        } catch (err) {
+        } catch {
             if (signal?.aborted) return null;
             // Keep cached items if offline or error
             const fallback = getStoredQuickAccessItems(storageKey);

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import CustomerInvoicesPage from './CustomerInvoicesPage';
 import * as rentalBillingApi from './rentalBillingApi';
-import * as agreementApi from './agreementApi';
 
 const session = vi.hoisted(() => ({
     roles: [] as string[],
