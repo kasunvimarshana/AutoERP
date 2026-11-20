@@ -217,6 +217,112 @@ final class RunningChartReportTest extends TestCase
             ->assertSee('1900.00');
     }
 
+    public function test_running_chart_report_with_replacement_vehicle_and_owner_sheet(): void
+    {
+        [$context, $customerInput, $ownerInput] = $this->loginFixture();
+
+        // 1. Activate Customer Agreement
+        $c = $this->postJson(self::ROOT.'/customer/agreements', $customerInput)->assertCreated()->json('data');
+        $c = $this->postJson(self::ROOT.'/customer/agreements/'.$c['id'].'/activate', ['expected_version' => $c['row_version']])->assertOk()->json('data');
+
+        // 2. Create Vehicle 1 as Company-Owned
+        $vehicle1Id = DB::table('vehicles')->insertGetId([
+            'tenant_id' => $context->tenantId,
+            'organization_unit_id' => $context->organizationUnitId,
+            'vehicle_number' => 'COMP-VEH-01',
+            'registration_number' => 'WP-CMP-1111',
+            'status' => 'active',
+        ]);
+        DB::table('vehicle_ownerships')->insert([
+            'tenant_id' => $context->tenantId,
+            'vehicle_id' => $vehicle1Id,
+            'owner_type' => 'company',
+            'owner_key' => 'company',
+            'owner_code_snapshot' => 'COMPANY',
+            'owner_name_snapshot' => 'Company',
+            'ownership_type' => 'company_owned',
+            'started_at' => '2026-09-01 00:00:00',
+        ]);
+
+        // 3. Create and activate Owner Agreement with Vehicle 2
+        $vehicle2Id = DB::table('vehicles')->insertGetId([
+            'tenant_id' => $context->tenantId,
+            'organization_unit_id' => $context->organizationUnitId,
+            'vehicle_number' => 'REPL-VEH-99',
+            'registration_number' => 'WP-REP-9999',
+            'status' => 'active',
+        ]);
+        $ownerInput2 = array_replace($ownerInput, [
+            'reference' => 'AG-OWNER-REPL-02',
+            'vehicle_id' => $vehicle2Id,
+        ]);
+        $o2 = $this->postJson(self::ROOT.'/owner/agreements', $ownerInput2)->assertCreated()->json('data');
+        $o2 = $this->postJson(self::ROOT.'/owner/agreements/'.$o2['id'].'/activate', ['expected_version' => $o2['row_version']])->assertOk()->json('data');
+
+        // 4. Plan Use 1 with Vehicle 1 (company supply, owner_agreement_id null)
+        $use1 = $this->postJson(self::ROOT.'/customer/agreements/'.$c['id'].'/vehicles', [
+            'expected_version' => $c['row_version'],
+            'vehicle_id' => $vehicle1Id,
+            'owner_agreement_id' => null,
+            'starts_at' => '2026-09-07T09:00:00+05:30',
+            'ends_at' => '2026-09-12T09:00:00+05:30',
+        ])->assertCreated()->json('data');
+
+        // Handover Use 1
+        $use1 = $this->postJson(self::ROOT.'/vehicle-uses/'.$use1['id'].'/handover', [
+            'expected_version' => $use1['row_version'],
+            'occurred_at' => '2026-09-07T09:00:00+05:30',
+            'odometer' => '100',
+            'reason' => 'Collected',
+        ])->assertOk()->json('data');
+
+        // 5. Mid-period replace Use 1 with Vehicle 2 (Owner-supplied under $o2)
+        $use2 = $this->postJson(self::ROOT.'/vehicle-uses/'.$use1['id'].'/replace', [
+            'expected_version' => $use1['row_version'],
+            'vehicle_id' => $vehicle2Id,
+            'owner_agreement_id' => $o2['id'],
+            'starts_at' => '2026-09-08T12:00:00+05:30',
+            'ends_at' => '2026-09-15T18:00:00+05:30',
+            'reason' => 'Defect swap',
+            'return_odometer' => '250',
+            'handover_odometer' => '500',
+        ])->assertOk()->json('data');
+
+        // 6. Create Running Chart on Use 2 (Vehicle 2)
+        $chart = $this->postJson(self::ROOT.'/vehicle-uses/'.$use2['id'].'/running-charts', [
+            'expected_version' => $use2['row_version'],
+            'reference' => 'CHART-REPL-001',
+            'starts_at' => '2026-09-08T13:00:00+05:30',
+            'ends_at' => '2026-09-08T17:00:00+05:30',
+            'start_odometer' => '500',
+            'end_odometer' => '580',
+        ])->assertCreated()->json('data');
+
+        $this->postJson(self::ROOT.'/running-charts/'.$chart['id'].'/finalize', [
+            'expected_version' => $chart['row_version'],
+        ])->assertOk();
+
+        // 7. Query running chart report specifically for Use 2 with sheet_mode=owner
+        $params = [
+            'agreement_id' => $c['id'],
+            'vehicle_use_id' => $use2['id'],
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-09-30',
+            'sheet_mode' => 'owner',
+        ];
+
+        $res = $this->getJson(self::ROOT.'/reports/running-chart-sheet?'.http_build_query($params))->assertOk();
+        $res->assertJsonPath('header.is_owner_sheet', true);
+        $res->assertJsonPath('header.vehicle_use_id', $use2['id']);
+        $res->assertJsonPath('header.agreement_number', $o2['reference']);
+        $res->assertJsonPath('header.agreement_vehicle_number', 'WP-REP-9999');
+
+        // Also test HTML print endpoint for the replacement owner sheet
+        $printRes = $this->get(self::ROOT.'/reports/running-chart-sheet/export/print?'.http_build_query($params))->assertOk();
+        $printRes->assertSee('RUNNING CHART FOR VEHICLE OWNER');
+        $printRes->assertSee('WP-REP-9999');
+    }
+
     private function loginFixture(): array
     {
         [$context, $customer, $owner] = $this->fixture();

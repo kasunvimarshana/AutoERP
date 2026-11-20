@@ -699,4 +699,58 @@ final class VehicleRentalCrudAuditAndEdgeCasesTest extends TestCase
         $res->assertUnprocessable();
         $res->assertJsonValidationErrors(['due_date']);
     }
+
+    public function test_owner_agreement_vehicles_and_running_chart_register_filtering(): void
+    {
+        [$context, $customerData, $ownerData] = $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $customerAg = $this->activate('customer', $customerData);
+        $ownerAg = $this->activate('owner', $ownerData);
+
+        // Assign vehicle to customer with owner agreement as source
+        $use = $this->postJson(self::ROOT."/customer/agreements/{$customerAg['id']}/vehicles", [
+            'vehicle_id' => $ownerData['vehicle_id'],
+            'owner_agreement_id' => $ownerAg['id'],
+            'starts_at' => '2026-09-07T09:00:00+05:30',
+            'ends_at' => '2026-09-10T18:00:00+05:30',
+            'expected_version' => $customerAg['row_version'],
+        ])->assertCreated()->json('data');
+
+        // Check owner agreement vehicle endpoint
+        $ownerVehicles = $this->getJson(self::ROOT."/owner/agreements/{$ownerAg['id']}/vehicles")->assertOk()->json('data');
+        $this->assertCount(1, $ownerVehicles);
+        $this->assertSame($use['id'], $ownerVehicles[0]['id']);
+
+        // Check generic {kind}/agreements/{agreement}/vehicles endpoint
+        $ownerVehiclesGeneric = $this->getJson(self::ROOT."/owner/agreements/{$ownerAg['id']}/vehicles")->assertOk()->json('data');
+        $this->assertCount(1, $ownerVehiclesGeneric);
+
+        // Record a running chart on this use
+        $chart = $this->postJson(self::ROOT."/vehicle-uses/{$use['id']}/running-charts", [
+            'reference' => 'RC-OWNER-TEST-01',
+            'starts_at' => '2026-09-07T10:00:00+05:30',
+            'ends_at' => '2026-09-07T12:00:00+05:30',
+            'start_odometer' => '1000.000000',
+            'end_odometer' => '1150.000000',
+            'expected_version' => $use['row_version'],
+        ])->assertCreated()->json('data');
+
+        // Verify running chart register filters by owner_agreement_id, customer_agreement_id, vehicle_use_id, kind
+        $byOwner = $this->getJson(self::ROOT."/running-charts?owner_agreement_id={$ownerAg['id']}")->assertOk()->json('data');
+        $this->assertCount(1, $byOwner);
+        $this->assertSame($chart['id'], $byOwner[0]['id']);
+        $this->assertSame($ownerAg['id'], $byOwner[0]['owner_agreement']['id']);
+        $this->assertSame($customerAg['id'], $byOwner[0]['customer_agreement']['id']);
+
+        $byCustomer = $this->getJson(self::ROOT."/running-charts?customer_agreement_id={$customerAg['id']}")->assertOk()->json('data');
+        $this->assertCount(1, $byCustomer);
+
+        $byUse = $this->getJson(self::ROOT."/running-charts?vehicle_use_id={$use['id']}")->assertOk()->json('data');
+        $this->assertCount(1, $byUse);
+
+        $byKindOwner = $this->getJson(self::ROOT.'/running-charts?kind=owner')->assertOk()->json('data');
+        $this->assertCount(1, $byKindOwner);
+
+        $byKindCustomer = $this->getJson(self::ROOT.'/running-charts?kind=customer')->assertOk()->json('data');
+        $this->assertCount(0, $byKindCustomer);
+    }
 }

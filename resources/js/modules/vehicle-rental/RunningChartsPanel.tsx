@@ -6,13 +6,13 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';
 import { Pagination } from '@/shared/components/Pagination';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { formatBusinessDateTime, businessDateInputValue } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { ApiError, toApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { VehicleUseStatus, localTimestampValue, type VehicleUse } from './vehicleUse';
-import { CHART_ACTION_CONFIRM_LABELS, CHART_PERMISSION, DriverIdentitySource, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
+import { AC_LABELS, CHART_ACTION_CONFIRM_LABELS, CHART_PERMISSION, COUNT_LABELS, DISTANCE_LABELS, DriverIdentitySource, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
 import { exportRunningChartReport, listCharts, transitionChart } from './runningChartApi';
 import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartEditor } from './RunningChartEditor';
@@ -24,6 +24,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
     const [printing, setPrinting] = useState<'lessee' | 'owner' | null>(null);
     const [editor, setEditor] = useState<{ chart?: RunningChart; correction?: boolean } | null>(null); const [history, setHistory] = useState<number | null>(null);
+    const [detailsChartId, setDetailsChartId] = useState<number | null>(null);
     const [action, setAction] = useState<{ chart: RunningChart; type: RunningChartAction } | null>(null); const [reason, setReason] = useState('');
     const [reassignChart, setReassignChart] = useState<RunningChart | null>(null);
     const [currentTime] = useState(() => Date.now());
@@ -43,7 +44,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     } : undefined;
 
     useEffect(() => { const c = new AbortController(); listCharts(use.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [use.id, page, revision]);
-    function reload() { setLoading(true); setEditor(null); setAction(null); setHistory(null); setRevision(v => v + 1); }
+    function reload() { setLoading(true); setEditor(null); setAction(null); setHistory(null); setDetailsChartId(null); setRevision(v => v + 1); }
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!action) return;
@@ -99,8 +100,8 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     function choose(chart: RunningChart, type: RunningChartAction) { setAction({ chart, type }); setReason(''); setError(null); }
 
     async function handlePrint(mode: 'lessee' | 'owner') {
-        const s = use.starts_at.slice(0, 10);
-        const e = use.ends_at ? use.ends_at.slice(0, 10) : s;
+        const s = businessDateInputValue(new Date(use.starts_at));
+        const e = use.ends_at ? businessDateInputValue(new Date(use.ends_at)) : s;
         setPrinting(mode);
         setError(null);
         const preview = window.open('', '_blank');
@@ -124,7 +125,22 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
         }
     }
 
-    return <section aria-label="Running Charts" className="space-y-3 border-t pt-3"><div className="flex flex-wrap items-center gap-2"><h4 className="grow font-semibold">Running Charts · {use.vehicle.label}</h4><Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'lessee'} onClick={() => void handlePrint('lessee')}>Print Sheet</Button>{use.owner_agreement !== null && <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'owner'} onClick={() => void handlePrint('owner')}>Print Owner Sheet</Button>}<Button variant="secondary" disabled={loading || saving || !!editor} onClick={reload}>Reload charts</Button>{canManage && [VehicleUseStatus.Planned, VehicleUseStatus.InCustody, VehicleUseStatus.Returned].includes(use.status) && <Button disabled={loading || saving || !!editor || !!action} onClick={() => setEditor({})}>Record usage</Button>}</div>
+    return <section aria-label="Running Charts" className="space-y-3 border-t pt-3">
+        <div className="flex flex-wrap items-center gap-2">
+            <div className="grow">
+                <h4 className="font-semibold text-slate-900">Running Charts · {use.vehicle.label}</h4>
+                <div className="flex flex-wrap gap-x-3 text-xs text-slate-600">
+                    {use.customer_agreement?.party_name && (
+                        <span>Customer: <strong className="text-slate-800">{use.customer_agreement.party_name}</strong> ({use.customer_agreement.reference})</span>
+                    )}
+                    <span>{use.owner_agreement ? <>Owner: <strong className="text-slate-800">{use.owner_agreement.party_name}</strong> ({use.owner_agreement.reference})</> : 'Company supply'}</span>
+                </div>
+            </div>
+            <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'lessee'} onClick={() => void handlePrint('lessee')}>Print Sheet</Button>
+            {use.owner_agreement !== null && <Button variant="secondary" disabled={loading || saving || printing !== null} loading={printing === 'owner'} onClick={() => void handlePrint('owner')}>Print Owner Sheet</Button>}
+            <Button variant="secondary" disabled={loading || saving || !!editor} onClick={reload}>Reload charts</Button>
+            {canManage && [VehicleUseStatus.Planned, VehicleUseStatus.InCustody, VehicleUseStatus.Returned].includes(use.status) && <Button disabled={loading || saving || !!editor || !!action} onClick={() => setEditor({})}>Record usage</Button>}
+        </div>
         <ErrorAlert error={error} inline />{editor && <RunningChartEditor use={use} chart={editor.chart} correction={editor.correction} initialDriver={initialDriver} initialOdometer={initialOdometer} initialStartTime={initialStartTime} onSaved={reload} onCancel={() => setEditor(null)} />}
         {loading ? <LoadingState label="Loading Running Charts…" /> : error ? null : rows.map(chart => {
             const nowGraceMs = currentTime + 60_000;
@@ -182,6 +198,9 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
                     {chart.corrects_chart && <p className="text-xs text-blue-600 font-medium">Corrects {chart.corrects_chart.reference}</p>}
                     {chart.corrected_by_chart && <p className="text-xs text-amber-700 font-medium">Corrected by chart {chart.corrected_by_chart.reference}</p>}
                     <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="secondary" aria-expanded={detailsChartId === chart.id} onClick={() => setDetailsChartId(detailsChartId === chart.id ? null : chart.id)}>
+                            {detailsChartId === chart.id ? 'Hide details' : 'Chart details'}
+                        </Button>
                         <Button type="button" variant="secondary" aria-expanded={history === chart.id} onClick={() => setHistory(history === chart.id ? null : chart.id)}>
                             {history === chart.id ? 'Hide chart history' : 'Chart history'}
                         </Button>
@@ -211,6 +230,30 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
                             )}
                         </>}
                     </div>
+                    {detailsChartId === chart.id && (
+                        <div className="space-y-3 border-t border-slate-200 pt-3">
+                            <dl className="grid gap-3 sm:grid-cols-2">
+                                {Object.entries(DISTANCE_LABELS).map(([key, label]) => (
+                                    <div key={key} className="rounded-lg bg-slate-50 p-2.5">
+                                        <dt className="text-sm text-slate-500">{label}</dt>
+                                        <dd className="mt-1 font-medium text-slate-900">{chart[key as keyof typeof DISTANCE_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={chart[key as keyof typeof DISTANCE_LABELS] as string} />}</dd>
+                                    </div>
+                                ))}
+                                {Object.entries(COUNT_LABELS).map(([key, label]) => (
+                                    <div key={key} className="rounded-lg bg-slate-50 p-2.5">
+                                        <dt className="text-sm text-slate-500">{label}</dt>
+                                        <dd className="mt-1 font-medium text-slate-900">{chart[key as keyof typeof COUNT_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={chart[key as keyof typeof COUNT_LABELS] as number} precision={0} />}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                            <div className="grid grid-cols-1 gap-1 text-sm text-slate-700 sm:grid-cols-2">
+                                <p>Air conditioning: {chart.ac_mode === null ? 'Not recorded' : AC_LABELS[chart.ac_mode]}</p>
+                                <p>Driver identity: {chart.driver ? `${chart.driver.name} (${chart.driver.source}) · ${chart.driver.reference}` : 'Not recorded'}</p>
+                                {chart.driver_observation && <p className="sm:col-span-2">Driver observation: {chart.driver_observation}</p>}
+                                {chart.notes && <p className="sm:col-span-2">Notes: {chart.notes}</p>}
+                            </div>
+                        </div>
+                    )}
                     {history === chart.id && <RunningChartHistoryPanel key={chart.id} id={chart.id} />}
                     <UsageChargePanel chart={chart} hasOwner={use.owner_agreement !== null} />
                 </article>

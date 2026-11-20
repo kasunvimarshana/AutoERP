@@ -1,4 +1,5 @@
 import { AGREEMENT_API } from './agreements';
+import type { VehicleUse } from './vehicleUse';
 export enum RunningChartStatus { Draft = 'draft', Finalized = 'finalized', Reversed = 'reversed' }
 export enum RunningChartAction { Finalize = 'finalize', Reverse = 'reverse' }
 export enum AirConditioningMode { NonAc = 'non_ac', Front = 'front', Dual = 'dual' }
@@ -25,11 +26,20 @@ export interface ChartHistory { version: number; action: string; reason: string 
 
 export const CHART_REGISTER_PATH = '/vehicle-rental/running-charts';
 export interface ChartRegisterRow extends RunningChart {
-    vehicle_use: { id: number; vehicle_label: string; version: number };
-    customer_agreement: { id?: number; reference: string; party_name: string };
+    vehicle_use: { id: number; vehicle_label: string; version?: number; row_version?: number } & Partial<VehicleUse>;
+    customer_agreement: { id?: number; reference: string; party_name: string; driver_mode?: string };
     owner_agreement: { id?: number; reference: string; party_name: string } | null;
     replaces_vehicle: string | null;
 }
-export interface ChartRegisterFilters { search?: string; chart_status?: RunningChartStatus; from?: string; until?: string }
+export interface ChartRegisterFilters {
+    search?: string;
+    chart_status?: RunningChartStatus;
+    from?: string;
+    until?: string;
+    kind?: 'customer' | 'owner';
+    customer_agreement_id?: number;
+    owner_agreement_id?: number;
+    vehicle_use_id?: number;
+}
 
 export const AC_LABELS = { [AirConditioningMode.NonAc]: 'Non-AC', [AirConditioningMode.Front]: 'Front AC', [AirConditioningMode.Dual]: 'Dual AC' };

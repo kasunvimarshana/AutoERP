@@ -45,6 +45,15 @@ final class VehicleUseService
             ->with(OperationalFields::USE_RELATIONS)->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
     }
 
+    public function listOwner(AgreementContext $context, int $ownerAgreement, int $perPage): LengthAwarePaginator
+    {
+        $this->authorization->assertUse($context, false);
+        OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($ownerAgreement);
+
+        return VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->where('owner_agreement_id', $ownerAgreement)
+            ->with(OperationalFields::USE_RELATIONS)->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
+    }
+
     public function availableVehicles(AgreementContext $context, ?string $startsAt, ?string $endsAt, ?int $categoryId = null): array
     {
         $this->authorization->assertUse($context, false);

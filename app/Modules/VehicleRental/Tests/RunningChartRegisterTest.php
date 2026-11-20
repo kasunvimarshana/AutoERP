@@ -102,6 +102,42 @@ final class RunningChartRegisterTest extends TestCase
         });
     }
 
+    public function test_register_filters_by_kind_and_agreement_and_exposes_complete_vehicle_use(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $charts = app(RunningChartService::class);
+            $chart = $charts->create($context, $use->id, $use->row_version, $facts);
+            $register = app(RunningChartRegisterService::class);
+
+            // Filter by vehicle_use_id
+            $byUse = $register->list($context, ['vehicle_use_id' => $use->id], 10);
+            self::assertSame(1, $byUse->total());
+
+            // Filter by customer_agreement_id
+            $byCust = $register->list($context, ['customer_agreement_id' => $use->customer_agreement_id], 10);
+            self::assertSame(1, $byCust->total());
+
+            // Filter by owner_agreement_id (if owner exists)
+            if ($use->owner_agreement_id !== null) {
+                $byOwner = $register->list($context, ['owner_agreement_id' => $use->owner_agreement_id], 10);
+                self::assertSame(1, $byOwner->total());
+
+                $byKindOwner = $register->list($context, ['kind' => 'owner'], 10);
+                self::assertSame(1, $byKindOwner->total());
+            }
+
+            // Exposes full vehicle_use representation in resource
+            $row = (new RunningChartRegisterResource($byUse->items()[0]))->toArray(new Request);
+            self::assertArrayHasKey('vehicle_use', $row);
+            self::assertSame($use->id, $row['vehicle_use']['id']);
+            self::assertSame($use->row_version, $row['vehicle_use']['row_version']);
+            self::assertSame($chart->vehicle_use_version, $row['vehicle_use']['chart_use_version']);
+            self::assertSame($use->status->value, $row['vehicle_use']['status']);
+            self::assertArrayHasKey('customer_agreement', $row['vehicle_use']);
+            self::assertArrayHasKey('vehicle', $row['vehicle_use']);
+        });
+    }
+
     public function test_invalid_filters_fail_and_read_requires_chart_view_permission(): void
     {
         [$context] = $this->fixture();

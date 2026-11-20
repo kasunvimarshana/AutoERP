@@ -134,6 +134,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     });
 
     Route::get('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'index'])->whereNumber('agreement');
+    Route::get('owner/agreements/{agreement}/vehicles', [VehicleUseController::class, 'ownerUses'])->whereNumber('agreement');
+    Route::get('{kind}/agreements/{agreement}/vehicles', [VehicleUseController::class, 'index'])->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->whereNumber('agreement');
     Route::post('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'store'])->whereNumber('agreement');
     Route::get('vehicles/{vehicle}/sources', [VehicleUseController::class, 'sources'])->whereNumber('vehicle');
     Route::get('vehicle-uses/{use}', [VehicleUseController::class, 'show'])->whereNumber('use');

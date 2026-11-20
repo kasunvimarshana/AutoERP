@@ -20,6 +20,7 @@ vi.mock('./agreementApi', async (importOriginal) => {
         ...actual,
         getAgreement: vi.fn(),
         searchCustomerAgreements: vi.fn(),
+        searchOwnerAgreements: vi.fn(),
     };
 });
 

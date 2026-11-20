@@ -239,14 +239,27 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                     </button>
                 )}
                 {kind === AgreementKind.Owner && canViewUse && (
-                    <Link
-                        to={`/vehicle-rental/vehicle-uses?search=${encodeURIComponent(selected.reference)}`}
-                        className="px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center gap-1"
-                        title="View vehicle uses utilizing this owner's vehicle in the vehicle-use register"
-                    >
-                        <span>Vehicle Uses</span>
-                        <span aria-hidden="true">&rarr;</span>
-                    </Link>
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setActiveReviewTab('vehicles')}
+                            className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
+                                activeReviewTab === 'vehicles'
+                                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            }`}
+                        >
+                            Supplied Vehicles & Usage
+                        </button>
+                        <Link
+                            to={`/vehicle-rental/vehicle-uses?search=${encodeURIComponent(selected.reference)}`}
+                            className="px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center gap-1"
+                            title="View vehicle uses utilizing this owner's vehicle in the vehicle-use register"
+                        >
+                            <span>Vehicle Uses</span>
+                            <span aria-hidden="true">&rarr;</span>
+                        </Link>
+                    </>
                 )}
                 {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && (
                     <button
@@ -294,11 +307,12 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                 </div>
             )}
 
-            {activeReviewTab === 'vehicles' && kind === AgreementKind.Customer && canViewUse && (
+            {activeReviewTab === 'vehicles' && canViewUse && (
                 <VehicleUsePanel
-                    key={selected.id}
+                    key={`${kind}-${selected.id}`}
                     agreement={selected}
                     canManage={canManageUse}
+                    kind={kind}
                     initialVehicleId={vehicleIdParam ? Number(vehicleIdParam) : undefined}
                     onVehicleAssigned={clearVehicleParam}
                 />

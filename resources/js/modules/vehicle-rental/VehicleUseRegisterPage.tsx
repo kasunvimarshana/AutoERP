@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -15,9 +17,20 @@ import { ApiError, toApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { listVehicleUseRegister } from './vehicleUseApi';
 import { operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, USE_LABELS, VehicleUseStatus, type VehicleUse, type VehicleUseRegisterFilters } from './vehicleUse';
+import { CHART_PERMISSION } from './runningCharts';
+import { RunningChartsPanel } from './RunningChartsPanel';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 
+function useSafeAuth() {
+    try {
+        return useAuth();
+    } catch {
+        return null;
+    }
+}
+
 export default function VehicleUseRegisterPage() {
+    const auth = useSafeAuth();
     const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const initialSearch = searchParams.get('search') ?? '';
     const initialStatusParam = searchParams.get('status') ?? searchParams.get('use_status') ?? '';
@@ -47,6 +60,7 @@ export default function VehicleUseRegisterPage() {
     const [rows, setRows] = useState<VehicleUse[]>([]); const [meta, setMeta] = useState<PaginationMeta>();
     const [loading, setLoading] = useState(true); const [error, setError] = useState<ApiError | null>(null);
     const [selected, setSelected] = useState<number | null>(null);
+    const [activeChartsUseId, setActiveChartsUseId] = useState<number | null>(null);
     useEffect(() => {
         const controller = new AbortController();
         listVehicleUseRegister(filters, page, controller.signal).then(result => {
@@ -84,12 +98,12 @@ export default function VehicleUseRegisterPage() {
         try {
             const next = { search: search.trim() || undefined, use_status: status || undefined, from: from ? timestampWithOffset(from) : undefined, until: until ? timestampWithOffset(until) : undefined };
             syncUrl(search, status, from, until);
-            setLoading(true); setError(null); setPage(1); setSelected(null); setFilters(next);
+            setLoading(true); setError(null); setPage(1); setSelected(null); setActiveChartsUseId(null); setFilters(next);
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
         const needsReload = error !== null || page !== 1 || Object.values(filters).some(value => value !== undefined);
-        setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setError(null);
+        setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setActiveChartsUseId(null); setError(null);
         syncUrl('', '', '', '');
         if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
@@ -150,15 +164,30 @@ export default function VehicleUseRegisterPage() {
                 </div>
                 {row.replaces_use && <p className="text-sm font-medium text-amber-700">Replaces vehicle {row.replaces_use.vehicle_label}</p>}
                 {row.replaced_by_use && <p className="text-sm font-medium text-purple-700">Replaced by vehicle {row.replaced_by_use.vehicle_label}</p>}
-                <div><Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.vehicle.label}</Button></div>
+                <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.vehicle.label}</Button>
+                    {auth && hasPermission(auth, CHART_PERMISSION.view) && (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            aria-expanded={activeChartsUseId === row.id}
+                            onClick={() => setActiveChartsUseId(activeChartsUseId === row.id ? null : row.id)}
+                        >
+                            {activeChartsUseId === row.id ? 'Hide Running Charts' : 'Running Charts'}
+                        </Button>
+                    )}
+                </div>
                 {selected === row.id && <div className="space-y-3 border-t border-slate-200 pt-3">
                     <p>Handover odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>
                     <p>Return odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>
                     <p>Notes: {row.notes ?? 'Not recorded'}</p>
                     <VehicleUseHistoryPanel key={row.id} id={row.id} />
                 </div>}
+                {activeChartsUseId === row.id && (
+                    <RunningChartsPanel key={`charts-${row.id}`} use={row} />
+                )}
             </article>)}
-            <Pagination meta={meta} onPageChange={next => { setLoading(true); setSelected(null); setPage(next); }} />
+            <Pagination meta={meta} onPageChange={next => { setLoading(true); setSelected(null); setActiveChartsUseId(null); setPage(next); }} />
         </>}
     </div>;
 }

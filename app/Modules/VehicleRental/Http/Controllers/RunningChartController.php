@@ -29,7 +29,7 @@ final class RunningChartController
 
     public function register(RunningChartRegisterRequest $request, RunningChartRegisterService $register): AnonymousResourceCollection
     {
-        return RunningChartRegisterResource::collection($register->list($request->context(), $request->only(['search', 'chart_status', 'from', 'until']), $request->perPage()));
+        return RunningChartRegisterResource::collection($register->list($request->context(), $request->only(['search', 'chart_status', 'from', 'until', 'customer_agreement_id', 'owner_agreement_id', 'vehicle_use_id', 'kind']), $request->perPage()));
     }
 
     public function index(AgreementRequest $request, int $use): AnonymousResourceCollection

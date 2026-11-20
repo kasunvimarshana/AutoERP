@@ -14,7 +14,7 @@ import { formatBusinessDateTime, businessDateTimeInputValueWithSeconds } from '@
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
-import { AgreementStatus, type Agreement } from './agreements';
+import { AgreementAction, AgreementKind, AgreementStatus, type Agreement } from './agreements';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 import { ReassignDriverModal } from './ReassignDriverModal';
@@ -25,18 +25,20 @@ export function VehicleUsePanel({
     canManage,
     initialVehicleId,
     onVehicleAssigned,
+    kind = AgreementKind.Customer,
 }: {
     agreement: Agreement;
     canManage: boolean;
     initialVehicleId?: number;
     onVehicleAssigned?: () => void;
+    kind?: AgreementKind;
 }) {
     const auth = useAuth(); const [charts, setCharts] = useState<number | null>(null);
     const [replacement, setReplacement] = useState<VehicleUse | null>(null);
     const [reassignDriverUse, setReassignDriverUse] = useState<VehicleUse | null>(null);
     const [rows, setRows] = useState<VehicleUse[]>([]); const [page, setPage] = useState(1); const [meta, setMeta] = useState<PaginationMeta>(); const [revision, setRevision] = useState(0);
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true);
-    const [adding, setAdding] = useState(Boolean(initialVehicleId));
+    const [adding, setAdding] = useState(kind === AgreementKind.Customer && Boolean(initialVehicleId));
     const [action, setAction] = useState<{ row: VehicleUse; type: VehicleUseAction } | null>(null); const [at, setAt] = useState(''); const [odometer, setOdometer] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [history, setHistory] = useState<number | null>(null);
     const actionPlannedStartLocal = (() => {
         if (!action?.row?.starts_at) return undefined;
@@ -46,7 +48,7 @@ export function VehicleUsePanel({
             return action.row.starts_at.slice(0, 19);
         }
     })();
-    useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
+    useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal, kind).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision, kind]);
     function reload() { setReplacement(null); setReassignDriverUse(null); setLoading(true); setAdding(false); setAction(null); setHistory(null); setRevision(v => v + 1); }
     function choose(row: VehicleUse, type: VehicleUseAction) {
         setAction({ row, type });
@@ -110,11 +112,17 @@ export function VehicleUsePanel({
         try { await transitionVehicleUse(action.row, action.type, { reason: reason.trim(), ...(action.type === VehicleUseAction.Cancel ? {} : { occurred_at: timestampWithOffset(at), odometer: odometer.trim() || null }) }); reload(); }
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
-    return <section aria-label="Assigned vehicles" className="space-y-4 border-t pt-4">
-        <div className="flex flex-wrap items-center gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={loading || saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={loading || saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
+    return <section aria-label={kind === AgreementKind.Owner ? 'Supplied vehicles' : 'Assigned vehicles'} className="space-y-4 border-t pt-4">
+        <div className="flex flex-wrap items-center gap-2">
+            <h3 className="grow text-lg font-semibold">{kind === AgreementKind.Owner ? 'Supplied vehicles & usage' : 'Assigned vehicles'}</h3>
+            <Button variant="secondary" disabled={loading || saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>
+            {canManage && kind === AgreementKind.Customer && agreement.status === AgreementStatus.Active && <Button disabled={loading || saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}
+        </div>
         {agreement.status === AgreementStatus.Draft && (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                This agreement is currently in Draft. Activate the agreement to assign and dispatch vehicles.
+                {kind === AgreementKind.Owner
+                    ? 'This owner agreement is currently in Draft. Activate the agreement to record vehicle supply.'
+                    : 'This agreement is currently in Draft. Activate the agreement to assign and dispatch vehicles.'}
             </div>
         )}
         <ErrorAlert error={error} inline />
@@ -154,7 +162,7 @@ export function VehicleUsePanel({
                         {row.customer_agreement.driver_mode === 'self_drive' ? 'Self-drive' : 'With driver'}
                     </span>
                 )}
-            </div><p className="text-sm text-slate-600">{formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>{row.replaces_use && <p className="text-xs text-blue-600 font-medium">Replaces {row.replaces_use.vehicle_label}</p>}{row.replaced_by_use && <p className="text-xs text-amber-600 font-medium">Replaced by {row.replaced_by_use.vehicle_label}</p>}<p className="text-sm text-slate-600">{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+            </div><p className="text-sm text-slate-600">{formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>{row.replaces_use && <p className="text-xs text-blue-600 font-medium">Replaces {row.replaces_use.vehicle_label}</p>}{row.replaced_by_use && <p className="text-xs text-amber-600 font-medium">Replaced by {row.replaced_by_use.vehicle_label}</p>}{kind === AgreementKind.Owner ? <p className="text-sm text-slate-700">Customer: <span className="font-medium text-slate-900">{row.customer_agreement.party_name}</span> · {row.customer_agreement.reference}</p> : <p className="text-sm text-slate-600">{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>}
             {row.handed_over_at && <p className="text-xs text-slate-500">Actual handover: {formatBusinessDateTime(row.handed_over_at)} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}{row.returned_at && <p className="text-xs text-slate-500">Actual return: {formatBusinessDateTime(row.returned_at)} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
             <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" disabled={saving} aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>

@@ -95,3 +95,17 @@ it('removes stale rows when a vehicle-use reload fails', async () => {
     expect(await screen.findByText('Vehicle uses could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByText('CAR-1234')).not.toBeInTheDocument();
 });
+
+it('renders supplied vehicles and customer context for owner agreement', async () => {
+    vi.mocked(listVehicleUses).mockResolvedValue({
+        data: [{
+            ...row,
+            customer_agreement: { id: 1, reference: 'CUST-AG-01', party_name: 'Customer Acme', version: 1 },
+        }],
+    });
+    render(<VehicleUsePanel agreement={{ ...agreement, reference: 'OWNER-AG-01' }} canManage={false} kind={AgreementKind.Owner} />);
+    expect(await screen.findByText('Supplied vehicles & usage')).toBeInTheDocument();
+    expect(screen.getByText('Customer Acme')).toBeInTheDocument();
+    expect(screen.getByText(/CUST-AG-01/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Assign vehicle' })).not.toBeInTheDocument();
+});

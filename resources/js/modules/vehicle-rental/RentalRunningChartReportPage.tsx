@@ -12,7 +12,7 @@ import { toApiError, ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { AgreementKind } from './agreements';
-import { getAgreement, searchCustomerAgreements } from './agreementApi';
+import { getAgreement, searchCustomerAgreements, searchOwnerAgreements } from './agreementApi';
 import { exportRunningChartReport, fetchRunningChartReport, type RunningChartReportData } from './runningChartApi';
 
 const sheetModeOptions = [
@@ -29,6 +29,9 @@ export default function RentalRunningChartReportPage() {
     const [startDate, setStartDate] = useState<string>(searchParams.get('start_date') || firstDayOfMonth);
     const [endDate, setEndDate] = useState<string>(searchParams.get('end_date') || today);
     const [sheetMode, setSheetMode] = useState<'lessee' | 'owner'>(searchParams.get('sheet_mode') === 'owner' ? 'owner' : 'lessee');
+    const [agreementKind, setAgreementKind] = useState<AgreementKind>(() => {
+        return searchParams.get('sheet_mode') === 'owner' ? AgreementKind.Owner : AgreementKind.Customer;
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [report, setReport] = useState<RunningChartReportData | null>(null);
@@ -48,6 +51,7 @@ export default function RentalRunningChartReportPage() {
                 agreement_id: report.header.agreement_id,
                 start_date: report.header.start_date,
                 end_date: report.header.end_date,
+                vehicle_use_id: (report.header as { vehicle_use_id?: number }).vehicle_use_id,
                 sheet_mode: report.header.is_owner_sheet ? 'owner' : 'lessee',
             }, format, preview);
         } catch (err) {
@@ -63,11 +67,24 @@ export default function RentalRunningChartReportPage() {
         if (agId) {
             const parsed = parseInt(agId, 10);
             if (!isNaN(parsed) && parsed > 0) {
-                void getAgreement(AgreementKind.Customer, parsed)
+                const isOwner = searchParams.get('sheet_mode') === 'owner';
+                const initialKind = isOwner ? AgreementKind.Owner : AgreementKind.Customer;
+                void getAgreement(initialKind, parsed)
                     .then(ag => {
+                        setAgreementKind(initialKind);
                         setAgreement({
                             id: ag.id,
                             name: `${ag.reference} — ${ag.party.name}`,
+                        });
+                    })
+                    .catch(() => {
+                        const fallbackKind = isOwner ? AgreementKind.Customer : AgreementKind.Owner;
+                        return getAgreement(fallbackKind, parsed).then(ag => {
+                            setAgreementKind(fallbackKind);
+                            setAgreement({
+                                id: ag.id,
+                                name: `${ag.reference} — ${ag.party.name}`,
+                            });
                         });
                     })
                     .catch(() => {
@@ -131,18 +148,48 @@ export default function RentalRunningChartReportPage() {
             />
 
             <Panel title="Report Parameters">
-                <form aria-label="Generate running chart report" onSubmit={handleGenerate} className="grid gap-3 md:grid-cols-5 items-end">
-                    <LookupSelect
-                        label="Customer Agreement"
-                        placeholder="Search agreement or customer..."
-                        value={agreement}
-                        onChange={setAgreement}
-                        search={searchCustomerAgreements}
-                        required
-                        loadOnOpen
-                        minSearchLength={0}
-                        error={error?.fields.agreement_id?.[0]}
+                <form aria-label="Generate running chart report" onSubmit={handleGenerate} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6 items-end">
+                    <Select
+                        label="Sheet Type"
+                        options={sheetModeOptions}
+                        value={sheetMode}
+                        onChange={e => {
+                            const nextMode = e.target.value as 'lessee' | 'owner';
+                            setSheetMode(nextMode);
+                            if (nextMode === 'lessee' && agreementKind !== AgreementKind.Customer) {
+                                setAgreementKind(AgreementKind.Customer);
+                                setAgreement(null);
+                            }
+                        }}
                     />
+                    {sheetMode === 'owner' && (
+                        <Select
+                            label="Agreement Source"
+                            value={agreementKind}
+                            options={[
+                                { value: AgreementKind.Owner, label: 'Owner Agreement (Direct)' },
+                                { value: AgreementKind.Customer, label: 'Customer Agreement (Lessee contract)' },
+                            ]}
+                            onChange={e => {
+                                const nextKind = e.target.value as AgreementKind;
+                                setAgreementKind(nextKind);
+                                setAgreement(null);
+                            }}
+                        />
+                    )}
+                    <div className={sheetMode === 'owner' ? '' : 'sm:col-span-2'}>
+                        <LookupSelect
+                            label={agreementKind === AgreementKind.Owner ? 'Owner Agreement' : 'Customer Agreement'}
+                            placeholder={agreementKind === AgreementKind.Owner ? 'Search agreement or owner...' : 'Search agreement or customer...'}
+                            value={agreement}
+                            onChange={setAgreement}
+                            search={agreementKind === AgreementKind.Owner ? searchOwnerAgreements : searchCustomerAgreements}
+                            required
+                            loadOnOpen
+                            minSearchLength={0}
+                            error={error?.fields.agreement_id?.[0]}
+                        />
+                    </div>
                     <Input
                         label="Period start date"
                         type="date"
@@ -158,12 +205,6 @@ export default function RentalRunningChartReportPage() {
                         value={endDate}
                         onChange={e => setEndDate(e.target.value)}
                         error={error?.fields.end_date?.[0]}
-                    />
-                    <Select
-                        label="Sheet Type"
-                        options={sheetModeOptions}
-                        value={sheetMode}
-                        onChange={e => setSheetMode(e.target.value as 'lessee' | 'owner')}
                     />
                     <div>
                         <Button type="submit" loading={loading} disabled={!agreement} className="w-full">

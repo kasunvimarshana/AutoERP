@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Constants\OperationalFields;
+use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Requests\VehicleAvailabilityQueryRequest;
@@ -49,7 +50,17 @@ final class VehicleUseController
 
     public function index(AgreementRequest $request, int $agreement): AnonymousResourceCollection
     {
+        $kind = $request->route('kind');
+        if ($kind === AgreementKind::Owner->value) {
+            return VehicleUseResource::collection($this->uses->listOwner($request->context(), $agreement, $request->perPage()));
+        }
+
         return VehicleUseResource::collection($this->uses->list($request->context(), $agreement, $request->perPage()));
+    }
+
+    public function ownerUses(AgreementRequest $request, int $agreement): AnonymousResourceCollection
+    {
+        return VehicleUseResource::collection($this->uses->listOwner($request->context(), $agreement, $request->perPage()));
     }
 
     public function store(AgreementRequest $request, int $agreement): JsonResponse

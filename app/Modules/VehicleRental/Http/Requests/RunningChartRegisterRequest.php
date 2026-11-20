@@ -15,7 +15,7 @@ final class RunningChartRegisterRequest extends TenantScopedRequest
         parent::prepareForValidation();
 
         $merges = [];
-        foreach (['search', 'chart_status', 'from', 'until', 'per_page', 'page'] as $field) {
+        foreach (['search', 'chart_status', 'from', 'until', 'per_page', 'page', 'customer_agreement_id', 'owner_agreement_id', 'vehicle_use_id', 'kind'] as $field) {
             if ($this->has($field) && is_string($this->input($field)) && trim($this->input($field)) === '') {
                 $merges[$field] = null;
             }
@@ -33,6 +33,10 @@ final class RunningChartRegisterRequest extends TenantScopedRequest
             'chart_status' => ['nullable', 'string'],
             'from' => ['nullable', 'string'],
             'until' => ['nullable', 'string'],
+            'customer_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'vehicle_use_id' => ['nullable', 'integer', 'min:1'],
+            'kind' => ['nullable', 'string'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];

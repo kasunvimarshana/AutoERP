@@ -96,7 +96,9 @@ final class RunningChartReportService
                 ? [$selectedUseId]
                 : $customerAgreement->vehicleUses->pluck('id')->all();
 
-            $primaryUse = $customerAgreement->vehicleUses->firstWhere('replaces_use_id', null) ?? $customerAgreement->vehicleUses->first();
+            $primaryUse = ($selectedUseId !== null ? $customerAgreement->vehicleUses->firstWhere('id', $selectedUseId) : null)
+                ?? $customerAgreement->vehicleUses->firstWhere('replaces_use_id', null)
+                ?? $customerAgreement->vehicleUses->first();
 
             if ($sheetMode === 'owner') {
                 $ownerAgreement = $primaryUse?->ownerAgreement;
@@ -114,14 +116,15 @@ final class RunningChartReportService
             $ownerUses = VehicleUse::query()
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->where(fn (Builder $q) => $q->where('owner_agreement_id', $ownerAgreement->id)->orWhere('vehicle_id', $ownerAgreement->vehicle_id))
-                ->with(['customerAgreement.customer', 'vehicle'])
+                ->with(['customerAgreement.customer', 'vehicle', 'ownerAgreement.party'])
                 ->get();
 
             $useIds = $selectedUseId !== null
                 ? [$selectedUseId]
                 : $ownerUses->pluck('id')->all();
 
-            $primaryUse = $ownerUses->first();
+            $primaryUse = ($selectedUseId !== null ? $ownerUses->firstWhere('id', $selectedUseId) : null)
+                ?? $ownerUses->first();
         }
 
         $isOwnerSheet = $sheetMode === 'owner';
@@ -379,6 +382,7 @@ final class RunningChartReportService
                 'report_date' => now()->format('d/m/Y'),
                 'agreement_number' => $agreementNumber,
                 'agreement_id' => $agreementId,
+                'vehicle_use_id' => $selectedUseId,
                 'agreement_vehicle_number' => $agreementVehicleNo,
             ],
             'rows' => $rows,
