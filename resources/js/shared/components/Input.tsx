@@ -1,13 +1,14 @@
-import { forwardRef, useId, type InputHTMLAttributes } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
     label?: string;
     error?: string;
     hint?: string;
+    suffix?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-    { label, error, hint, className = '', id, ...props },
+    { label, error, hint, suffix, className = '', id, ...props },
     ref,
 ) {
     const generatedId = useId();
@@ -24,14 +25,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
                     {label}
                 </label>
             ) : null}
-            <input
-                ref={ref}
-                id={inputId}
-                aria-invalid={Boolean(error)}
-                aria-describedby={error || hint ? messageId : undefined}
-                className={`min-h-10 w-full rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 ${error ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-300 focus:border-blue-600 focus:ring-blue-500/20'} ${className}`}
-                {...props}
-            />
+            <div className="relative">
+                <input
+                    ref={ref}
+                    id={inputId}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error || hint ? messageId : undefined}
+                    className={`min-h-10 w-full rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-200 ${error ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-300 focus:border-blue-600 focus:ring-blue-500/20'} ${suffix ? 'pr-9' : ''} ${className}`}
+                    {...props}
+                />
+                {suffix ? (
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-2.5">
+                        {suffix}
+                    </div>
+                ) : null}
+            </div>
             {error ? (
                 <span id={messageId} className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-rose-600">
                     <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">

@@ -19,6 +19,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { Tabs } from '@/shared/components/Tabs';
 import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
@@ -28,6 +29,8 @@ import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementEditor } from './AgreementEditor';
 import { AgreementTermsGrid } from './AgreementTermsGrid';
 import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, type Agreement } from './agreements';
+
+type ReviewTab = 'billing' | 'vehicles' | 'deposits' | 'financials' | 'history';
 
 export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const auth = useAuth();
@@ -46,7 +49,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [action, setAction] = useState<AgreementAction | null>(null);
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
-    const [activeReviewTab, setActiveReviewTab] = useState<'billing' | 'vehicles' | 'deposits' | 'financials' | 'history'>('billing');
+    const [activeReviewTab, setActiveReviewTab] = useState<ReviewTab>('billing');
     const [showSuccessor, setShowSuccessor] = useState(false);
     const [search, setSearch] = useState(() => {
         if (typeof window === 'undefined') return '';
@@ -213,89 +216,35 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
             {selected.notes && <p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">Notes:</span> {selected.notes}</p>}
 
-            <div className="flex flex-wrap gap-2 border-b border-slate-200 pt-3">
-                <button
-                    type="button"
-                    onClick={() => setActiveReviewTab('billing')}
-                    className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
-                        activeReviewTab === 'billing'
-                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                >
-                    Billing & Rate Estimates
-                </button>
-                {kind === AgreementKind.Customer && canViewUse && (
-                    <button
-                        type="button"
-                        onClick={() => setActiveReviewTab('vehicles')}
-                        className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
-                            activeReviewTab === 'vehicles'
-                                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
-                    >
-                        Assigned Vehicles & Handover
-                    </button>
-                )}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
+                <Tabs<ReviewTab>
+                    variant="pills"
+                    tabs={[
+                        { id: 'billing', label: 'Billing & Rate Estimates' },
+                        ...(canViewUse ? [{
+                            id: 'vehicles' as const,
+                            label: kind === AgreementKind.Customer ? 'Assigned Vehicles & Handover' : 'Supplied Vehicles & Usage',
+                        }] : []),
+                        ...(kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) ? [{
+                            id: 'deposits' as const,
+                            label: 'Security Deposits',
+                        }] : []),
+                        { id: 'financials', label: 'Financial Position & Notes' },
+                        { id: 'history', label: 'Audit History' },
+                    ]}
+                    active={activeReviewTab}
+                    onChange={setActiveReviewTab}
+                />
                 {kind === AgreementKind.Owner && canViewUse && (
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => setActiveReviewTab('vehicles')}
-                            className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
-                                activeReviewTab === 'vehicles'
-                                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                            }`}
-                        >
-                            Supplied Vehicles & Usage
-                        </button>
-                        <Link
-                            to={`/vehicle-rental/vehicle-uses?search=${encodeURIComponent(selected.reference)}`}
-                            className="px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors text-slate-600 hover:text-slate-900 hover:bg-slate-50 flex items-center gap-1"
-                            title="View vehicle uses utilizing this owner's vehicle in the vehicle-use register"
-                        >
-                            <span>Vehicle Uses</span>
-                            <span aria-hidden="true">&rarr;</span>
-                        </Link>
-                    </>
-                )}
-                {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && (
-                    <button
-                        type="button"
-                        onClick={() => setActiveReviewTab('deposits')}
-                        className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
-                            activeReviewTab === 'deposits'
-                                ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
+                    <Link
+                        to={`/vehicle-rental/vehicle-uses?search=${encodeURIComponent(selected.reference)}`}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                        title="View vehicle uses utilizing this owner's vehicle in the vehicle-use register"
                     >
-                        Security Deposits
-                    </button>
+                        <span>Vehicle Uses</span>
+                        <span aria-hidden="true">&rarr;</span>
+                    </Link>
                 )}
-                <button
-                    type="button"
-                    onClick={() => setActiveReviewTab('financials')}
-                    className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
-                        activeReviewTab === 'financials'
-                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                >
-                    Financial Position & Notes
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveReviewTab('history')}
-                    className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors ${
-                        activeReviewTab === 'history'
-                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                >
-                    Audit History
-                </button>
             </div>
 
             {activeReviewTab === 'billing' && (

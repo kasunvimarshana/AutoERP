@@ -60,7 +60,7 @@ export function AppHeader({
         <header className="app-header sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur-md shadow-2xs sm:px-6">
             <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:hidden"
                 onClick={onOpenMobile}
                 aria-label="Open navigation"
                 aria-controls="app-sidebar"
@@ -69,7 +69,7 @@ export function AppHeader({
             </button>
             <button
                 type="button"
-                className="hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:inline-flex"
+                className="hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:inline-flex"
                 onClick={onToggleCollapsed}
                 aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
                 aria-controls="app-sidebar"

@@ -20,7 +20,7 @@ export function ReportDataGrid({ columns, rows, sort, direction, onSort }: {
         render: (row) => column.format === 'link' && typeof row[`${column.key}_url`] === 'string'
             ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={String(row[`${column.key}_url`])}>{formatValue(row[column.key], column.format)}</Link>
             : formatValue(row[column.key], column.format),
-        className: ['money', 'decimal'].includes(column.format) ? 'tabular-nums' : undefined,
+        className: ['money', 'decimal'].includes(column.format) ? 'tabular-nums text-right' : undefined,
     }));
 
     return <DataTable rows={rows} columns={tableColumns} rowKey={(row, index) => String(row.id ?? `${JSON.stringify(row)}-${index}`)} />;

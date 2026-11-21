@@ -34,6 +34,31 @@ describe('Tabs', () => {
         expect(screen.getByText('Summary content')).not.toBeVisible();
         expect(screen.getByText('History content')).toBeVisible();
     });
+
+    it('renders segmented pills variant with proper styling and ARIA attributes', () => {
+        render(
+            <Tabs<Tab>
+                tabs={[
+                    { id: 'summary', label: 'Summary', badge: 3 },
+                    { id: 'history', label: 'History' },
+                ]}
+                active="summary"
+                onChange={() => undefined}
+                variant="pills"
+            />,
+        );
+
+        const tablist = screen.getByRole('tablist');
+        expect(tablist).toHaveClass('inline-flex', 'p-1', 'bg-slate-100', 'rounded-lg');
+
+        const summaryTab = screen.getByRole('tab', { name: /Summary/ });
+        expect(summaryTab).toHaveAttribute('aria-selected', 'true');
+        expect(summaryTab).toHaveClass('bg-white', 'text-slate-900', 'shadow-xs', 'font-semibold');
+
+        const historyTab = screen.getByRole('tab', { name: 'History' });
+        expect(historyTab).toHaveAttribute('aria-selected', 'false');
+        expect(historyTab).toHaveClass('text-slate-600');
+    });
 });
 
 function TabsHarness({ keepMounted = false }: { keepMounted?: boolean }) {

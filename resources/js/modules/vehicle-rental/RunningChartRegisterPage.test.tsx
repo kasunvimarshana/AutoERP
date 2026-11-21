@@ -7,7 +7,7 @@ import RunningChartRegisterPage from './RunningChartRegisterPage';
 import { listChartRegister, listCharts } from './runningChartApi';
 import { listVehicleUseRegister } from './vehicleUseApi';
 import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
-import { CHART_PERMISSION, DriverIdentitySource, RunningChartAction, RunningChartStatus, type ChartRegisterRow } from './runningCharts';
+import { CHART_PERMISSION, DriverIdentitySource, RunningChartStatus, type ChartRegisterRow } from './runningCharts';
 const session = vi.hoisted(() => ({ roles: [] as string[], permissions: [] as string[], permissionsLoaded: true }));
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => session }));
 vi.mock('./runningChartApi', () => ({ listChartRegister: vi.fn(), chartHistory: vi.fn(), listCharts: vi.fn(), exportRunningChartReport: vi.fn(), transitionChart: vi.fn() }));

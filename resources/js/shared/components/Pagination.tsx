@@ -17,6 +17,7 @@ export function Pagination({ meta, onPageChange, disabled = false }: {
             <div className="flex flex-wrap items-center gap-2">
                 <Button
                     variant="secondary"
+                    size="sm"
                     disabled={disabled || meta.current_page <= 1}
                     aria-label={`Go to page ${Math.max(1, meta.current_page - 1)}`}
                     onClick={() => onPageChange(meta.current_page - 1)}
@@ -31,6 +32,7 @@ export function Pagination({ meta, onPageChange, disabled = false }: {
                 </span>
                 <Button
                     variant="secondary"
+                    size="sm"
                     disabled={disabled || meta.current_page >= meta.last_page}
                     aria-label={`Go to page ${Math.min(meta.last_page, meta.current_page + 1)}`}
                     onClick={() => onPageChange(meta.current_page + 1)}

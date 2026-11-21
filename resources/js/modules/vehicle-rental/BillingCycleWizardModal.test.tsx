@@ -148,12 +148,12 @@ describe('BillingCycleWizardModal', () => {
         expect(screen.getByText(/INV-2026-0077/i)).toBeInTheDocument();
 
         // Switch to items tab
-        const itemsTab = screen.getByRole('button', { name: /Additions & Deductions/i });
+        const itemsTab = screen.getByRole('tab', { name: /Additions & Deductions/i });
         fireEvent.click(itemsTab);
         expect(screen.getByText(/Add Line Item Adjustment/i)).toBeInTheDocument();
 
         // Switch to finalize tab
-        const finalizeTab = screen.getByRole('button', { name: /Finalize/i });
+        const finalizeTab = screen.getByRole('tab', { name: /Finalize/i });
         fireEvent.click(finalizeTab);
 
         await waitFor(() => {

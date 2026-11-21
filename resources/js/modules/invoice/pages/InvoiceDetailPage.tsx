@@ -22,6 +22,8 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button, LinkButton } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
+import { Modal } from '@/shared/components/Modal';
 import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
 import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
@@ -80,6 +82,8 @@ export default function InvoiceDetailPage() {
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [reversalOpen, setReversalOpen] = useState(false);
+    const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
     const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
     const tabState = useOnDemandTab<Tab>('summary');
     const tabs: TabItem<Tab>[] = [
@@ -139,23 +143,30 @@ export default function InvoiceDetailPage() {
     const canShareViaWhatsApp = value.direction === 'outbound' && value.party_type === 'customer' && ['posted', 'partially_paid', 'paid'].includes(value.status ?? '');
     const printUrl = `/invoices/${id}/print`;
 
-    const runAction = async (nextAction: Exclude<InvoiceAction, 'reverse'>) => {
-        let reason: string | undefined;
-        if (nextAction === 'cancel') {
-            const response = window.prompt('Enter the reason for cancelling this invoice.');
-            if (response === null) return;
-            reason = response.trim() || undefined;
-        }
-
+    const runAction = async (nextAction: 'approve' | 'post') => {
         setAction(nextAction);
         setActionError(null);
         try {
             const updated = nextAction === 'approve'
                 ? await approveInvoice(id, value.row_version)
-                : nextAction === 'post'
-                    ? await postInvoice(id, value.row_version)
-                    : await cancelInvoice(id, value.row_version, reason ?? '');
+                : await postInvoice(id, value.row_version);
             invoice.setData(updated);
+            if (canViewBalance) balance.reload();
+        } catch (error: unknown) {
+            setActionError(toApiError(error));
+        } finally {
+            setAction(null);
+        }
+    };
+
+    const handleCancelInvoice = async () => {
+        const reason = cancelReason.trim();
+        setAction('cancel');
+        setActionError(null);
+        try {
+            const updated = await cancelInvoice(id, value.row_version, reason ?? '');
+            invoice.setData(updated);
+            setCancelDialogOpen(false);
             if (canViewBalance) balance.reload();
         } catch (error: unknown) {
             setActionError(toApiError(error));
@@ -235,7 +246,7 @@ export default function InvoiceDetailPage() {
                             <Button variant="danger" disabled={action !== null} onClick={() => setReversalOpen(true)}>Reverse</Button>
                         ) : null}
                         {!isRetiredSourceInvoice && ['draft', 'approved'].includes(value.status ?? '') && canCancel ? (
-                            <Button variant="danger" loading={action === 'cancel'} onClick={() => void runAction('cancel')}>Cancel</Button>
+                            <Button variant="danger" loading={action === 'cancel'} onClick={() => { setCancelReason(''); setActionError(null); setCancelDialogOpen(true); }}>Cancel</Button>
                         ) : null}
                         <Button variant="secondary" onClick={async () => {
                             try {
@@ -315,6 +326,48 @@ export default function InvoiceDetailPage() {
                 onCancel={() => setReversalOpen(false)}
                 onConfirm={reverse}
             />
+            <Modal
+                open={cancelDialogOpen}
+                title="Cancel Invoice"
+                onClose={() => { if (action !== 'cancel') setCancelDialogOpen(false); }}
+            >
+                <form
+                    className="space-y-4"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        void handleCancelInvoice();
+                    }}
+                >
+                    <ErrorAlert error={actionError} />
+                    <p className="text-sm text-slate-600">
+                        Please provide a reason for cancelling invoice <span className="font-semibold text-slate-900">{value.invoice_number ?? `#${value.id}`}</span>. This action cannot be undone.
+                    </p>
+                    <Input
+                        label="Cancellation Reason"
+                        value={cancelReason}
+                        onChange={(event) => setCancelReason(event.target.value)}
+                        placeholder="e.g. Duplicate invoice, customer requested cancellation"
+                        autoFocus
+                    />
+                    <div className="flex justify-end gap-2.5 pt-2">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setCancelDialogOpen(false)}
+                            disabled={action === 'cancel'}
+                        >
+                            Keep Invoice
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="danger"
+                            loading={action === 'cancel'}
+                        >
+                            Confirm Cancellation
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
         </>
     );
 }

@@ -66,8 +66,8 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
         { key: 'date', header: 'Date', render: (row) => formatDate(row.invoice_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${row.invoice_type ?? '-'} / ${row.direction ?? '-'}` },
-        { key: 'total', header: 'Total', render: (row) => <MoneyDisplay value={row.grand_total} currency={row.currency?.code ?? undefined} /> },
-        { key: 'balance', header: 'Balance', render: (row) => <MoneyDisplay value={row.balance_due ?? (row.balance?.remaining_amount as string)} currency={row.currency?.code ?? undefined} /> },
+        { key: 'total', header: 'Total', className: 'text-right', render: (row) => <MoneyDisplay value={row.grand_total} currency={row.currency?.code ?? undefined} /> },
+        { key: 'balance', header: 'Balance', className: 'text-right', render: (row) => <MoneyDisplay value={row.balance_due ?? (row.balance?.remaining_amount as string)} currency={row.currency?.code ?? undefined} /> },
         { key: 'status', header: 'Status', render: (row) => <InvoiceStatusBadge invoice={row} /> },
     ];
     return (
@@ -79,7 +79,7 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
                     actions={view?.action ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton> : undefined}
                 />
             )}
-            <div className="mb-4 max-w-md"><Input type="search" placeholder="Search invoice number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
+            <div className="mb-4 max-w-md"><Input type="search" aria-label="Search invoices" placeholder="Search invoice number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => rowHref ? rowHref(row) : `/invoices/${row.id}`} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />

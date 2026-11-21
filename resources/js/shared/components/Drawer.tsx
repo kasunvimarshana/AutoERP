@@ -32,6 +32,7 @@ export function Drawer({ open, title, onClose, children, canClose, closeDisabled
                     <Button
                         ref={closeRef}
                         variant="ghost"
+                        size="sm"
                         className="h-9 px-2.5 text-slate-500 hover:text-slate-700"
                         onClick={requestClose}
                         disabled={closeDisabled}

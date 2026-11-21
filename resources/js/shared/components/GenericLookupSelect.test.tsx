@@ -154,6 +154,88 @@ describe('GenericLookupSelect', () => {
         fireEvent.blur(input);
         expect(screen.getByText('Select a valid source from the list.')).toBeInTheDocument();
     });
+
+    it('clears selection when the inline clear button is clicked', async () => {
+        const handleChange = vi.fn();
+        render(
+            <GenericLookupSelect<NamedResource>
+                label="Source"
+                value={resource(1, 'Existing option')}
+                onChange={handleChange}
+                search={async () => ({ data: [], links: {}, meta: undefined })}
+                formatLabel={(item) => item.name}
+            />,
+        );
+
+        const clearBtn = screen.getByRole('button', { name: 'Clear Source' });
+        expect(clearBtn).toBeInTheDocument();
+        await act(async () => {
+            fireEvent.click(clearBtn);
+        });
+
+        expect(handleChange).toHaveBeenCalledWith(null);
+    });
+
+    it('does not clear selection if onChange returns false', async () => {
+        const handleChange = vi.fn(() => false);
+        render(
+            <GenericLookupSelect<NamedResource>
+                label="Source"
+                value={resource(1, 'Existing option')}
+                onChange={handleChange}
+                search={async () => ({ data: [], links: {}, meta: undefined })}
+                formatLabel={(item) => item.name}
+            />,
+        );
+
+        const clearBtn = screen.getByRole('button', { name: 'Clear Source' });
+        await act(async () => {
+            fireEvent.click(clearBtn);
+        });
+
+        expect(handleChange).toHaveBeenCalledWith(null);
+        const input = screen.getByRole('combobox', { name: 'Source' });
+        expect(input).toHaveValue('Existing option');
+    });
+
+    it('navigates through visible options with arrow keys respecting exclusions', async () => {
+        const handleChange = vi.fn();
+        const search = vi.fn(async (): Promise<LookupResult<NamedResource>> => ({
+            data: [resource(1, 'Option 1'), resource(2, 'Option 2'), resource(3, 'Option 3')],
+            links: {},
+            meta: undefined,
+        }));
+
+        render(
+            <GenericLookupSelect<NamedResource>
+                label="Source"
+                value={null}
+                onChange={handleChange}
+                search={search}
+                formatLabel={(item) => item.name}
+                excludeId={2}
+                loadOnOpen
+                minSearchLength={0}
+                debounceMs={0}
+            />,
+        );
+
+        const input = screen.getByRole('combobox', { name: 'Source' });
+        fireEvent.focus(input);
+
+        await waitFor(() => expect(screen.getByRole('option', { name: 'Option 1' })).toBeInTheDocument());
+        expect(screen.queryByRole('option', { name: 'Option 2' })).not.toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'Option 3' })).toBeInTheDocument();
+
+        // Down arrow should select first visible option (Option 1)
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        // Down arrow again should select second visible option (Option 3, since Option 2 is excluded)
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        // Press Enter
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(handleChange).toHaveBeenCalledWith(resource(3, 'Option 3'));
+    });
 });
 
 function renderLookup(props: Partial<{

@@ -44,6 +44,7 @@ export function Modal({
                     <h2 id={titleId} className="text-lg font-bold tracking-tight text-slate-900">{title}</h2>
                     <Button
                         variant="ghost"
+                        size="sm"
                         className="h-9 px-2.5 text-slate-500 hover:text-slate-700"
                         onClick={requestClose}
                         disabled={closeDisabled}

@@ -8,6 +8,7 @@ import PaymentDetailPage from './PaymentDetailPage';
 const paymentApiMocks = vi.hoisted(() => ({
     allocatePayment: vi.fn(),
     approvePayment: vi.fn(),
+    deletePayment: vi.fn(),
     getPayment: vi.fn(),
     getPaymentAllocations: vi.fn(),
     getPaymentUnappliedBalance: vi.fn(),
@@ -98,5 +99,38 @@ describe('Payment detail optimistic version flow', () => {
 
         await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
         await waitFor(() => expect(paymentApiMocks.approvePayment).toHaveBeenCalledWith(15, 2));
+    });
+
+    it('confirms draft deletion using ConfirmDialog before deleting', async () => {
+        paymentApiMocks.getPayment.mockResolvedValue({
+            ...payment(1, 'can_submit'),
+            capabilities: { can_delete_draft: true },
+        });
+        paymentApiMocks.deletePayment.mockResolvedValue({});
+
+        render(
+            <MemoryRouter initialEntries={['/payments/15']}>
+                <Routes>
+                    <Route path="/payments/:id" element={<PaymentDetailPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        await userEvent.click(await screen.findByRole('button', { name: 'Delete draft' }));
+
+        expect(await screen.findByText('Delete draft payment?')).toBeInTheDocument();
+        expect(screen.getByText(/Are you sure you want to delete this draft payment\?/)).toBeInTheDocument();
+
+        // Cancel
+        await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(paymentApiMocks.deletePayment).not.toHaveBeenCalled();
+
+        // Open again and confirm inside dialog
+        await userEvent.click(screen.getByRole('button', { name: 'Delete draft' }));
+        const dialog = screen.getByRole('dialog');
+        const confirmBtn = dialog.querySelector('button.bg-rose-600');
+        expect(confirmBtn).not.toBeNull();
+        await userEvent.click(confirmBtn!);
+        await waitFor(() => expect(paymentApiMocks.deletePayment).toHaveBeenCalledWith(15, 1));
     });
 });

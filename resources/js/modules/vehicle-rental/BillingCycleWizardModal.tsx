@@ -9,6 +9,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Tabs } from '@/shared/components/Tabs';
 import { businessDateInputValue, formatBusinessDate } from '@/shared/utils/businessDate';
 import { AgreementKind, type Agreement } from './agreements';
 import {
@@ -36,6 +37,8 @@ interface Props {
     onCycleUpdated?: (cycle: BillingCycle) => void;
 }
 
+type WizardTab = 'overview' | 'charts' | 'items' | 'finalize';
+
 export function BillingCycleWizardModal({
     open,
     onClose,
@@ -45,7 +48,7 @@ export function BillingCycleWizardModal({
     onCycleUpdated,
 }: Props) {
     const [currentCycle, setCurrentCycle] = useState<BillingCycle | null>(initialCycle ?? null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'charts' | 'items' | 'finalize'>('overview');
+    const [activeTab, setActiveTab] = useState<WizardTab>('overview');
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -416,30 +419,25 @@ export function BillingCycleWizardModal({
                     /* Existing Cycle Management */
                     <div className="space-y-4">
                         {/* Sub-tabs */}
-                        <div className="flex border-b border-slate-200 gap-2">
-                            {(['overview', 'charts', 'items', 'finalize'] as const).map(tab => (
-                                <button
-                                    key={tab}
-                                    type="button"
-                                    onClick={() => {
-                                        setActiveTab(tab);
-                                        if (tab === 'charts') {
-                                            loadCandidates(currentCycle.id);
-                                        }
-                                        if (tab === 'finalize') {
-                                            loadFinalPreview();
-                                        }
-                                    }}
-                                    className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors capitalize ${
-                                        activeTab === tab
-                                            ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    {tab === 'items' ? 'Additions & Deductions' : tab}
-                                </button>
-                            ))}
-                        </div>
+                        <Tabs<WizardTab>
+                            variant="pills"
+                            tabs={[
+                                { id: 'overview', label: 'Overview' },
+                                { id: 'charts', label: 'Charts' },
+                                { id: 'items', label: 'Additions & Deductions' },
+                                { id: 'finalize', label: 'Finalize' },
+                            ]}
+                            active={activeTab}
+                            onChange={(tab) => {
+                                setActiveTab(tab);
+                                if (tab === 'charts') {
+                                    loadCandidates(currentCycle.id);
+                                }
+                                if (tab === 'finalize') {
+                                    loadFinalPreview();
+                                }
+                            }}
+                        />
 
                         {loading && <LoadingState label="Refreshing cycle data..." />}
 

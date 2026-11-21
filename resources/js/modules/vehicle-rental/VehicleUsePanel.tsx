@@ -14,7 +14,7 @@ import { formatBusinessDateTime, businessDateTimeInputValueWithSeconds } from '@
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
-import { AgreementAction, AgreementKind, AgreementStatus, type Agreement } from './agreements';
+import { AgreementKind, AgreementStatus, type Agreement } from './agreements';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 import { ReassignDriverModal } from './ReassignDriverModal';

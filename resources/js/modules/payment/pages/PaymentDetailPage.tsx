@@ -30,6 +30,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
 import { Button, LinkButton } from '@/shared/components/Button';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Input } from '@/shared/components/Input';
 import { useDetailResourceStore } from '@/shared/state/useDetailResourceStore';
 import { PaymentAllocationPanel } from '../components/PaymentAllocationPanel';
@@ -65,6 +66,7 @@ export default function PaymentDetailPage() {
     const [reversalDate, setReversalDate] = useState(today());
     const [reversalReason, setReversalReason] = useState('');
     const [voidReason, setVoidReason] = useState('');
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     if (payment.loading && paymentState.data === null) return <LoadingState />;
     if (!paymentState.data) return <ErrorAlert error={payment.error} />;
@@ -141,14 +143,16 @@ export default function PaymentDetailPage() {
     }
 
     async function handleDeleteDraft() {
-        if (busy || !window.confirm('Are you sure you want to delete this draft payment? This action cannot be undone.')) return;
         setBusy(true);
         setActionError(null);
         try {
             await deletePayment(id, value.row_version);
+            setDeleteConfirmOpen(false);
             navigate('/payments');
         } catch (error) {
             setActionError(toApiError(error));
+            setDeleteConfirmOpen(false);
+        } finally {
             setBusy(false);
         }
     }
@@ -164,7 +168,7 @@ export default function PaymentDetailPage() {
                 {canApprove && <Button variant="secondary" loading={busy} onClick={() => void runPaymentAction('approve')}>Approve</Button>}
                 {canPost && <Button loading={busy} onClick={() => void runPaymentAction('post')}>Post</Button>}
                 {canVoid && <Button variant="danger" loading={busy} onClick={() => void runPaymentAction('void')}>Void</Button>}
-                {canDeleteDraft && <Button variant="danger" loading={busy} onClick={() => void handleDeleteDraft()}>Delete draft</Button>}
+                {canDeleteDraft && <Button variant="danger" loading={busy} onClick={() => setDeleteConfirmOpen(true)}>Delete draft</Button>}
                 {canPrintCheque && <LinkButton to={`/payments/${id}/lines/${chequeLine.id}/cheque-print`}>Print cheque</LinkButton>}
                 <Button variant="secondary" onClick={() => window.open(getPaymentReceiptUrl(id, 'print'), '_blank')}>Print receipt</Button>
                 <Button variant="secondary" onClick={() => window.open(getPaymentReceiptUrl(id, 'html'), '_blank')}>View receipt</Button>
@@ -222,5 +226,15 @@ export default function PaymentDetailPage() {
                 {tabState.activeTab === 'history' && <RecordTable rows={(value.lifecycle_events ?? []) as Record<string, unknown>[]} fields={['occurred_at', 'event_type', 'from_document_status', 'to_document_status', 'reason']} rowKey={(row, index) => String(row.id ?? row.occurred_at ?? `lifecycle-${index}`)} />}
             </div>
         </Panel>
+        <ConfirmDialog
+            open={deleteConfirmOpen}
+            title="Delete draft payment?"
+            message="Are you sure you want to delete this draft payment? This action cannot be undone."
+            confirmLabel="Delete draft"
+            danger
+            loading={busy}
+            onCancel={() => !busy && setDeleteConfirmOpen(false)}
+            onConfirm={() => void handleDeleteDraft()}
+        />
     </>;
 }

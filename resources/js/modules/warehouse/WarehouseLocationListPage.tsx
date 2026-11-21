@@ -117,7 +117,7 @@ export default function WarehouseLocationListPage() {
                         label="Organization Unit"
                         value={organizationUnitId}
                         placeholder="Visible scope"
-                        options={[{ value: String(auth.organizationUnit.id), label: auth.organizationUnit.name ?? `Organization ${auth.organizationUnit.id}` }]}
+                        options={[{ value: String(auth.organizationUnit.id), label: auth.organizationUnit.name ?? 'Current organization unit' }]}
                         onChange={(event) => { setOrganizationUnitId(event.target.value); setPage(1); }}
                     />
                 )}

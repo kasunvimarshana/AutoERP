@@ -6,11 +6,14 @@ export interface TabItem<T extends string> {
     badge?: number | ReactNode;
 }
 
-export function Tabs<T extends string>({ tabs, active, onChange, id }: {
+export function Tabs<T extends string>({ tabs, active, onChange, id, variant = 'underline', ariaLabel = 'Page sections', className = '' }: {
     tabs: TabItem<T>[];
     active: T;
     onChange: (tab: T) => void;
     id?: string;
+    variant?: 'underline' | 'pills';
+    ariaLabel?: string;
+    className?: string;
 }) {
     const generatedId = useId();
     const baseId = id ?? generatedId;
@@ -21,9 +24,11 @@ export function Tabs<T extends string>({ tabs, active, onChange, id }: {
         if (focus) window.requestAnimationFrame(() => refs.current.get(tabId)?.focus());
     };
 
+    const isPills = variant === 'pills';
+
     return (
-        <div className="overflow-x-auto border-b border-slate-200">
-            <div className="flex min-w-max gap-1" role="tablist" aria-label="Page sections">
+        <div className={`overflow-x-auto ${isPills ? '' : 'border-b border-slate-200'} ${className}`.trim()}>
+            <div className={isPills ? 'inline-flex p-1 bg-slate-100 rounded-lg gap-1' : 'flex min-w-max gap-1'} role="tablist" aria-label={ariaLabel}>
                 {tabs.map((tab) => (
                     <button
                         key={tab.id}
@@ -49,11 +54,13 @@ export function Tabs<T extends string>({ tabs, active, onChange, id }: {
                                     : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
                             selectTab(next.id, true);
                         }}
-                        className={`inline-flex min-h-11 items-center border-b-2 px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${active === tab.id ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'}`}
+                        className={isPills
+                            ? `inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${active === tab.id ? 'bg-white text-slate-900 shadow-xs font-semibold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`
+                            : `inline-flex min-h-11 items-center border-b-2 px-4 py-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${active === tab.id ? 'border-blue-600 text-blue-700 font-semibold' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'}`}
                     >
                         <span>{tab.label}</span>
                         {tab.badge !== undefined && tab.badge !== null && (
-                            <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${active === tab.id ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>
+                            <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${active === tab.id ? 'bg-blue-100 text-blue-800' : isPills ? 'bg-slate-200/60 text-slate-600' : 'bg-slate-100 text-slate-600'}`}>
                                 {tab.badge}
                             </span>
                         )}

@@ -26,7 +26,6 @@ import {
     operationalTimeZoneLabel,
     OPERATIONAL_TIME_STEP_SECONDS,
     timestampWithOffset,
-    localTimestampValue,
     USE_LABELS,
     USE_ACTION_LABELS,
     USE_ACTION_CONFIRM_LABELS,

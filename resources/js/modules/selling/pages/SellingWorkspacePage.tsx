@@ -7,7 +7,9 @@ import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
+import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
+import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
@@ -381,8 +383,8 @@ function SellingWorkspace() {
                                 { key: 'number', header: 'Credit note', render: (row) => row.number },
                                 { key: 'date', header: 'Date', render: (row) => row.date },
                                 { key: 'reason', header: 'Reason', render: (row) => row.reason },
-                                { key: 'credit', header: 'Credit', render: (row) => row.credit_amount },
-                                { key: 'available', header: 'Refundable', render: (row) => row.refundable_amount },
+                                { key: 'credit', header: 'Credit', className: 'text-right', render: (row) => row.credit_amount },
+                                { key: 'available', header: 'Refundable', className: 'text-right', render: (row) => row.refundable_amount },
                                 ...(canRefundReturns ? [{ key: 'refund', header: 'Action', render: (row: NonNullable<SaleDocument['returns']>[number]) => compareDecimalStrings(row.refundable_amount, '0') > 0
                                     ? <Button type="button" variant="secondary" onClick={() => {
                                         setRefundReturnId(row.id);
@@ -404,12 +406,14 @@ function SellingWorkspace() {
                             <p className="text-sm text-slate-600">Refundable credit: {selectedRefundReturn.refundable_amount}. This posts an outbound payment to the customer.</p>
                             <DecimalInput label="Refund amount" required maxFractionDigits={2} value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} />
                             <Input label="Refund date" type="date" required min={selectedRefundReturn.date} value={refundDate} onChange={(event) => setRefundDate(event.target.value)} />
-                            <label className="block text-sm font-medium text-slate-700">Payment method
-                                <select className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2" required value={refundMethodId} onChange={(event) => setRefundMethodId(event.target.value)}>
-                                    <option value="">Select method</option>
-                                    {refundMethods.map((method) => <option key={method.id} value={method.id}>{method.name}</option>)}
-                                </select>
-                            </label>
+                            <Select
+                                label="Payment method"
+                                required
+                                value={refundMethodId}
+                                placeholder="Select method"
+                                onChange={(event) => setRefundMethodId(event.target.value)}
+                                options={refundMethods.map((method) => ({ value: String(method.id), label: method.name }))}
+                            />
                             {refundMethods.length === 0 && <p className="text-sm text-amber-700">Configure an outbound cash, card, or bank transfer method before refunding.</p>}
                             <Input label="Payment reference" required={Boolean(selectedRefundMethod?.requires_reference)} value={refundReference} onChange={(event) => setRefundReference(event.target.value)} />
                             {selectedRefundMethod?.requires_instrument_details && <>
@@ -419,8 +423,8 @@ function SellingWorkspace() {
                             </>}
                             <Textarea label="Refund reason" required value={refundReason} onChange={(event) => setRefundReason(event.target.value)} />
                             <div className="flex gap-2">
-                                <Button type="submit" loading={busy} disabled={!selectedRefundMethod || compareDecimalStrings(refundAmount || '0', '0') <= 0 || compareDecimalStrings(refundAmount || '0', selectedRefundReturn.refundable_amount) > 0}>Post refund</Button>
                                 <Button type="button" variant="secondary" disabled={busy} onClick={() => setRefundReturnId(null)}>Cancel</Button>
+                                <Button type="submit" loading={busy} disabled={!selectedRefundMethod || compareDecimalStrings(refundAmount || '0', '0') <= 0 || compareDecimalStrings(refundAmount || '0', selectedRefundReturn.refundable_amount) > 0}>Post refund</Button>
                             </div>
                         </form>
                     </Panel>}
@@ -457,17 +461,11 @@ function SellingWorkspace() {
                             : row.sale.sale_number },
                         { key: 'customer', header: 'Customer', render: (row) => row.sale.customer ?? 'Customer' },
                         { key: 'reason', header: 'Reason', render: (row) => row.reason },
-                        { key: 'credit', header: 'Credit', render: (row) => row.credit_amount },
-                        { key: 'available', header: 'Refundable credit', render: (row) => row.refundable_amount },
+                        { key: 'credit', header: 'Credit', className: 'text-right', render: (row) => row.credit_amount },
+                        { key: 'available', header: 'Refundable credit', className: 'text-right', render: (row) => row.refundable_amount },
                     ]} />
                 </div>
-                {listMeta && <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
-                    <span>{listMeta.total} returns · Page {listMeta.current_page} of {listMeta.last_page}</span>
-                    <div className="flex gap-2">
-                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => { setError(null); setPage((current) => current - 1); }}>Previous</Button>
-                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => { setError(null); setPage((current) => current + 1); }}>Next</Button>
-                    </div>
-                </div>}
+                {listMeta && <Pagination meta={listMeta} onPageChange={(next) => { setError(null); setPage(next); }} />}
             </Panel>
         </>;
     }
@@ -484,17 +482,11 @@ function SellingWorkspace() {
                         { key: 'date', header: 'Date', render: (row) => row.sale_date },
                         { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? 'Customer' },
                         { key: 'invoice', header: 'Invoice', render: (row) => row.invoice?.number ?? 'Pending' },
-                        { key: 'balance', header: 'Balance due', render: (row) => row.invoice?.balance_due ?? '—' },
+                        { key: 'balance', header: 'Balance due', className: 'text-right', render: (row) => row.invoice?.balance_due ?? '—' },
                         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
                     ]} />
                 </div>
-                {listMeta && <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
-                    <span>{listMeta.total} sales · Page {listMeta.current_page} of {listMeta.last_page}</span>
-                    <div className="flex gap-2">
-                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => { setError(null); setPage((current) => current - 1); }}>Previous</Button>
-                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => { setError(null); setPage((current) => current + 1); }}>Next</Button>
-                    </div>
-                </div>}
+                {listMeta && <Pagination meta={listMeta} onPageChange={(next) => { setError(null); setPage(next); }} />}
             </Panel>
         </>;
     }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi, type ItemLookupResource, type VehicleLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
@@ -39,6 +40,7 @@ export default function PromotionWorkspacePage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [message, setMessage] = useState('');
     const [saving, setSaving] = useState(false);
+    const [offerToDelete, setOfferToDelete] = useState<PromotionOffer | null>(null);
     const [offer, setOffer] = useState({ code: '', name: '', paid: '5', reward: '1', scope: 'vehicle', starts: today(), ends: '' });
     const [qualifyingItem, setQualifyingItem] = useState<ItemLookupResource | null>(null);
     const [rewardItem, setRewardItem] = useState<ItemLookupResource | null>(null);
@@ -126,7 +128,7 @@ export default function PromotionWorkspacePage() {
                         <p className="mt-1 text-xs text-slate-500">{entry.count_scope === 'vehicle' ? 'Vehicle count' : 'Customer count'} · {entry.ends_on ? `Until ${entry.ends_on}` : 'No expiry'} · {entry.status}</p>
                         {canManage && <div className="mt-3 flex gap-2">
                             <Button type="button" variant="secondary" disabled={saving} onClick={() => void run(() => promotionApi.setOfferStatus(entry.id, entry.row_version, entry.status === 'active' ? 'paused' : 'active'), entry.status === 'active' ? 'Offer deactivated.' : 'Offer reactivated.')}>{entry.status === 'active' ? 'Deactivate' : 'Reactivate'}</Button>
-                            <Button type="button" variant="danger" disabled={saving} onClick={() => { if (window.confirm(`Delete unused offer ${entry.name}? Offers with assignments or card benefits cannot be deleted.`)) void run(() => promotionApi.deleteOffer(entry.id, entry.row_version), 'Offer deleted.'); }}>Delete</Button>
+                            <Button type="button" variant="danger" disabled={saving} onClick={() => setOfferToDelete(entry)}>Delete</Button>
                         </div>}
                     </div>)}
                 </div>
@@ -226,5 +228,20 @@ export default function PromotionWorkspacePage() {
                 </div>}
             </Panel>}
         </div>}
+        <ConfirmDialog
+            open={offerToDelete !== null}
+            title={offerToDelete ? `Delete offer ${offerToDelete.name}?` : 'Delete offer?'}
+            message="Offers with assignments or card benefits cannot be deleted. Are you sure you want to delete this offer?"
+            confirmLabel="Delete offer"
+            danger
+            loading={saving}
+            onCancel={() => !saving && setOfferToDelete(null)}
+            onConfirm={async () => {
+                if (!offerToDelete) return;
+                const target = offerToDelete;
+                await run(() => promotionApi.deleteOffer(target.id, target.row_version), 'Offer deleted.');
+                setOfferToDelete(null);
+            }}
+        />
     </>;
 }

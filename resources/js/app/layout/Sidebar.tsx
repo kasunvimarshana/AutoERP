@@ -4,6 +4,7 @@ import { NavigationIcon } from '@/app/navigation/NavigationIcon';
 import type { NavigationLinkItem, NavigationSection } from '@/app/navigation/navigationTypes';
 import type { AuthOrganizationUnit, AuthTenant, AuthUser } from '@/modules/auth/authTypes';
 import { useDialogAccessibility } from '@/shared/hooks/useDialogAccessibility';
+import { OrganizationUnitSwitcher } from './OrganizationUnitSwitcher';
 
 export function Sidebar({
     sections,
@@ -157,10 +158,13 @@ export function Sidebar({
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
                             {initials(user)}
                         </span>
-                        <div className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
+                        <div className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>
                             <p className="truncate text-sm font-semibold text-white">{user?.name ?? user?.email ?? 'AutoERP user'}</p>
                             <p className="truncate text-xs text-slate-400">{organizationUnit?.name ?? tenant?.name ?? 'Current workspace'}</p>
                         </div>
+                    </div>
+                    <div className="mt-2 lg:hidden">
+                        <OrganizationUnitSwitcher className="w-full" onSwitch={onCloseMobile} />
                     </div>
                 </div>
             </aside>

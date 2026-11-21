@@ -692,18 +692,18 @@ export default function PaymentEntryPage() {
                             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-sm font-medium text-slate-700">Filter by agreement:</span>
-                                    <select
-                                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    <Select
+                                        aria-label="Filter by agreement"
                                         value={agreementFilter}
                                         onChange={(e) => setAgreementFilter(e.target.value)}
-                                    >
-                                        <option value="all">All agreements ({openDocs.length} open documents)</option>
-                                        {agreements.map((agmt) => (
-                                            <option key={agmt.id} value={String(agmt.id)}>
-                                                {agmt.reference} ({agmt.status})
-                                            </option>
-                                        ))}
-                                    </select>
+                                        options={[
+                                            { value: 'all', label: `All agreements (${openDocs.length} open documents)` },
+                                            ...agreements.map((agmt) => ({
+                                                value: String(agmt.id),
+                                                label: `${agmt.reference} (${agmt.status})`,
+                                            })),
+                                        ]}
+                                    />
                                 </div>
                                 {openDocs.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
@@ -761,7 +761,7 @@ export default function PaymentEntryPage() {
                                                                 )}
                                                             </td>
                                                             <td className="px-3 py-2 font-medium text-slate-900">
-                                                                {doc.invoice_number ?? `Inv #${doc.id}`}
+                                                                {doc.invoice_number ?? 'Invoice (unassigned)'}
                                                             </td>
                                                             <td className="px-3 py-2 text-slate-600">
                                                                 {doc.invoice_date ?? '—'}

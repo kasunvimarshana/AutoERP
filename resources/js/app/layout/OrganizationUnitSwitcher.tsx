@@ -1,18 +1,25 @@
 import { useMemo, useState } from 'react';
 import { authApi } from '@/modules/auth/authApi';
-import { useAuth } from '@/modules/auth/AuthProvider';
+import { useOptionalAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 
-export function OrganizationUnitSwitcher({ className = 'hidden min-w-56 max-w-72 lg:block' }: { className?: string }) {
-    const auth = useAuth();
+export function OrganizationUnitSwitcher({
+    className = 'hidden min-w-56 max-w-72 lg:block',
+    onSwitch,
+}: {
+    className?: string;
+    onSwitch?: () => void;
+}) {
+    const auth = useOptionalAuth();
+    const isTenantAuthed = auth !== null && auth.authMode === 'tenant' && auth.isAuthenticated;
     const [switchError, setSwitchError] = useState<ApiError | null>(null);
     const [switching, setSwitching] = useState(false);
     const optionsRequest = useApi(
         (signal) => authApi.organizationUnitOptions(signal),
-        [auth.user?.id],
-        auth.authMode === 'tenant' && auth.isAuthenticated,
+        [auth?.user?.id],
+        isTenantAuthed,
     );
     const options = useMemo(
         () => (optionsRequest.data?.data ?? []).map((organizationUnit) => ({
@@ -23,11 +30,11 @@ export function OrganizationUnitSwitcher({ className = 'hidden min-w-56 max-w-72
         })),
         [optionsRequest.data],
     );
-    const currentId = auth.organizationUnit?.id === undefined || auth.organizationUnit?.id === null
+    const currentId = auth?.organizationUnit?.id === undefined || auth?.organizationUnit?.id === null
         ? ''
         : String(auth.organizationUnit.id);
 
-    if (auth.authMode !== 'tenant' || !auth.isAuthenticated) return null;
+    if (!auth || !isTenantAuthed) return null;
 
     return (
         <div className={className}>
@@ -48,6 +55,7 @@ export function OrganizationUnitSwitcher({ className = 'hidden min-w-56 max-w-72
                     setSwitching(true);
                     try {
                         await auth.switchOrganizationUnit(organizationUnitId);
+                        onSwitch?.();
                     } catch (error: unknown) {
                         setSwitchError(toApiError(error));
                     } finally {

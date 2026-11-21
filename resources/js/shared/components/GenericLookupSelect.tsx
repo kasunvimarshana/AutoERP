@@ -251,7 +251,7 @@ export function GenericLookupSelect<T extends NamedResource>({
 
     useEffect(() => {
         if (!open || activeIndex < 0) return;
-        const optionId = `${listboxId}-option-${options[activeIndex]?.id ?? ''}`;
+        const optionId = `${listboxId}-option-${visibleOptions[activeIndex]?.id ?? ''}`;
         const activeOption = document.getElementById(optionId);
         if (
             activeOption
@@ -260,7 +260,7 @@ export function GenericLookupSelect<T extends NamedResource>({
         ) {
             activeOption.scrollIntoView({ block: 'nearest' });
         }
-    }, [activeIndex, listboxId, open, options]);
+    }, [activeIndex, listboxId, open, visibleOptions]);
 
     useEffect(() => {
         if (!open || disabled) return;
@@ -317,6 +317,30 @@ export function GenericLookupSelect<T extends NamedResource>({
                 aria-activedescendant={open ? activeOptionId : undefined}
                 aria-autocomplete="list"
                 className={disabled ? 'cursor-not-allowed bg-slate-50 text-slate-500' : ''}
+                suffix={
+                    value !== null && !disabled ? (
+                        <button
+                            type="button"
+                            aria-label={label ? `Clear ${label}` : 'Clear selection'}
+                            className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+                            onMouseDown={(event) => {
+                                event.preventDefault();
+                            }}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (onChange(null) === false) return;
+                                setInputValue('');
+                                setHasUserInput(false);
+                                setSelectionError('');
+                                clearResults();
+                                inputRef.current?.focus();
+                            }}
+                        >
+                            <span aria-hidden="true" className="text-base leading-none">×</span>
+                        </button>
+                    ) : undefined
+                }
                 onFocus={openDropdown}
                 onClick={openDropdown}
                 onBlur={(event) => {
@@ -444,7 +468,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 return;
             }
             if (visibleOptions.length > 0) {
-                setActiveIndex((index) => index < options.length - 1 ? index + 1 : 0);
+                setActiveIndex((index) => index < visibleOptions.length - 1 ? index + 1 : 0);
             }
             return;
         }
@@ -456,7 +480,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 return;
             }
             if (visibleOptions.length > 0) {
-                setActiveIndex((index) => index > 0 ? index - 1 : options.length - 1);
+                setActiveIndex((index) => index > 0 ? index - 1 : visibleOptions.length - 1);
             }
             return;
         }

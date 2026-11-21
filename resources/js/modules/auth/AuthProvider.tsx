@@ -315,6 +315,10 @@ export function useAuth(): AuthContextValue {
     return context;
 }
 
+export function useOptionalAuth(): AuthContextValue | null {
+    return useContext(AuthContext);
+}
+
 const DEFINITIVE_SESSION_ERROR_CODES = new Set([
     'AUTH_TOKEN_INVALID',
     'AUTH_TOKEN_REVOKED',
