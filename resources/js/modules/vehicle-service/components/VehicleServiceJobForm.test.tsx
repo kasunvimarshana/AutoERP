@@ -4,7 +4,7 @@ import { TestRouter } from '@/test/TestRouter';
 import type { NamedResource } from '@/shared/types/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
-import { VehicleServiceJobForm } from './VehicleServiceJobForm';
+import { defaultNextServiceDate, VehicleServiceJobForm } from './VehicleServiceJobForm';
 import { VehicleServiceSummaryPanel } from './VehicleServiceSummaryPanel';
 
 const apiMocks = vi.hoisted(() => ({
@@ -47,6 +47,7 @@ const existingJob: VehicleServiceJob = {
     row_version: 3,
     job_number: 'VSJ-92',
     job_date: '2026-07-15',
+    next_service_date: '2026-08-15',
     type: 'body_wash',
     customer_id: 5,
     customer: { id: 5, code: 'CUS-5', name: 'Vehicle Owner' },
@@ -299,6 +300,119 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByText('4000.000000')).toBeInTheDocument();
         expect(screen.getByText('Next service mileage')).toBeInTheDocument();
         expect(screen.getByText('9500.000000')).toBeInTheDocument();
+    });
+
+    it('calculates default next service date clamping for short months and leap years', () => {
+        expect(defaultNextServiceDate('2026-11-21')).toBe('2026-12-21');
+        expect(defaultNextServiceDate('2026-01-31')).toBe('2026-02-28');
+        expect(defaultNextServiceDate('2024-01-31')).toBe('2024-02-29');
+        expect(defaultNextServiceDate('2026-12-15')).toBe('2027-01-15');
+        expect(defaultNextServiceDate('invalid')).toBe('');
+    });
+
+    it('defaults Next Service Date to one month after job date and tracks job date updates', async () => {
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        const jobDateInput = screen.getByLabelText('Service job date');
+        const nextDateInput = screen.getByLabelText('Next Service Date');
+
+        expect(nextDateInput).toHaveValue(defaultNextServiceDate(jobDateInput.getAttribute('value') ?? ''));
+
+        fireEvent.change(jobDateInput, { target: { value: '2026-05-10' } });
+        expect(nextDateInput).toHaveValue('2026-06-10');
+    });
+
+    it('allows modifying Next Service Date to a custom date and preserves it when job date changes', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        fireEvent.change(screen.getByLabelText('Service job date'), { target: { value: '2026-03-01' } });
+        expect(screen.getByLabelText('Next Service Date')).toHaveValue('2026-04-01');
+
+        fireEvent.change(screen.getByLabelText('Next Service Date'), { target: { value: '2026-09-15' } });
+        expect(screen.getByLabelText('Next Service Date')).toHaveValue('2026-09-15');
+
+        fireEvent.change(screen.getByLabelText('Service job date'), { target: { value: '2026-03-10' } });
+        expect(screen.getByLabelText('Next Service Date')).toHaveValue('2026-09-15');
+
+        await user.selectOptions(screen.getByLabelText('Type'), 'full_service');
+        await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
+        await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
+        await user.type(screen.getByLabelText('Manual Job Card'), 'MJC-CUSTOM-DATE');
+        await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+        await waitFor(() => expect(apiMocks.createVehicleServiceJob).toHaveBeenCalledWith(
+            expect.objectContaining({
+                job_date: '2026-03-10',
+                next_service_date: '2026-09-15',
+            }),
+        ));
+    });
+
+    it('allows leaving Next Service Date empty and submits null', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        fireEvent.change(screen.getByLabelText('Service job date'), { target: { value: '2026-04-01' } });
+        fireEvent.change(screen.getByLabelText('Next Service Date'), { target: { value: '' } });
+        expect(screen.getByLabelText('Next Service Date')).toHaveValue('');
+
+        await user.selectOptions(screen.getByLabelText('Type'), 'body_wash');
+        await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
+        await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
+        await user.type(screen.getByLabelText('Manual Job Card'), 'MJC-EMPTY-DATE');
+        await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+        await waitFor(() => expect(apiMocks.createVehicleServiceJob).toHaveBeenCalledWith(
+            expect.objectContaining({
+                job_date: '2026-04-01',
+                next_service_date: null,
+            }),
+        ));
+    });
+
+    it('loads existing next_service_date in edit mode and allows clearing it', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/92/edit']}>
+                <VehicleServiceJobForm job={existingJob} />
+            </TestRouter>,
+        );
+
+        const nextDateInput = screen.getByLabelText('Next Service Date');
+        expect(nextDateInput).toHaveValue('2026-08-15');
+
+        fireEvent.change(nextDateInput, { target: { value: '' } });
+        expect(nextDateInput).toHaveValue('');
+
+        await user.type(screen.getByLabelText('Manual Job Card'), 'MJC-EDIT-CLEARED');
+        await user.click(screen.getByRole('button', { name: 'Save job' }));
+
+        await waitFor(() => expect(apiMocks.updateVehicleServiceJob).toHaveBeenCalledWith(
+            92,
+            expect.objectContaining({
+                next_service_date: null,
+            }),
+        ));
+    });
+
+    it('displays next service date in summary panel overview', () => {
+        render(<VehicleServiceSummaryPanel job={existingJob} />);
+
+        expect(screen.getByText('Next service date')).toBeInTheDocument();
+        expect(screen.getByText('Aug 15, 2026')).toBeInTheDocument();
     });
 });
 

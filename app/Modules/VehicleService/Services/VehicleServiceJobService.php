@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
@@ -177,6 +178,7 @@ final class VehicleServiceJobService
             ),
             'odometer_reading' => $data->odometerReading === null ? null : $this->math->normalize($data->odometerReading),
             'next_service_mileage' => $data->nextServiceMileage === null ? null : $this->math->normalize($data->nextServiceMileage),
+            'next_service_date' => $this->resolveNextServiceDate($data, $creating, $existing),
             'manual_job_card' => $data->manualJobCard,
             'fuel_level' => $data->fuelLevel,
             'priority' => $data->priority,
@@ -200,6 +202,22 @@ final class VehicleServiceJobService
         }
 
         return $attributes;
+    }
+
+    private function resolveNextServiceDate(
+        VehicleServiceJobData $data,
+        bool $creating,
+        ?VehicleServiceJob $existing,
+    ): ?string {
+        if ($data->nextServiceDateProvided || $data->nextServiceDate !== null) {
+            return $data->nextServiceDate;
+        }
+
+        if ($creating) {
+            return CarbonImmutable::parse($data->jobDate)->addMonthNoOverflow()->toDateString();
+        }
+
+        return $existing?->next_service_date?->toDateString();
     }
 
     /** @return array{type: VehicleServiceCommissionType, value: string} */

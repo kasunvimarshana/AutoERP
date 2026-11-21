@@ -213,6 +213,7 @@ export interface VehicleServiceJob {
     status_label?: string;
     odometer_reading?: string | null;
     next_service_mileage?: string | null;
+    next_service_date?: string | null;
     manual_job_card?: string | null;
     fuel_level?: string | null;
     priority?: string | null;
@@ -295,6 +296,7 @@ export interface VehicleServiceJobPayload {
     supervisor_commission_value?: string;
     odometer_reading?: string;
     next_service_mileage?: string;
+    next_service_date?: string | null;
     manual_job_card?: string;
     fuel_level?: string;
     priority?: string;

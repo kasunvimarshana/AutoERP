@@ -673,6 +673,123 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('46.500000', (string) $job->supervisor_commission_amount);
     }
 
+    public function test_next_service_date_defaults_to_one_month_after_job_date_when_omitted(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+
+        $this->assertSame('2026-06-07', $job->job_date->toDateString());
+        $this->assertNotNull($job->next_service_date);
+        $this->assertSame('2026-07-07', $job->next_service_date->toDateString());
+
+        $resource = (new VehicleServiceJobResource($job))->resolve(request());
+        $this->assertSame('2026-07-07', $resource['next_service_date']);
+    }
+
+    public function test_next_service_date_can_be_customized_or_explicitly_left_empty_and_updated(): void
+    {
+        $context = $this->context();
+
+        $jobWithCustom = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
+                tenantId: $context['tenant_id'],
+                jobDate: '2026-06-07',
+                customerId: $context['customer_id'],
+                vehicleId: $context['vehicle_id'],
+                nextServiceDate: '2026-09-15',
+                nextServiceDateProvided: true,
+                odometerReading: '12000.000000',
+            )),
+        );
+        $this->assertSame('2026-09-15', $jobWithCustom->next_service_date?->toDateString());
+
+        $jobWithNull = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
+                tenantId: $context['tenant_id'],
+                jobDate: '2026-06-07',
+                customerId: $context['customer_id'],
+                vehicleId: $context['vehicle_id'],
+                nextServiceDate: null,
+                nextServiceDateProvided: true,
+                odometerReading: '12000.000000',
+            )),
+        );
+        $this->assertNull($jobWithNull->next_service_date);
+
+        $updatedJob = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->update(
+                $jobWithCustom,
+                new VehicleServiceJobData(
+                    tenantId: $context['tenant_id'],
+                    jobDate: '2026-06-07',
+                    customerId: $context['customer_id'],
+                    vehicleId: $context['vehicle_id'],
+                    nextServiceDate: null,
+                    nextServiceDateProvided: true,
+                    odometerReading: '12000.000000',
+                ),
+            ),
+        );
+        $this->assertNull($updatedJob->next_service_date);
+
+        $repopulatedJob = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->update(
+                $updatedJob,
+                new VehicleServiceJobData(
+                    tenantId: $context['tenant_id'],
+                    jobDate: '2026-06-07',
+                    customerId: $context['customer_id'],
+                    vehicleId: $context['vehicle_id'],
+                    nextServiceDate: '2026-10-01',
+                    nextServiceDateProvided: true,
+                    odometerReading: '12000.000000',
+                ),
+            ),
+        );
+        $this->assertSame('2026-10-01', $repopulatedJob->next_service_date?->toDateString());
+    }
+
+    public function test_next_service_date_validation_via_http_endpoint(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+
+        $basePayload = [
+            'tenant_id' => $context['tenant_id'],
+            'job_date' => '2026-06-07',
+            'type' => 'full_service',
+            'customer_id' => $context['customer_id'],
+            'vehicle_id' => $context['vehicle_id'],
+            'supervisor_employee_id' => $context['supervisor_employee_id'],
+            'odometer_reading' => '12000.000000',
+            'manual_job_card' => 'MJC-VAL-DATE',
+        ];
+
+        // 1. next_service_date before job_date fails validation
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', array_merge($basePayload, [
+            'next_service_date' => '2026-06-01',
+        ]))->assertUnprocessable()
+            ->assertJsonValidationErrors('next_service_date');
+
+        // 2. next_service_date with invalid format fails validation
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', array_merge($basePayload, [
+            'next_service_date' => 'not-a-date',
+        ]))->assertUnprocessable()
+            ->assertJsonValidationErrors('next_service_date');
+
+        // 3. valid next_service_date succeeds and is returned in the resource
+        $response = $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', array_merge($basePayload, [
+            'next_service_date' => '2026-07-15',
+        ]))->assertCreated();
+
+        $this->assertSame('2026-07-15', $response->json('data.next_service_date'));
+    }
+
     public function test_whole_job_discount_combines_with_line_discounts_and_keeps_immutable_revisions(): void
     {
         $context = $this->context();

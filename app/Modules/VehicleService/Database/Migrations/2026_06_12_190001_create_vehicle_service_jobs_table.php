@@ -31,6 +31,7 @@ return new class extends Migration
             $table->string('status', 30)->default('draft');
             $table->decimal('odometer_reading', 20, 6)->nullable();
             $table->decimal('next_service_mileage', 20, 6)->nullable();
+            $table->date('next_service_date')->nullable();
             $table->string('fuel_level')->nullable();
             $table->string('priority', 30)->nullable();
             $table->decimal('subtotal', 20, 6)->default('0.000000');

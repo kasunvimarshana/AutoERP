@@ -35,6 +35,7 @@ final class VehicleServiceJob extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'job_date' => 'date',
             'expected_delivery_date' => 'date',
+            'next_service_date' => 'date',
             'type' => VehicleServiceJobType::class,
             'customer_id' => 'integer',
             'bill_to_customer_id' => 'integer',
