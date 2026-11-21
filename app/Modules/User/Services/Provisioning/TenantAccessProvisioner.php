@@ -6,8 +6,8 @@ namespace Modules\User\Services\Provisioning;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\TenantAccessProvisionerInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserStatus;
 use Modules\User\Constants\UserSystemRole;
@@ -227,11 +227,10 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
         $rootAssigned = DB::table('user_organization_units')
             ->where('tenant_id', $tenantId)->where('user_id', $userId)
             ->where('organization_unit_id', $rootOrganizationUnitId)
-            ->where('status', 'active')->where('is_default', true)
+            ->where('status', UserStatus::ACTIVE)->where('is_default', true)
             ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
             ->exists();
 
         return $roleAssigned && $rootAssigned;
     }
-
 }

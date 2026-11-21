@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Supplier\DTOs\CreateSupplierData;
 use Modules\Supplier\DTOs\SupplierCreditProfileData;
+use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Validators\SupplierValidationService;
 
@@ -58,8 +59,8 @@ final class SupplierCreationService
                 'is_advance_allowed' => $data->isAdvanceAllowed,
                 'notes' => $data->notes,
                 'metadata' => $data->metadata,
-                'approved_by' => $data->status->value === 'active' ? $data->createdBy : null,
-                'approved_at' => $data->status->value === 'active' ? now() : null,
+                'approved_by' => $data->status === SupplierStatus::Active ? $data->createdBy : null,
+                'approved_at' => $data->status === SupplierStatus::Active ? now() : null,
             ]);
 
             foreach ($data->contacts as $contact) {

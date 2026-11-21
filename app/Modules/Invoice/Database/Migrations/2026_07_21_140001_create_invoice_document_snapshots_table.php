@@ -19,15 +19,21 @@ return new class extends Migration
             $table->boolean('organization_profile_present')->default(false);
             $table->boolean('counterparty_present')->default(false);
 
-            foreach (['seller', 'buyer'] as $role) {
-                $table->string($role.'_legal_name');
-                $table->string($role.'_tin', 150)->nullable();
-                $table->string($role.'_vat_registration_number', 150)->nullable();
-                $table->string($role.'_svat_registration_number', 150)->nullable();
-                $table->text($role.'_address')->nullable();
-                $table->string($role.'_phone', 100)->nullable();
-                $table->string($role.'_email')->nullable();
-            }
+            $table->string('seller_legal_name');
+            $table->string('seller_tin', 150)->nullable();
+            $table->string('seller_vat_registration_number', 150)->nullable();
+            $table->string('seller_svat_registration_number', 150)->nullable();
+            $table->text('seller_address')->nullable();
+            $table->string('seller_phone', 100)->nullable();
+            $table->string('seller_email')->nullable();
+
+            $table->string('buyer_legal_name');
+            $table->string('buyer_tin', 150)->nullable();
+            $table->string('buyer_vat_registration_number', 150)->nullable();
+            $table->string('buyer_svat_registration_number', 150)->nullable();
+            $table->text('buyer_address')->nullable();
+            $table->string('buyer_phone', 100)->nullable();
+            $table->string('buyer_email')->nullable();
 
             $table->date('supply_date')->nullable();
             $table->date('supply_period_start')->nullable();

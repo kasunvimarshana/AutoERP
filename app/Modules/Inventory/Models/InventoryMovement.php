@@ -6,7 +6,7 @@ namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
@@ -20,11 +20,44 @@ use Modules\Warehouse\Models\WarehouseModel;
 
 final class InventoryMovement extends TenantOwnedModel
 {
-    use SoftDeletes;
-
     protected $table = 'inventory_movements';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (self $model): void {
+            $rawOriginalStatus = $model->getRawOriginal('status');
+            $originalStatus = $rawOriginalStatus instanceof InventoryStatus
+                ? $rawOriginalStatus
+                : InventoryStatus::tryFrom((string) $rawOriginalStatus);
+
+            $rawNewStatus = $model->getAttribute('status');
+            $newStatus = $rawNewStatus instanceof InventoryStatus
+                ? $rawNewStatus
+                : InventoryStatus::tryFrom((string) $rawNewStatus);
+
+            $isPosting = $originalStatus === InventoryStatus::Draft
+                && $newStatus === InventoryStatus::Posted
+                && ! $model->isDirty(['tenant_id', 'item_id', 'warehouse_id', 'quantity', 'direction', 'movement_type']);
+
+            $isLinkingReversal = $originalStatus === InventoryStatus::Draft
+                && $model->isDirty('reversal_of_id')
+                && ! $model->isDirty(['tenant_id', 'item_id', 'warehouse_id', 'quantity', 'direction', 'movement_type']);
+
+            $isReversing = $originalStatus === InventoryStatus::Posted
+                && $newStatus === InventoryStatus::Reversed
+                && ! $model->isDirty(['tenant_id', 'item_id', 'warehouse_id', 'quantity', 'direction', 'movement_type', 'total_cost', 'unit_cost', 'balance_quantity_after', 'balance_value_after']);
+
+            if (! $isPosting && ! $isLinkingReversal && ! $isReversing) {
+                throw new LogicException('InventoryMovement is an immutable ledger and cannot be updated.');
+            }
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('InventoryMovement is an immutable ledger and cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {
@@ -66,6 +99,16 @@ final class InventoryMovement extends TenantOwnedModel
         return $this->belongsTo(Item::class, 'item_id');
     }
 
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ItemVariant::class, 'item_variant_id');
+    }
+
+    public function itemVariant(): BelongsTo
+    {
+        return $this->belongsTo(ItemVariant::class, 'item_variant_id');
+    }
+
     public function baseUom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'base_uom_id');
@@ -74,11 +117,6 @@ final class InventoryMovement extends TenantOwnedModel
     public function enteredUom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'entered_uom_id');
-    }
-
-    public function variant(): BelongsTo
-    {
-        return $this->belongsTo(ItemVariant::class, 'item_variant_id');
     }
 
     public function warehouse(): BelongsTo
@@ -111,6 +149,11 @@ final class InventoryMovement extends TenantOwnedModel
         return $this->hasMany(self::class, 'reversal_of_id');
     }
 
+    public function stockStateChanges(): HasMany
+    {
+        return $this->hasMany(InventoryStockStateChange::class, 'movement_id');
+    }
+
     public function valuationLayers(): HasMany
     {
         return $this->hasMany(InventoryValuationLayer::class, 'movement_id');
@@ -124,5 +167,20 @@ final class InventoryMovement extends TenantOwnedModel
     public function allocationIssues(): HasMany
     {
         return $this->hasMany(InventoryAllocationIssue::class, 'movement_id');
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === InventoryStatus::Draft;
+    }
+
+    public function isPosted(): bool
+    {
+        return $this->status === InventoryStatus::Posted;
+    }
+
+    public function isReversed(): bool
+    {
+        return $this->status === InventoryStatus::Reversed;
     }
 }

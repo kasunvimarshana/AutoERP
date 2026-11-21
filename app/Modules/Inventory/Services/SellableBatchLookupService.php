@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\BatchStatus;
 use Modules\Inventory\Models\InventoryBatch;
+use Modules\Inventory\Models\InventoryBatchPriceRevision;
 use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\TrackingType;
-use Modules\Item\Services\ItemQueryService;
 use Modules\Item\Services\ItemPriceResolutionService;
+use Modules\Item\Services\ItemQueryService;
 use Modules\Tenant\Models\TenantModel;
 
 final class SellableBatchLookupService
@@ -113,26 +115,60 @@ final class SellableBatchLookupService
         $items = $paginator->getCollection()->pluck('item')->filter();
         $duplicateNames = $this->itemQueries->duplicateNames($items, $tenantId, $organizationUnitId);
 
+        $batchIds = $paginator->getCollection()->pluck('id')->all();
+        $effectiveDate = CarbonImmutable::now()->toDateString();
+        $batchPricesByBatchId = ($currencyId === null || empty($batchIds))
+            ? collect()
+            : InventoryBatchPriceRevision::query()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('batch_id', $batchIds)
+                ->where('price_type', ItemPriceType::Service->value)
+                ->where('currency_id', (int) $currencyId)
+                ->whereNull('recorded_to')
+                ->when(
+                    $organizationUnitId === null,
+                    fn (Builder $query) => $query->whereNull('organization_unit_id'),
+                    fn (Builder $query) => $query->where(fn (Builder $scope): Builder => $scope
+                        ->whereNull('organization_unit_id')
+                        ->orWhere('organization_unit_id', $organizationUnitId)),
+                )
+                ->where('effective_from', '<=', $effectiveDate)
+                ->where(fn (Builder $query): Builder => $query->whereNull('effective_to')->orWhere('effective_to', '>=', $effectiveDate))
+                ->when($organizationUnitId !== null, fn (Builder $query) => $query->orderByRaw('case when organization_unit_id = ? then 0 else 1 end', [$organizationUnitId]))
+                ->orderByDesc('effective_from')
+                ->orderByDesc('recorded_from')
+                ->get()
+                ->groupBy('batch_id');
+
+        $fallbackPrices = [];
+        foreach ($paginator->getCollection() as $batch) {
+            $item = $batch->item;
+            if ($item === null) {
+                continue;
+            }
+            $variantId = $batch->item_variant_id === null ? null : (int) $batch->item_variant_id;
+            $lookupKey = (int) $item->getKey().':'.($variantId ?? 'null');
+            if (! array_key_exists($lookupKey, $fallbackPrices)) {
+                $fallbackPrices[$lookupKey] = $this->itemPrices->resolvePrice(
+                    item: $item,
+                    context: ItemPriceResolutionService::CONTEXT_SERVICE,
+                    organizationUnitId: $organizationUnitId,
+                    variantId: $variantId,
+                );
+            }
+        }
+
         foreach ($paginator->getCollection() as $batch) {
             $item = $batch->item;
             $item?->setAttribute('has_duplicate_name', in_array(mb_strtolower(trim((string) $item->name)), $duplicateNames, true));
             $uomId = $item?->base_uom_id;
             $batchPrice = $currencyId === null || $uomId === null
                 ? null
-                : $this->batchPrices->resolve(
-                    $batch,
-                    ItemPriceType::Service,
-                    (int) $currencyId,
-                    (int) $uomId,
-                    $organizationUnitId,
-                );
+                : $batchPricesByBatchId->get((int) $batch->getKey())?->firstWhere('uom_id', (int) $uomId);
+            $variantId = $batch->item_variant_id === null ? null : (int) $batch->item_variant_id;
+            $fallbackLookupKey = (int) $item?->getKey().':'.($variantId ?? 'null');
             $fallback = $batchPrice === null && $item !== null
-                ? $this->itemPrices->resolvePrice(
-                    item: $item,
-                    context: ItemPriceResolutionService::CONTEXT_SERVICE,
-                    organizationUnitId: $organizationUnitId,
-                    variantId: $batch->item_variant_id === null ? null : (int) $batch->item_variant_id,
-                )
+                ? ($fallbackPrices[$fallbackLookupKey] ?? null)
                 : null;
 
             $batch->setAttribute(

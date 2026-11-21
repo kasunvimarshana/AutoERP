@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Authentication;
 
 use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
+use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Tenant\Services\TenantEntitlementService;
 
@@ -14,10 +15,11 @@ final readonly class TenantAuthenticationDirectory implements TenantAuthenticati
 
     public function findActive(int $tenantId): ?array
     {
-        $tenant = TenantModel::query()->whereKey($tenantId)->where('status', 'active')->first();
+        $tenant = TenantModel::query()->whereKey($tenantId)->where('status', TenantStatus::ACTIVE)->first();
         if (! $tenant instanceof TenantModel) {
             return null;
         }
+
         return [
             'id' => (int) $tenant->getKey(),
             'code' => (string) $tenant->getAttribute('code'),

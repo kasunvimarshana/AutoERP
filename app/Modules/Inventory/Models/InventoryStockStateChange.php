@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Item\Models\Item;
@@ -17,6 +18,17 @@ final class InventoryStockStateChange extends TenantOwnedModel
     protected $table = 'inventory_stock_state_changes';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): void {
+            throw new LogicException('InventoryStockStateChange is an immutable ledger and cannot be updated.');
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('InventoryStockStateChange is an immutable ledger and cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

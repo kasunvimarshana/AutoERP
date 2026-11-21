@@ -9,6 +9,7 @@ use Modules\Finance\Contracts\FinancePaymentReversalInterface;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\Contracts\FinanceSourceReversalInterface;
 use Modules\Finance\DTOs\PostingResultData;
+use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Models\FinanceJournalEntry;
 
 final class ReversalService implements FinancePaymentReversalInterface, FinanceSourceReversalInterface
@@ -42,7 +43,7 @@ final class ReversalService implements FinancePaymentReversalInterface, FinanceS
             ->where('source_module', $sourceModule)
             ->where('source_type', $sourceType)
             ->where('source_id', $sourceId)
-            ->where('status', 'posted');
+            ->where('status', JournalStatus::Posted->value);
 
         $organizationUnitId === null
             ? $query->whereNull('organization_unit_id')

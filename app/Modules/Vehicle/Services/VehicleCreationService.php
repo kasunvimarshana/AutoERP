@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Vehicle\Data\CreateVehicleOwnershipData;
 use Modules\Vehicle\DTOs\CreateVehicleData;
+use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Modules\Vehicle\Validators\VehicleValidationService;
@@ -59,8 +60,8 @@ final class VehicleCreationService
                     'status' => $data->status,
                     'notes' => $data->notes,
                     'metadata' => $data->metadata,
-                    'approved_by' => $data->status->value === 'active' ? $data->createdBy : null,
-                    'approved_at' => $data->status->value === 'active' ? now() : null,
+                    'approved_by' => $data->status === VehicleStatus::Active ? $data->createdBy : null,
+                    'approved_at' => $data->status === VehicleStatus::Active ? now() : null,
                 ]);
 
                 foreach ($data->documents as $document) {

@@ -27,6 +27,7 @@ const mockAuth = vi.hoisted(() => ({
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => mockAuth,
+    useOptionalAuth: () => mockAuth,
 }));
 
 describe('AppHeader', () => {

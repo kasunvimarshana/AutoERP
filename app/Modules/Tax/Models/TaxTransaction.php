@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -13,6 +14,17 @@ use Modules\Tenant\Models\TenantModel;
 final class TaxTransaction extends TenantOwnedModel
 {
     protected $table = 'tax_transactions';
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): void {
+            throw new LogicException('TaxTransaction is an immutable ledger and cannot be updated.');
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('TaxTransaction is an immutable ledger and cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

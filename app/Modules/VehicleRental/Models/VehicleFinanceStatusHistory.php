@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\User\Models\UserModel;
@@ -14,6 +15,17 @@ final class VehicleFinanceStatusHistory extends TenantOwnedModel
     protected $table = 'vehicle_rental_finance_status_histories';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): void {
+            throw new LogicException('VehicleFinanceStatusHistory is an immutable ledger and cannot be updated.');
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('VehicleFinanceStatusHistory is an immutable ledger and cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

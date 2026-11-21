@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\User\Models\UserModel;
 use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
@@ -12,6 +13,17 @@ use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 final class AgreementAdjustmentHistory extends TenantOwnedModel
 {
     protected $table = 'vehicle_rental_agreement_adjustments_history';
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): void {
+            throw new LogicException('AgreementAdjustmentHistory is an immutable ledger and cannot be updated.');
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('AgreementAdjustmentHistory is an immutable ledger and cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

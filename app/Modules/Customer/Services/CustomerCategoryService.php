@@ -6,6 +6,7 @@ namespace Modules\Customer\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Customer\DTOs\CustomerCategoryData;
 use Modules\Customer\Models\Customer;
@@ -114,16 +115,18 @@ final class CustomerCategoryService
             $this->validator->assertCategoryUsable($customer, $categoryId);
         }
 
-        $customer->categoryAssignments()->delete();
+        DB::transaction(function () use ($customer, $categoryIds): void {
+            $customer->categoryAssignments()->delete();
 
-        foreach ($categoryIds as $categoryId) {
-            CustomerCategoryAssignment::query()->create([
-                'tenant_id' => $customer->tenant_id,
-                'organization_unit_id' => $customer->organization_unit_id,
-                'customer_id' => $customer->getKey(),
-                'customer_category_id' => $categoryId,
-            ]);
-        }
+            foreach ($categoryIds as $categoryId) {
+                CustomerCategoryAssignment::query()->create([
+                    'tenant_id' => $customer->tenant_id,
+                    'organization_unit_id' => $customer->organization_unit_id,
+                    'customer_id' => $customer->getKey(),
+                    'customer_category_id' => $categoryId,
+                ]);
+            }
+        });
     }
 
     public function attach(Customer $customer, int $categoryId): CustomerCategory

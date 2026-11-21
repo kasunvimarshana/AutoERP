@@ -6,6 +6,7 @@ namespace Modules\Supplier\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Supplier\DTOs\SupplierCategoryData;
 use Modules\Supplier\Models\Supplier;
@@ -114,16 +115,18 @@ final class SupplierCategoryService
             $this->validator->assertCategoryUsable($supplier, $categoryId);
         }
 
-        $supplier->categoryAssignments()->delete();
+        DB::transaction(function () use ($supplier, $categoryIds): void {
+            $supplier->categoryAssignments()->delete();
 
-        foreach ($categoryIds as $categoryId) {
-            SupplierCategoryAssignment::query()->create([
-                'tenant_id' => $supplier->tenant_id,
-                'organization_unit_id' => $supplier->organization_unit_id,
-                'supplier_id' => $supplier->getKey(),
-                'supplier_category_id' => $categoryId,
-            ]);
-        }
+            foreach ($categoryIds as $categoryId) {
+                SupplierCategoryAssignment::query()->create([
+                    'tenant_id' => $supplier->tenant_id,
+                    'organization_unit_id' => $supplier->organization_unit_id,
+                    'supplier_id' => $supplier->getKey(),
+                    'supplier_category_id' => $categoryId,
+                ]);
+            }
+        });
     }
 
     public function attach(Supplier $supplier, int $categoryId): SupplierCategory

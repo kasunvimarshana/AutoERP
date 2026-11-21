@@ -28,6 +28,7 @@ const auth = vi.hoisted(() => ({
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => auth,
+    useOptionalAuth: () => auth,
 }));
 
 const sections: NavigationSection[] = [

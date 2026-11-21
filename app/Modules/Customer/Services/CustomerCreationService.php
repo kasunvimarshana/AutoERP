@@ -6,6 +6,7 @@ namespace Modules\Customer\Services;
 
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\CustomerCreditProfileData;
+use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Validators\CustomerValidationService;
 
@@ -56,8 +57,8 @@ final class CustomerCreationService
                 'preferred_communication_channel' => $data->preferredCommunicationChannel,
                 'notes' => $data->notes,
                 'metadata' => $data->metadata,
-                'approved_by' => $data->status->value === 'active' ? $data->createdBy : null,
-                'approved_at' => $data->status->value === 'active' ? now() : null,
+                'approved_by' => $data->status === CustomerStatus::Active ? $data->createdBy : null,
+                'approved_at' => $data->status === CustomerStatus::Active ? now() : null,
             ]);
 
             foreach ($data->contacts as $index => $contact) {
