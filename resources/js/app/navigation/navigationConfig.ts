@@ -18,6 +18,7 @@ import { sellingPermissions } from "@/modules/selling/sellingPermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
 import { inventoryPermissions } from "@/modules/inventory/inventoryPermissions";
 import { warehousePermissions } from "@/modules/warehouse/warehousePermissions";
+import { vehicleServicePermissions } from "@/modules/vehicle-service/vehicleServicePermissions";
 const tenantAccess = (
     modules: NonNullable<
         NavigationSection["items"][number]["access"]
@@ -715,6 +716,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         to: "/vehicle-service/promotions",
                         match: ["/vehicle-service/promotions"],
                         access: { ...operationalAccess(["vehicle-service"]), permissions: ["promotion.view"] },
+                    },
+                    {
+                        id: "service-job-types",
+                        type: "link",
+                        label: "Service Job Types",
+                        to: "/vehicle-service/job-types",
+                        match: ["/vehicle-service/job-types"],
+                        access: {
+                            ...operationalAccess(["vehicle-service"]),
+                            permissions: [vehicleServicePermissions.jobTypesView],
+                        },
                     },
                     {
                         id: "service-invoices",

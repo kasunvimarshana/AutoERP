@@ -5,6 +5,8 @@ export const vehicleServicePermissions = {
     jobsTransition: 'vehicle_service.jobs.transition',
     jobsCancel: 'vehicle_service.jobs.cancel',
     jobsCancelAfterStart: 'vehicle_service.jobs.cancel_after_start',
+    jobTypesView: 'vehicle_service.job_types.view',
+    jobTypesManage: 'vehicle_service.job_types.manage',
     discountsManage: 'vehicle_service.discounts.manage',
     linesView: 'vehicle_service.lines.view',
     linesManage: 'vehicle_service.lines.manage',

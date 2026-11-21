@@ -17,8 +17,19 @@ final class VehicleServiceJobResource extends JsonResource
             'job_number' => $this->job_number,
             'job_date' => $this->job_date?->toDateString(),
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
+            'job_type_id' => $this->job_type_id === null ? null : (int) $this->job_type_id,
+            'job_type' => $this->whenLoaded('jobType', fn () => $this->jobType ? [
+                'id' => (int) $this->jobType->id,
+                'code' => (string) $this->jobType->code,
+                'name' => (string) $this->jobType->name,
+                'tracks_mileage' => (bool) $this->jobType->tracks_mileage,
+                'is_active' => (bool) $this->jobType->is_active,
+                'is_system' => (bool) $this->jobType->is_system,
+            ] : null),
             'type' => $this->enum($this->type),
-            'type_label' => str((string) $this->enum($this->type))->replace('_', ' ')->title()->toString(),
+            'type_label' => $this->relationLoaded('jobType') && $this->jobType
+                ? (string) $this->jobType->name
+                : str((string) $this->enum($this->type))->replace('_', ' ')->title()->toString(),
             'customer_id' => (int) $this->customer_id,
             'customer' => $this->whenLoaded('customer', fn () => $this->customerRelation($this->customer)),
             'bill_to_customer_id' => $this->bill_to_customer_id === null ? null : (int) $this->bill_to_customer_id,

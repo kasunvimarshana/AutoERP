@@ -19,6 +19,7 @@ use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobType as VehicleServiceJobTypeModel;
 use Modules\VehicleService\Services\Availability\VehicleServiceAdmissionService;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
@@ -39,6 +40,7 @@ final class VehicleServiceJobService
         private readonly VehicleServiceAdmissionService $admission,
         private readonly VehicleServiceLineService $lines,
         private readonly JobPromotionHandlerInterface $promotions,
+        private readonly VehicleServiceJobTypeService $jobTypes,
     ) {}
 
     /** @param list<VehicleServiceLineData> $lines */
@@ -51,10 +53,11 @@ final class VehicleServiceJobService
             if ($data->supervisorEmployeeId !== null) {
                 $this->validator->supervisorEmployee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
-            $this->validateMileageFields($data);
+            $jobType = $this->jobTypes->resolveForJob($data->tenantId, $data->jobTypeId, $data->typeCode(), isNewAssignment: true);
+            $this->validateMileageFields($data, $jobType);
 
             $job = new VehicleServiceJob;
-            $job->forceFill($this->attributes($data, true, self::ZERO_AMOUNT))->save();
+            $job->forceFill($this->attributes($data, true, self::ZERO_AMOUNT, null, $jobType))->save();
             $this->statuses->recordCreated($job, $data->createdBy);
             if ($data->customerComplaint !== null) {
                 $this->inspections->save($job, new VehicleServiceInspectionData(
@@ -119,10 +122,12 @@ final class VehicleServiceJobService
             if ($data->supervisorEmployeeId !== null) {
                 $this->validator->supervisorEmployee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
-            $this->validateMileageFields($data);
+            $isNewType = $job->type !== $data->typeCode() || ($data->jobTypeId !== null && (int) $job->job_type_id !== $data->jobTypeId);
+            $jobType = $this->jobTypes->resolveForJob($data->tenantId, $data->jobTypeId, $data->typeCode(), isNewAssignment: $isNewType);
+            $this->validateMileageFields($data, $jobType);
 
             $versionBefore = (int) $job->row_version;
-            $job->forceFill($this->attributes($data, false, (string) $job->grand_total, $job))->save();
+            $job->forceFill($this->attributes($data, false, (string) $job->grand_total, $job, $jobType))->save();
             if (in_array($job->status, [VehicleServiceJobStatus::Inspected, VehicleServiceJobStatus::InProgress], true)) {
                 $this->admission->assertAdmissible($job);
             }
@@ -157,6 +162,7 @@ final class VehicleServiceJobService
         bool $creating,
         string $commissionBase,
         ?VehicleServiceJob $existing = null,
+        ?VehicleServiceJobTypeModel $jobType = null,
     ): array {
         $commission = $this->supervisorCommission($data, $existing);
         $attributes = [
@@ -164,7 +170,8 @@ final class VehicleServiceJobService
             'organization_unit_id' => $data->organizationUnitId,
             'job_date' => $data->jobDate,
             'expected_delivery_date' => $data->expectedDeliveryDate,
-            'type' => $data->type->value,
+            'job_type_id' => $jobType?->getKey() ?? $existing?->job_type_id,
+            'type' => $jobType?->code ?? $data->typeCode(),
             'customer_id' => $data->customerId,
             'bill_to_customer_id' => $this->billToCustomerId($data),
             'vehicle_id' => $data->vehicleId,
@@ -266,9 +273,9 @@ final class VehicleServiceJobService
         return $data->billToCustomerId ?? $data->customerId;
     }
 
-    private function validateMileageFields(VehicleServiceJobData $data): void
+    private function validateMileageFields(VehicleServiceJobData $data, VehicleServiceJobTypeModel $jobType): void
     {
-        if (! $data->type->tracksMileage()) {
+        if (! $jobType->tracks_mileage) {
             if ($data->odometerReading !== null || $data->nextServiceMileage !== null) {
                 throw new InvalidArgumentException('Mileage fields are not applicable to this job type.');
             }
@@ -323,7 +330,7 @@ final class VehicleServiceJobService
     public function relations(): array
     {
         return [
-            'customer', 'billToCustomer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor', 'inspection.inspector',
+            'jobType', 'customer', 'billToCustomer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor', 'inspection.inspector',
             'currentDiscountRevision.changedBy',
             'invoiceLinks.invoice.balance', 'paymentLinks.payment.lines.paymentMethod', 'paymentLinks.payment.allocations', 'paymentLinks.invoice',
         ];

@@ -57,7 +57,7 @@ function JobTile({ job }: { job: VehicleServiceJob }) {
                 <strong className="text-base text-slate-950">{readableRelation(job.vehicle)}</strong>
                 <span className="text-xs font-semibold text-blue-700">{job.job_number}</span>
             </div>
-            <p className="mt-1 text-sm font-semibold text-slate-800">{job.type_label ?? job.type.replaceAll('_', ' ')}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">{job.job_type?.name ?? job.type_label ?? job.type.replaceAll('_', ' ')}</p>
             <p className="mt-1 truncate text-sm text-slate-600" title={readableRelation(job.customer)}>{readableRelation(job.customer)}</p>
             <div className="mt-3 flex items-center justify-between gap-2">
                 <VehicleServiceStatusBadge status={job.status} />

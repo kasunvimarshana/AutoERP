@@ -22,12 +22,12 @@ export function VehicleServiceSummaryPanel({ job }: {
                 { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
                 { label: 'Registered owner', value: readableRelation(currentCustomerOwner) },
                 { label: 'Supervisor', value: readableRelation(job.supervisor) },
-                ...(tracksVehicleServiceMileage(job.type) ? [
+                ...(tracksVehicleServiceMileage(job.job_type ?? job.type) ? [
                     { label: 'Odometer', value: job.odometer_reading ?? '-' },
                     { label: 'Next service mileage', value: job.next_service_mileage ?? '-' },
                 ] : []),
                 { label: 'Manual job card', value: job.manual_job_card ?? '-' },
-                { label: 'Type', value: job.type_label ?? job.type.replaceAll('_', ' ') },
+                { label: 'Type', value: job.job_type?.name ?? job.type_label ?? job.type.replaceAll('_', ' ') },
                 { label: 'Subtotal', value: <MoneyDisplay value={job.subtotal} /> },
                 { label: 'Line discounts', value: <MoneyDisplay value={job.line_discount_total} /> },
                 { label: 'Whole-job discount', value: <MoneyDisplay value={job.job_discount_amount} /> },

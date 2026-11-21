@@ -12,6 +12,7 @@ use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobType;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
+use Modules\VehicleService\Models\VehicleServiceJobType as VehicleServiceJobTypeModel;
 
 final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 {
@@ -19,8 +20,21 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 
     public function rules(): array
     {
-        $jobType = VehicleServiceJobType::tryFrom((string) $this->input('type'));
-        $tracksMileage = $jobType?->tracksMileage() ?? false;
+        $jobTypeId = $this->filled('job_type_id') ? (int) $this->input('job_type_id') : null;
+        $typeString = (string) $this->input('type');
+
+        $jobTypeModel = null;
+        if ($this->has('tenant_id') && is_numeric($this->input('tenant_id'))) {
+            $tenantId = (int) $this->input('tenant_id');
+            if ($jobTypeId !== null) {
+                $jobTypeModel = VehicleServiceJobTypeModel::query()->where('tenant_id', $tenantId)->find($jobTypeId);
+            }
+            if ($jobTypeModel === null && $typeString !== '') {
+                $jobTypeModel = VehicleServiceJobTypeModel::query()->where('tenant_id', $tenantId)->where('code', $typeString)->first();
+            }
+        }
+        $enumCase = VehicleServiceJobType::tryFrom($typeString);
+        $tracksMileage = $jobTypeModel?->tracks_mileage ?? $enumCase?->tracksMileage() ?? false;
 
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
@@ -29,7 +43,8 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             'job_number' => ['nullable', 'string', 'max:100'],
             'job_date' => ['required', 'date_format:Y-m-d'],
             'expected_delivery_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:job_date'],
-            'type' => ['required', Rule::enum(VehicleServiceJobType::class)],
+            'job_type_id' => ['nullable', 'integer', 'min:1'],
+            'type' => ['required_without:job_type_id', 'nullable', 'string', 'max:50'],
             'customer_id' => ['required', 'integer', 'min:1'],
             'vehicle_id' => ['required', 'integer', 'min:1'],
             'bill_to_customer_id' => ['nullable', 'integer', 'min:1'],
@@ -97,12 +112,17 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 
     public function toData(): VehicleServiceJobData
     {
+        $typeInput = (string) $this->input('type');
+        $jobTypeId = $this->filled('job_type_id') ? (int) $this->input('job_type_id') : null;
+        $enumType = VehicleServiceJobType::tryFrom($typeInput);
+
         return new VehicleServiceJobData(
             tenantId: $this->tenantId(),
             jobDate: (string) $this->input('job_date'),
             customerId: (int) $this->input('customer_id'),
             vehicleId: (int) $this->input('vehicle_id'),
-            type: VehicleServiceJobType::from((string) $this->input('type')),
+            type: $enumType ?? ($typeInput !== '' ? $typeInput : VehicleServiceJobType::FullService),
+            jobTypeId: $jobTypeId,
             billToCustomerId: $this->intOrNull('bill_to_customer_id'),
             organizationUnitId: $this->organizationUnitId(),
             jobNumber: $this->stringOrNull('job_number'),

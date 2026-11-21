@@ -10,6 +10,7 @@ import { VehicleServiceSummaryPanel } from './VehicleServiceSummaryPanel';
 const apiMocks = vi.hoisted(() => ({
     createVehicleServiceJob: vi.fn(),
     getVehicleServiceJobCreateDefaults: vi.fn(),
+    lookupVehicleServiceJobTypes: vi.fn(),
     updateVehicleServiceJob: vi.fn(),
 }));
 
@@ -81,6 +82,7 @@ describe('VehicleServiceJobForm', () => {
             job_number: 'VSJ-91',
         });
         apiMocks.updateVehicleServiceJob.mockResolvedValue(existingJob);
+        apiMocks.lookupVehicleServiceJobTypes.mockResolvedValue([]);
     });
 
     it('suggests the next service mileage for a full service job and preserves an edited value', async () => {

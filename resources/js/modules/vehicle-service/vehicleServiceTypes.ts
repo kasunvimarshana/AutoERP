@@ -10,16 +10,51 @@ export type VehicleServiceJobStatus =
     | 'paid'
     | 'cancelled';
 
-export type VehicleServiceJobType = 'full_service' | 'body_wash' | 'oil_change' | 'wheel_alignment' | 'accessories';
+export type VehicleServiceJobType = 'full_service' | 'body_wash' | 'oil_change' | 'wheel_alignment' | 'accessories' | (string & {});
 
-const MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES: readonly VehicleServiceJobType[] = [
+export interface VehicleServiceJobTypeResource {
+    id: number;
+    row_version: number;
+    tenant_id: number;
+    organization_unit_id?: number | null;
+    code: string;
+    name: string;
+    description?: string | null;
+    tracks_mileage: boolean;
+    is_active: boolean;
+    is_system: boolean;
+    sort_order: number;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface VehicleServiceJobTypePayload {
+    expected_version?: number;
+    tenant_id?: number;
+    organization_unit_id?: number | null;
+    code: string;
+    name: string;
+    description?: string | null;
+    tracks_mileage: boolean;
+    is_active: boolean;
+    sort_order?: number;
+}
+
+const MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES: readonly string[] = [
     'full_service',
     'oil_change',
     'wheel_alignment',
 ];
 
-export const tracksVehicleServiceMileage = (jobType: VehicleServiceJobType | ''): boolean =>
-    jobType !== '' && MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES.includes(jobType);
+export const tracksVehicleServiceMileage = (
+    jobType: VehicleServiceJobType | VehicleServiceJobTypeResource | string | null | undefined,
+): boolean => {
+    if (!jobType) return false;
+    if (typeof jobType === 'object' && 'tracks_mileage' in jobType) {
+        return Boolean(jobType.tracks_mileage);
+    }
+    return MILEAGE_TRACKED_VEHICLE_SERVICE_JOB_TYPES.includes(String(jobType));
+};
 
 export type VehicleServiceLineSourceType =
     | 'inventory_item'
@@ -196,6 +231,8 @@ export interface VehicleServiceJob {
     job_number: string;
     job_date: string;
     expected_delivery_date?: string | null;
+    job_type_id?: number | null;
+    job_type?: VehicleServiceJobTypeResource | null;
     type: VehicleServiceJobType;
     type_label?: string;
     customer_id: number;
@@ -287,6 +324,7 @@ export interface VehicleServiceJobPayload {
     expected_version?: number;
     job_date: string;
     expected_delivery_date?: string;
+    job_type_id?: number | null;
     type: VehicleServiceJobType;
     customer_id: number;
     bill_to_customer_id?: number;

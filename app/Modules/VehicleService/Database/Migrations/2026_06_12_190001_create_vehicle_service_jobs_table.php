@@ -20,7 +20,8 @@ return new class extends Migration
             $table->string('manual_job_card', 100)->nullable();
             $table->date('job_date');
             $table->date('expected_delivery_date')->nullable();
-            $table->string('type', 30)->default(VehicleServiceJobType::FullService->value);
+            $table->foreignId('job_type_id')->nullable();
+            $table->string('type', 50)->default(VehicleServiceJobType::FullService->value);
             $table->foreignId('customer_id');
             $table->foreignId('bill_to_customer_id')->nullable();
             $table->foreignId('vehicle_id');
@@ -55,6 +56,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'job_number'], 'vehicle_service_jobs_tenant_number_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_jobs_tenant_org_ix');
+            $table->index(['tenant_id', 'job_type_id'], 'vehicle_service_jobs_tenant_job_type_ix');
             $table->index(['customer_id', 'vehicle_id'], 'vehicle_service_jobs_party_vehicle_ix');
             $table->index('bill_to_customer_id', 'vehicle_service_jobs_bill_to_customer_ix');
             $table->index(['status', 'job_date'], 'vehicle_service_jobs_status_date_ix');
@@ -63,6 +65,10 @@ return new class extends Migration
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_jobs_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
+                ->restrictOnDelete();
+            $table->foreign(['job_type_id', 'tenant_id'], 'vehicle_service_jobs_job_type_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('vehicle_service_job_types')
                 ->restrictOnDelete();
             $table->foreign(['customer_id', 'tenant_id'], 'vehicle_service_jobs_customer_id_tenant_fk')
                 ->references(['id', 'tenant_id'])

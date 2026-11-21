@@ -14,7 +14,8 @@ final readonly class VehicleServiceJobData
         public string $jobDate,
         public int $customerId,
         public int $vehicleId,
-        public VehicleServiceJobType $type = VehicleServiceJobType::FullService,
+        public VehicleServiceJobType|string $type = VehicleServiceJobType::FullService,
+        public ?int $jobTypeId = null,
         public ?int $billToCustomerId = null,
         public ?int $organizationUnitId = null,
         public ?string $jobNumber = null,
@@ -34,4 +35,9 @@ final readonly class VehicleServiceJobData
         public bool $customerComplaintProvided = false,
         public ?int $createdBy = null,
     ) {}
+
+    public function typeCode(): string
+    {
+        return $this->type instanceof VehicleServiceJobType ? $this->type->value : (string) $this->type;
+    }
 }

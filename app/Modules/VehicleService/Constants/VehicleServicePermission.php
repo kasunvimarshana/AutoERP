@@ -18,6 +18,10 @@ final class VehicleServicePermission
 
     public const JOBS_CANCEL_AFTER_START = 'vehicle_service.jobs.cancel_after_start';
 
+    public const JOB_TYPES_VIEW = 'vehicle_service.job_types.view';
+
+    public const JOB_TYPES_MANAGE = 'vehicle_service.job_types.manage';
+
     public const DISCOUNTS_MANAGE = 'vehicle_service.discounts.manage';
 
     public const LINES_VIEW = 'vehicle_service.lines.view';
@@ -57,6 +61,8 @@ final class VehicleServicePermission
             self::JOBS_TRANSITION => 'Inspect, start, or complete vehicle service jobs.',
             self::JOBS_CANCEL => 'Cancel draft or inspected vehicle service jobs.',
             self::JOBS_CANCEL_AFTER_START => 'Additionally cancel in-progress or completed vehicle service jobs, reverse their issued stock, and remove their commissions from payable reports while preserving commission history.',
+            self::JOB_TYPES_VIEW => 'View vehicle service job types.',
+            self::JOB_TYPES_MANAGE => 'Manage vehicle service job types.',
             self::DISCOUNTS_MANAGE => 'Add, change, or remove whole-job Vehicle Service discounts.',
             self::LINES_VIEW => 'View service job lines.',
             self::LINES_MANAGE => 'Create, update, and remove service job lines.',

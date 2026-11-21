@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi, type ItemLookupResource, type VehicleLookupResource } from '@/shared/api/lookupApi';
@@ -23,10 +23,18 @@ import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { addDecimal, isDecimalString } from '@/shared/utils/decimal';
 import {
     createVehicleServiceJob,
+    lookupVehicleServiceJobTypes,
     updateVehicleServiceJob,
 } from '../vehicleServiceApi';
 import { tracksVehicleServiceMileage } from '../vehicleServiceTypes';
-import type { CommissionType, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobPayload, VehicleServiceJobType } from '../vehicleServiceTypes';
+import type {
+    CommissionType,
+    VehicleServiceJob,
+    VehicleServiceJobLine,
+    VehicleServiceJobPayload,
+    VehicleServiceJobType,
+    VehicleServiceJobTypeResource,
+} from '../vehicleServiceTypes';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 import { PromotionJobStrip } from '@/modules/promotion/components/PromotionJobStrip';
 
@@ -108,6 +116,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [quickVehicleNumber, setQuickVehicleNumber] = useState('');
     const [quickVehicleModalOpen, setQuickVehicleModalOpen] = useState(false);
     const [nextServiceDateTouched, setNextServiceDateTouched] = useState(false);
+    const [jobTypes, setJobTypes] = useState<VehicleServiceJobTypeResource[]>([]);
+    const [selectedJobTypeId, setSelectedJobTypeId] = useState<number | null>(job?.job_type_id ?? job?.job_type?.id ?? null);
     const initialJobDate = job?.job_date ?? today();
     const [form, setForm] = useState({
         job_date: initialJobDate,
@@ -133,10 +143,58 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [editingDraftLine, setEditingDraftLine] = useState<DraftJobLine | null>(null);
     const [removeDraftLineId, setRemoveDraftLineId] = useState<number | null>(null);
     const formGuard = useMutationFormGuard(submitting);
+
+    useEffect(() => {
+        let active = true;
+        lookupVehicleServiceJobTypes()
+            .then((data) => {
+                if (active) {
+                    setJobTypes(data);
+                    if (job?.job_type_id) {
+                        setSelectedJobTypeId(job.job_type_id);
+                    } else if (job?.type) {
+                        const match = data.find((t) => t.code === job.type);
+                        if (match) setSelectedJobTypeId(match.id);
+                    }
+                }
+            })
+            .catch(() => {
+                // Fallback gracefully to default options if lookup fails
+            });
+        return () => {
+            active = false;
+        };
+    }, [job?.job_type_id, job?.type]);
+
+    const activeJobType = useMemo(() => {
+        if (selectedJobTypeId) {
+            return jobTypes.find((t) => t.id === selectedJobTypeId) ?? null;
+        }
+        if (form.type) {
+            return jobTypes.find((t) => t.code === form.type) ?? null;
+        }
+        return null;
+    }, [selectedJobTypeId, form.type, jobTypes]);
+
+    const jobTypeOptions = useMemo(() => {
+        if (jobTypes.length > 0) {
+            return jobTypes.map((t) => ({
+                value: t.code,
+                label: t.name,
+            }));
+        }
+        return JOB_TYPE_OPTIONS;
+    }, [jobTypes]);
+
+    const doesTrackMileage = activeJobType !== null
+        ? activeJobType.tracks_mileage
+        : tracksVehicleServiceMileage(form.type);
+
+    const selectedTypeLabel = activeJobType?.name ?? jobTypeOptions.find((option) => option.value === form.type)?.label;
     const mileageHint = form.type === ''
         ? 'Select a job type to determine mileage requirements.'
-        : !tracksVehicleServiceMileage(form.type)
-            ? `Not applicable to ${JOB_TYPE_OPTIONS.find((option) => option.value === form.type)?.label}.`
+        : !doesTrackMileage
+            ? `Not applicable to ${selectedTypeLabel ?? 'this job type'}.`
             : undefined;
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
         formGuard.markDirty();
@@ -172,6 +230,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         expected_version: job?.row_version,
         job_date: form.job_date,
         expected_delivery_date: form.expected_delivery_date || undefined,
+        job_type_id: selectedJobTypeId ?? job?.job_type_id ?? undefined,
         type,
         customer_id: customer?.id ?? 0,
         bill_to_customer_id: billToCustomer?.id ?? customer?.id ?? 0,
@@ -197,23 +256,25 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         setVehicle(value);
         setCustomer(nextCustomer);
         setBillToCustomer(nextCustomer);
-        if (value?.odometer_reading && !form.odometer_reading && tracksVehicleServiceMileage(form.type)) {
+        if (value?.odometer_reading && !form.odometer_reading && doesTrackMileage) {
             updateForm((current) => ({
                 ...current,
                 odometer_reading: value.odometer_reading ?? '',
                 next_service_mileage: suggestedNextServiceMileage(value.odometer_reading ?? ''),
             }));
         }
-    }, [form.odometer_reading, form.type, formGuard, updateForm]);
+    }, [doesTrackMileage, form.odometer_reading, formGuard, updateForm]);
 
     const applyJobType = useCallback((next: VehicleServiceJobType | '') => {
+        const matched = jobTypes.find((t) => t.code === next) ?? null;
+        setSelectedJobTypeId(matched?.id ?? null);
         updateForm((current) => ({
             ...current,
             type: next,
             odometer_reading: '',
             next_service_mileage: '',
         }));
-    }, [updateForm]);
+    }, [jobTypes, updateForm]);
 
     const applyOdometerReading = useCallback((next: string) => {
         updateForm((current) => ({
@@ -364,8 +425,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             error={errorFor('odometer_reading')}
                             hint={mileageHint}
                             className={DISABLED_MILEAGE_CLASS}
-                            required={tracksVehicleServiceMileage(form.type)}
-                            disabled={!tracksVehicleServiceMileage(form.type)}
+                            required={doesTrackMileage}
+                            disabled={!doesTrackMileage}
                             onChange={(event) => applyOdometerReading(event.target.value)}
                         />
                         <DecimalInput
@@ -374,7 +435,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             error={errorFor('next_service_mileage')}
                             hint={mileageHint}
                             className={DISABLED_MILEAGE_CLASS}
-                            disabled={!tracksVehicleServiceMileage(form.type)}
+                            disabled={!doesTrackMileage}
                             onChange={(event) => updateForm({ ...form, next_service_mileage: event.target.value })}
                         />
                         <Input
@@ -399,7 +460,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         <Select
                             label="Type"
                             value={form.type}
-                            options={JOB_TYPE_OPTIONS}
+                            options={jobTypeOptions}
                             error={errorFor('type') || (attemptedSubmit && !form.type ? 'Select a job type.' : undefined)}
                             required
                             onInvalid={() => setAttemptedSubmit(true)}

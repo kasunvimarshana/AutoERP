@@ -53,6 +53,7 @@ export default function VehicleServiceJobListPage() {
     const canCreate = hasPermission(auth, vehicleServicePermissions.jobsCreate);
     const canUpdate = hasPermission(auth, vehicleServicePermissions.jobsUpdate);
     const canViewCommissions = hasPermission(auth, vehicleServicePermissions.commissionsView);
+    const canViewJobTypes = hasPermission(auth, vehicleServicePermissions.jobTypesView);
     const [searchParams, setSearchParams] = useSearchParams();
     const view = searchParams.get('view') === 'list' ? 'list' : 'board';
     const [search, setSearch] = useState('');
@@ -173,13 +174,15 @@ export default function VehicleServiceJobListPage() {
                 actions={(
                     <>
                         <div className="hidden flex-wrap gap-2 md:flex">
+                            {canViewJobTypes && <LinkButton to="/vehicle-service/job-types" variant="secondary">Job types</LinkButton>}
                             {canViewCommissions && <Button type="button" variant="secondary" onClick={() => setShowCommissionDefaults(true)}>Commission defaults</Button>}
                             {canCreate && <LinkButton to="/vehicle-service/jobs/create">New service job</LinkButton>}
                         </div>
                         <div className="flex w-full gap-2 md:hidden">
                             {canCreate && <LinkButton className="min-w-0 flex-1" to="/vehicle-service/jobs/create">New service job</LinkButton>}
-                            {canViewCommissions && <ActionMenu label="More" className="shrink-0" triggerClassName="justify-center">
-                                <Button className="w-full justify-start" type="button" variant="ghost" onClick={() => setShowCommissionDefaults(true)}>Commission defaults</Button>
+                            {(canViewCommissions || canViewJobTypes) && <ActionMenu label="More" className="shrink-0" triggerClassName="justify-center">
+                                {canViewJobTypes && <LinkButton className="w-full justify-start" to="/vehicle-service/job-types" variant="ghost">Job types</LinkButton>}
+                                {canViewCommissions && <Button className="w-full justify-start" type="button" variant="ghost" onClick={() => setShowCommissionDefaults(true)}>Commission defaults</Button>}
                             </ActionMenu>}
                         </div>
                     </>

@@ -419,6 +419,9 @@ const EmployeeDetailPage = lazy(
 const VehicleServiceJobListPage = lazy(
     () => import("@/modules/vehicle-service/pages/VehicleServiceJobListPage"),
 );
+const VehicleServiceJobTypeListPage = lazy(
+    () => import("@/modules/vehicle-service/pages/VehicleServiceJobTypeListPage"),
+);
 const PromotionWorkspacePage = lazy(
     () => import("@/modules/promotion/pages/PromotionWorkspacePage"),
 );
@@ -1106,6 +1109,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/vehicle-service/jobs"
                             element={<VehicleServiceJobListPage />}
+                        />
+                        <Route
+                            path="/vehicle-service/job-types"
+                            element={<VehicleServiceJobTypeListPage />}
                         />
                         <Route
                             path="/vehicle-service/promotions"

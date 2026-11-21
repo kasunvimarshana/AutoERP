@@ -10,6 +10,7 @@ use Modules\VehicleService\Http\Controllers\VehicleServiceInventoryController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInvoiceController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobDiscountController;
+use Modules\VehicleService\Http\Controllers\VehicleServiceJobTypeController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceLineController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceLineItemLookupController;
 use Modules\VehicleService\Http\Controllers\VehicleServicePaymentController;
@@ -35,6 +36,16 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::get('jobs/{job}/inspection', [VehicleServiceJobController::class, 'inspection'])->whereNumber('job')->name('inspection.show');
         Route::get('jobs/{job}/status-history', [VehicleServiceJobController::class, 'statusHistory'])->whereNumber('job')->name('status-history.index');
         Route::get('jobs/{job}/discount-history', [VehicleServiceJobDiscountController::class, 'history'])->whereNumber('job')->name('discount-history.index');
+    });
+    Route::get('job-types/lookup', [VehicleServiceJobTypeController::class, 'lookup'])->name('job-types.lookup');
+    Route::middleware($requires(VehicleServicePermission::JOB_TYPES_VIEW))->group(function (): void {
+        Route::get('job-types', [VehicleServiceJobTypeController::class, 'index'])->name('job-types.index');
+        Route::get('job-types/{jobType}', [VehicleServiceJobTypeController::class, 'show'])->whereNumber('jobType')->name('job-types.show');
+    });
+    Route::middleware($requires(VehicleServicePermission::JOB_TYPES_MANAGE))->group(function (): void {
+        Route::post('job-types', [VehicleServiceJobTypeController::class, 'store'])->name('job-types.store');
+        Route::put('job-types/{jobType}', [VehicleServiceJobTypeController::class, 'update'])->whereNumber('jobType')->name('job-types.update');
+        Route::delete('job-types/{jobType}', [VehicleServiceJobTypeController::class, 'destroy'])->whereNumber('jobType')->name('job-types.destroy');
     });
     Route::middleware($requires(VehicleServicePermission::DISCOUNTS_MANAGE))->group(function (): void {
         Route::put('jobs/{job}/discount', [VehicleServiceJobDiscountController::class, 'update'])->whereNumber('job')->name('discount.update');

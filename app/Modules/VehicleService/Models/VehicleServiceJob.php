@@ -15,7 +15,6 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
-use Modules\VehicleService\Enums\VehicleServiceJobType;
 use Modules\VehicleService\Models\Concerns\HasVehicleServiceJobRowVersion;
 
 final class VehicleServiceJob extends TenantOwnedModel
@@ -36,7 +35,8 @@ final class VehicleServiceJob extends TenantOwnedModel
             'job_date' => 'date',
             'expected_delivery_date' => 'date',
             'next_service_date' => 'date',
-            'type' => VehicleServiceJobType::class,
+            'job_type_id' => 'integer',
+            'type' => 'string',
             'customer_id' => 'integer',
             'bill_to_customer_id' => 'integer',
             'vehicle_id' => 'integer',
@@ -69,6 +69,16 @@ final class VehicleServiceJob extends TenantOwnedModel
         return $organizationUnitId === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $organizationUnitId);
+    }
+
+    public function setTypeAttribute(mixed $value): void
+    {
+        $this->attributes['type'] = $value instanceof \BackedEnum ? $value->value : (string) $value;
+    }
+
+    public function jobType(): BelongsTo
+    {
+        return $this->belongsTo(VehicleServiceJobType::class, 'job_type_id');
     }
 
     public function customer(): BelongsTo
