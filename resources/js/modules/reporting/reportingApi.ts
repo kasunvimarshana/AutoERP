@@ -6,6 +6,10 @@ import type { PurchaseOrderDetailResult } from './purchaseOrderDetailTypes';
 import type { EmployeeCommissionJobsResult } from './employeeReportResultTypes';
 import type { GoodsReceiptSummaryParams, GoodsReceiptSummaryResult } from './goodsReceiptSummaryTypes';
 import type { UpcomingServicesParams, UpcomingServicesResult } from './upcomingServicesTypes';
+import type {
+    ServiceJobsByJobTypeParams,
+    ServiceJobsByJobTypeResult,
+} from './types/serviceJobsByJobTypeReportTypes';
 import type { StockBalanceDetail, StockBalanceReportParams, StockBalanceReportResult, StockBalanceReportRow } from './stockBalanceReportTypes';
 import type { PaymentMethodWiseDay } from './paymentMethodWiseSummaryTypes';
 import type { NamedResource } from '@/shared/types/common';
@@ -60,7 +64,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
 export async function exportReport(
     key: string,
     format: ReportFormat,
-    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | VehicleServiceSalesSummaryParams | ExpenseReportParams | PaymentMethodWiseParams | UpcomingServicesParams,
+    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | VehicleServiceSalesSummaryParams | ExpenseReportParams | PaymentMethodWiseParams | UpcomingServicesParams | ServiceJobsByJobTypeParams,
     previewWindow?: Window | null,
 ): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {
@@ -139,6 +143,11 @@ export async function runVehicleServiceHistoryReport(params: VehicleServiceHisto
 
 export async function runUpcomingServicesReport(params: UpcomingServicesParams, signal?: AbortSignal): Promise<UpcomingServicesResult> {
     const response = await apiClient.get<UpcomingServicesResult>(`${endpoints.reports}/vehicle-service/upcoming-services`, { params, signal });
+    return response.data;
+}
+
+export async function runServiceJobsByJobTypeReport(params: ServiceJobsByJobTypeParams, signal?: AbortSignal): Promise<ServiceJobsByJobTypeResult> {
+    const response = await apiClient.get<ServiceJobsByJobTypeResult>(`${endpoints.reports}/vehicle-service/jobs-by-type`, { params, signal });
     return response.data;
 }
 

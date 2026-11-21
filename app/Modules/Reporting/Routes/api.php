@@ -12,6 +12,7 @@ use Modules\Reporting\Http\Controllers\InventoryAgingLookupController;
 use Modules\Reporting\Http\Controllers\OperationalReportController;
 use Modules\Reporting\Http\Controllers\PaymentMethodWiseSummaryReportController;
 use Modules\Reporting\Http\Controllers\ReportController;
+use Modules\Reporting\Http\Controllers\ServiceJobsByJobTypeReportController;
 use Modules\Reporting\Http\Controllers\StockBalanceReportController;
 use Modules\Reporting\Http\Controllers\TechnicianWorkReportController;
 use Modules\Reporting\Http\Controllers\UpcomingServicesReportController;
@@ -71,6 +72,8 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
             ->name('vehicle-service.service-history');
         Route::get('vehicle-service/upcoming-services', [UpcomingServicesReportController::class, 'index'])
             ->name('vehicle-service.upcoming-services');
+        Route::get('vehicle-service/jobs-by-type', [ServiceJobsByJobTypeReportController::class, 'index'])
+            ->name('vehicle-service.jobs-by-type');
         Route::get('vehicle-service/sales-summary', [VehicleServiceSalesSummaryReportController::class, 'index'])
             ->name('vehicle-service.sales-summary');
 
@@ -121,6 +124,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('vehicle-service/upcoming-services/export/{format}', [UpcomingServicesReportController::class, 'export'])
             ->whereIn('format', $exportFormats)
             ->name('vehicle-service.upcoming-services.export');
+        Route::get('vehicle-service/jobs-by-type/export/{format}', [ServiceJobsByJobTypeReportController::class, 'export'])
+            ->whereIn('format', $exportFormats)
+            ->name('vehicle-service.jobs-by-type.export');
 
         Route::get('{report}/export/{format}', [ReportController::class, 'export'])
             ->where('report', '[A-Za-z0-9._-]+')

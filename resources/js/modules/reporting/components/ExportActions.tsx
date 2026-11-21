@@ -10,10 +10,11 @@ import type { EmployeeCommissionReportParams, GrnPayablesReportParams, Operation
 import type { GoodsReceiptSummaryParams } from '../goodsReceiptSummaryTypes';
 import type { VehicleServiceSalesSummaryParams } from '../vehicleServiceSalesSummaryTypes';
 import type { UpcomingServicesParams } from '../upcomingServicesTypes';
+import type { ServiceJobsByJobTypeParams } from '../types/serviceJobsByJobTypeReportTypes';
 
 const defaultFormats: ReportFormat[] = ['html', 'print', 'pdf', 'xlsx', 'csv'];
 
-export function ExportActions({ reportKey, params, formats = defaultFormats, compact = false }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams | VehicleServiceSalesSummaryParams | UpcomingServicesParams; formats?: ReportFormat[]; compact?: boolean }) {
+export function ExportActions({ reportKey, params, formats = defaultFormats, compact = false }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams | VehicleServiceSalesSummaryParams | UpcomingServicesParams | ServiceJobsByJobTypeParams; formats?: ReportFormat[]; compact?: boolean }) {
     const auth = useAuth();
     const [busy, setBusy] = useState<ReportFormat | null>(null);
     const [error, setError] = useState<ApiError | null>(null);

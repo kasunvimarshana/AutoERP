@@ -1132,6 +1132,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         },
                     },
                     {
+                        id: "vehicle-service-jobs-by-type-report",
+                        type: "link",
+                        label: "Jobs by Job Type",
+                        to: "/reports/vehicle-service/jobs-by-type",
+                        match: ["/reports/vehicle-service/jobs-by-type"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
                         id: "vehicle-service-sales-summary-report",
                         type: "link",
                         label: "Service Sales Summary",
