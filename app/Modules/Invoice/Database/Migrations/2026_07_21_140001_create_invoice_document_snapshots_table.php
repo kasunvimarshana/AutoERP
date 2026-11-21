@@ -41,6 +41,7 @@ return new class extends Migration
             $table->text('place_of_supply')->nullable();
             $table->string('payment_mode', 100)->nullable();
             $table->string('payment_terms')->nullable();
+            $table->json('purchaser_reference_fields')->nullable();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'invoice_id'], 'invoice_doc_snapshots_tenant_invoice_uk');

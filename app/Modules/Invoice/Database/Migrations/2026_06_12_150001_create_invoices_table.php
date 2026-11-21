@@ -53,6 +53,7 @@ return new class extends Migration
             $table->unsignedBigInteger('cancelled_by')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->text('cancellation_reason')->nullable();
+            $table->timestamp('original_printed_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

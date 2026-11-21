@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('barcode', 120)->nullable();
             $table->string('name');
             $table->text('description')->nullable();
+            $table->decimal('reorder_level', 20, 6)->nullable();
             $table->string('item_type', 30);
             $table->string('tracking_type', 30)->default('none');
             $table->string('costing_method', 30)->default('none');

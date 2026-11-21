@@ -16,9 +16,6 @@ final class HrServiceProvider extends ServiceProvider
             ->register('hr', HrAuthorizationService::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([
-            __DIR__.'/../Database/Migrations',
-            __DIR__.'/../Database/UpgradeMigrations',
-        ]);
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

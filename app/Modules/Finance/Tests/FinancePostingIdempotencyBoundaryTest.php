@@ -57,13 +57,15 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
 
     public function test_existing_source_keys_have_a_fail_closed_upgrade_path(): void
     {
-        $migration = $this->source('../Database/UpgradeMigrations/2026_07_13_000002_canonicalize_finance_journal_source_keys.php');
+        $posting = $this->source('../Services/JournalPostingService.php');
+        $financePosting = $this->source('../Services/FinancePostingService.php');
 
-        self::assertStringContainsString("\$identity['source_type'] = \$sourceType;", $migration);
-        self::assertStringContainsString("\$identity['source_id'] = \$sourceId;", $migration);
-        self::assertStringContainsString('Multiple Finance journals use the same canonical source identity', $migration);
-        self::assertStringContainsString("->update(['source_key' => null])", $migration);
-        self::assertStringContainsString("->update(['source_key' => \$key])", $migration);
+        self::assertStringContainsString('assertPostedLedgerIntegrity', $posting);
+        self::assertStringContainsString('Only draft journals can be posted. Reversed journals cannot be reposted.', $posting);
+        self::assertStringContainsString("'tenant_id' => \$request->source->tenantId", $financePosting);
+        self::assertStringContainsString("'organization_unit_id' => \$request->source->organizationUnitId", $financePosting);
+        self::assertStringContainsString("'source_type' => \$request->source->sourceType", $financePosting);
+        self::assertStringContainsString("'source_id' => \$request->source->sourceId", $financePosting);
     }
 
     public function test_posted_journal_replay_is_idempotent_and_reversed_journal_replay_is_rejected(): void

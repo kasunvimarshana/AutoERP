@@ -33,6 +33,10 @@ return new class extends Migration
             $table->unsignedInteger('double_ot_minutes')->nullable();
             $table->unsignedInteger('triple_ot_minutes')->nullable();
             $table->unsignedInteger('night_outs')->nullable();
+            $table->string('driver_identity_source')->nullable();
+            $table->unsignedBigInteger('driver_employee_id')->nullable();
+            $table->string('driver_name_snapshot')->nullable();
+            $table->string('driver_reference_snapshot')->nullable();
             $table->text('driver_observation')->nullable();
             $table->text('notes')->nullable();
             $table->foreignId('corrects_chart_id')->nullable();
@@ -43,9 +47,15 @@ return new class extends Migration
             $table->unique(['tenant_id', 'reference'], 'vrc_reference_uk');
             $table->unique('corrects_chart_id', 'vrc_correction_uk');
             $table->index(['tenant_id', 'vehicle_use_id', 'starts_at'], 'vrc_period_ix');
+            $table->index(['tenant_id', 'driver_employee_id', 'starts_at', 'ends_at'], 'vrc_driver_employee_period_ix');
+            $table->index(['tenant_id', 'driver_identity_source', 'driver_reference_snapshot', 'starts_at', 'ends_at'], 'vrc_driver_external_period_ix');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vrc_org_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['vehicle_use_id', 'tenant_id'], 'vrc_use_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_uses')->restrictOnDelete();
             $table->foreign(['vehicle_use_id', 'vehicle_use_version'], 'vrc_revision_fk')->references(['vehicle_use_id', 'row_version'])->on('vehicle_rental_use_history')->restrictOnDelete();
+            $table->foreign(['driver_employee_id', 'tenant_id'], 'vrc_driver_employee_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('hr_employees')
+                ->restrictOnDelete();
             $table->foreign(['corrects_chart_id', 'tenant_id'], 'vrc_correction_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_running_charts')->restrictOnDelete();
         });
     }

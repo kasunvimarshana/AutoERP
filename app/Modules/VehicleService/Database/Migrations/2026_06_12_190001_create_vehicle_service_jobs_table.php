@@ -35,6 +35,9 @@ return new class extends Migration
             $table->string('priority', 30)->nullable();
             $table->decimal('subtotal', 20, 6)->default('0.000000');
             $table->decimal('discount_total', 20, 6)->default('0.000000');
+            $table->decimal('line_discount_total', 20, 6)->default('0.000000');
+            $table->decimal('job_discount_base', 20, 6)->default('0.000000');
+            $table->decimal('job_discount_amount', 20, 6)->default('0.000000');
             $table->decimal('tax_total', 20, 6)->default('0.000000');
             $table->decimal('charge_total', 20, 6)->default('0.000000');
             $table->decimal('grand_total', 20, 6)->default('0.000000');

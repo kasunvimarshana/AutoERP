@@ -28,7 +28,7 @@ final class CustomerServiceProvider extends ServiceProvider
             ->register('customer', CustomerAuthorizationService::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([__DIR__.'/../Database/Migrations', __DIR__.'/../Database/UpgradeMigrations']);
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
         if ($this->app->runningInConsole()) {
             $this->commands([AuditCustomerPhoneNumbersCommand::class]);
         }

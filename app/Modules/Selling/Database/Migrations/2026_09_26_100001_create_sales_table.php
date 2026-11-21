@@ -24,6 +24,9 @@ return new class extends Migration
             $table->date('due_date')->nullable();
             $table->string('status', 30)->default('draft');
             $table->text('notes')->nullable();
+            $table->string('bill_discount_type', 20)->nullable();
+            $table->decimal('bill_discount_value', 20, 6)->default('0');
+            $table->decimal('bill_discount_amount', 20, 6)->default('0');
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamp('posted_at')->nullable();
             $table->timestamps();

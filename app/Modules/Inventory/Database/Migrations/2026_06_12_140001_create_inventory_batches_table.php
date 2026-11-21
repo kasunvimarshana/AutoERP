@@ -22,6 +22,7 @@ return new class extends Migration
             $table->date('expiry_date')->nullable();
             $table->string('status', 30)->default('active');
             $table->json('metadata')->nullable();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
             $table->softDeletes();
 

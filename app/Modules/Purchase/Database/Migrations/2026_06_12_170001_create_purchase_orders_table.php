@@ -41,6 +41,8 @@ return new class extends Migration
             $table->timestamp('approved_at')->nullable();
             $table->unsignedBigInteger('closed_by')->nullable();
             $table->timestamp('closed_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
@@ -77,6 +79,10 @@ return new class extends Migration
                 ->on('users')
                 ->restrictOnDelete();
             $table->foreign(['closed_by', 'tenant_id'], 'purchase_orders_closed_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['cancelled_by', 'tenant_id'], 'purchase_orders_cancelled_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
                 ->restrictOnDelete();

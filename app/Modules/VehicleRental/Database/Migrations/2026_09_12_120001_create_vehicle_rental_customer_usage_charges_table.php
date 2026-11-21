@@ -33,6 +33,7 @@ return new class extends Migration
             $table->foreign(['voided_by', 'tenant_id'], 'vruc_void_actor_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
             $table->unique(['id', 'tenant_id'], 'vruc_tenant_uk');
             $table->index(['running_chart_id', 'component'], 'vruc_chart_component_ix');
+            $table->index(['agreement_id', 'component', 'period_from', 'id'], 'vruc_cycle_ix');
             $table->foreign(['running_chart_id', 'tenant_id'], 'vruc_chart_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_running_charts')->restrictOnDelete();
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vruc_org_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['agreement_id', 'tenant_id'], 'vruc_agreement_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_customer_agreements')->restrictOnDelete();

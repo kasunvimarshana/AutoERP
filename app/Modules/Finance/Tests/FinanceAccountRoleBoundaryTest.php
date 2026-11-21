@@ -82,19 +82,19 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
     public function test_posting_profile_rule_validity_has_a_deployed_database_upgrade_path(): void
     {
         $provider = $this->source('../Providers/FinanceServiceProvider.php');
-        $validityUpgrade = $this->source('../Database/UpgradeMigrations/2026_07_10_000001_add_validity_to_finance_posting_profile_rules_table.php');
-        $versionUpgrade = $this->source('../Database/UpgradeMigrations/2026_07_13_000001_add_row_version_to_finance_posting_profiles_table.php');
+        $rulesMigration = $this->source('../Database/Migrations/2026_06_12_070019_create_finance_posting_profile_rules_table.php');
+        $profilesMigration = $this->source('../Database/Migrations/2026_06_12_070007_create_finance_posting_profiles_table.php');
 
-        self::assertStringContainsString('Database/UpgradeMigrations', $provider);
-        self::assertStringContainsString("private const TABLE = 'finance_posting_profile_rules'", $validityUpgrade);
-        self::assertStringContainsString("private const OPENING_EFFECTIVE_DATE = '1900-01-01'", $validityUpgrade);
-        self::assertStringContainsString("Schema::hasColumn(self::TABLE, 'effective_from')", $validityUpgrade);
-        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::OLD_PROFILE_KEY_UNIQUE', $validityUpgrade);
-        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::PROFILE_KEY_FROM_UNIQUE', $validityUpgrade);
-        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::EFFECTIVE_LOOKUP_INDEX', $validityUpgrade);
-        self::assertStringContainsString('$table->dropUnique(self::OLD_PROFILE_KEY_UNIQUE)', $validityUpgrade);
-        self::assertStringContainsString("private const TABLE = 'finance_posting_profiles'", $versionUpgrade);
-        self::assertStringContainsString("private const COLUMN = 'row_version'", $versionUpgrade);
+        self::assertStringContainsString('Database/Migrations', $provider);
+        self::assertStringNotContainsString('Database/UpgradeMigrations', $provider);
+        self::assertStringContainsString("OPENING_EFFECTIVE_DATE = '1900-01-01'", $rulesMigration);
+        self::assertStringContainsString('effective_from', $rulesMigration);
+        self::assertStringContainsString('effective_to', $rulesMigration);
+        self::assertStringContainsString('is_active', $rulesMigration);
+        self::assertStringContainsString('finance_posting_rules_profile_key_from_uk', $rulesMigration);
+        self::assertStringContainsString('finance_posting_rules_effective_lookup_idx', $rulesMigration);
+        self::assertStringContainsString("Schema::create('finance_posting_profiles'", $profilesMigration);
+        self::assertStringContainsString('row_version', $profilesMigration);
     }
 
     public function test_finance_posting_resolution_and_journal_creation_share_transaction(): void

@@ -43,6 +43,8 @@ return new class extends Migration
             $table->boolean('is_billable')->default(true);
             $table->boolean('is_employee_assignable')->default(false);
             $table->foreignId('inventory_movement_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
+            $table->foreignId('batch_price_revision_id')->nullable();
             $table->string('status', 30)->default('pending');
             $table->timestamps();
 
@@ -50,6 +52,8 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_job_lines_tenant_org_ix');
             $table->index(['vehicle_service_job_id', 'line_source_type'], 'vehicle_service_job_lines_job_type_ix');
             $table->index('parent_line_id', 'vehicle_service_job_lines_parent_ix');
+            $table->index('batch_id', 'vehicle_service_job_lines_batch_ix');
+            $table->index('batch_price_revision_id', 'vehicle_service_job_lines_batch_price_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_job_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_job_lines_organization_unit_id_tenant_fk')
@@ -79,6 +83,14 @@ return new class extends Migration
             $table->foreign(['inventory_movement_id', 'tenant_id'], 'vehicle_service_job_lines_inventory_movement_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('inventory_movements')
+                ->restrictOnDelete();
+            $table->foreign(['batch_id', 'tenant_id'], 'vehicle_service_job_lines_batch_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_batches')
+                ->restrictOnDelete();
+            $table->foreign(['batch_price_revision_id', 'tenant_id'], 'vehicle_service_job_lines_batch_price_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_batch_price_revisions')
                 ->restrictOnDelete();
         });
     }

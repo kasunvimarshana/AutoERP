@@ -24,6 +24,7 @@ return new class extends Migration
             $table->boolean('is_primary')->default(false);
             $table->boolean('is_active')->default(true);
             $table->text('notes')->nullable();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
             $table->softDeletes();
 

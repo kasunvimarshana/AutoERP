@@ -34,12 +34,20 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamp('activated_at')->nullable();
             $table->timestamp('closed_at')->nullable();
+            $table->date('closed_on')->nullable();
+            $table->unsignedBigInteger('supersedes_agreement_id')->nullable();
             $table->timestamps();
             $table->unique(['tenant_id', 'reference'], 'vrca_reference_uk');
             $table->unique(['id', 'tenant_id'], 'vrca_tenant_uk');
+            $table->unique(['id', 'tenant_id', 'organization_unit_id'], 'vrca_identity_uk');
+            $table->unique('supersedes_agreement_id', 'vrca_successor_uk');
             $table->index(['tenant_id', 'organization_unit_id', 'status'], 'vrca_context_ix');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vrca_org_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['customer_id', 'tenant_id'], 'vrca_party_fk')->references(['id', 'tenant_id'])->on('customers')->restrictOnDelete();
+            $table->foreign(['supersedes_agreement_id', 'tenant_id', 'organization_unit_id'], 'vrca_successor_fk')
+                ->references(['id', 'tenant_id', 'organization_unit_id'])
+                ->on('vehicle_rental_customer_agreements')
+                ->restrictOnDelete();
         });
     }
 

@@ -37,13 +37,21 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamp('activated_at')->nullable();
             $table->timestamp('closed_at')->nullable();
+            $table->date('closed_on')->nullable();
+            $table->unsignedBigInteger('supersedes_agreement_id')->nullable();
             $table->timestamps();
             $table->unique(['tenant_id', 'reference'], 'vroa_reference_uk');
             $table->unique(['id', 'tenant_id'], 'vroa_tenant_uk');
+            $table->unique(['id', 'tenant_id', 'organization_unit_id'], 'vroa_identity_uk');
+            $table->unique('supersedes_agreement_id', 'vroa_successor_uk');
             $table->index(['tenant_id', 'organization_unit_id', 'status'], 'vroa_context_ix');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vroa_org_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['supplier_id', 'tenant_id'], 'vroa_party_fk')->references(['id', 'tenant_id'])->on('suppliers')->restrictOnDelete();
             $table->foreign(['vehicle_id', 'tenant_id'], 'vroa_vehicle_fk')->references(['id', 'tenant_id'])->on('vehicles')->restrictOnDelete();
+            $table->foreign(['supersedes_agreement_id', 'tenant_id', 'organization_unit_id'], 'vroa_successor_fk')
+                ->references(['id', 'tenant_id', 'organization_unit_id'])
+                ->on('vehicle_rental_owner_agreements')
+                ->restrictOnDelete();
         });
     }
 

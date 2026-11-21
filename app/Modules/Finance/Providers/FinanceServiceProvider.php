@@ -29,9 +29,6 @@ final class FinanceServiceProvider extends ServiceProvider
             ->register('finance', FinancePermission::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([
-            __DIR__.'/../Database/Migrations',
-            __DIR__.'/../Database/UpgradeMigrations',
-        ]);
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

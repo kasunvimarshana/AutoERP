@@ -26,9 +26,6 @@ final class PurchaseServiceProvider extends ServiceProvider
             ->register('purchase', PurchaseAuthorizationService::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([
-            __DIR__.'/../Database/Migrations',
-            __DIR__.'/../Database/UpgradeMigrations',
-        ]);
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

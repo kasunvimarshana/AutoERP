@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
 
             $table->unique(

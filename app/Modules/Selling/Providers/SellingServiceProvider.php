@@ -16,6 +16,6 @@ final class SellingServiceProvider extends ServiceProvider
             ->register('selling', SellingAuthorizationService::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom([__DIR__.'/../Database/Migrations', __DIR__.'/../Database/UpgradeMigrations']);
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }
