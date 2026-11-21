@@ -5,6 +5,7 @@ import type { ApiResource } from '@/shared/types/api';
 import type { PurchaseOrderDetailResult } from './purchaseOrderDetailTypes';
 import type { EmployeeCommissionJobsResult } from './employeeReportResultTypes';
 import type { GoodsReceiptSummaryParams, GoodsReceiptSummaryResult } from './goodsReceiptSummaryTypes';
+import type { UpcomingServicesParams, UpcomingServicesResult } from './upcomingServicesTypes';
 import type { StockBalanceDetail, StockBalanceReportParams, StockBalanceReportResult, StockBalanceReportRow } from './stockBalanceReportTypes';
 import type { PaymentMethodWiseDay } from './paymentMethodWiseSummaryTypes';
 import type { NamedResource } from '@/shared/types/common';
@@ -59,7 +60,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
 export async function exportReport(
     key: string,
     format: ReportFormat,
-    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | VehicleServiceSalesSummaryParams | ExpenseReportParams | PaymentMethodWiseParams,
+    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | VehicleServiceSalesSummaryParams | ExpenseReportParams | PaymentMethodWiseParams | UpcomingServicesParams,
     previewWindow?: Window | null,
 ): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {
@@ -133,6 +134,11 @@ export async function getEmployeeCommissionJobs(employeeId: number, params: Empl
 
 export async function runVehicleServiceHistoryReport(params: VehicleServiceHistoryParams, signal?: AbortSignal): Promise<VehicleServiceHistoryResult> {
     const response = await apiClient.get<VehicleServiceHistoryResult>(`${endpoints.reports}/vehicle-service/service-history`, { params, signal });
+    return response.data;
+}
+
+export async function runUpcomingServicesReport(params: UpcomingServicesParams, signal?: AbortSignal): Promise<UpcomingServicesResult> {
+    const response = await apiClient.get<UpcomingServicesResult>(`${endpoints.reports}/vehicle-service/upcoming-services`, { params, signal });
     return response.data;
 }
 

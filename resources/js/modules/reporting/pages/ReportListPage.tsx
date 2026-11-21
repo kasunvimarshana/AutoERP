@@ -71,5 +71,6 @@ function reportPath(key: string): string {
     if (key === 'vehicle-service.technician-work') return '/reports/vehicle-service/technician-work';
     if (key === 'vehicle-service.employee-commissions') return '/reports/vehicle-service/employee-commissions';
     if (key === 'vehicle-service/service-history') return '/reports/vehicle-service/service-history';
+    if (key === 'vehicle-service/upcoming-services') return '/reports/vehicle-service/upcoming-services';
     return `/reports/${key}`;
 }

@@ -1109,6 +1109,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         },
                     },
                     {
+                        id: "vehicle-service-upcoming-services-report",
+                        type: "link",
+                        label: "Upcoming Services",
+                        to: "/reports/vehicle-service/upcoming-services",
+                        match: ["/reports/vehicle-service/upcoming-services"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
                         id: "vehicle-service-sales-summary-report",
                         type: "link",
                         label: "Service Sales Summary",

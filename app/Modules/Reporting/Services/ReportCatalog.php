@@ -73,6 +73,7 @@ final class ReportCatalog
         private readonly DecimalMath $math,
         private readonly ConfigurationResolverInterface $configuration,
         private readonly VehicleServiceHistoryReportService $vehicleServiceHistory,
+        private readonly UpcomingServicesReportService $upcomingServices,
         private readonly InventoryAgingRows $inventoryAgingRows,
     ) {}
 
@@ -245,6 +246,7 @@ final class ReportCatalog
             $this->labour('vehicle-service.technician-work', 'Technician Work'),
             $this->labour('vehicle-service.employee-commissions', 'Employee Commission Report'),
             $this->vehicleServiceHistory->definition(),
+            $this->upcomingServices->definition(),
             $this->definition('vehicle-service.supervisor-commission', 'Supervisor Commission', 'Vehicle Service', VehicleServiceJob::class, [
                 $this->col('job_date', 'Date', format: 'date', sort: 'job_date'), $this->col('job_number', 'Job', sort: 'job_number'),
                 $this->col('supervisor', 'Supervisor', 'supervisor.display_name'), $this->money('supervisor_commission_value', 'Value', false),
