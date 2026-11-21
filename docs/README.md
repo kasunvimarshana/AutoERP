@@ -9,8 +9,9 @@ This file is the canonical entry point for current architecture, remediation, re
 - Other worktree and feature branches must be compared against this branch before integration.
 - A branch is not merged solely because it contains newer commits. Changes must preserve bounded data access, module ownership, tenant isolation, financial integrity, and current regression fixes.
 
-## Core Module Technical & User Guides
+## Core Technical & Architectural Guides
 
+- [AutoERP Project Knowledge Base & Technical Developer Guide](file:///d:/project-new/AutoERP/docs/project_knowledgebase.md): The authoritative enterprise architecture, business domain specification, module catalog, and developer handbook for AutoERP.
 - [Vehicle Rental Complete Guide](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md): The definitive end-to-end technical, architectural, and operational manual for AutoERP's Vehicle Rental module.
 - [Vehicle Rental User Guide](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md): The comprehensive, beginner-friendly operator handbook for daily business users (Dispatchers, Fleet Officers, Billing Clerks, Cashiers, and Managers).
 
