@@ -251,6 +251,9 @@ describe('navigation access and matching', () => {
             'GRN Payables',
             'Employee Commission',
             'Vehicle Service History',
+            'Upcoming Services',
+            'Jobs by Job Type',
+            'Reviews & Ratings',
             'Service Sales Summary',
         ]);
         expect(findNavigationMatch('/reports/summary', '', tenantNavigationSections)?.item.id).toBe('summary-reports');
@@ -412,6 +415,7 @@ describe('navigation access and matching', () => {
             'Service Job List',
             'Create Service Job',
             'Service Cards & Offers',
+            'Service Job Types',
             'Service Invoices',
             'Customer Receipts',
         ]);

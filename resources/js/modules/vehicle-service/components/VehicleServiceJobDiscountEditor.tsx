@@ -123,10 +123,17 @@ export function VehicleServiceJobDiscountEditor({ job, onChanged }: {
                         hint="Required for adding, changing, or removing a discount."
                         onChange={(event) => setReason(event.target.value)}
                     />
-                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3">
-                        <Preview label="Eligible amount" value={job.job_discount_base} />
-                        <Preview label="Discount" value={previewAmount} />
-                        <Preview label="New grand total" value={previewGrandTotal} />
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2">
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <Preview label="Eligible amount" value={job.job_discount_base} />
+                            <Preview label="Discount" value={previewAmount} />
+                            <Preview label="New grand total" value={previewGrandTotal} />
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            {calculationType === 'percentage'
+                                ? `Auto-calculated as ${value || '0'}% of eligible base (${job.job_discount_base}). Applied after line-level discounts.`
+                                : 'Fixed discount amount deducted directly from eligible whole-job balance.'}
+                        </p>
                     </div>
                     <div className="flex flex-wrap justify-between gap-3">
                         <div>

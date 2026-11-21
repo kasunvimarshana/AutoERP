@@ -12,7 +12,10 @@ export interface LinePreview {
 export function LineSummary({ preview }: { preview: LinePreview }) {
     return (
         <div className="rounded-lg border border-slate-200 p-4 text-sm">
-            <h3 className="font-semibold text-slate-900">Pricing summary</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-slate-900">Pricing summary</h3>
+                <span className="text-xs text-slate-500">Auto-calculated from line quantity, unit price, discounts, and taxes</span>
+            </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-5">
                 <SummaryValue label="Subtotal" value={<MoneyDisplay value={preview.subtotal} />} />
                 <SummaryValue label="Discount" value={<MoneyDisplay value={preview.discount} />} />

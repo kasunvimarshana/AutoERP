@@ -121,7 +121,12 @@ export default function ServiceJobFeedbackReportPage() {
         lookupVehicleServiceJobTypes()
             .then((jobTypes) => {
                 if (mounted) {
-                    setAvailableJobTypes(jobTypes);
+                    const resolved = Array.isArray(jobTypes)
+                        ? jobTypes
+                        : Array.isArray((jobTypes as unknown as { data?: VehicleServiceJobTypeResource[] })?.data)
+                            ? (jobTypes as unknown as { data: VehicleServiceJobTypeResource[] }).data
+                            : [];
+                    setAvailableJobTypes(resolved);
                 }
             })
             .catch(() => {
@@ -469,7 +474,7 @@ export default function ServiceJobFeedbackReportPage() {
                         onChange={(e) => setFilters((prev) => ({ ...prev, job_type_id: e.target.value ? Number(e.target.value) : undefined, page: 1 }))}
                         options={[
                             { value: '', label: 'All Job Types' },
-                            ...availableJobTypes.map((jt) => ({ value: String(jt.id), label: jt.name })),
+                            ...(Array.isArray(availableJobTypes) ? availableJobTypes : []).map((jt) => ({ value: String(jt.id), label: jt.name })),
                         ]}
                     />
 

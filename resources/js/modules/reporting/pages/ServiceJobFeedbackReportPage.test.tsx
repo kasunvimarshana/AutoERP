@@ -184,7 +184,7 @@ describe('ServiceJobFeedbackReportPage', () => {
     });
 
     it('handles rating bar click to filter by star rating', async () => {
-        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce({ data: [] });
+        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce([]);
         apiMocks.runServiceJobFeedbackReport.mockResolvedValue(mockResult);
 
         const user = userEvent.setup();
@@ -210,7 +210,7 @@ describe('ServiceJobFeedbackReportPage', () => {
     });
 
     it('handles date preset selection and re-fetches report', async () => {
-        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce({ data: [] });
+        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce([]);
         apiMocks.runServiceJobFeedbackReport.mockResolvedValue(mockResult);
 
         const user = userEvent.setup();
@@ -235,7 +235,7 @@ describe('ServiceJobFeedbackReportPage', () => {
     });
 
     it('submits search filter keyword', async () => {
-        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce({ data: [] });
+        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce([]);
         apiMocks.runServiceJobFeedbackReport.mockResolvedValue(mockResult);
 
         const user = userEvent.setup();
@@ -263,7 +263,7 @@ describe('ServiceJobFeedbackReportPage', () => {
     });
 
     it('renders empty state when no feedback records exist', async () => {
-        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce({ data: [] });
+        jobTypeMocks.lookupVehicleServiceJobTypes.mockResolvedValueOnce([]);
         apiMocks.runServiceJobFeedbackReport.mockResolvedValueOnce({
             ...mockResult,
             data: [],

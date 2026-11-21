@@ -21,8 +21,9 @@ export function LinePricingFields({ value, total, error, set }: {
                 onChange={(event) => set('unit_price', event.target.value)}
             />
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Line Total</span>
                 <strong className="mt-1 block text-lg tabular-nums text-slate-900"><MoneyDisplay value={total} /></strong>
+                <span className="mt-0.5 block text-xs text-slate-500">Auto-calculated: (Qty × Unit Price) − Discount + Taxes</span>
             </div>
         </>
     );

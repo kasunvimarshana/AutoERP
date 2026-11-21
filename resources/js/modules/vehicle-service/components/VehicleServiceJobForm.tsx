@@ -400,7 +400,14 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                                 );
                             }}
                         />
-                        <Input label="Customer" value={customerLabel(customer)} error={errorFor('customer_id')} placeholder="Selected vehicle owner" readOnly />
+                        <Input
+                            label="Customer"
+                            value={customerLabel(customer)}
+                            error={errorFor('customer_id')}
+                            placeholder="Selected vehicle owner"
+                            hint={customer ? 'Auto-populated from selected vehicle owner' : 'Select a vehicle to populate customer owner'}
+                            readOnly
+                        />
                         <GenericLookupSelect
                             label="Supervisor"
                             value={supervisor}
@@ -423,7 +430,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             label="Odometer"
                             value={form.odometer_reading}
                             error={errorFor('odometer_reading')}
-                            hint={mileageHint}
+                            hint={!doesTrackMileage ? mileageHint : (vehicle?.odometer_reading ? `Prefilled from vehicle reading (${vehicle.odometer_reading} km). Edit if current reading differs.` : 'Current vehicle odometer reading')}
                             className={DISABLED_MILEAGE_CLASS}
                             required={doesTrackMileage}
                             disabled={!doesTrackMileage}
@@ -433,7 +440,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             label="Next Service Mileage"
                             value={form.next_service_mileage}
                             error={errorFor('next_service_mileage')}
-                            hint={mileageHint}
+                            hint={!doesTrackMileage ? mileageHint : 'Auto-calculated: current odometer + 5,000 km standard interval (editable)'}
                             className={DISABLED_MILEAGE_CLASS}
                             disabled={!doesTrackMileage}
                             onChange={(event) => updateForm({ ...form, next_service_mileage: event.target.value })}
@@ -443,7 +450,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             type="date"
                             value={form.next_service_date}
                             error={errorFor('next_service_date')}
-                            hint="Optional next service target date"
+                            hint="Auto-suggested: 1 month from job date (editable or clearable)"
                             onChange={(event) => {
                                 setNextServiceDateTouched(true);
                                 updateForm({ ...form, next_service_date: event.target.value });
@@ -454,6 +461,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             value={form.manual_job_card}
                             error={errorFor('manual_job_card') || (attemptedSubmit && !form.manual_job_card.trim() ? 'Manual Job Card is required.' : undefined)}
                             required
+                            hint="Physical workshop job card reference number"
                             onInvalid={() => setAttemptedSubmit(true)}
                             onChange={(event) => updateForm({ ...form, manual_job_card: event.target.value })}
                         />
