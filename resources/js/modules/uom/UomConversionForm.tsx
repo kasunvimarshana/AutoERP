@@ -78,10 +78,22 @@ export default function UomConversionForm() {
                     }
                 }}>
                     <div className="grid gap-4 md:grid-cols-2">
-                        <UomLookupSelect label="From UOM" value={fromUom} onChange={setFromUom} excludeId={toUom?.id ?? null} error={fieldError(error, 'from_uom_id')} />
-                        <UomLookupSelect label="To UOM" value={toUom} onChange={setToUom} excludeId={fromUom?.id ?? null} error={fieldError(error, 'to_uom_id')} />
+                        <UomLookupSelect label="From UOM" value={fromUom} onChange={setFromUom} excludeId={toUom?.id ?? null} error={fieldError(error, 'from_uom_id')} hint="Source unit of measurement" />
+                        <UomLookupSelect label="To UOM" value={toUom} onChange={setToUom} excludeId={fromUom?.id ?? null} error={fieldError(error, 'to_uom_id')} hint="Target unit of measurement" />
                     </div>
-                    <Input label="Conversion factor" value={conversionFactor} onChange={(event) => setConversionFactor(event.target.value)} error={fieldError(error, 'conversion_factor')} required />
+                    <Input
+                        label="Conversion factor"
+                        value={conversionFactor}
+                        onChange={(event) => setConversionFactor(event.target.value)}
+                        error={fieldError(error, 'conversion_factor')}
+                        hint="Multiplier: Quantity in Target = Quantity in Source × Conversion Factor"
+                        required
+                    />
+                    {fromUom && toUom && conversionFactor && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 font-medium">
+                            Conversion Rule: 1 {fromUom.name || fromUom.code} = {conversionFactor} {toUom.name || toUom.code}
+                        </div>
+                    )}
                     <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Active</label>
                     <Textarea label="Description" value={description} onChange={(event) => setDescription(event.target.value)} error={fieldError(error, 'description')} />
                     <div className="flex justify-end gap-2">

@@ -53,8 +53,8 @@ export function ItemForm({
     return (
         <Panel title="Item identity">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Input label="Code" value={value.code} onChange={(event) => set('code', event.target.value)} error={fieldError(error, 'code') ?? fieldError(error, 'item.code')} required />
-                <Input label="Name" value={value.name} onChange={(event) => set('name', event.target.value)} error={fieldError(error, 'name') ?? fieldError(error, 'item.name')} required />
+                <Input label="Code" value={value.code} onChange={(event) => set('code', event.target.value)} error={fieldError(error, 'code') ?? fieldError(error, 'item.code')} hint="Unique item catalog code" required />
+                <Input label="Name" value={value.name} onChange={(event) => set('name', event.target.value)} error={fieldError(error, 'name') ?? fieldError(error, 'item.name')} hint="Primary display name" required />
                 <Select label="Item type" value={value.item_type} onChange={(event) => {
                     const itemType = event.target.value;
                     const nextIsCombo = ['combo', 'package'].includes(itemType);
@@ -68,11 +68,11 @@ export function ItemForm({
                         tracking_type: nextNonInventory ? 'none' : value.tracking_type,
                         costing_method: nextNonInventory ? 'none' : value.costing_method,
                     });
-                }} options={options(itemTypes)} error={fieldError(error, 'item_type') ?? fieldError(error, 'item.item_type')} />
-                <Select label="Tracking type" value={value.tracking_type} onChange={(event) => set('tracking_type', event.target.value)} options={options(trackingTypes)} error={fieldError(error, 'tracking_type') ?? fieldError(error, 'item.tracking_type')} />
-                <Select label="Costing method" value={value.costing_method} onChange={(event) => set('costing_method', event.target.value)} options={options(costingMethods)} error={fieldError(error, 'costing_method') ?? fieldError(error, 'item.costing_method')} />
-                <Input label="SKU" value={value.sku ?? ''} onChange={(event) => set('sku', event.target.value || null)} error={fieldError(error, 'sku') ?? fieldError(error, 'item.sku')} />
-                <Input label="Barcode" value={value.barcode ?? ''} onChange={(event) => set('barcode', event.target.value || null)} error={fieldError(error, 'barcode') ?? fieldError(error, 'item.barcode')} />
+                }} options={options(itemTypes)} error={fieldError(error, 'item_type') ?? fieldError(error, 'item.item_type')} hint={nonInventoryType ? 'Non-inventory: physical stock and valuation disabled' : 'Controls inventory tracking and ledger treatment'} />
+                <Select label="Tracking type" value={value.tracking_type} onChange={(event) => set('tracking_type', event.target.value)} options={options(trackingTypes)} error={fieldError(error, 'tracking_type') ?? fieldError(error, 'item.tracking_type')} hint={nonInventoryType ? 'Disabled for non-inventory items' : 'Batch, lot, serial, or none'} />
+                <Select label="Costing method" value={value.costing_method} onChange={(event) => set('costing_method', event.target.value)} options={options(costingMethods)} error={fieldError(error, 'costing_method') ?? fieldError(error, 'item.costing_method')} hint={nonInventoryType ? 'Disabled for non-inventory items' : 'FIFO, moving average, or standard'} />
+                <Input label="SKU" value={value.sku ?? ''} onChange={(event) => set('sku', event.target.value || null)} error={fieldError(error, 'sku') ?? fieldError(error, 'item.sku')} hint="Stock keeping unit reference" />
+                <Input label="Barcode" value={value.barcode ?? ''} onChange={(event) => set('barcode', event.target.value || null)} error={fieldError(error, 'barcode') ?? fieldError(error, 'item.barcode')} hint="UPC / EAN / QR code" />
                 <ItemCategorySelect value={category} onChange={(next) => { onCategoryChange(next); set('item_category_id', next ? Number(next.id) : null); }} error={fieldError(error, 'item_category_id') ?? fieldError(error, 'item.item_category_id')} />
                 <ItemBrandSelect value={brand} onChange={(next) => { onBrandChange(next); set('item_brand_id', next ? Number(next.id) : null); }} error={fieldError(error, 'item_brand_id') ?? fieldError(error, 'item.item_brand_id')} />
                 {baseUomLocked ? (

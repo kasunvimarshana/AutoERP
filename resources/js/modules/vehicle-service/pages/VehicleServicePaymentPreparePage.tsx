@@ -533,6 +533,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                     value={amountValue}
                                                     className="text-right text-lg font-semibold tabular-nums"
                                                     error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.amount`) : undefined}
+                                                    hint={row.kind === 'cash' ? 'Tendered cash from customer' : 'Amount to charge to this method'}
                                                     disabled={paymentEntryDisabled || availableMethods.length === 0}
                                                     onFocus={(event) => event.currentTarget.select()}
                                                     onKeyDown={(event) => {
@@ -604,15 +605,18 @@ export default function VehicleServicePaymentPreparePage() {
                                             )}
 
                                             {row.kind === 'cash' && (
-                                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                                    <div className="rounded-md bg-white/70 px-4 py-2">
-                                                        <p className="text-xs text-slate-600">Cash amount applied</p>
-                                                        <p className="mt-1 font-semibold tabular-nums text-slate-950">{formatMoney(appliedAmount)}</p>
+                                                <div className="mt-4 space-y-1">
+                                                    <div className="grid gap-3 sm:grid-cols-2">
+                                                        <div className="rounded-md bg-white/70 px-4 py-2">
+                                                            <p className="text-xs text-slate-600">Cash amount applied</p>
+                                                            <p className="mt-1 font-semibold tabular-nums text-slate-950">{formatMoney(appliedAmount)}</p>
+                                                        </div>
+                                                        <div className="rounded-md bg-white/70 px-4 py-2">
+                                                            <p className="text-xs text-slate-600">Change to return</p>
+                                                            <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(paymentInvoice ? nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)) : ZERO_AMOUNT)}</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="rounded-md bg-white/70 px-4 py-2">
-                                                        <p className="text-xs text-slate-600">Change to return</p>
-                                                        <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(paymentInvoice ? nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)) : ZERO_AMOUNT)}</p>
-                                                    </div>
+                                                    <p className="text-[11px] text-slate-500 px-1">Formula: Change to Return = Cash Received − Cash Applied to Invoice</p>
                                                 </div>
                                             )}
                                         </section>

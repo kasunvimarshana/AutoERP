@@ -22,20 +22,20 @@ export function SupplierForm({ value, onChange, currency, onCurrencyChange, erro
         <Panel title="Supplier identity">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Input label="Code" value={value.code} onChange={(event) => set('code', event.target.value)} placeholder="Auto-generated when left blank" hint="Leave blank for an automatic code, or enter a custom code." error={fieldError(error, 'code') ?? fieldError(error, 'supplier.code')} />
-                <Input label="Legal Name" value={value.name} onChange={(event) => set('name', event.target.value)} error={fieldError(error, 'name') ?? fieldError(error, 'supplier.name')} required />
-                <Select label="Supplier type" value={value.supplier_type} onChange={(event) => set('supplier_type', event.target.value)} options={options(supplierTypes)} error={fieldError(error, 'supplier_type') ?? fieldError(error, 'supplier.supplier_type')} />
+                <Input label="Legal Name" value={value.name} onChange={(event) => set('name', event.target.value)} error={fieldError(error, 'name') ?? fieldError(error, 'supplier.name')} hint="Registered commercial or company name" required />
+                <Select label="Supplier type" value={value.supplier_type} onChange={(event) => set('supplier_type', event.target.value)} options={options(supplierTypes)} error={fieldError(error, 'supplier_type') ?? fieldError(error, 'supplier.supplier_type')} hint="Trade vendor, parts supplier, or service provider" />
                 {creating && <Select label="Initial status" value={value.status ?? 'pending_approval'} onChange={(event) => set('status', event.target.value)} options={options(supplierStatuses)} error={fieldError(error, 'status') ?? fieldError(error, 'supplier.status')} />}
-                <Input label="Display name" value={value.display_name ?? ''} onChange={(event) => set('display_name', event.target.value || null)} />
+                <Input label="Display name" value={value.display_name ?? ''} onChange={(event) => set('display_name', event.target.value || null)} hint="Short name shown in search menus" />
             </div>
         </Panel>
         <Panel title="Contact and commercial defaults">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Input label="Email" type="email" value={value.email ?? ''} onChange={(event) => set('email', event.target.value || null)} error={fieldError(error, 'email') ?? fieldError(error, 'supplier.email')} />
-                <Input label="Phone" value={value.phone ?? ''} onChange={(event) => set('phone', event.target.value || null)} />
-                <Input label="WhatsApp Number" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} />
+                <Input label="Email" type="email" value={value.email ?? ''} onChange={(event) => set('email', event.target.value || null)} error={fieldError(error, 'email') ?? fieldError(error, 'supplier.email')} hint="PO and remittance dispatch email" />
+                <Input label="Phone" value={value.phone ?? ''} onChange={(event) => set('phone', event.target.value || null)} hint="Office telephone" />
+                <Input label="WhatsApp Number" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} hint="Instant mobile communication channel" />
                 <Input label="Website" type="url" value={value.website ?? ''} onChange={(event) => set('website', event.target.value || null)} />
                 <SupplierCurrencySelect value={currency} onChange={(next) => { onCurrencyChange(next); set('default_currency_id', next ? Number(next.id) : null); }} error={fieldError(error, 'default_currency_id') ?? fieldError(error, 'supplier.default_currency_id')} />
-                <Input label="Reference credit limit" value={value.credit_limit ?? '0.000000'} onChange={(event) => set('credit_limit', event.target.value)} error={fieldError(error, 'credit_limit') ?? fieldError(error, 'supplier.credit_limit')} />
+                <Input label="Reference credit limit" value={value.credit_limit ?? '0.000000'} onChange={(event) => set('credit_limit', event.target.value)} error={fieldError(error, 'credit_limit') ?? fieldError(error, 'supplier.credit_limit')} hint="Credit ceiling allowed by this vendor" />
             </div>
             <div className="mt-4 flex flex-wrap gap-6 text-sm">
                 <label><input className="mr-2" type="checkbox" checked={value.is_credit_allowed} onChange={(event) => set('is_credit_allowed', event.target.checked)} />Credit allowed</label>

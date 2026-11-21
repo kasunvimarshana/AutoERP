@@ -30,6 +30,7 @@ export function CustomerLookupSelect({
     required,
     label = DEFAULT_LABEL,
     placeholder,
+    hint,
     loadOnOpen,
     minSearchLength,
     dropdownPlacement,
@@ -43,6 +44,7 @@ export function CustomerLookupSelect({
     required?: boolean;
     label?: string;
     placeholder?: string;
+    hint?: string;
     loadOnOpen?: boolean;
     minSearchLength?: number;
     dropdownPlacement?: 'top' | 'bottom';
@@ -58,6 +60,7 @@ export function CustomerLookupSelect({
             formatLabel={formatCustomerLookupLabel}
             renderOption={(customer) => renderCustomerLookupOption(customer)}
             error={error}
+            hint={hint}
             disabled={disabled}
             required={required}
             placeholder={placeholder}

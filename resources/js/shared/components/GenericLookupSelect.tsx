@@ -22,6 +22,7 @@ interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehavi
     excludeId?: number | null;
     excludeIds?: Array<number | string>;
     error?: string;
+    hint?: string;
     placeholder?: string;
     disabled?: boolean;
     required?: boolean;
@@ -42,6 +43,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     excludeId,
     excludeIds,
     error,
+    hint,
     placeholder = 'Search by code or name',
     disabled = false,
     required = false,
@@ -306,6 +308,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 value={hasUserInput ? inputValue : selectedLabel}
                 placeholder={placeholder}
                 error={error ?? (required && value === null ? selectionError : '')}
+                hint={hint}
                 disabled={disabled}
                 required={required}
                 autoFocus={autoFocus}

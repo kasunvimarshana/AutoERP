@@ -141,12 +141,14 @@ export default function CustomerOutstandingReportPage() {
                                 value={draftCustomer}
                                 onChange={setDraftCustomer}
                                 placeholder="Name, code, or customer number"
+                                hint="Filter by specific customer account"
                             />
                             <Select
                                 label="Location"
                                 value={draft.location_id?.toString() ?? ''}
                                 placeholder="All accessible locations"
                                 options={locations.map((location) => ({ value: String(location.id), label: location.name }))}
+                                hint="Branch or warehouse location"
                                 onChange={(event) => setDraft((current) => ({ ...current, location_id: event.target.value ? Number(event.target.value) : undefined }))}
                             />
                             <Select
@@ -154,6 +156,7 @@ export default function CustomerOutstandingReportPage() {
                                 value={draft.aging_bucket ?? ''}
                                 placeholder="All aging buckets"
                                 options={AGING_OPTIONS}
+                                hint="Days overdue past payment due date"
                                 onChange={(event) => setDraft((current) => ({ ...current, aging_bucket: (event.target.value || undefined) as ReceivableAgingBucket | undefined }))}
                             />
                             <div className="flex items-end gap-2">

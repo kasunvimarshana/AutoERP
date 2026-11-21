@@ -206,13 +206,20 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                             }));
                         }}
                     />
-                    <DecimalInput label="Quantity" value={draft.quantity} error={formError('quantity')} onChange={(event) => set('quantity', event.target.value)} />
+                    <DecimalInput
+                        label="Quantity"
+                        value={draft.quantity}
+                        error={formError('quantity')}
+                        hint="Order quantity in selected UOM"
+                        onChange={(event) => set('quantity', event.target.value)}
+                    />
                     <Select
                         label="UOM"
                         value={draft.uom?.id ?? ''}
                         options={uomOptions}
                         disabled={!context}
                         error={formError('uom') ?? errorFor('uom_id')}
+                        hint="Allowed purchase units for item"
                         onChange={(event) => {
                             const uomId = event.target.value ? Number(event.target.value) : null;
                             const selected = context?.allowed_purchase_uoms.find((row) => row.id === uomId)?.uom ?? null;
@@ -234,6 +241,7 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                         label={config.unitLabel}
                         value={draft.unit_price}
                         error={formError('unit_price')}
+                        hint={draft.auto_price ? 'Auto-suggested from price agreement or item defaults' : 'Manually specified unit price'}
                         onChange={(event) => setDraft((current) => ({
                             ...current,
                             unit_price: event.target.value,
@@ -245,12 +253,21 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                     />
                     <Input className="sm:col-span-2" label="Description" value={draft.description} onChange={(event) => set('description', event.target.value)} />
                 </div>
-                {draft.price_source_label && <p className="text-xs text-slate-500">{draft.price_source_label}</p>}
+                {draft.price_source_label && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                            Price Source: {draft.price_source_label}
+                        </span>
+                        <span className="text-slate-500">
+                            {draft.auto_price ? '(Auto-populated, editable)' : '(Manually confirmed)'}
+                        </span>
+                    </div>
+                )}
             </section>
 
             <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <summary className="cursor-pointer font-semibold text-slate-800">Advanced pricing</summary>
-                <p className="mt-1 text-sm text-slate-500">Advanced pricing is optional.</p>
+                <p className="mt-1 text-sm text-slate-500">Advanced pricing (discounts, taxes, and freight/charges) is optional.</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <CalculationField
                         label="Discount"
@@ -296,8 +313,11 @@ export function PurchaseLineForm({ line, mode, config, supplierId, currencyId, w
                 </div>
             </details>
 
-            <div className="rounded-lg border border-slate-200 p-4 text-sm">
-                <h3 className="font-semibold text-slate-900">Line Preview</h3>
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
+                    <h3 className="font-semibold text-slate-900">Line Calculation Preview</h3>
+                    <span className="text-xs text-slate-500 font-medium">Formula: (Qty × Price) − Discount + Tax + Charge</span>
+                </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-5">
                     <PreviewValue label="Subtotal" value={preview.subtotal} />
                     <PreviewValue label="Discount" value={preview.discount} />

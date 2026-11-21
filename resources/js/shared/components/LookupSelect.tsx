@@ -14,6 +14,7 @@ export interface LookupSelectProps<T extends NamedResource = NamedResource> exte
     renderEmptyState?: (state: { searchText: string; meta: PaginationMeta | undefined }) => ReactNode;
     placeholder?: string;
     error?: string;
+    hint?: string;
     excludeId?: number | null;
     excludeIds?: Array<number | string>;
     disabled?: boolean;
@@ -33,6 +34,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     renderEmptyState,
     placeholder = 'Search...',
     error,
+    hint,
     excludeId,
     excludeIds,
     disabled,
@@ -63,6 +65,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
             renderEmptyState={renderEmptyState}
             placeholder={placeholder}
             error={error}
+            hint={hint}
             excludeId={excludeId}
             excludeIds={excludeIds}
             disabled={disabled}

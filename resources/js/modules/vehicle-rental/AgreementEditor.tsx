@@ -21,6 +21,30 @@ const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unkn
 const basisOptions = [{ value: RentalBasis.Daily, label: 'Daily' }, { value: RentalBasis.Monthly, label: 'Monthly' }];
 const driverOptions = [{ value: DriverMode.SelfDrive, label: 'Self-drive' }, { value: DriverMode.WithDriver, label: 'With driver' }];
 
+const TERM_HINTS: Partial<Record<TermKey, string>> = {
+    base_rate: 'Recurring base rent per day or month depending on rental basis',
+    included_km: 'Free distance allowed before excess kilometer charges apply',
+    excess_km_rate: 'Rate applied per kilometer exceeding included distance',
+    non_ac_rate: 'Rate applied when operating in Non-AC mode',
+    front_ac_rate: 'Rate applied when operating in Front-AC mode',
+    dual_ac_rate: 'Rate applied when operating in Dual-AC mode',
+    driver_rate: 'Agreed daily allowance or fixed fee for assigned driver',
+    normal_ot_rate: 'Hourly overtime rate applied to normal OT minutes',
+    double_ot_rate: 'Hourly overtime rate applied to double OT minutes (holidays/special shifts)',
+    triple_ot_rate: 'Hourly overtime rate applied to triple OT minutes',
+    night_out_rate: 'Fixed allowance per overnight stay away from base garage',
+    deposit_requirement: 'Refundable security deposit collected prior to handover',
+};
+
+function termHint(kind: AgreementKind, key: TermKey): string | undefined {
+    if (kind === AgreementKind.Owner) {
+        if (key === 'base_rate') return 'Base lease amount payable to vehicle owner';
+        if (key === 'excess_km_rate') return 'Payable to owner per kilometer exceeding included distance';
+        if (key === 'driver_rate') return 'Reimbursement to owner for driver services';
+    }
+    return TERM_HINTS[key];
+}
+
 export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: AgreementKind; record?: Agreement; onSaved: () => void; onCancel: () => void }) {
     const isSuccessor = Boolean(record?.supersedes_agreement);
     const [party, setParty] = useState<NamedResource | null>(record?.party ?? null);
@@ -79,43 +103,31 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
                 hint={record ? undefined : "Leave blank to automatically generate a unique contract reference"}
                 error={fieldError('reference')}
             />
-            <div>
+            <LookupSelect
+                label={kind === AgreementKind.Customer ? 'Customer' : 'Owner / supplier'}
+                value={party}
+                onChange={setParty}
+                search={kind === AgreementKind.Customer ? lookupApi.customers : lookupApi.suppliers}
+                required
+                disabled={isSuccessor}
+                error={fieldError('party_id')}
+                hint={isSuccessor ? 'Successor agreements inherit the counterparty of the predecessor agreement.' : undefined}
+                loadOnOpen
+                minSearchLength={0}
+            />
+            {kind === AgreementKind.Owner && (
                 <LookupSelect
-                    label={kind === AgreementKind.Customer ? 'Customer' : 'Owner / supplier'}
-                    value={party}
-                    onChange={setParty}
-                    search={kind === AgreementKind.Customer ? lookupApi.customers : lookupApi.suppliers}
+                    label="Vehicle"
+                    value={vehicle}
+                    onChange={setVehicle}
+                    search={vehicles}
                     required
                     disabled={isSuccessor}
-                    error={fieldError('party_id')}
+                    error={fieldError('vehicle_id')}
+                    hint={isSuccessor ? 'Owner successor agreements inherit the supplied vehicle.' : 'Select the specific vehicle supplied by the owner.'}
                     loadOnOpen
                     minSearchLength={0}
                 />
-                {isSuccessor && (
-                    <p className="mt-1 text-xs text-slate-500">
-                        Successor agreements inherit the counterparty of the predecessor agreement.
-                    </p>
-                )}
-            </div>
-            {kind === AgreementKind.Owner && (
-                <div>
-                    <LookupSelect
-                        label="Vehicle"
-                        value={vehicle}
-                        onChange={setVehicle}
-                        search={vehicles}
-                        required
-                        disabled={isSuccessor}
-                        error={fieldError('vehicle_id')}
-                        loadOnOpen
-                        minSearchLength={0}
-                    />
-                    {isSuccessor && (
-                        <p className="mt-1 text-xs text-slate-500">
-                            Owner successor agreements inherit the supplied vehicle.
-                        </p>
-                    )}
-                </div>
             )}
             <LookupSelect
                 label="Currency"
@@ -124,6 +136,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
                 search={currencies}
                 required
                 error={fieldError('currency_id')}
+                hint="Base operational and billing currency"
                 loadOnOpen
                 minSearchLength={0}
             />
@@ -177,7 +190,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             <summary className="cursor-pointer font-medium">Agreed rates and allowances</summary>
             <p className="my-3 text-sm text-slate-600">Enter only the terms agreed with this party. Blank means unknown; enter zero only when explicitly agreed.</p>
             <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
-                {ratesTermKeys.map(key => <Input key={key} label={termLabel(kind, key)} inputMode="decimal" value={terms[key] ?? ''} onChange={e => setTerms({ ...terms, [key]: e.target.value || null })} error={fieldError(`terms.${key}`)} />)}
+                {ratesTermKeys.map(key => <Input key={key} label={termLabel(kind, key)} inputMode="decimal" value={terms[key] ?? ''} onChange={e => setTerms({ ...terms, [key]: e.target.value || null })} error={fieldError(`terms.${key}`)} hint={termHint(kind, key)} />)}
             </fieldset>
         </details>
         <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} error={fieldError('notes')} />

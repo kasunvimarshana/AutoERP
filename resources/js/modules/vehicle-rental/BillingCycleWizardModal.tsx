@@ -941,16 +941,19 @@ export function BillingCycleWizardModal({
                                                     <div>
                                                         <span className="text-xs text-slate-500 font-semibold">Consolidated Net Total</span>
                                                         <div className="text-lg font-bold text-slate-900"><MoneyDisplay value={preview.total_billed_amount} currency={cur} /></div>
+                                                        <span className="block text-[11px] text-slate-500">Formula: Base Rent + Excess KM/OT + Additions − Deductions</span>
                                                     </div>
                                                     <div>
                                                         <span className="text-xs text-slate-500 font-semibold">Stage 1 Invoiced</span>
                                                         <div className="text-lg font-semibold text-slate-600">
                                                             <MoneyDisplay value={preview.initial_invoice?.grand_total ?? '0.000000'} currency={cur} />
                                                         </div>
+                                                        <span className="block text-[11px] text-slate-500">Advance base rent invoice previously issued</span>
                                                     </div>
                                                     <div>
                                                         <span className="text-xs text-slate-500 font-semibold">Delta to Settle</span>
                                                         <div className="text-lg font-bold text-blue-700"><MoneyDisplay value={preview.gross_delta_amount} currency={cur} /></div>
+                                                        <span className="block text-[11px] text-blue-600 font-medium">Calculation: Consolidated Net Total − Stage 1 Invoiced</span>
                                                     </div>
                                                 </div>
 
@@ -1055,6 +1058,7 @@ export function BillingCycleWizardModal({
                                                     type="date"
                                                     value={finalInvoiceDate}
                                                     onChange={e => setFinalInvoiceDate(e.target.value)}
+                                                    hint="Posting date for final invoice"
                                                     required
                                                 />
                                                 <Input
@@ -1062,6 +1066,7 @@ export function BillingCycleWizardModal({
                                                     type="date"
                                                     value={finalDueDate}
                                                     onChange={e => setFinalDueDate(e.target.value)}
+                                                    hint="Final payment deadline"
                                                 />
                                             </div>
 

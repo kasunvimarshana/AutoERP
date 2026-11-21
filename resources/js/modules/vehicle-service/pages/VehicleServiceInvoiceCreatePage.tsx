@@ -73,6 +73,10 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
         <>
             <ContentHeader title={`Invoice ${job.job_number}`} description="Creates, approves and posts the customer invoice in one transaction." />
             <ErrorAlert error={error ?? loadError} />
+            <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 space-y-1">
+                <span className="font-semibold text-blue-950">Invoicing Quantities:</span>
+                <p>Quantities default to remaining unbilled amounts. Adjust any line quantity to issue a partial invoice or clear to exclude from this invoice.</p>
+            </div>
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <DataTable rows={billableLines} rowKey={(line) => line.id} columns={[
                     { key: 'line', header: 'Line', render: (line) => line.line_number },
@@ -101,9 +105,9 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
                 ]} />
                 <Panel title="Invoice details">
                     <div className="space-y-4">
-                        <Input label="Invoice date" type="date" value={form.invoice_date} error={fieldError(error, 'invoice_date')} onChange={(event) => { setPreview(null); setForm({ ...form, invoice_date: event.target.value }); }} />
-                        <Input label="Due date" type="date" value={form.due_date} error={fieldError(error, 'due_date')} onChange={(event) => { setPreview(null); setForm({ ...form, due_date: event.target.value }); }} />
-                        <DecimalInput label="Exchange rate" value={form.exchange_rate} error={fieldError(error, 'exchange_rate')} onChange={(event) => { setPreview(null); setForm({ ...form, exchange_rate: event.target.value }); }} />
+                        <Input label="Invoice date" type="date" value={form.invoice_date} error={fieldError(error, 'invoice_date')} hint="Sales ledger posting date" onChange={(event) => { setPreview(null); setForm({ ...form, invoice_date: event.target.value }); }} />
+                        <Input label="Due date" type="date" value={form.due_date} error={fieldError(error, 'due_date')} hint="Payment due date" onChange={(event) => { setPreview(null); setForm({ ...form, due_date: event.target.value }); }} />
+                        <DecimalInput label="Exchange rate" value={form.exchange_rate} error={fieldError(error, 'exchange_rate')} hint="Currency multiplier (1.0 for local base)" onChange={(event) => { setPreview(null); setForm({ ...form, exchange_rate: event.target.value }); }} />
                         <Textarea label="Notes" value={form.notes} error={fieldError(error, 'notes')} onChange={(event) => { setPreview(null); setForm({ ...form, notes: event.target.value }); }} />
                         <div className="flex gap-2">
                             <Button type="button" variant="secondary" loading={busy} disabled={!hasSelection} onClick={async () => {
@@ -133,13 +137,19 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
                                 }
                             }}>Create & post invoice</Button>
                         </div>
-                        {preview && <DetailGrid items={[
-                            { label: 'Subtotal', value: <MoneyDisplay value={preview.subtotal} /> },
-                            { label: 'Discount', value: <MoneyDisplay value={preview.discountTotal} /> },
-                            { label: 'Tax', value: <MoneyDisplay value={preview.taxTotal} /> },
-                            { label: 'Charges', value: <MoneyDisplay value={preview.chargeTotal} /> },
-                            { label: 'Grand total', value: <MoneyDisplay value={preview.grandTotal} /> },
-                        ]} />}
+                        {preview && (
+                            <div className="space-y-2 pt-2 border-t border-slate-200">
+                                <span className="text-xs font-semibold text-slate-800">Calculation Preview</span>
+                                <DetailGrid items={[
+                                    { label: 'Subtotal', value: <MoneyDisplay value={preview.subtotal} /> },
+                                    { label: 'Discount', value: <MoneyDisplay value={preview.discountTotal} /> },
+                                    { label: 'Tax', value: <MoneyDisplay value={preview.taxTotal} /> },
+                                    { label: 'Charges', value: <MoneyDisplay value={preview.chargeTotal} /> },
+                                    { label: 'Grand total', value: <MoneyDisplay value={preview.grandTotal} /> },
+                                ]} />
+                                <p className="text-[11px] text-slate-500">Formula: (Subtotal − Discount) + Tax + Charges = Grand Total</p>
+                            </div>
+                        )}
                     </div>
                 </Panel>
             </div>

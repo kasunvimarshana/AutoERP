@@ -146,14 +146,35 @@ function GoodsReceiptLineForm({ line, errorFor, onSave, onCancel }: {
                     <h3 className="font-semibold text-slate-900">Basic Details</h3>
                     <p className="text-sm text-slate-500">{formatGoodsReceiptItem(draft)} / {draft.source.uom?.code ?? '-'}</p>
                 </div>
+                <div className="rounded-md bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600">
+                    <span className="font-semibold text-slate-800">Receiving Invariant:</span> Received Quantity = Accepted Quantity + Rejected Quantity. Accepted items are placed into warehouse inventory.
+                </div>
                 <div className="grid gap-4 sm:grid-cols-3">
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                         <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={draft.include} onChange={(event) => set('include', event.target.checked)} />
-                        Include
+                        Include in GRN
                     </label>
-                    <DecimalInput label="Received quantity" value={draft.received_quantity} error={errorFor('received_quantity')} onChange={(event) => set('received_quantity', event.target.value)} />
-                    <DecimalInput label="Accepted quantity" value={draft.accepted_quantity} error={errorFor('accepted_quantity')} onChange={(event) => set('accepted_quantity', event.target.value)} />
-                    <DecimalInput label="Rejected quantity" value={draft.rejected_quantity} error={errorFor('rejected_quantity')} onChange={(event) => set('rejected_quantity', event.target.value)} />
+                    <DecimalInput
+                        label="Received quantity"
+                        value={draft.received_quantity}
+                        error={errorFor('received_quantity')}
+                        hint="Total physically received"
+                        onChange={(event) => set('received_quantity', event.target.value)}
+                    />
+                    <DecimalInput
+                        label="Accepted quantity"
+                        value={draft.accepted_quantity}
+                        error={errorFor('accepted_quantity')}
+                        hint="Passed inspection into stock"
+                        onChange={(event) => set('accepted_quantity', event.target.value)}
+                    />
+                    <DecimalInput
+                        label="Rejected quantity"
+                        value={draft.rejected_quantity}
+                        error={errorFor('rejected_quantity')}
+                        hint="Rejected/damaged items"
+                        onChange={(event) => set('rejected_quantity', event.target.value)}
+                    />
                 </div>
             </section>
             <div className="rounded-lg border border-slate-200 p-4 text-sm">

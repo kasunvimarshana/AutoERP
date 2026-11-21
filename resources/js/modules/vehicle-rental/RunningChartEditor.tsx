@@ -358,7 +358,7 @@ export function RunningChartEditor({
     const hasValidOdo = !isNaN(startOdo) && !isNaN(endOdo);
     const calculatedTripDistance = hasValidOdo && endOdo >= startOdo ? (endOdo - startOdo).toFixed(2) : null;
 
-    const decimal = (key: string, label: string) => (
+    const decimal = (key: string, label: string, hint?: string) => (
         <Input
             key={key}
             label={label}
@@ -366,6 +366,7 @@ export function RunningChartEditor({
             inputMode="decimal"
             onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))}
             error={error?.fields[key]?.[0]}
+            hint={hint}
         />
     );
     const count = (key: string, label: string) => {
@@ -622,13 +623,13 @@ export function RunningChartEditor({
 
             <div className="space-y-1">
                 <div className="grid gap-3 sm:grid-cols-2">
-                    {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}
-                    {decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
+                    {decimal('start_odometer', DISTANCE_LABELS.start_odometer, initialOdometer ? 'Prefilled from previous odometer reading (verify physical meter)' : 'Physical vehicle meter at departure')}
+                    {decimal('end_odometer', DISTANCE_LABELS.end_odometer, 'Physical vehicle meter at return')}
                 </div>
                 {calculatedTripDistance !== null && (
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-1">
                         <span>
-                            Total physical distance: <strong className="text-slate-800">{calculatedTripDistance} km</strong>
+                            Total physical distance: <strong className="text-slate-800">{calculatedTripDistance} km</strong> <span className="text-slate-500">(Formula: End Odometer − Start Odometer)</span>
                         </span>
                         {!values.commercial_km && (
                             <Button

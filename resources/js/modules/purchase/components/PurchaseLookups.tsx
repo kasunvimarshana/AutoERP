@@ -18,6 +18,7 @@ interface LookupProps extends LookupBehaviorOptions {
     value: NamedResource | null;
     onChange: (value: NamedResource | null) => void;
     error?: string;
+    hint?: string;
     excludeId?: number | null;
     excludeIds?: Array<number | string>;
     disabled?: boolean;

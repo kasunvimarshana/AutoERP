@@ -43,7 +43,10 @@ function StockValue({ value, tone = 'normal' }: { value: string | number; tone?:
 
 function StockBreakdown({ details }: { details: StockBalanceDetail[] }) {
     return <div className="rounded-lg border border-slate-200 bg-white p-3">
-        <h3 className="mb-2 text-sm font-semibold text-slate-900">Stock breakdown by batch</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h3 className="text-sm font-semibold text-slate-900">Stock breakdown by batch</h3>
+            <span className="text-xs text-slate-500">Formula: Available = Current On-Hand − Reserved − Allocated − Damaged/Quarantine</span>
+        </div>
         <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
                 <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500"><tr>

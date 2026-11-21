@@ -24,6 +24,9 @@ export function PurchaseTotalsSummary({ title = 'Totals', rows }: { title?: stri
                     </div>
                 ))}
             </dl>
+            <p className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                Auto-calculated from lines, taxes, freight/charges, and order adjustments.
+            </p>
         </section>
     );
 }

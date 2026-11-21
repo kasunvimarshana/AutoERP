@@ -239,12 +239,20 @@ export function RentalInvoiceCreateModal({
 
                     {agreement && mode === 'base' && (
                         <form onSubmit={handleBaseRentSubmit} className="space-y-4 pt-2 border-t border-slate-100">
+                            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-950 space-y-1">
+                                <p className="font-semibold text-blue-900">Base Rent Billing Scope:</p>
+                                <p className="text-blue-800">
+                                    Issues an advance invoice for fixed contract base rent across the selected coverage span. Variable excess mileage, overtime, and toll adjustments are consolidated separately via the Billing Cycle Wizard.
+                                </p>
+                            </div>
+
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <Input
                                     label="Coverage Period From"
                                     type="date"
                                     value={periodFrom}
                                     onChange={e => setPeriodFrom(e.target.value)}
+                                    hint="Coverage start date"
                                     required
                                 />
                                 <Input
@@ -252,6 +260,7 @@ export function RentalInvoiceCreateModal({
                                     type="date"
                                     value={periodUntil}
                                     onChange={e => setPeriodUntil(e.target.value)}
+                                    hint="Coverage end date"
                                     required
                                 />
                             </div>
@@ -262,6 +271,7 @@ export function RentalInvoiceCreateModal({
                                     type="date"
                                     value={invoiceDate}
                                     onChange={e => setInvoiceDate(e.target.value)}
+                                    hint="Sales ledger posting date"
                                     required
                                 />
                                 <Input
@@ -269,6 +279,7 @@ export function RentalInvoiceCreateModal({
                                     type="date"
                                     value={dueDate}
                                     onChange={e => setDueDate(e.target.value)}
+                                    hint="Customer payment due date"
                                 />
                             </div>
 

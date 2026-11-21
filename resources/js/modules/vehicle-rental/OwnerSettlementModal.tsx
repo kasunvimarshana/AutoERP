@@ -159,6 +159,7 @@ export function OwnerSettlementModal({
                             type="date"
                             value={startDate}
                             onChange={e => setStartDate(e.target.value)}
+                            hint="Start of calculation cycle"
                             required
                         />
                         <Input
@@ -166,8 +167,14 @@ export function OwnerSettlementModal({
                             type="date"
                             value={endDate}
                             onChange={e => setEndDate(e.target.value)}
+                            hint="End of calculation cycle"
                             required
                         />
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+                        <p className="font-semibold text-slate-900">Owner Settlement Formula:</p>
+                        <p className="text-slate-600">Net Payable = Gross Lease Disbursements − ({whtRate || '0'}% WHT Deduction) − Approved Maintenance Deductions</p>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -179,6 +186,7 @@ export function OwnerSettlementModal({
                             max="100"
                             value={whtRate}
                             onChange={e => setWhtRate(e.target.value)}
+                            hint="Statutory 10% WHT default for leased vehicles"
                             required
                         />
                         <Input
@@ -186,6 +194,7 @@ export function OwnerSettlementModal({
                             type="date"
                             value={invoiceDate}
                             onChange={e => setInvoiceDate(e.target.value)}
+                            hint="AP ledger posting date"
                             required
                         />
                         <Input
@@ -193,6 +202,7 @@ export function OwnerSettlementModal({
                             type="date"
                             value={dueDate}
                             onChange={e => setDueDate(e.target.value)}
+                            hint="Contractual payment due date"
                         />
                     </div>
 

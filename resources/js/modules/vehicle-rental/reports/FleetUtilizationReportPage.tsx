@@ -187,26 +187,32 @@ export default function FleetUtilizationReportPage() {
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Fleet</div>
                             <div className="mt-1 text-2xl font-bold text-slate-900">{data.summary.total_vehicles}</div>
+                            <div className="mt-1 text-[11px] text-slate-500">Active fleet assets</div>
                         </div>
                         <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">In Custody</div>
                             <div className="mt-1 text-2xl font-bold text-blue-900">{data.summary.in_custody_count}</div>
+                            <div className="mt-1 text-[11px] text-blue-600">On active rental trip</div>
                         </div>
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">Available / Idle</div>
                             <div className="mt-1 text-2xl font-bold text-emerald-900">{data.summary.available_count}</div>
+                            <div className="mt-1 text-[11px] text-emerald-600">Ready in garage</div>
                         </div>
                         <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">Average Utilization</div>
                             <div className="mt-1 text-2xl font-bold text-blue-900">{data.summary.average_utilization_rate}%</div>
+                            <div className="mt-1 text-[11px] text-blue-600 font-medium">Formula: (Custody Days ÷ Fleet Days) × 100</div>
                         </div>
                         <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700">Total KM Driven</div>
                             <div className="mt-1 text-2xl font-bold text-amber-900">{data.summary.total_distance_km.toLocaleString()}</div>
+                            <div className="mt-1 text-[11px] text-amber-600">Sum of running chart distances</div>
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-700">Owner Leased</div>
                             <div className="mt-1 text-2xl font-bold text-slate-900">{data.summary.owner_leased_count}</div>
+                            <div className="mt-1 text-[11px] text-slate-500">Supplier fleet units</div>
                         </div>
                     </div>
 

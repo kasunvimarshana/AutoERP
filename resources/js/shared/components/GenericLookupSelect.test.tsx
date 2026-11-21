@@ -236,6 +236,23 @@ describe('GenericLookupSelect', () => {
 
         expect(handleChange).toHaveBeenCalledWith(resource(3, 'Option 3'));
     });
+
+    it('renders hint text beneath the input when provided', async () => {
+        await act(async () => {
+            render(
+                <GenericLookupSelect<NamedResource>
+                    label="Customer"
+                    value={null}
+                    onChange={() => undefined}
+                    search={async () => ({ data: [], links: {}, meta: undefined })}
+                    formatLabel={(item) => item.name}
+                    hint="Auto-populated from vehicle owner"
+                />,
+            );
+        });
+
+        expect(screen.getByText('Auto-populated from vehicle owner')).toBeInTheDocument();
+    });
 });
 
 function renderLookup(props: Partial<{

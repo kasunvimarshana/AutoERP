@@ -353,11 +353,11 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                     <h2 className="mb-4 text-base font-semibold text-slate-950">Payment Details</h2>
                     <div className="grid gap-4 md:grid-cols-2">
-                        <SupplierLookupSelect value={supplier} onChange={(value) => void setSupplier(value)} error={errorFor('supplier_id')} />
-                        <CurrencyLookupSelect value={currency} onChange={(value) => void setCurrency(value)} error={errorFor('currency_id')} disabled={currencyLocked} />
-                        <Input label="Payment date" type="date" value={paymentDate} error={errorFor('payment_date')} onChange={(event) => setPaymentDate(event.target.value)} />
-                        <Input label="Reference" value={referenceNumber} error={errorFor('reference_number')} onChange={(event) => setReferenceNumber(event.target.value)} />
-                        <DecimalInput label="Payment total" value={amount} error={errorFor('amount')} onChange={(event) => updateAmount(event.target.value)} />
+                        <SupplierLookupSelect value={supplier} onChange={(value) => void setSupplier(value)} error={errorFor('supplier_id')} hint="Supplier receiving disbursement" />
+                        <CurrencyLookupSelect value={currency} onChange={(value) => void setCurrency(value)} error={errorFor('currency_id')} hint={currencyLocked ? 'Locked to match allocated invoice currency' : 'Disbursement currency'} disabled={currencyLocked} />
+                        <Input label="Payment date" type="date" value={paymentDate} error={errorFor('payment_date')} hint="Bank/cash transaction date" onChange={(event) => setPaymentDate(event.target.value)} />
+                        <Input label="Reference" value={referenceNumber} error={errorFor('reference_number')} hint="Cheque, wire reference, or voucher #" onChange={(event) => setReferenceNumber(event.target.value)} />
+                        <DecimalInput label="Payment total" value={amount} error={errorFor('amount')} hint="Total disbursement amount across all payment methods" onChange={(event) => updateAmount(event.target.value)} />
                         {currencyLocked && <div className="self-end rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Currency is derived from selected supplier invoices.</div>}
                     </div>
                 </section>
@@ -440,12 +440,18 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
 function PaymentPreviewPanel({ preview }: { preview: PurchasePaymentPreview }) {
     return (
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-            <h2 className="text-base font-semibold text-emerald-950">Payment Preview</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold text-emerald-950">Payment Preview</h2>
+                <span className="text-xs text-emerald-800 font-medium">Formula: Unapplied = Payment Total − Allocated</span>
+            </div>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
                 <Summary label="Payment Total" value={<MoneyDisplay value={preview.line_total} />} />
                 <Summary label="Allocated" value={<MoneyDisplay value={preview.allocation_total} />} />
                 <Summary label="Unapplied" value={<MoneyDisplay value={preview.unapplied_amount} />} />
             </div>
+            <p className="mt-2 text-xs text-emerald-800">
+                Any unapplied balance remains on the supplier account as an advance credit.
+            </p>
             {preview.allocations.length > 0 && (
                 <div className="mt-4 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
                     <table className="min-w-full divide-y divide-emerald-100 text-left text-sm">
