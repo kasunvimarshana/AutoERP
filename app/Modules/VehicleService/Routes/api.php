@@ -10,6 +10,7 @@ use Modules\VehicleService\Http\Controllers\VehicleServiceInventoryController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInvoiceController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobDiscountController;
+use Modules\VehicleService\Http\Controllers\VehicleServiceJobFeedbackController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobTypeController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceLineController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceLineItemLookupController;
@@ -134,5 +135,16 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
     Route::middleware($requires(VehicleServicePermission::DOCUMENTS_MANAGE))->group(function (): void {
         Route::post('jobs/{job}/documents', [VehicleServiceDocumentController::class, 'store'])->whereNumber('job')->name('documents.store');
         Route::delete('jobs/{job}/documents/{document}', [VehicleServiceDocumentController::class, 'destroy'])->whereNumber('job')->whereNumber('document')->name('documents.destroy');
+    });
+
+    Route::middleware($requires(VehicleServicePermission::FEEDBACK_VIEW))->group(function (): void {
+        Route::get('jobs/{job}/feedbacks', [VehicleServiceJobFeedbackController::class, 'index'])->whereNumber('job')->name('feedbacks.index');
+        Route::get('jobs/{job}/feedbacks/summary', [VehicleServiceJobFeedbackController::class, 'summary'])->whereNumber('job')->name('feedbacks.summary');
+        Route::get('jobs/{job}/feedbacks/{feedback}', [VehicleServiceJobFeedbackController::class, 'show'])->whereNumber('job')->whereNumber('feedback')->name('feedbacks.show');
+    });
+    Route::middleware($requires(VehicleServicePermission::FEEDBACK_MANAGE))->group(function (): void {
+        Route::post('jobs/{job}/feedbacks', [VehicleServiceJobFeedbackController::class, 'store'])->whereNumber('job')->name('feedbacks.store');
+        Route::put('jobs/{job}/feedbacks/{feedback}', [VehicleServiceJobFeedbackController::class, 'update'])->whereNumber('job')->whereNumber('feedback')->name('feedbacks.update');
+        Route::delete('jobs/{job}/feedbacks/{feedback}', [VehicleServiceJobFeedbackController::class, 'destroy'])->whereNumber('job')->whereNumber('feedback')->name('feedbacks.destroy');
     });
 });

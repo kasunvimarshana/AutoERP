@@ -501,3 +501,68 @@ export interface VehicleServiceCancellationPreview {
     inventory_value: string;
     commission_amount: string;
 }
+
+export type VehicleServiceFeedbackType = 'review' | 'internal_note' | 'customer_feedback' | 'complaint';
+
+export interface VehicleServiceJobFeedback {
+    id: number;
+    row_version: number;
+    tenant_id: number;
+    organization_unit_id?: number | null;
+    vehicle_service_job_id: number;
+    user_id?: number | null;
+    author_name: string;
+    user?: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    feedback_type: VehicleServiceFeedbackType;
+    feedback_type_label: string;
+    rating?: number | null;
+    title?: string | null;
+    comment: string;
+    is_customer_visible: boolean;
+    created_by?: number | null;
+    created_by_name?: string | null;
+    updated_by?: number | null;
+    updated_by_name?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface VehicleServiceFeedbackSummary {
+    average_rating: number | null;
+    total_count: number;
+    ratings_count: number;
+    reviews_count: number;
+    notes_count: number;
+    customer_feedback_count: number;
+    complaints_count: number;
+    rating_breakdown: Record<number, number>;
+}
+
+export interface VehicleServiceFeedbackListResult {
+    data: VehicleServiceJobFeedback[];
+    meta: {
+        summary: VehicleServiceFeedbackSummary;
+    };
+}
+
+export interface VehicleServiceJobFeedbackPayload {
+    feedback_type: VehicleServiceFeedbackType;
+    comment: string;
+    rating?: number | null;
+    title?: string | null;
+    is_customer_visible?: boolean;
+    author_name?: string | null;
+    expected_version?: number | null;
+    expected_job_version?: number | null;
+}
+
+export interface VehicleServiceFeedbackFilterParams {
+    feedback_type?: VehicleServiceFeedbackType | '';
+    rating?: number | '';
+    customer_visible_only?: boolean;
+    search?: string;
+}

@@ -34,9 +34,10 @@ const WorkforceTab = lazy(() => import('../components/VehicleServiceEmployeeAssi
 const InvoiceTab = lazy(() => import('../components/VehicleServiceInvoiceTab'));
 const PaymentTab = lazy(() => import('../components/VehicleServicePaymentTab'));
 const DocumentTab = lazy(() => import('../components/VehicleServiceDocumentTab'));
+const FeedbackTab = lazy(() => import('../components/VehicleServiceFeedbackTab'));
 const StatusHistoryTab = lazy(() => import('../components/VehicleServiceStatusHistoryTab'));
 
-type Tab = 'summary' | 'inspection' | 'lines' | 'workforce' | 'invoice' | 'payments' | 'documents' | 'history';
+type Tab = 'summary' | 'inspection' | 'lines' | 'workforce' | 'invoice' | 'payments' | 'documents' | 'feedback' | 'history';
 const INSPECT_WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee in Workforce before marking this job as inspected.';
 
 export default function VehicleServiceJobDetailPage() {
@@ -250,6 +251,7 @@ export default function VehicleServiceJobDetailPage() {
                     { id: 'invoice', label: 'Invoice' },
                     { id: 'payments', label: 'Payments' },
                     { id: 'documents', label: 'Documents' },
+                    { id: 'feedback', label: 'Reviews & Feedback' },
                     { id: 'history', label: 'Timeline' },
                 ]} active={tabs.activeTab} onChange={tabs.openTab} />
                 <div className="p-5">
@@ -268,6 +270,7 @@ export default function VehicleServiceJobDetailPage() {
                         {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab} keepMounted><InvoiceTab job={job} /></TabPanel>}
                         {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab} keepMounted><PaymentTab job={job} /></TabPanel>}
                         {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab} keepMounted><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
+                        {tabs.openedTabs.has('feedback') && <TabPanel tabsId="service-job-tabs" tabId="feedback" active={tabs.activeTab} keepMounted><FeedbackTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
                         {tabs.openedTabs.has('history') && <TabPanel tabsId="service-job-tabs" tabId="history" active={tabs.activeTab} keepMounted><StatusHistoryTab jobId={job.id} refreshKey={historyRefreshKey} /></TabPanel>}
                     </Suspense>
                 </div>
@@ -278,6 +281,7 @@ export default function VehicleServiceJobDetailPage() {
                     <Button type="button" variant="secondary" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
                     <Button type="button" variant="secondary" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
                     <Button type="button" variant="secondary" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
+                    <Button type="button" variant="secondary" onClick={() => tabs.openTab('feedback')}>View feedback</Button>
                     {job.status === 'completed' && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary">Create & post invoice</LinkButton>}
                     {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <LinkButton to={`/vehicle-service/jobs/${job.id}/payment`} variant="secondary">Receive payment</LinkButton>}
                 </div>

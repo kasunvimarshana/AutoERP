@@ -147,4 +147,9 @@ final class VehicleServiceJob extends TenantOwnedModel
     {
         return $this->hasMany(VehicleServiceStatusHistory::class, 'vehicle_service_job_id')->latest('changed_at');
     }
+
+    public function feedbacks(): HasMany
+    {
+        return $this->hasMany(VehicleServiceJobFeedback::class, 'vehicle_service_job_id')->latest('created_at');
+    }
 }

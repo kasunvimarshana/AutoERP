@@ -52,6 +52,10 @@ final class VehicleServicePermission
 
     public const DOCUMENTS_MANAGE = 'vehicle_service.documents.manage';
 
+    public const FEEDBACK_VIEW = 'vehicle_service.feedback.view';
+
+    public const FEEDBACK_MANAGE = 'vehicle_service.feedback.manage';
+
     public static function descriptions(): array
     {
         return [
@@ -78,6 +82,8 @@ final class VehicleServicePermission
             self::PAYMENTS_CREATE => 'Create and post service receipts.',
             self::DOCUMENTS_VIEW => 'View and download service documents.',
             self::DOCUMENTS_MANAGE => 'Upload and remove service documents.',
+            self::FEEDBACK_VIEW => 'View service job reviews, ratings, and feedback.',
+            self::FEEDBACK_MANAGE => 'Create, update, and remove service job reviews, ratings, and feedback.',
         ];
     }
 }

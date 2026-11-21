@@ -1,5 +1,6 @@
 export * from './api/commissions';
 export * from './api/documents';
+export * from './api/feedbacks';
 export * from './api/inventory';
 export * from './api/invoices';
 export * from './api/jobs';

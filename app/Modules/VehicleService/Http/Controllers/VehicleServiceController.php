@@ -6,6 +6,7 @@ namespace Modules\VehicleService\Http\Controllers;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobFeedback;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 
@@ -26,5 +27,10 @@ abstract class VehicleServiceController
     protected function assignment(VehicleServiceJobLine $line, int $id): VehicleServiceLineEmployee
     {
         return $line->employeeAssignments()->findOrFail($id);
+    }
+
+    protected function feedback(VehicleServiceJob $job, int $id): VehicleServiceJobFeedback
+    {
+        return $job->feedbacks()->findOrFail($id);
     }
 }

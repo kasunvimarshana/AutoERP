@@ -22,4 +22,6 @@ export const vehicleServicePermissions = {
     paymentsCreate: 'vehicle_service.payments.create',
     documentsView: 'vehicle_service.documents.view',
     documentsManage: 'vehicle_service.documents.manage',
+    feedbackView: 'vehicle_service.feedback.view',
+    feedbackManage: 'vehicle_service.feedback.manage',
 } as const;
