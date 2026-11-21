@@ -41,10 +41,10 @@ final class VehicleServiceJobFeedback extends TenantOwnedModel
 
     public function scopeForContext(Builder $query, int $tenantId, ?int $organizationUnitId = null): Builder
     {
-        $query->where('tenant_id', $tenantId);
+        $query->where($this->qualifyColumn('tenant_id'), $tenantId);
 
         if ($organizationUnitId !== null) {
-            $query->where('organization_unit_id', $organizationUnitId);
+            $query->where($this->qualifyColumn('organization_unit_id'), $organizationUnitId);
         }
 
         return $query;
