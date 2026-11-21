@@ -50,6 +50,12 @@ use Modules\Supplier\Models\SupplierItemMapping;
 use Modules\Tax\Models\TaxTransaction;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Models\CustomerAgreement;
+use Modules\VehicleRental\Models\OwnerAgreement;
+use Modules\VehicleRental\Models\RentalExpense;
+use Modules\VehicleRental\Models\RentalReservation;
+use Modules\VehicleRental\Models\RunningChart;
+use Modules\VehicleRental\Models\VehicleFinanceInstallment;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
@@ -351,7 +357,7 @@ final class ReportCatalog
             $this->taxTransactions('tax.vat', 'VAT Report', ['tax_type' => 'VAT']),
             $this->taxTransactions('tax.wht', 'WHT Report', ['is_withholding' => true]),
 
-            $this->definition('vehicle-rental.running-chart', 'Daily Running Chart', 'Vehicle Rental', \Modules\VehicleRental\Models\RunningChart::class, [
+            $this->definition('vehicle-rental.running-chart', 'Daily Running Chart', 'Vehicle Rental', RunningChart::class, [
                 $this->col('starts_at', 'Date', format: 'date', sort: 'starts_at'),
                 $this->col('reference', 'Chart Ref', sort: 'reference'),
                 $this->col('vehicle', 'Vehicle', 'vehicleUse.vehicle_label_snapshot'),
@@ -363,7 +369,7 @@ final class ReportCatalog
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['reference', 'driver_name_snapshot'], ['vehicleUse'], 'starts_at'),
 
-            $this->definition('vehicle-rental.driver-overtime', 'Driver Overtime and Night-Out', 'Vehicle Rental', \Modules\VehicleRental\Models\RunningChart::class, [
+            $this->definition('vehicle-rental.driver-overtime', 'Driver Overtime and Night-Out', 'Vehicle Rental', RunningChart::class, [
                 $this->col('starts_at', 'Date', format: 'date', sort: 'starts_at'),
                 $this->col('reference', 'Chart Ref', sort: 'reference'),
                 $this->col('driver', 'Driver', 'driver_name_snapshot'),
@@ -375,7 +381,7 @@ final class ReportCatalog
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['reference', 'driver_name_snapshot'], ['vehicleUse'], 'starts_at'),
 
-            $this->definition('vehicle-rental.customer-agreements', 'Customer Rental Agreements', 'Vehicle Rental', \Modules\VehicleRental\Models\CustomerAgreement::class, [
+            $this->definition('vehicle-rental.customer-agreements', 'Customer Rental Agreements', 'Vehicle Rental', CustomerAgreement::class, [
                 $this->col('reference', 'Agreement Ref', sort: 'reference'),
                 $this->col('customer', 'Customer', 'party_name_snapshot'),
                 $this->col('agreed_on', 'Agreed On', format: 'date', sort: 'agreed_on'),
@@ -387,7 +393,7 @@ final class ReportCatalog
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['reference', 'party_name_snapshot'], [], 'starts_on'),
 
-            $this->definition('vehicle-rental.owner-agreements', 'Owner Rental Agreements', 'Vehicle Rental', \Modules\VehicleRental\Models\OwnerAgreement::class, [
+            $this->definition('vehicle-rental.owner-agreements', 'Owner Rental Agreements', 'Vehicle Rental', OwnerAgreement::class, [
                 $this->col('reference', 'Agreement Ref', sort: 'reference'),
                 $this->col('owner', 'Supplier/Owner', 'party_name_snapshot'),
                 $this->col('vehicle', 'Vehicle', 'vehicle_registration_snapshot'),
@@ -399,7 +405,7 @@ final class ReportCatalog
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['reference', 'party_name_snapshot', 'vehicle_registration_snapshot'], [], 'starts_on'),
 
-            $this->definition('vehicle-rental.reservations', 'Rental Reservations', 'Vehicle Rental', \Modules\VehicleRental\Models\RentalReservation::class, [
+            $this->definition('vehicle-rental.reservations', 'Rental Reservations', 'Vehicle Rental', RentalReservation::class, [
                 $this->col('reservation_number', 'Reservation No', sort: 'reservation_number'),
                 $this->col('customer', 'Customer', 'customer_name_snapshot'),
                 $this->col('requested_start_at', 'Requested Start', format: 'datetime', sort: 'requested_start_at'),
@@ -411,7 +417,7 @@ final class ReportCatalog
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['reservation_number', 'customer_name_snapshot'], [], 'requested_start_at'),
 
-            $this->definition('vehicle-rental.lease-installments', 'Vehicle Lease Installments', 'Vehicle Rental', \Modules\VehicleRental\Models\VehicleFinanceInstallment::class, [
+            $this->definition('vehicle-rental.lease-installments', 'Vehicle Lease Installments', 'Vehicle Rental', VehicleFinanceInstallment::class, [
                 $this->col('installment_number', 'Installment #', sort: 'installment_number'),
                 $this->col('agreement', 'Agreement', 'financeAgreement.agreement_number'),
                 $this->col('due_date', 'Due Date', format: 'date', sort: 'due_date'),
@@ -424,7 +430,7 @@ final class ReportCatalog
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['financeAgreement.agreement_number'], ['financeAgreement'], 'due_date'),
 
-            $this->definition('vehicle-rental.expenses', 'Fleet Rental Expenses', 'Vehicle Rental', \Modules\VehicleRental\Models\RentalExpense::class, [
+            $this->definition('vehicle-rental.expenses', 'Fleet Rental Expenses', 'Vehicle Rental', RentalExpense::class, [
                 $this->col('expense_number', 'Expense No', sort: 'expense_number'),
                 $this->col('expense_date', 'Date', format: 'date', sort: 'expense_date'),
                 $this->col('expense_type', 'Type', format: 'enum', sort: 'expense_type'),
@@ -1047,7 +1053,23 @@ final class ReportCatalog
         return new ReportColumn(
             key: 'age_days',
             label: $label,
-            value: static fn (InventoryValuationLayer $layer): int => (int) ($layer->movement?->posted_at ?? $layer->created_at)?->copy()->utc()->startOfDay()->diffInDays(now('UTC')->startOfDay()),
+            value: function (InventoryValuationLayer $layer): int {
+                $postedAt = $layer->movement?->posted_at ?? $layer->created_at;
+                if ($postedAt === null) {
+                    return 0;
+                }
+
+                $tenantId = (int) $layer->tenant_id;
+                $timezone = (string) $this->configuration->value(
+                    ConfigurationKey::WORKSPACE_TIMEZONE,
+                    $tenantId,
+                );
+
+                $today = CarbonImmutable::now($timezone)->startOfDay();
+                $layerDate = CarbonImmutable::parse($postedAt)->setTimezone($timezone)->startOfDay();
+
+                return (int) $layerDate->diffInDays($today);
+            },
         );
     }
 

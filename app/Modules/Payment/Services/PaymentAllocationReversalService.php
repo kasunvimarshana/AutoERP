@@ -64,6 +64,11 @@ final class PaymentAllocationReversalService
                 throw new InvalidArgumentException('Payment allocation was changed by another request. Reload it before reversing.');
             }
 
+            $paymentDate = $payment->payment_date?->toDateString();
+            if ($paymentDate !== null && $reversalDate < $paymentDate) {
+                throw new InvalidArgumentException('Payment allocation reversal date cannot be before the payment date.');
+            }
+
             $allocationDate = $allocation->allocation_date?->toDateString();
             if ($allocationDate !== null && $reversalDate < $allocationDate) {
                 throw new InvalidArgumentException('Payment allocation reversal date cannot be before the allocation date.');

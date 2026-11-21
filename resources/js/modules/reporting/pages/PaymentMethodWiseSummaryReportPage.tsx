@@ -8,6 +8,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { ExportActions } from '../components/ExportActions';
 import { loadPaymentMethodWiseDocuments, runPaymentMethodWiseSummaryReport } from '../reportingApi';
@@ -20,9 +21,8 @@ const SOURCES = [
 ] as const;
 
 function currentMonth(): PaymentMethodWiseParams {
-    const today = new Date();
-    const dateTo = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
-    return { date_from: `${dateTo.slice(0, 7)}-01`, date_to: dateTo, source: 'all' };
+    const today = businessDateInputValue();
+    return { date_from: `${today.slice(0, 7)}-01`, date_to: today, source: 'all' };
 }
 
 export default function PaymentMethodWiseSummaryReportPage() {

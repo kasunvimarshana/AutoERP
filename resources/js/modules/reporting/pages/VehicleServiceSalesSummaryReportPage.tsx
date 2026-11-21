@@ -7,7 +7,7 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { useApi } from '@/shared/hooks/useApi';
-import { formatBusinessDate } from '@/shared/utils/businessDate';
+import { formatBusinessDate, businessDateInputValue } from '@/shared/utils/businessDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { formatQuantity } from '@/shared/utils/formatQuantity';
 import { ItemLookupSelect } from '@/modules/item/components/ItemLookupSelect';
@@ -439,19 +439,17 @@ function ItemName({ item }: { item: { name: string; code: string } }) {
 }
 
 function rangeFor(preset: Exclude<DatePreset, 'custom'>): VehicleServiceSalesSummaryParams {
-    const today = new Date();
-    const end = toDateInput(today);
-    if (preset === 'today') return { date_from: end, date_to: end };
-    if (preset === 'month') return { date_from: toDateInput(new Date(today.getFullYear(), today.getMonth(), 1)), date_to: end };
-    const start = new Date(today);
-    const dayOfWeek = (start.getDay() + 6) % 7;
-    start.setDate(start.getDate() - dayOfWeek);
-    return { date_from: toDateInput(start), date_to: end };
-}
-
-function toDateInput(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const today = businessDateInputValue();
+    if (preset === 'today') return { date_from: today, date_to: today };
+    if (preset === 'month') return { date_from: `${today.slice(0, 7)}-01`, date_to: today };
+    const [year, month, day] = today.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    const dayOfWeek = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - dayOfWeek);
+    const start = [
+        date.getUTCFullYear(),
+        String(date.getUTCMonth() + 1).padStart(2, '0'),
+        String(date.getUTCDate()).padStart(2, '0'),
+    ].join('-');
+    return { date_from: start, date_to: today };
 }

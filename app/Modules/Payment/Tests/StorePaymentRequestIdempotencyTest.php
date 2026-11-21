@@ -60,11 +60,47 @@ final class StorePaymentRequestIdempotencyTest extends TestCase
         }
     }
 
+    public function test_request_rejects_invalid_date_format(): void
+    {
+        $request = StorePaymentRequest::create(
+            '/api/v1/payments',
+            'POST',
+            [
+                'payment_type' => PaymentType::CustomerReceipt->value,
+                'direction' => 'inbound',
+                'payment_date' => '16/07/2026',
+                'party_type' => 'customer',
+                'party_id' => 10,
+                'lines' => [[
+                    'payment_method_id' => 20,
+                    'amount' => '100.000000',
+                ]],
+            ],
+            server: ['HTTP_IDEMPOTENCY_KEY' => self::VALID_KEY],
+        );
+        $request->setContainer($this->app);
+        $request->setRedirector($this->app->make(Redirector::class));
+        $request->attributes->set(
+            (string) config('core.current_tenant.id_attribute', 'current_tenant_id'),
+            1,
+        );
+        $request->attributes->set(
+            (string) config('core.current_user.id_attribute', 'current_user_id'),
+            1,
+        );
+
+        try {
+            $request->validateResolved();
+            self::fail('Expected non-Y-m-d payment_date to fail validation.');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('payment_date', $exception->errors());
+        }
+    }
+
     private function request(
         string $idempotencyKey,
         string $paymentType = PaymentType::CustomerReceipt->value,
-    ): StorePaymentRequest
-    {
+    ): StorePaymentRequest {
         $request = StorePaymentRequest::create(
             '/api/v1/payments',
             'POST',

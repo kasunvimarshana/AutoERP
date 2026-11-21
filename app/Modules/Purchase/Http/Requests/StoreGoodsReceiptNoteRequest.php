@@ -43,7 +43,7 @@ final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
             'lines.*.batch_allocations.*.batch_number' => ['nullable', 'string', 'max:120', 'required_without:lines.*.batch_allocations.*.batch_id'],
             'lines.*.batch_allocations.*.lot_number' => ['nullable', 'string', 'max:120'],
             'lines.*.batch_allocations.*.manufacture_date' => ['nullable', 'date'],
-            'lines.*.batch_allocations.*.expiry_date' => ['nullable', 'date'],
+            'lines.*.batch_allocations.*.expiry_date' => ['nullable', 'date', 'after_or_equal:lines.*.batch_allocations.*.manufacture_date'],
             'lines.*.batch_allocations.*.quantity' => ['required', 'decimal:0,6', 'gt:0'],
         ]);
     }

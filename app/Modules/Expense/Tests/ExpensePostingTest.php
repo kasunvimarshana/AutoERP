@@ -181,6 +181,38 @@ final class ExpensePostingTest extends TestCase
         );
     }
 
+    public function test_expense_rejects_future_date(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        FinancePostingFixture::seedExpensePaymentProfile($tenantId, $organizationUnitId);
+
+        $typeId = (int) DB::table('expense_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'FUTURE-EXP',
+            'name' => 'Future Expense',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $methodId = $this->paymentMethod($tenantId);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Expense date cannot be in the future.');
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ExpensePostingService::class)->createAndPost(new CreateExpenseData(
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                expenseTypeId: $typeId,
+                paymentMethodId: $methodId,
+                expenseDate: now()->addDays(5)->toDateString(),
+                amount: '50.000000',
+                idempotencyKey: (string) Str::uuid(),
+            )),
+        );
+    }
+
     /** @return array{int, int} */
     private function scope(): array
     {

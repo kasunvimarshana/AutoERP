@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -67,6 +68,7 @@ use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
+use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseDebitNote;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
@@ -1298,6 +1300,34 @@ final class PurchaseEngineTest extends TestCase
             purchaseOrderId: (int) $order->getKey(),
             lines: [new GoodsReceiptNoteLineData((int) $item->getKey(), '10.000000', '10.000000', '100.000000', purchaseOrderLineId: (int) $line->getKey())],
         ));
+    }
+
+    public function test_goods_receipt_request_rejects_batch_expiry_before_manufacture_date(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->purchaseContext();
+        $validator = Validator::make([
+            'tenant_id' => $tenantId,
+            'received_date' => '2026-06-15',
+            'warehouse_id' => $warehouseId,
+            'lines' => [
+                [
+                    'item_id' => (int) $item->getKey(),
+                    'received_quantity' => '5.000000',
+                    'accepted_quantity' => '5.000000',
+                    'batch_allocations' => [
+                        [
+                            'batch_number' => 'BATCH-TEST-EXP',
+                            'quantity' => '5.000000',
+                            'manufacture_date' => '2026-06-15',
+                            'expiry_date' => '2026-06-10',
+                        ],
+                    ],
+                ],
+            ],
+        ], (new StoreGoodsReceiptNoteRequest)->rules());
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('lines.0.batch_allocations.0.expiry_date', $validator->errors()->toArray());
     }
 
     public function test_purchase_return_rejects_return_date_before_goods_receipt_date(): void

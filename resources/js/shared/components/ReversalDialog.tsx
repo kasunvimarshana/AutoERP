@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Modal } from './Modal';
 import { Textarea } from './Textarea';
 
-const DATE_PART_WIDTH = 2;
 const MINIMUM_REASON_LENGTH = 1;
 
 export interface ReversalFacts {
@@ -28,7 +28,7 @@ type ReversalDialogContentProps = Omit<ReversalDialogProps, 'open' | 'defaultDat
 export function ReversalDialog(props: ReversalDialogProps) {
     if (!props.open) return null;
 
-    const defaultDate = props.defaultDate ?? todayLocalDate();
+    const defaultDate = props.defaultDate ?? businessDateInputValue();
 
     return (
         <ReversalDialogContent
@@ -115,9 +115,5 @@ function ReversalDialogContent({
 }
 
 export function todayLocalDate(date = new Date()): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(DATE_PART_WIDTH, '0');
-    const day = String(date.getDate()).padStart(DATE_PART_WIDTH, '0');
-
-    return `${year}-${month}-${day}`;
+    return businessDateInputValue(date);
 }

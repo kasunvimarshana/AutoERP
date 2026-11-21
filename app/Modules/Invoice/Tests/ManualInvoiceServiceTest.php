@@ -6,6 +6,7 @@ namespace Modules\Invoice\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
@@ -18,15 +19,17 @@ use Modules\Invoice\DTOs\ManualInvoiceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
+use Modules\Invoice\Http\Requests\StoreInvoiceRequest;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceBalanceService;
+use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\ManualInvoiceService;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class ManualInvoiceServiceTest extends TestCase
@@ -171,6 +174,66 @@ final class ManualInvoiceServiceTest extends TestCase
             now()->toDateString(),
             'Retired source safety check.',
         ));
+    }
+
+    public function test_invoice_reversal_rejects_reversal_date_before_invoice_date(): void
+    {
+        $tenantId = $this->createTenant();
+        $organizationUnitId = $this->createOrganizationUnit($tenantId);
+        $customerId = $this->createCustomer($tenantId, $organizationUnitId);
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
+            $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
+            'reversal-date-test',
+        ));
+        DB::table('invoices')->where('id', $invoice->getKey())->update([
+            'status' => InvoiceStatus::Posted->value,
+            'posted_at' => '2026-06-29 10:00:00',
+        ]);
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh());
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invoice reversal date cannot be before the invoice date.');
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceReversalService::class)->reverse(
+            $invoice,
+            (int) $invoice->row_version,
+            '2026-06-20',
+            'Cannot reverse before invoice date.',
+        ));
+    }
+
+    public function test_store_invoice_request_rejects_invalid_date_format(): void
+    {
+        $tenantId = $this->createTenant();
+        $organizationUnitId = $this->createOrganizationUnit($tenantId);
+        $customerId = $this->createCustomer($tenantId, $organizationUnitId);
+
+        $request = StoreInvoiceRequest::create(
+            '/api/v1/invoices',
+            'POST',
+            [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'direction' => InvoiceDirection::Outbound->value,
+                'invoice_date' => '29/06/2026',
+                'due_date' => '30/06/2026',
+                'customer_id' => $customerId,
+                'lines' => [
+                    [
+                        'line_type' => 'manual',
+                        'quantity' => '1.000000',
+                        'unit_price' => '100.000000',
+                    ],
+                ],
+            ],
+        );
+        $request->attributes->set((string) config('core.current_tenant.id_attribute', 'current_tenant_id'), $tenantId);
+        $rules = $request->rules();
+        $validator = Validator::make($request->all(), $rules);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('invoice_date', $validator->errors()->toArray());
+        $this->assertArrayHasKey('due_date', $validator->errors()->toArray());
     }
 
     public function test_requested_posted_status_uses_governed_issuance_transitions(): void
@@ -362,7 +425,7 @@ final class ManualInvoiceServiceTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'row_version' => 1,
             'name' => 'Invoice Test Unit',

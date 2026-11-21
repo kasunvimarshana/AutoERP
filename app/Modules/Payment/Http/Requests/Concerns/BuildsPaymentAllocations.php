@@ -20,7 +20,7 @@ trait BuildsPaymentAllocations
             'allocations' => $rootRules,
             'allocations.*.invoice_id' => ['required', 'integer', 'min:1'],
             'allocations.*.allocated_amount' => ['required', 'decimal:0,6', 'gt:0'],
-            'allocations.*.allocation_date' => ['required', 'date'],
+            'allocations.*.allocation_date' => ['required', 'date_format:Y-m-d'],
             'allocations.*.allow_overpayment' => ['nullable', 'boolean'],
             'allocations.*.allocation_method' => ['nullable', Rule::enum(PaymentAllocationMethod::class)],
             'allocations.*.metadata' => ['nullable', 'array'],

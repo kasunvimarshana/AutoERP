@@ -41,8 +41,11 @@ final class PaymentAllocationReversalServiceTest extends TestCase
     use RefreshDatabase;
 
     private const PAYMENT_DATE = '2026-07-11';
+
     private const PAYMENT_METHOD_CODE = 'TEST-CASH';
+
     private const PAYMENT_METHOD_NAME = 'Test Cash';
+
     private const ALLOCATION_METHOD = 'specific_invoice';
 
     public function test_it_reverses_one_invoice_allocation_and_allows_a_corrected_allocation_with_history(): void
@@ -337,7 +340,7 @@ final class PaymentAllocationReversalServiceTest extends TestCase
         $this->assertEqualsWithDelta(500.0, (float) $this->invoiceBalance($tenantId, $invoice), 0.01);
 
         // 4. Reverse the allocation with top-ups and verify complete Finance GL reversal!
-        $reversalPayment = $this->withTenantExecutionContext($tenantId, function () use ($payment, $invoice, $tenantId): Payment {
+        $reversalPayment = $this->withTenantExecutionContext($tenantId, function () use ($payment, $invoice): Payment {
             $allocationToReverse = PaymentAllocation::query()
                 ->where('payment_id', $payment->getKey())
                 ->where('invoice_id', $invoice->getKey())
@@ -365,6 +368,112 @@ final class PaymentAllocationReversalServiceTest extends TestCase
         $this->assertSame(AllocationStatus::Reversed, $reversedAlloc->status instanceof AllocationStatus ? $reversedAlloc->status : AllocationStatus::from((string) $reversedAlloc->status));
         $this->assertNotEmpty($reversedAlloc->metadata['top_up_reversal_references'] ?? []);
         $this->assertCount(2, $reversedAlloc->metadata['top_up_reversal_references']);
+    }
+
+    public function test_it_rejects_allocation_reversal_before_payment_date(): void
+    {
+        $tenantId = $this->createTenant();
+        FinancePostingFixture::seedCustomerPaymentProfiles($tenantId);
+        $customerId = (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'customer_number' => 'CUS-ALLOC-REV-EARLY',
+            'code' => 'CUS-ALLOC-REV-EARLY',
+            'name' => 'Allocation Early Customer',
+            'customer_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            self::PAYMENT_DATE,
+            FinanceAccountRoleCode::Revenue,
+            '500.000000',
+            description: 'Early allocation reversal invoice',
+        );
+        $invoice = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $postingPlan) {
+            $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+                tenantId: $tenantId,
+                invoiceType: InvoiceType::Manual,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: self::PAYMENT_DATE,
+                invoiceNumber: 'INV-ALLOC-EARLY',
+                partyType: 'customer',
+                partyId: $customerId,
+                lines: [new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Early allocation reversal invoice',
+                    quantity: '1.000000',
+                    unitPrice: '500.000000',
+                )],
+                postingPlan: $postingPlan,
+            ));
+            $statuses = app(InvoiceStatusService::class);
+            $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
+
+            return $statuses->transition($invoice, InvoiceStatus::Posted);
+        });
+
+        $paymentMethodId = (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $tenantId,
+            'scope_key' => 'tenant:'.$tenantId,
+            'code' => self::PAYMENT_METHOD_CODE.'-EARLY',
+            'name' => self::PAYMENT_METHOD_NAME,
+            'method_type' => PaymentMethodType::Cash->value,
+            'direction_allowed' => PaymentMethodDirection::Both->value,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payment = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $paymentMethodId, $invoice): Payment {
+            $payment = app(PaymentCreationService::class)->create(new CreatePaymentData(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                paymentType: PaymentType::CustomerReceipt,
+                direction: PaymentDirection::Inbound,
+                paymentDate: '2026-07-15',
+                partyType: 'customer',
+                partyId: $customerId,
+                lines: [
+                    new PaymentLineData(
+                        paymentMethodId: $paymentMethodId,
+                        amount: '500.000000',
+                    ),
+                ],
+            ));
+            $lifecycle = app(PaymentDocumentLifecycleService::class);
+            $payment = $lifecycle->submit($payment, (int) $payment->row_version);
+            $payment = $lifecycle->approve($payment, (int) $payment->row_version);
+            $payment = app(PaymentPostingService::class)->post($payment, (int) $payment->row_version);
+
+            return app(PaymentAllocationService::class)->allocate(
+                $payment,
+                [new PaymentAllocationData(
+                    invoiceId: (int) $invoice->getKey(),
+                    allocatedAmount: '500.000000',
+                    allocationDate: '2026-07-15',
+                    allocationMethod: self::ALLOCATION_METHOD,
+                )],
+                (int) $payment->row_version,
+            );
+        });
+
+        $allocation = $this->withTenantExecutionContext($tenantId, fn () => $payment->allocations()->firstOrFail());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Payment allocation reversal date cannot be before the payment date.');
+
+        $this->withTenantExecutionContext($tenantId, function () use ($payment, $allocation): void {
+            app(PaymentAllocationReversalService::class)->reverse(
+                $payment,
+                $allocation->getKey(),
+                (int) $payment->row_version,
+                (int) $allocation->row_version,
+                '2026-07-10',
+                'Reverse before payment date',
+            );
+        });
     }
 
     private function invoiceBalance(int $tenantId, object $invoice): string

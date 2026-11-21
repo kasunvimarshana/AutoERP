@@ -171,4 +171,21 @@ class StockCardTest extends InventoryTestCase
         $this->assertSame('1.000000', $card['closing']);
         $this->assertSame('Card Box', $card['item']['uom']);
     }
+
+    public function test_stock_card_resolves_workspace_timezone_when_filters_omit_timezone(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+
+        $this->travelTo(CarbonImmutable::parse('2026-06-10 09:00:00 UTC'));
+        $this->receipt($tenantId, $warehouseId, $item, '5.000000', '2.000000');
+
+        $card = $this->withTenantExecutionContext($tenantId, fn () => app(StockCardService::class)->build([
+            'item_id' => (int) $item->id,
+            'warehouse_id' => $warehouseId,
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ], $tenantId, null));
+
+        $this->assertSame('5.000000', $card['closing']);
+    }
 }

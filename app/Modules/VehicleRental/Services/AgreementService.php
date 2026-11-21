@@ -115,7 +115,7 @@ final class AgreementService
                 }
                 throw new ConflictHttpException("This agreement has already been superseded by {$existingSuccessor->reference}.");
             }
-            $this->assertSuccessorStartsAfter($predecessor, $data['starts_on']);
+            $this->assertSuccessorStartsAfter($context, $predecessor, $data['starts_on']);
 
             $successorTerms = $predecessor->terms;
             // Payment receipts remain attached to the predecessor agreement. A successor must not
@@ -220,7 +220,7 @@ final class AgreementService
 
     private function activateSuccessor(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, Agreement $successor): void
     {
-        $this->assertSuccessorStartsAfter($predecessor, $successor->starts_on->toDateString());
+        $this->assertSuccessorStartsAfter($context, $predecessor, $successor->starts_on->toDateString());
         $timezone = $this->calendar->timezone($context);
         $effectiveDate = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), $timezone);
         if ($effectiveDate->isAfter($this->calendar->today($context))) {
@@ -228,7 +228,7 @@ final class AgreementService
         }
         $this->assertCutoverAvailable($kind, $context, $predecessor, $successor->starts_on->toDateString());
 
-        $cutoff = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), 'UTC')->subDay();
+        $cutoff = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), $timezone)->subDay();
         if ($predecessor->ends_on === null || $predecessor->ends_on->toDateString() >= $successor->starts_on->toDateString()) {
             $predecessor->ends_on = $cutoff->toDateString();
         }
@@ -305,13 +305,14 @@ final class AgreementService
         if ($kind === AgreementKind::Owner && (int) $validated['vehicle_id'] !== (int) $predecessor->vehicle_id) {
             throw ValidationException::withMessages(['vehicle_id' => ['An owner-agreement successor must keep the same supplied vehicle. Create a new owner agreement for another vehicle.']]);
         }
-        $this->assertSuccessorStartsAfter($predecessor, $validated['starts_on']);
+        $this->assertSuccessorStartsAfter($context, $predecessor, $validated['starts_on']);
     }
 
-    private function assertSuccessorStartsAfter(Agreement $predecessor, string $successorStart): void
+    private function assertSuccessorStartsAfter(AgreementContext $context, Agreement $predecessor, string $successorStart): void
     {
-        $next = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, 'UTC');
-        $current = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $predecessor->starts_on->format(AgreementFields::DATE_FORMAT), 'UTC');
+        $timezone = $this->calendar->timezone($context);
+        $next = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $timezone);
+        $current = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $predecessor->starts_on->format(AgreementFields::DATE_FORMAT), $timezone);
         if ($next <= $current) {
             throw ValidationException::withMessages(['starts_on' => ['A successor must start after the predecessor start date.']]);
         }

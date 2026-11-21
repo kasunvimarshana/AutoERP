@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -43,6 +44,16 @@ final class BatchTrackingService
         $lotNumber = $lotNumber === null || trim($lotNumber) === '' ? null : trim($lotNumber);
         if ($batchNumber === '') {
             throw new InvalidArgumentException('Inventory batch number is required.');
+        }
+
+        if ($manufactureDate !== null && $expiryDate !== null) {
+            $manufacture = CarbonImmutable::parse($manufactureDate);
+            $expiry = CarbonImmutable::parse($expiryDate);
+            if ($expiry->lessThan($manufacture)) {
+                throw ValidationException::withMessages([
+                    'expiry_date' => ['The expiry date cannot precede the manufacture date.'],
+                ]);
+            }
         }
 
         return DB::transaction(function () use ($tenantId, $organizationUnitId, $itemId, $itemVariantId, $batchNumber, $lotNumber, $manufactureDate, $expiryDate): InventoryBatch {

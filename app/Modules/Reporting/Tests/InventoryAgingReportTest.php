@@ -6,6 +6,8 @@ namespace Modules\Reporting\Tests;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
@@ -112,5 +114,31 @@ class InventoryAgingReportTest extends InventoryTestCase
         $this->assertSame('5.000000', $row['original_quantity']);
         $this->assertSame('5.000000', $row['remaining_quantity']);
         $this->assertSame('16.000000', $row['unit_cost']);
+    }
+
+    public function test_inventory_aging_calculates_age_days_using_workspace_timezone(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+
+        // Layer posted at UTC 2026-06-10 23:00:00 (which is 2026-06-11 in Asia/Colombo +05:30)
+        $this->travelTo(CarbonImmutable::parse('2026-06-10 23:00:00 UTC'));
+        $this->receipt($tenantId, $warehouseId, $item, '5.000000', '10.000000');
+
+        // Current time is UTC 2026-06-12 01:00:00 (which is 2026-06-12 in Asia/Colombo +05:30)
+        $this->travelTo(CarbonImmutable::parse('2026-06-12 01:00:00 UTC'));
+
+        $this->mock(ConfigurationResolverInterface::class, function ($mock) use ($tenantId): void {
+            $mock->shouldReceive('value')
+                ->with(ConfigurationKey::WORKSPACE_TIMEZONE, $tenantId)
+                ->andReturn('Asia/Colombo');
+            $mock->shouldReceive('value')->zeroOrMoreTimes()->andReturn(null);
+        });
+
+        $report = $this->withTenantExecutionContext($tenantId, fn (): array => app(ReportService::class)->run('inventory.aging', $tenantId, null, [
+            'search' => (string) $item->code,
+        ], 25));
+
+        // In Asia/Colombo: 2026-06-12 - 2026-06-11 = 1 day (in UTC: 2026-06-12 - 2026-06-10 = 2 days)
+        $this->assertSame(1, $report['data'][0]['age_days']);
     }
 }

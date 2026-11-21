@@ -6,8 +6,8 @@ namespace Modules\Invoice\Http\Requests;
 
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
-use Modules\Customer\Enums\CustomerStatus;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Customer\Enums\CustomerStatus;
 use Modules\Invoice\DTOs\ManualInvoiceData;
 use Modules\Invoice\DTOs\ManualInvoiceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
@@ -59,7 +59,7 @@ final class StoreInvoiceRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['required', 'integer', 'min:1'],
             'direction' => ['required', Rule::enum(InvoiceDirection::class)],
-            'invoice_date' => ['required', 'date'],
+            'invoice_date' => ['required', 'date_format:Y-m-d'],
             'customer_id' => [
                 'nullable',
                 'integer',
@@ -76,7 +76,7 @@ final class StoreInvoiceRequest extends TenantScopedRequest
                 'prohibited_if:direction,'.InvoiceDirection::Outbound->value,
                 $this->activePartyExists('suppliers', SupplierStatus::Active->value),
             ],
-            'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
+            'due_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:invoice_date'],
             'currency_id' => [
                 'nullable',
                 'integer',
@@ -91,9 +91,9 @@ final class StoreInvoiceRequest extends TenantScopedRequest
                 $this->activeScopedExists('tax_groups', 'active', softDeletes: false),
             ],
             'notes' => ['nullable', 'string'],
-            'supply_date' => ['nullable', 'date'],
-            'supply_period_start' => ['nullable', 'date', 'required_with:supply_period_end'],
-            'supply_period_end' => ['nullable', 'date', 'required_with:supply_period_start', 'after_or_equal:supply_period_start'],
+            'supply_date' => ['nullable', 'date_format:Y-m-d'],
+            'supply_period_start' => ['nullable', 'date_format:Y-m-d', 'required_with:supply_period_end'],
+            'supply_period_end' => ['nullable', 'date_format:Y-m-d', 'required_with:supply_period_start', 'after_or_equal:supply_period_start'],
             'place_of_supply' => ['nullable', 'string', 'max:1000'],
             'payment_mode' => ['nullable', 'string', 'max:100'],
             'payment_terms' => ['nullable', 'string', 'max:255'],

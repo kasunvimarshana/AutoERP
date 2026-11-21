@@ -68,7 +68,11 @@ final class InvoiceReversalService
             if ($status !== InvoiceStatus::Posted) {
                 throw new InvalidArgumentException('Only an unsettled posted invoice can be reversed.');
             }
-            $postingDate = $invoice->posted_at?->toDateString() ?? $invoice->invoice_date->toDateString();
+            $invoiceDate = $invoice->invoice_date->toDateString();
+            if ($reversalDate < $invoiceDate) {
+                throw new InvalidArgumentException('Invoice reversal date cannot be before the invoice date.');
+            }
+            $postingDate = $invoice->posted_at?->toDateString() ?? $invoiceDate;
             if ($reversalDate < $postingDate) {
                 throw new InvalidArgumentException('Invoice reversal date cannot be before the posting date.');
             }

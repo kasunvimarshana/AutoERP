@@ -158,4 +158,21 @@ final class InventoryBatchManagementTest extends InventoryTestCase
             'INVALID-BATCH',
         ));
     }
+
+    public function test_batch_rejects_expiry_date_before_manufacture_date(): void
+    {
+        $tenantId = $this->createTenant();
+        $item = $this->createItem($tenantId, 'BATCH-EXP-TEST', TrackingType::Batch);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('The expiry date cannot precede the manufacture date.');
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(BatchTrackingService::class)->create(
+            tenantId: $tenantId,
+            itemId: (int) $item->getKey(),
+            batchNumber: 'EXP-BEFORE-MFG',
+            manufactureDate: '2026-06-15',
+            expiryDate: '2026-06-14',
+        ));
+    }
 }

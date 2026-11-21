@@ -8,6 +8,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryStatus;
@@ -25,6 +27,7 @@ class StockCardService
         private readonly DecimalMath $math,
         private readonly InventoryValidationService $validation,
         private readonly InventorySourceDocumentResolver $documents,
+        private readonly ConfigurationResolverInterface $configuration,
     ) {}
 
     public function build(array $filters, int $tenantId, ?int $organizationUnitId): array
@@ -45,7 +48,11 @@ class StockCardService
             }
         }
 
-        $timezone = (string) ($filters['timezone'] ?? config('app.timezone'));
+        $timezone = (string) (
+            $filters['timezone']
+            ?? $this->configuration->value(ConfigurationKey::WORKSPACE_TIMEZONE, $tenantId, $organizationUnitId)
+            ?? config('app.timezone')
+        );
         $from = CarbonImmutable::parse($filters['date_from'], $timezone)->startOfDay()->utc();
         $to = CarbonImmutable::parse($filters['date_to'], $timezone)->addDay()->startOfDay()->utc();
         $snapshot = CarbonImmutable::now('UTC');

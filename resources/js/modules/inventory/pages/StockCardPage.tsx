@@ -13,12 +13,12 @@ import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referen
 import { getDefaultWarehouse, getDefaultWarehouseLocation } from '@/modules/warehouse/warehouseApi';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { downloadStockCard, getStockCard, type StockCardFilters, type StockCardResult } from '../inventoryApi';
 
 function currentMonth() {
-    const today = new Date();
-    const date = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
-    return { date_from: `${date.slice(0, 7)}-01`, date_to: date };
+    const today = businessDateInputValue();
+    return { date_from: `${today.slice(0, 7)}-01`, date_to: today };
 }
 
 export default function StockCardPage() {

@@ -8,6 +8,7 @@ import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { ExportActions } from '../components/ExportActions';
 import { ReportDataGrid } from '../components/ReportDataGrid';
@@ -353,10 +354,6 @@ function formatDate(value: string): string {
 }
 
 function currentMonthRange(): Pick<ExpenseReportParams, 'date_from' | 'date_to'> {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-
-    return { date_from: `${year}-${month}-01`, date_to: `${year}-${month}-${day}` };
+    const today = businessDateInputValue();
+    return { date_from: `${today.slice(0, 7)}-01`, date_to: today };
 }

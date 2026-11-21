@@ -5,6 +5,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatMoney } from '@/shared/utils/formatMoney';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { runSummaryReport } from '../reportingApi';
@@ -605,13 +606,10 @@ function formatDate(value: string): string {
 }
 
 function currentMonthRange(): DateRange {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
+    const today = businessDateInputValue();
 
     return {
-        date_from: `${year}-${month}-01`,
-        date_to: `${year}-${month}-${day}`,
+        date_from: `${today.slice(0, 7)}-01`,
+        date_to: today,
     };
 }

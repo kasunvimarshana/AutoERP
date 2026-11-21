@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Expense\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Expense\Constants\ExpenseIdempotency;
 use Modules\Expense\DTOs\CreateExpenseData;
@@ -34,6 +37,7 @@ final class ExpensePostingService
         private readonly PaymentMethodProviderInterface $paymentMethods,
         private readonly FinancePostingInterface $finance,
         private readonly IdempotencyService $idempotency,
+        private readonly ConfigurationResolverInterface $configuration,
     ) {}
 
     public function createAndPost(CreateExpenseData $data): Expense
@@ -42,6 +46,17 @@ final class ExpensePostingService
             $record = $this->acquireIdempotency($data);
             if ($record instanceof IdempotencyRecord && ! $record->wasRecentlyCreated) {
                 return $this->replay($record, $data);
+            }
+
+            $timezone = (string) ($this->configuration->value(
+                ConfigurationKey::WORKSPACE_TIMEZONE,
+                $data->tenantId,
+                $data->organizationUnitId,
+            ) ?: config('app.timezone'));
+            $today = CarbonImmutable::now($timezone)->startOfDay();
+            $expenseDate = CarbonImmutable::parse($data->expenseDate, $timezone)->startOfDay();
+            if ($expenseDate->greaterThan($today)) {
+                throw new InvalidArgumentException('Expense date cannot be in the future.');
             }
 
             $amount = $this->math->normalize($data->amount);

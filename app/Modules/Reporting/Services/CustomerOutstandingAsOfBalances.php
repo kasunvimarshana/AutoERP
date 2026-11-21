@@ -8,10 +8,10 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Modules\Reporting\Http\Requests\CustomerOutstandingReportRequest;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentSourceType;
+use Modules\Reporting\Http\Requests\CustomerOutstandingReportRequest;
 
 final class CustomerOutstandingAsOfBalances
 {
@@ -84,7 +84,7 @@ final class CustomerOutstandingAsOfBalances
 
     public function assertHistoricalCoverage(CustomerOutstandingReportRequest $request, string $asOfDate, CustomerOutstandingLocationScope $locations): void
     {
-        if ($asOfDate >= now()->toDateString()) {
+        if ($asOfDate >= $request->reportToday()) {
             return;
         }
 

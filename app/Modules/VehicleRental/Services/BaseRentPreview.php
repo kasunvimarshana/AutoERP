@@ -23,8 +23,6 @@ final class BaseRentPreview
     // Resource guard for a single interactive preview, not a maximum contract term.
     private const MAX_PREVIEW_YEARS = 10;
 
-    private const DATE_TIMEZONE = 'UTC';
-
     public function __construct(
         private readonly AgreementService $agreements,
         private readonly DecimalMath $math,
@@ -47,9 +45,10 @@ final class BaseRentPreview
         if ($rate === null) {
             throw ValidationException::withMessages(['base_rate' => ['Record an explicit base rental rate before calculating.']]);
         }
-        $from = $this->date($data['from']);
-        $until = $this->date($data['until']);
-        $anchor = $this->date($agreement->starts_on->format(AgreementFields::DATE_FORMAT));
+        $timezone = $this->calendar->timezone($context);
+        $from = $this->date($data['from'], $timezone);
+        $until = $this->date($data['until'], $timezone);
+        $anchor = $this->date($agreement->starts_on->format(AgreementFields::DATE_FORMAT), $timezone);
         $coverageEnd = $this->calendar->coverageEnd($agreement, $context);
         if ($from->lessThan($anchor) || ($coverageEnd !== null && $until->toDateString() > $coverageEnd)) {
             throw ValidationException::withMessages(['from' => ['The complete preview period must be covered by this agreement.']]);
@@ -57,7 +56,7 @@ final class BaseRentPreview
         if ($until->greaterThanOrEqualTo($from->addYears(self::MAX_PREVIEW_YEARS))) {
             throw ValidationException::withMessages(['until' => ['Split long previews into periods shorter than '.self::MAX_PREVIEW_YEARS.' years.']]);
         }
-        // Civil dates are inclusive. UTC is used only for date arithmetic, not custody conversion.
+        // Civil dates are inclusive. The workspace timezone is used for date arithmetic.
         $end = $until->addDay();
         $segments = [];
         $total = $this->math->normalize(AgreementFields::ZERO);
@@ -100,8 +99,8 @@ final class BaseRentPreview
             'days' => $days, 'denominator_days' => $denominator, 'amount' => $amount];
     }
 
-    private function date(string $date): CarbonImmutable
+    private function date(string $date, string $timezone): CarbonImmutable
     {
-        return CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $date, self::DATE_TIMEZONE);
+        return CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $date, $timezone);
     }
 }
