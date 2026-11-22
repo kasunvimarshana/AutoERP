@@ -267,14 +267,25 @@
         .layout-outbound-continuous .service-footer td:last-child { width: 65%; text-align: right; }
         .layout-outbound-continuous .print-trace { margin-top: 0; font-size: 9px; white-space: normal; overflow-wrap: break-word; }
         .pdf-output.layout-outbound-continuous .sheet { padding: 0; }
+        .layout-thermal { font-family: 'Courier New', Courier, monospace; font-size: 11px; }
+        .layout-thermal .sheet { width: 80mm; min-height: 0; padding: 3mm 2mm; margin: 0 auto; background: #fff; }
+        .layout-thermal .controls { width: 80mm; }
+        .pdf-output.layout-thermal .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
+        .modern-invoice { font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.3; }
         @media print {
             body { background: #fff; }
             .controls { display: none !important; }
             .sheet,
             .layout-a5 .sheet,
-            .layout-continuous .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
+            .layout-continuous .sheet,
+            .layout-thermal .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         }
     </style>
+    @if (! empty($layout['custom_css']))
+        <style>
+            {!! $layout['custom_css'] !!}
+        </style>
+    @endif
 </head>
 <body class="{{ $print_layout['css_class'] }}{{ $isOutboundA4 ? ' layout-outbound-a4' : '' }}{{ $isOutboundContinuous ? ' layout-outbound-continuous' : '' }}{{ $isPdf ? ' pdf-output' : '' }}">
 
@@ -288,7 +299,11 @@
 @endif
 
 <main class="sheet">
-    @if ($isOutboundA4 || $isOutboundContinuous)
+    @if (($layout['view_template'] ?? '') === 'invoice.layouts.modern')
+        @include('invoice.layouts.modern')
+    @elseif (($layout['view_template'] ?? '') === 'invoice.layouts.thermal')
+        @include('invoice.layouts.thermal')
+    @elseif ($isOutboundA4 || $isOutboundContinuous)
         @include('invoice.partials.outbound')
     @else
     @if ($isCompact)

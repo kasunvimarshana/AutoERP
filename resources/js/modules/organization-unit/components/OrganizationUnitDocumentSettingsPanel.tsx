@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { listInvoiceLayouts } from '@/modules/invoice/invoiceLayoutApi';
+import type { InvoiceLayout } from '@/modules/invoice/invoiceLayoutTypes';
 import {
     createConfigurationEntry,
     getResolvedConfiguration,
@@ -18,6 +20,7 @@ import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import type { OrganizationUnitSummary } from '../organizationUnitApi';
 
+const INVOICE_DEFAULT_LAYOUT_KEY = 'invoice.default_layout';
 const INVOICE_PRINT_LAYOUT_KEY = 'invoice.default_print_layout';
 const STANDARD_A4 = 'standard_a4';
 const COMPACT_A5 = 'compact_a5';
@@ -26,6 +29,7 @@ const CONTINUOUS_85_BY_55 = 'continuous_8_5_by_5_5';
 interface DocumentSettingsData {
     resolved: ResolvedConfiguration;
     entry: ConfigurationEntry | null;
+    layouts: InvoiceLayout[];
 }
 
 export function OrganizationUnitDocumentSettingsPanel({ unit }: { unit: OrganizationUnitSummary }) {
@@ -34,14 +38,22 @@ export function OrganizationUnitDocumentSettingsPanel({ unit }: { unit: Organiza
     const canView = hasPermission(auth, settingsPermissions.view);
     const canManage = hasPermission(auth, settingsPermissions.manageOrganization);
     const settings = useApi<DocumentSettingsData>(async (signal) => {
-        const [resolved, page] = await Promise.all([
-            getResolvedConfiguration(INVOICE_PRINT_LAYOUT_KEY, signal),
+        const [resolvedNew, page, availableLayouts] = await Promise.all([
+            getResolvedConfiguration(INVOICE_DEFAULT_LAYOUT_KEY, signal).catch(() => null),
             listConfigurationEntries('organization_unit', { owner: 'Invoice', page: 1, per_page: 20 }, signal),
+            listInvoiceLayouts({ is_active: true }, signal).catch(() => [] as InvoiceLayout[]),
         ]);
+
+        const entry = page.data.find((e) => e.key === INVOICE_DEFAULT_LAYOUT_KEY)
+            ?? page.data.find((e) => e.key === INVOICE_PRINT_LAYOUT_KEY)
+            ?? null;
+
+        const resolved = resolvedNew ?? (await getResolvedConfiguration(INVOICE_PRINT_LAYOUT_KEY, signal));
 
         return {
             resolved,
-            entry: page.data.find((entry) => entry.key === INVOICE_PRINT_LAYOUT_KEY) ?? null,
+            entry,
+            layouts: availableLayouts,
         };
     }, [unit.id], canView && isCurrentUnit);
 
@@ -51,7 +63,7 @@ export function OrganizationUnitDocumentSettingsPanel({ unit }: { unit: Organiza
         <Panel>
             <h3 className="font-semibold text-slate-900">Document settings</h3>
             <p className="mt-1 text-sm text-slate-600">
-                Choose the default paper layout used when invoices are printed for this organization unit.
+                Choose the default invoice layout template applied when invoices are printed or generated for this organization unit.
             </p>
             {!isCurrentUnit ? (
                 <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -83,7 +95,7 @@ function DocumentSettingsEditor({
     error: ApiError | null;
     onSaved: (data: DocumentSettingsData) => void;
 }) {
-    const effectiveValue = printLayoutValue(data?.resolved.value);
+    const effectiveValue = resolveLayoutValue(data?.resolved.value);
     const [value, setValue] = useState(effectiveValue);
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -96,8 +108,9 @@ function DocumentSettingsEditor({
         try {
             const saved = data.entry
                 ? await updateConfigurationEntry('organization_unit', data.entry, value)
-                : await createConfigurationEntry('organization_unit', INVOICE_PRINT_LAYOUT_KEY, value);
+                : await createConfigurationEntry('organization_unit', INVOICE_DEFAULT_LAYOUT_KEY, value);
             onSaved({
+                ...data,
                 entry: saved,
                 resolved: {
                     ...data.resolved,
@@ -114,32 +127,50 @@ function DocumentSettingsEditor({
         }
     };
 
+    const layoutOptions = data?.layouts && data.layouts.length > 0
+        ? data.layouts.map((l) => ({
+            value: l.code,
+            label: `${l.name} (${l.paper_size_label} - ${l.orientation})`,
+        }))
+        : [
+            { value: STANDARD_A4, label: 'Classic Standard (A4 Portrait)' },
+            { value: COMPACT_A5, label: 'Compact Slip (A5 Portrait)' },
+            { value: CONTINUOUS_85_BY_55, label: 'Continuous Paper (8.5 × 5.5 in)' },
+        ];
+
+    // Ensure the current effective value is in the options list
+    if (!layoutOptions.some((opt) => opt.value === value)) {
+        layoutOptions.unshift({
+            value,
+            label: `${value} (Current)`,
+        });
+    }
+
     return (
         <form className="mt-4 space-y-4" onSubmit={(event) => void save(event)}>
             <ErrorAlert error={actionError ?? error} />
             <Select
-                label="Default invoice print layout"
+                label="Default invoice layout template"
                 value={value}
-                options={[
-                    { value: STANDARD_A4, label: 'A4 Standard - Portrait' },
-                    { value: COMPACT_A5, label: 'A5 Compact - Portrait' },
-                    { value: CONTINUOUS_85_BY_55, label: 'Continuous paper - 8.5 × 5.5 in' },
-                ]}
-                hint="Match this layout to the paper size selected in the printer dialog. Continuous stock requires a matching 8.5 × 5.5 in custom form."
+                options={layoutOptions}
+                hint="Invoices printed or downloaded in this organization unit will use this layout unless explicitly overridden."
                 onChange={(event) => setValue(event.target.value)}
                 disabled={!canManage || data === null}
             />
             {canManage && data && (
                 <div className="flex justify-end">
-                    <Button type="submit" loading={saving} disabled={value === effectiveValue}>Save document settings</Button>
+                    <Button type="submit" loading={saving} disabled={value === effectiveValue}>
+                        Save document settings
+                    </Button>
                 </div>
             )}
         </form>
     );
 }
 
-function printLayoutValue(value: unknown): string {
-    if (value === COMPACT_A5 || value === CONTINUOUS_85_BY_55) return value;
-
+function resolveLayoutValue(value: unknown): string {
+    if (typeof value === 'string' && value.trim() !== '') {
+        return value.trim();
+    }
     return STANDARD_A4;
 }

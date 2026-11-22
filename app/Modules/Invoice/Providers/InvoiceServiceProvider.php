@@ -9,10 +9,14 @@ use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
+use Modules\Invoice\Contracts\InvoiceLayoutResolverInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
 use Modules\Invoice\Contracts\InvoiceTaxDocumentProviderInterface;
 use Modules\Invoice\Services\InvoiceBalanceProvider;
+use Modules\Invoice\Services\InvoiceLayoutProvisioner;
+use Modules\Invoice\Services\InvoiceLayoutResolver;
+use Modules\Invoice\Services\InvoiceLayoutService;
 use Modules\Invoice\Services\InvoiceSettlementService;
 use Modules\Invoice\Services\InvoiceSourceRestorationRegistry;
 use Modules\Invoice\Services\SupplierBalanceProvider;
@@ -27,6 +31,9 @@ final class InvoiceServiceProvider extends ServiceProvider
         $this->app->singleton(InvoiceBalanceProviderInterface::class, InvoiceBalanceProvider::class);
         $this->app->singleton(InvoiceSettlementServiceInterface::class, InvoiceSettlementService::class);
         $this->app->singleton(InvoiceTaxDocumentProviderInterface::class, InvoiceTaxDocumentProvider::class);
+        $this->app->bind(InvoiceLayoutResolverInterface::class, InvoiceLayoutResolver::class);
+        $this->app->bind(InvoiceLayoutProvisioner::class);
+        $this->app->bind(InvoiceLayoutService::class);
         $this->app->singleton(
             InvoiceSourceRestorationRegistry::class,
             static fn ($app): InvoiceSourceRestorationRegistry => new InvoiceSourceRestorationRegistry(

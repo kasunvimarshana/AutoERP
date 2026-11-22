@@ -92,9 +92,12 @@ export async function getInvoiceWhatsAppShare(id: number) {
 }
 
 
-export async function getInvoiceSignedPrintLink(id: number, signal?: AbortSignal) {
+export async function getInvoiceSignedPrintLink(id: number, signal?: AbortSignal, layout?: string) {
+    const url = layout
+        ? `${endpoints.invoices}/${id}/signed-print?layout=${encodeURIComponent(layout)}`
+        : `${endpoints.invoices}/${id}/signed-print`;
     const response = await apiClient.post<ApiResource<{ print_url: string; pdf_url: string }>>(
-        `${endpoints.invoices}/${id}/signed-print`,
+        url,
         null,
         { signal },
     );

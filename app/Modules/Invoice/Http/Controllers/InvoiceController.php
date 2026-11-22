@@ -28,6 +28,7 @@ use Modules\Invoice\Http\Resources\InvoiceResource;
 use Modules\Invoice\Http\Resources\InvoiceSourceLineResource;
 use Modules\Invoice\Http\Resources\InvoiceSourceResource;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Models\InvoiceLayout;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoicePrintIssuanceService;
 use Modules\Invoice\Services\InvoicePrintService;
@@ -218,11 +219,16 @@ final class InvoiceController
         }
 
         $context = $this->printIssuance->issue($model);
+        $layoutParam = $request->query('layout');
+        $requestedLayout = is_string($layoutParam) && trim($layoutParam) !== ''
+            ? $this->prints->resolveLayout($model, trim($layoutParam))
+            : null;
 
         return view('invoice.print', $this->prints->viewData(
             $model,
-            $this->signedPdfUrl($model, $context),
+            $this->signedPdfUrl($model, $context, $layoutParam),
             printContext: $context,
+            requestedLayout: $requestedLayout,
         ));
     }
 
@@ -238,7 +244,12 @@ final class InvoiceController
             return $this->notFound($invoice);
         }
 
-        return $this->pdfResponse($model, $this->printIssuance->issue($model));
+        $layoutParam = $request->query('layout');
+        $requestedLayout = is_string($layoutParam) && trim($layoutParam) !== ''
+            ? $this->prints->resolveLayout($model, trim($layoutParam))
+            : null;
+
+        return $this->pdfResponse($model, $this->printIssuance->issue($model), $requestedLayout);
     }
 
     public function signedPrintLink(Request $request, int $invoice): JsonResponse
@@ -253,6 +264,11 @@ final class InvoiceController
 
         $context = $this->printIssuance->issue($model);
         $routeParameters = $this->publicRouteParameters($model, $context);
+        $layoutParam = $request->input('layout') ?? $request->query('layout');
+        if (is_string($layoutParam) && trim($layoutParam) !== '') {
+            $routeParameters['layout'] = trim($layoutParam);
+        }
+
         $printUrl = URL::temporarySignedRoute(
             'invoices.public.print',
             now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
@@ -302,11 +318,16 @@ final class InvoiceController
         }
 
         $context = $this->signedPrintContext($request);
+        $layoutParam = $request->query('layout');
+        $requestedLayout = is_string($layoutParam) && trim($layoutParam) !== ''
+            ? $this->prints->resolveLayout($model, trim($layoutParam))
+            : null;
 
         return view('invoice.print', $this->prints->viewData(
             $model,
-            $this->signedPdfUrl($model, $context),
+            $this->signedPdfUrl($model, $context, $layoutParam),
             printContext: $context,
+            requestedLayout: $requestedLayout,
         ));
     }
 
@@ -321,7 +342,12 @@ final class InvoiceController
             return $this->notFound($invoice);
         }
 
-        return $this->pdfResponse($model, $this->signedPrintContext($request));
+        $layoutParam = $request->query('layout');
+        $requestedLayout = is_string($layoutParam) && trim($layoutParam) !== ''
+            ? $this->prints->resolveLayout($model, trim($layoutParam))
+            : null;
+
+        return $this->pdfResponse($model, $this->signedPrintContext($request), $requestedLayout);
     }
 
     public function publicSharedPdf(
@@ -343,17 +369,21 @@ final class InvoiceController
         return $this->pdfResponse($model);
     }
 
-    private function pdfResponse(Invoice $invoice, ?InvoicePrintContext $context = null): Response
-    {
+    private function pdfResponse(
+        Invoice $invoice,
+        ?InvoicePrintContext $context = null,
+        ?InvoiceLayout $requestedLayout = null,
+    ): Response {
+        $layoutModel = $requestedLayout ?? $this->prints->resolveLayout($invoice);
         $html = view('invoice.print', $this->prints->viewData(
             $invoice,
             mode: 'pdf',
             printContext: $context,
+            requestedLayout: $layoutModel,
         ))->render();
-        $layout = $this->prints->layout($invoice);
         $dompdf = new Dompdf;
         $dompdf->loadHtml($html);
-        $dompdf->setPaper($layout->pdfPaper(), $layout->orientation());
+        $dompdf->setPaper($layoutModel->pdfPaper(), $layoutModel->orientation);
         $dompdf->render();
 
         return response($dompdf->output(), 200)
@@ -361,12 +391,17 @@ final class InvoiceController
             ->header('Content-Disposition', 'inline; filename="'.$this->prints->filename($invoice).'"');
     }
 
-    private function signedPdfUrl(Invoice $invoice, ?InvoicePrintContext $context): string
+    private function signedPdfUrl(Invoice $invoice, ?InvoicePrintContext $context, ?string $layoutCode = null): string
     {
+        $parameters = $this->publicRouteParameters($invoice, $context);
+        if (is_string($layoutCode) && trim($layoutCode) !== '') {
+            $parameters['layout'] = trim($layoutCode);
+        }
+
         return URL::temporarySignedRoute(
             'invoices.public.pdf',
             now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
-            $this->publicRouteParameters($invoice, $context),
+            $parameters,
         );
     }
 

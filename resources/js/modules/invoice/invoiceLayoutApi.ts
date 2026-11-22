@@ -1,0 +1,67 @@
+import { apiClient } from '@/shared/api/apiClient';
+import { endpoints } from '@/shared/api/endpoints';
+import type { ApiResource } from '@/shared/types/api';
+import type {
+    CreateInvoiceLayoutPayload,
+    InvoiceLayout,
+    InvoiceLayoutFilterParams,
+    SetDefaultInvoiceLayoutPayload,
+    UpdateInvoiceLayoutPayload,
+} from './invoiceLayoutTypes';
+
+export async function listInvoiceLayouts(params?: InvoiceLayoutFilterParams, signal?: AbortSignal): Promise<InvoiceLayout[]> {
+    const response = await apiClient.get<ApiResource<InvoiceLayout[]>>(endpoints.invoiceLayouts, {
+        params,
+        signal,
+    });
+    return response.data.data;
+}
+
+export async function getInvoiceLayout(id: number, signal?: AbortSignal): Promise<InvoiceLayout> {
+    const response = await apiClient.get<ApiResource<InvoiceLayout>>(`${endpoints.invoiceLayouts}/${id}`, { signal });
+    return response.data.data;
+}
+
+export async function createInvoiceLayout(payload: CreateInvoiceLayoutPayload): Promise<InvoiceLayout> {
+    const response = await apiClient.post<ApiResource<InvoiceLayout>>(endpoints.invoiceLayouts, payload);
+    return response.data.data;
+}
+
+export async function updateInvoiceLayout(id: number, payload: UpdateInvoiceLayoutPayload): Promise<InvoiceLayout> {
+    const response = await apiClient.put<ApiResource<InvoiceLayout>>(`${endpoints.invoiceLayouts}/${id}`, payload);
+    return response.data.data;
+}
+
+export async function deleteInvoiceLayout(id: number): Promise<{ message: string }> {
+    const response = await apiClient.delete<{ message: string }>(`${endpoints.invoiceLayouts}/${id}`);
+    return response.data;
+}
+
+export async function previewInvoiceLayout(
+    idOrCode: number | string,
+    invoiceId?: number,
+    signal?: AbortSignal,
+): Promise<string> {
+    const response = await apiClient.get<string>(`${endpoints.invoiceLayouts}/${idOrCode}/preview`, {
+        params: invoiceId ? { invoice_id: invoiceId } : undefined,
+        signal,
+        headers: { Accept: 'text/html' },
+        responseType: 'text',
+    });
+    return response.data;
+}
+
+export async function setDefaultInvoiceLayout(payload: SetDefaultInvoiceLayoutPayload): Promise<{
+    message: string;
+    scope: string;
+    code: string;
+    organization_unit_id: number | null;
+}> {
+    const response = await apiClient.post<ApiResource<{
+        message: string;
+        scope: string;
+        code: string;
+        organization_unit_id: number | null;
+    }>>(`${endpoints.invoiceLayouts}/set-default`, payload);
+    return response.data.data;
+}

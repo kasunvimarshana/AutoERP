@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { listInvoices, type Invoice } from '../invoiceApi';
+import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { invoicePermissions } from '../invoicePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -45,6 +48,7 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
     renderHeader?: (view: InvoiceView | undefined) => ReactNode;
     rowHref?: (invoice: Invoice) => string;
 }) {
+    const auth = useAuth();
     const [searchParams] = useSearchParams();
     const viewKey = forcedViewKey ?? (searchParams.get('view') as InvoiceViewKey | null);
     const view = viewKey ? invoiceViews[viewKey] : undefined;
@@ -76,7 +80,16 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
                 <ContentHeader
                     title={view?.title ?? 'Invoices'}
                     description={view?.description ?? 'Invoice list and on-demand financial relations.'}
-                    actions={view?.action ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton> : undefined}
+                    actions={(
+                        <div className="flex items-center gap-2">
+                            {hasPermission(auth, invoicePermissions.layoutsView) && (
+                                <LinkButton variant="secondary" to="/settings/invoice-layouts">
+                                    Layout Templates
+                                </LinkButton>
+                            )}
+                            {view?.action && <LinkButton to={view.action.to}>{view.action.label}</LinkButton>}
+                        </div>
+                    )}
                 />
             )}
             <div className="mb-4 max-w-md"><Input type="search" aria-label="Search invoices" placeholder="Search invoice number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>

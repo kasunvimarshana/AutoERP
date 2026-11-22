@@ -24,6 +24,10 @@ final class InvoicePermission
 
     public const VIEW_SOURCES = 'invoices.sources.view';
 
+    public const LAYOUTS_VIEW = 'invoices.layouts.view';
+
+    public const LAYOUTS_MANAGE = 'invoices.layouts.manage';
+
     /** @return array<string, string> */
     public static function descriptions(): array
     {
@@ -37,6 +41,8 @@ final class InvoicePermission
             self::CANCEL => 'Cancel eligible unposted invoices.',
             self::VIEW_BALANCE => 'View invoice settlement balances.',
             self::VIEW_SOURCES => 'View invoice source documents, source lines, and adjustments.',
+            self::LAYOUTS_VIEW => 'View invoice layout configurations and rendered previews.',
+            self::LAYOUTS_MANAGE => 'Create, customize, update, and manage invoice layouts.',
         ];
     }
 }

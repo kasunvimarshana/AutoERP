@@ -51,6 +51,7 @@ final class Invoice extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'party_id' => 'integer',
             'currency_id' => 'integer',
+            'invoice_layout_id' => 'integer',
             'created_by' => 'integer',
             'approved_by' => 'integer',
             'posted_by' => 'integer',
@@ -90,6 +91,11 @@ final class Invoice extends TenantOwnedModel
     public function currency(): BelongsTo
     {
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
+    }
+
+    public function layout(): BelongsTo
+    {
+        return $this->belongsTo(InvoiceLayout::class, 'invoice_layout_id');
     }
 
     public function customer(): BelongsTo

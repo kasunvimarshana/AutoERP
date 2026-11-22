@@ -14,6 +14,7 @@ const invoiceApi = vi.hoisted(() => ({
 const auth = vi.hoisted(() => ({ permissions: ['invoices.cancel', 'invoices.manage'] }));
 
 vi.mock('../invoiceApi', () => invoiceApi);
+vi.mock('../invoiceLayoutApi', () => ({ listInvoiceLayouts: vi.fn().mockResolvedValue([]) }));
 vi.mock('@/modules/auth/useTenantRouteAccess', () => ({ useTenantRouteAccess: () => true }));
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({ roles: [], permissions: auth.permissions, permissionsLoaded: true }),

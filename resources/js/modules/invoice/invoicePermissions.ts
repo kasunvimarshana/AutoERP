@@ -10,6 +10,8 @@ export const invoicePermissions = {
     cancel: 'invoices.cancel',
     balanceView: 'invoices.balance.view',
     sourcesView: 'invoices.sources.view',
+    layoutsView: 'invoices.layouts.view',
+    layoutsManage: 'invoices.layouts.manage',
 } as const;
 
 export function hasInvoicePermission(subject: AccessSubject, permission: string): boolean {

@@ -13,6 +13,7 @@ import {
     reverseInvoice,
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
+import { listInvoiceLayouts } from '../invoiceLayoutApi';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
@@ -22,6 +23,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button, LinkButton } from '@/shared/components/Button';
+import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Input } from '@/shared/components/Input';
 import { Modal } from '@/shared/components/Modal';
 import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
@@ -110,6 +112,10 @@ export default function InvoiceDetailPage() {
         (signal) => getInvoiceAdjustments(id, signal),
         [id],
         canViewSources && tabState.openedTabs.has('adjustments'),
+    );
+    const availableLayouts = useApi(
+        (signal) => listInvoiceLayouts({ is_active: true }, signal).catch(() => []),
+        [],
     );
     if (invoice.loading) return <LoadingState />;
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
@@ -216,6 +222,36 @@ export default function InvoiceDetailPage() {
         }
     };
 
+    const handlePrintWithLayout = async (layoutCode?: string) => {
+        try {
+            const json = await getInvoiceSignedPrintLink(id, undefined, layoutCode);
+            if (json.print_url) {
+                openSameOriginUrl(json.print_url);
+                return;
+            }
+        } catch {
+            // fallback to direct print URL
+        }
+
+        const fallbackUrl = layoutCode ? `${printUrl}?layout=${encodeURIComponent(layoutCode)}` : printUrl;
+        openSameOriginUrl(fallbackUrl);
+    };
+
+    const handleDownloadPdfWithLayout = async (layoutCode?: string) => {
+        try {
+            const json = await getInvoiceSignedPrintLink(id, undefined, layoutCode);
+            if (json.pdf_url) {
+                window.open(json.pdf_url, '_blank', 'noopener');
+                return;
+            }
+        } catch {
+            // fallback
+        }
+
+        const fallbackPdfUrl = layoutCode ? `/invoices/${id}/pdf?layout=${encodeURIComponent(layoutCode)}` : `/invoices/${id}/pdf`;
+        window.open(fallbackPdfUrl, '_blank');
+    };
+
     return (
         <>
             <ContentHeader
@@ -248,32 +284,28 @@ export default function InvoiceDetailPage() {
                         {!isRetiredSourceInvoice && ['draft', 'approved'].includes(value.status ?? '') && canCancel ? (
                             <Button variant="danger" loading={action === 'cancel'} onClick={() => { setCancelReason(''); setActionError(null); setCancelDialogOpen(true); }}>Cancel</Button>
                         ) : null}
-                        <Button variant="secondary" onClick={async () => {
-                            try {
-                                const json = await getInvoiceSignedPrintLink(id);
-                                if (json.print_url) {
-                                    openSameOriginUrl(json.print_url);
-                                    return;
-                                }
-                            } catch {
-                                // fallback to direct print URL
-                            }
-
-                            openSameOriginUrl(printUrl);
-                        }}>Print</Button>
-                        <Button variant="secondary" onClick={async () => {
-                            try {
-                                const json = await getInvoiceSignedPrintLink(id);
-                                if (json.pdf_url) {
-                                    window.open(json.pdf_url, '_blank', 'noopener');
-                                    return;
-                                }
-                            } catch {
-                                // fallback
-                            }
-
-                            window.open(`/invoices/${id}/pdf`, '_blank');
-                        }}>Download PDF</Button>
+                        <Button variant="secondary" onClick={() => void handlePrintWithLayout()}>Print</Button>
+                        <Button variant="secondary" onClick={() => void handleDownloadPdfWithLayout()}>Download PDF</Button>
+                        {availableLayouts.data && availableLayouts.data.length > 1 && (
+                            <ActionMenu label="Layouts" triggerClassName="min-h-9 py-1 px-2.5 text-xs">
+                                <div className="py-1 min-w-[220px]">
+                                    <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                                        Print with layout
+                                    </div>
+                                    {availableLayouts.data.map((l) => (
+                                        <button
+                                            key={l.code}
+                                            type="button"
+                                            className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-100"
+                                            onClick={() => void handlePrintWithLayout(l.code)}
+                                        >
+                                            <span className="font-medium text-slate-900">{l.name}</span>
+                                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{l.paper_size_label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </ActionMenu>
+                        )}
                         {canShareViaWhatsApp ? (
                             <Button
                                 variant="secondary"
@@ -399,6 +431,7 @@ function SourceRecords({ loading, error, data }: {
 }) {
     if (loading) return <LoadingState />;
     if (error) return <ErrorAlert error={error} />;
+
     return (
         <div className="space-y-6">
             <section>
@@ -421,6 +454,7 @@ function AdjustmentRecords({ loading, error, rows }: {
     if (loading) return <LoadingState />;
     if (error) return <ErrorAlert error={error} />;
     const allocations = rows.flatMap((row) => row.allocations ?? []);
+
     return (
         <div className="space-y-6">
             <RecordTable rows={rows} fields={['name', 'adjustment_type', 'effect', 'calculation_type', 'rate', 'amount', 'allocation_method']} rowKey={(row, index) => String(row.id ?? `${String(row.name ?? 'adjustment')}-${index}`)} />

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Http\Controllers\InvoiceController;
+use Modules\Invoice\Http\Controllers\InvoiceLayoutController;
 
 $middleware = [
     'api',
@@ -68,4 +69,32 @@ Route::prefix('api/v1/invoices')->middleware($middleware)->name('api.v1.invoices
         ->whereNumber('invoice')
         ->middleware($requires(InvoicePermission::VIEW))
         ->name('whatsapp-share');
+});
+
+Route::prefix('api/v1/invoice-layouts')->middleware($middleware)->name('api.v1.invoice-layouts.')->group(function () use ($requires): void {
+    Route::get('/', [InvoiceLayoutController::class, 'index'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
+        ->name('index');
+    Route::post('/', [InvoiceLayoutController::class, 'store'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
+        ->name('store');
+    Route::post('set-default', [InvoiceLayoutController::class, 'setDefault'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
+        ->name('set-default');
+    Route::get('{layout}', [InvoiceLayoutController::class, 'show'])
+        ->whereNumber('layout')
+        ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
+        ->name('show');
+    Route::match(['put', 'patch'], '{layout}', [InvoiceLayoutController::class, 'update'])
+        ->whereNumber('layout')
+        ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
+        ->name('update');
+    Route::delete('{layout}', [InvoiceLayoutController::class, 'destroy'])
+        ->whereNumber('layout')
+        ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
+        ->name('destroy');
+    Route::post('{layout}/preview', [InvoiceLayoutController::class, 'preview'])
+        ->whereNumber('layout')
+        ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
+        ->name('preview');
 });

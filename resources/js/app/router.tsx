@@ -23,6 +23,7 @@ import { RouteErrorPage } from "./errors/RouteErrorPage";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 import { expensePermissions } from "@/modules/expense/expensePermissions";
 import { inventoryPermissions } from "@/modules/inventory/inventoryPermissions";
+import { invoicePermissions } from "@/modules/invoice/invoicePermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -254,6 +255,9 @@ const InvoiceListPage = lazy(
 );
 const InvoiceDetailPage = lazy(
     () => import("@/modules/invoice/pages/InvoiceDetailPage"),
+);
+const InvoiceLayoutsPage = lazy(
+    () => import("@/modules/invoice/pages/InvoiceLayoutsPage"),
 );
 const PaymentListPage = lazy(
     () => import("@/modules/payment/pages/PaymentListPage"),
@@ -540,6 +544,14 @@ const appRouter = createBrowserRouter(
                         />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/settings/quick-access" element={<QuickAccessSettingsPage />} />
+                        <Route
+                            path="/settings/invoice-layouts"
+                            element={(
+                                <PermissionRoute permission={invoicePermissions.layoutsView}>
+                                    <InvoiceLayoutsPage />
+                                </PermissionRoute>
+                            )}
+                        />
                         <Route
                             path="/reference-data"
                             element={<ReferenceDataPage />}

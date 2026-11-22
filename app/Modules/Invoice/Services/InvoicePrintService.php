@@ -13,6 +13,7 @@ use Illuminate\Support\Collection;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Contracts\InvoiceLayoutResolverInterface;
 use Modules\Invoice\Contracts\InvoicePaymentMethodProviderInterface;
 use Modules\Invoice\Data\InvoicePrintContext;
 use Modules\Invoice\Enums\AdjustmentEffect;
@@ -24,6 +25,7 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Invoice\Models\InvoiceDocumentSnapshot;
+use Modules\Invoice\Models\InvoiceLayout;
 use Modules\Invoice\Models\InvoiceLine;
 
 final class InvoicePrintService
@@ -46,6 +48,7 @@ final class InvoicePrintService
         private readonly ConfigurationResolverInterface $configuration,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly InvoicePaymentMethodProviderInterface $paymentMethods,
+        private readonly InvoiceLayoutResolverInterface $layoutResolver,
     ) {}
 
     /** @return Builder<Invoice> */
@@ -77,6 +80,7 @@ final class InvoicePrintService
         ?string $pdfUrl = null,
         string $mode = 'print',
         ?InvoicePrintContext $printContext = null,
+        ?InvoiceLayout $requestedLayout = null,
     ): array {
         $this->executionContext->runForTenant((int) $invoice->tenant_id, static fn () => $invoice->loadMissing([
             'tenant',
@@ -98,7 +102,8 @@ final class InvoicePrintService
             ? $this->snapshotParty($snapshot, 'buyer')
             : $this->purchaser($invoice);
         $taxLabel = $this->taxLabel($invoice->lines);
-        $layout = $this->layout($invoice);
+        $resolvedLayout = $requestedLayout ?? $this->resolveLayout($invoice);
+        $layout = $resolvedLayout->toLegacyPrintLayout();
         $usesFocusedPrint = $this->usesFocusedPrint($invoice);
         $usesOutboundLayout = $this->isOutbound($invoice)
             && in_array($this->enumValue($invoice->invoice_type), [
@@ -112,6 +117,19 @@ final class InvoicePrintService
         return [
             'mode' => $mode,
             'pdf_url' => $pdfUrl,
+            'layout_model' => $resolvedLayout,
+            'layout' => [
+                'code' => $resolvedLayout->code,
+                'name' => $resolvedLayout->name,
+                'paper_size' => $resolvedLayout->paper_size,
+                'orientation' => $resolvedLayout->orientation,
+                'view_template' => $resolvedLayout->view_template,
+                'is_compact' => $resolvedLayout->isCompact(),
+                'custom_css' => $resolvedLayout->custom_css,
+                'header_content' => $resolvedLayout->header_content,
+                'footer_content' => $resolvedLayout->footer_content,
+                'settings' => $resolvedLayout->settings ?? [],
+            ],
             'print_layout' => [
                 'value' => $layout->value,
                 'css_class' => $layout->cssClass(),
@@ -169,14 +187,14 @@ final class InvoicePrintService
         ];
     }
 
-    public function layout(Invoice $invoice): InvoicePrintLayout
+    public function layout(Invoice $invoice, ?string $explicitCode = null): InvoicePrintLayout
     {
-        $value = $this->configurationValue(
-            $invoice,
-            InvoicePrintLayout::CONFIGURATION_KEY,
-        );
+        return $this->resolveLayout($invoice, $explicitCode)->toLegacyPrintLayout();
+    }
 
-        return InvoicePrintLayout::from((string) $value);
+    public function resolveLayout(Invoice $invoice, ?string $explicitCode = null): InvoiceLayout
+    {
+        return $this->layoutResolver->resolve($invoice, $explicitCode);
     }
 
     public function filename(Invoice $invoice): string
