@@ -76,6 +76,55 @@ final class RequireTenantPermissionMiddlewareTest extends TestCase
         self::assertSame('finance.journals.post', $payload['error']['details']['permission']);
     }
 
+    public function test_it_allows_a_user_with_any_of_multiple_required_permissions(): void
+    {
+        $user = $this->createMock(CurrentUserContextAccessorInterface::class);
+        $tenant = $this->createMock(CurrentTenantContextAccessorInterface::class);
+        $permissions = $this->createMock(PermissionCheckerInterface::class);
+
+        $user->method('currentUserId')->willReturn(7);
+        $tenant->method('currentTenantId')->willReturn(11);
+        $permissions->expects(self::exactly(2))
+            ->method('allows')
+            ->willReturnCallback(static function (int $u, int $t, string $p): bool {
+                return $p === 'purchase.fast_purchases.view';
+            });
+
+        $response = $this->middleware($user, $tenant, $permissions)->handle(
+            Request::create('/api/v1/purchase/adjustments/catalogue', 'GET'),
+            static fn (): Response => new Response('', Response::HTTP_NO_CONTENT),
+            'purchase.orders.view',
+            'purchase.fast_purchases.view',
+        );
+
+        self::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode());
+    }
+
+    public function test_it_fails_closed_when_none_of_multiple_permissions_are_granted(): void
+    {
+        $user = $this->createMock(CurrentUserContextAccessorInterface::class);
+        $tenant = $this->createMock(CurrentTenantContextAccessorInterface::class);
+        $permissions = $this->createMock(PermissionCheckerInterface::class);
+
+        $user->method('currentUserId')->willReturn(7);
+        $tenant->method('currentTenantId')->willReturn(11);
+        $permissions->expects(self::exactly(2))
+            ->method('allows')
+            ->willReturn(false);
+
+        $response = $this->middleware($user, $tenant, $permissions)->handle(
+            Request::create('/api/v1/purchase/adjustments/catalogue', 'GET'),
+            static fn (): Response => new Response('', Response::HTTP_NO_CONTENT),
+            'purchase.orders.view',
+            'purchase.fast_purchases.view',
+        );
+        $payload = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+        self::assertSame('TENANT_PERMISSION_REQUIRED', $payload['error']['code']);
+        self::assertSame(['purchase.orders.view', 'purchase.fast_purchases.view'], $payload['error']['details']['permissions']);
+    }
+
     private function middleware(
         CurrentUserContextAccessorInterface&MockObject $user,
         CurrentTenantContextAccessorInterface&MockObject $tenant,

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Http\Requests;
 
-final class DeleteConfigurationEntryRequest extends ViewConfigurationRequest
+final class DeleteConfigurationEntryRequest extends ManageConfigurationEntryRequest
 {
     public function rules(): array
     {

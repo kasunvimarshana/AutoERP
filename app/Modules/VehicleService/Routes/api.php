@@ -26,7 +26,7 @@ $middleware = [
     'tenant.feature:vehicle-service',
 ];
 $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
-$requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
+$requires = static fn (string ...$permissions): string => $permissionMiddleware.':'.implode(',', $permissions);
 
 Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.vehicle-service.')->group(function () use ($requires): void {
     Route::middleware($requires(VehicleServicePermission::JOBS_VIEW))->group(function (): void {
@@ -38,7 +38,13 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::get('jobs/{job}/status-history', [VehicleServiceJobController::class, 'statusHistory'])->whereNumber('job')->name('status-history.index');
         Route::get('jobs/{job}/discount-history', [VehicleServiceJobDiscountController::class, 'history'])->whereNumber('job')->name('discount-history.index');
     });
-    Route::get('job-types/lookup', [VehicleServiceJobTypeController::class, 'lookup'])->name('job-types.lookup');
+    Route::get('job-types/lookup', [VehicleServiceJobTypeController::class, 'lookup'])
+        ->middleware($requires(
+            VehicleServicePermission::JOB_TYPES_VIEW,
+            VehicleServicePermission::JOBS_VIEW,
+            VehicleServicePermission::JOBS_CREATE,
+        ))
+        ->name('job-types.lookup');
     Route::middleware($requires(VehicleServicePermission::JOB_TYPES_VIEW))->group(function (): void {
         Route::get('job-types', [VehicleServiceJobTypeController::class, 'index'])->name('job-types.index');
         Route::get('job-types/{jobType}', [VehicleServiceJobTypeController::class, 'show'])->whereNumber('jobType')->name('job-types.show');
@@ -55,6 +61,10 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
     Route::get('jobs/create-defaults', [VehicleServiceJobController::class, 'createDefaults'])
         ->middleware($requires(VehicleServicePermission::JOBS_CREATE))->name('jobs.create-defaults');
     Route::get('job-line-items/lookup', VehicleServiceLineItemLookupController::class)
+        ->middleware($requires(
+            VehicleServicePermission::JOBS_CREATE,
+            VehicleServicePermission::LINES_MANAGE,
+        ))
         ->name('job-line-items.lookup');
     Route::post('jobs', [VehicleServiceJobController::class, 'store'])->middleware($requires(VehicleServicePermission::JOBS_CREATE))->name('jobs.store');
     Route::middleware($requires(VehicleServicePermission::JOBS_UPDATE))->group(function (): void {

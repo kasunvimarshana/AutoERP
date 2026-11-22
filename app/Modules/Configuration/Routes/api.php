@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Configuration\Constants\ConfigurationPermission;
 use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Http\Controllers\ConfigurationController;
 use Modules\Configuration\Http\Controllers\Platform\PlatformConfigurationController;
@@ -12,6 +13,8 @@ $guard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
 $currentUser = (string) config('core.current_user.middleware_alias', 'current.user');
 $currentTenant = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
+$permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
+$requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
 $currentOrganization = (string) config(
     'core.current_organization_unit.middleware_alias',
     'current.organization-unit',
@@ -178,19 +181,30 @@ Route::prefix('api/v1/platform/configuration')
 Route::prefix('api/v1/configuration')
     ->middleware(['api', 'auth:'.$guard, $currentUser, $currentTenant])
     ->name('api.v1.configuration.')
-    ->group(function () use ($currentOrganization, $registerTenantScope): void {
+    ->group(function () use ($currentOrganization, $registerTenantScope, $requires): void {
         Route::get('definitions', [ConfigurationController::class, 'definitions'])
+            ->middleware($requires(ConfigurationPermission::ENTRIES_VIEW))
             ->defaults('scope', ConfigurationScope::TENANT)
             ->name('definitions');
         Route::get('resolved/{key}', [ConfigurationController::class, 'resolved'])
-            ->middleware($currentOrganization.':optional')
+            ->middleware([$currentOrganization.':optional', $requires(ConfigurationPermission::ENTRIES_VIEW)])
             ->where('key', '[a-z][a-z0-9._-]+')
             ->defaults('scope', ConfigurationScope::TENANT)
             ->name('resolved');
 
-        $registerTenantScope('tenant', ConfigurationScope::TENANT);
+        $registerTenantScope(
+            'tenant',
+            ConfigurationScope::TENANT,
+            [$requires(ConfigurationPermission::ENTRIES_VIEW)],
+            [$requires(ConfigurationPermission::ENTRIES_MANAGE_TENANT)],
+        );
 
-        Route::middleware($currentOrganization.':required')->group(function () use ($registerTenantScope): void {
-            $registerTenantScope('organization', ConfigurationScope::ORGANIZATION_UNIT);
+        Route::middleware($currentOrganization.':required')->group(function () use ($registerTenantScope, $requires): void {
+            $registerTenantScope(
+                'organization',
+                ConfigurationScope::ORGANIZATION_UNIT,
+                [$requires(ConfigurationPermission::ENTRIES_VIEW)],
+                [$requires(ConfigurationPermission::ENTRIES_MANAGE_ORGANIZATION)],
+            );
         });
     });

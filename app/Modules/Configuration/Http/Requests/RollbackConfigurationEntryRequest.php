@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Http\Requests;
 
-final class RollbackConfigurationEntryRequest extends ViewConfigurationRequest
+final class RollbackConfigurationEntryRequest extends ManageConfigurationEntryRequest
 {
     /** @return array<string, mixed> */
     public function rules(): array

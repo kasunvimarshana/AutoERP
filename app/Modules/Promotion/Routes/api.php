@@ -15,12 +15,30 @@ $middleware = [
     'tenant.feature:vehicle-service',
 ];
 $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
-$requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
+$requires = static fn (string ...$permissions): string => $permissionMiddleware.':'.implode(',', $permissions);
 
 Route::prefix('api/v1/promotions')->middleware($middleware)->name('api.v1.promotions.')->group(function () use ($requires): void {
-    Route::get('job-items/lookup', [PromotionController::class, 'jobItems'])->name('job-items.lookup');
-    Route::get('available', [PromotionController::class, 'available'])->name('available');
-    Route::post('offers/{offer}/assignments', [PromotionController::class, 'assignOffer'])->whereNumber('offer')->name('offers.assign');
+    Route::get('job-items/lookup', [PromotionController::class, 'jobItems'])
+        ->middleware($requires(
+            PromotionPermission::VIEW,
+            PromotionPermission::MANAGE,
+            PromotionPermission::REDEEM,
+        ))
+        ->name('job-items.lookup');
+    Route::get('available', [PromotionController::class, 'available'])
+        ->middleware($requires(
+            PromotionPermission::VIEW,
+            PromotionPermission::MANAGE,
+            PromotionPermission::REDEEM,
+        ))
+        ->name('available');
+    Route::post('offers/{offer}/assignments', [PromotionController::class, 'assignOffer'])
+        ->middleware($requires(
+            PromotionPermission::MANAGE,
+            PromotionPermission::REDEEM,
+        ))
+        ->whereNumber('offer')
+        ->name('offers.assign');
     Route::middleware($requires(PromotionPermission::VIEW))->group(function (): void {
         Route::get('offers', [PromotionController::class, 'offers'])->name('offers.index');
         Route::get('card-templates', [PromotionController::class, 'templates'])->name('templates.index');

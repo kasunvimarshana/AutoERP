@@ -22,7 +22,7 @@ $middleware = [
     'tenant.feature:purchase',
 ];
 $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
-$requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
+$requires = static fn (string ...$permissions): string => $permissionMiddleware.':'.implode(',', $permissions);
 
 Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase.')->group(function () use ($requires): void {
     Route::get('fast-purchases/context', [FastPurchaseController::class, 'context'])->middleware($requires(PurchaseAuthorizationService::FAST_PURCHASE_VIEW))->name('fast-purchases.context');
@@ -30,11 +30,49 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::post('fast-purchases', [FastPurchaseController::class, 'store'])->middleware($requires(PurchaseAuthorizationService::FAST_PURCHASE_EXECUTE))->name('fast-purchases.store');
 
     Route::get('orders/create-context', [PurchaseContextController::class, 'orderCreateContext'])->middleware($requires(PurchaseAuthorizationService::ORDERS_CREATE))->name('orders.create-context');
-    Route::get('suppliers/{supplier}/purchase-context', [PurchaseContextController::class, 'supplierContext'])->whereNumber('supplier')->name('suppliers.purchase-context');
-    Route::get('items/{item}/purchase-context', [PurchaseContextController::class, 'itemContext'])->whereNumber('item')->name('items.purchase-context');
-    Route::get('adjustments/catalogue', [PurchaseContextController::class, 'adjustmentCatalogue'])->name('adjustments.catalogue');
-    Route::get('warehouses', [PurchaseContextController::class, 'warehouses'])->name('warehouses.index');
-    Route::get('warehouses/{warehouse}/locations', [PurchaseContextController::class, 'warehouseLocations'])->whereNumber('warehouse')->name('warehouses.locations');
+    Route::get('suppliers/{supplier}/purchase-context', [PurchaseContextController::class, 'supplierContext'])
+        ->middleware($requires(
+            PurchaseAuthorizationService::ORDERS_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_LOOKUPS,
+            PurchaseAuthorizationService::FAST_PURCHASE_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_EXECUTE,
+        ))
+        ->whereNumber('supplier')
+        ->name('suppliers.purchase-context');
+    Route::get('items/{item}/purchase-context', [PurchaseContextController::class, 'itemContext'])
+        ->middleware($requires(
+            PurchaseAuthorizationService::ORDERS_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_LOOKUPS,
+            PurchaseAuthorizationService::FAST_PURCHASE_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_EXECUTE,
+        ))
+        ->whereNumber('item')
+        ->name('items.purchase-context');
+    Route::get('adjustments/catalogue', [PurchaseContextController::class, 'adjustmentCatalogue'])
+        ->middleware($requires(
+            PurchaseAuthorizationService::ORDERS_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_LOOKUPS,
+            PurchaseAuthorizationService::FAST_PURCHASE_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_EXECUTE,
+        ))
+        ->name('adjustments.catalogue');
+    Route::get('warehouses', [PurchaseContextController::class, 'warehouses'])
+        ->middleware($requires(
+            PurchaseAuthorizationService::ORDERS_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_LOOKUPS,
+            PurchaseAuthorizationService::FAST_PURCHASE_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_EXECUTE,
+        ))
+        ->name('warehouses.index');
+    Route::get('warehouses/{warehouse}/locations', [PurchaseContextController::class, 'warehouseLocations'])
+        ->middleware($requires(
+            PurchaseAuthorizationService::ORDERS_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_LOOKUPS,
+            PurchaseAuthorizationService::FAST_PURCHASE_VIEW,
+            PurchaseAuthorizationService::FAST_PURCHASE_EXECUTE,
+        ))
+        ->whereNumber('warehouse')
+        ->name('warehouses.locations');
 
     Route::get('eligible/receivable-purchase-orders', [PurchaseEligibilityController::class, 'receivablePurchaseOrders'])->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW))->name('eligible.receivable-purchase-orders');
     Route::get('eligible/invoiceable-purchase-orders', [PurchaseEligibilityController::class, 'invoiceablePurchaseOrders'])->middleware($requires(PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW))->name('eligible.invoiceable-purchase-orders');

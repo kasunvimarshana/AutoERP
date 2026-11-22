@@ -21,7 +21,7 @@ final class RequireTenantPermissionMiddleware
         private readonly ApiErrorResponseFactory $responses,
     ) {}
 
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
         $userId = $this->currentUser->currentUserId();
         $tenantId = $this->currentTenant->currentTenantId();
@@ -29,17 +29,38 @@ final class RequireTenantPermissionMiddleware
         if (
             $userId === null
             || $tenantId === null
-            || ! $this->permissions->allows($userId, $tenantId, $permission)
+            || ! $this->allowsAny($userId, $tenantId, $permissions)
         ) {
             return $this->responses->make(
                 'TENANT_PERMISSION_REQUIRED',
                 'You do not have permission to perform this tenant action.',
                 Response::HTTP_FORBIDDEN,
                 'authorization',
-                ['permission' => $permission],
+                [
+                    'permission' => $permissions[0] ?? null,
+                    'permissions' => $permissions,
+                ],
             );
         }
 
         return $next($request);
+    }
+
+    /**
+     * @param  list<string>  $permissions
+     */
+    private function allowsAny(int $userId, int $tenantId, array $permissions): bool
+    {
+        if ($permissions === []) {
+            return false;
+        }
+
+        foreach ($permissions as $permission) {
+            if ($this->permissions->allows($userId, $tenantId, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

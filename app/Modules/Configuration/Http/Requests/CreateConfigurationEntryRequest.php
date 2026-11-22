@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Http\Requests;
 
-final class CreateConfigurationEntryRequest extends ViewConfigurationRequest
+final class CreateConfigurationEntryRequest extends ManageConfigurationEntryRequest
 {
     public function rules(): array
     {
