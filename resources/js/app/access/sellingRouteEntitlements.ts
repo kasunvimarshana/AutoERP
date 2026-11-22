@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { sellingPermissions } from '@/modules/selling/sellingPermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 

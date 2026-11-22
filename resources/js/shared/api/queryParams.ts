@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 type QueryParam = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryParam | QueryParam[] | Record<string, QueryParam>>;
 

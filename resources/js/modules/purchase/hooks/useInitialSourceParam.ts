@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useEffect, useRef } from 'react';
 import type { SetURLSearchParams } from 'react-router-dom';
 import { sourceKey } from '../sourceIdentity';

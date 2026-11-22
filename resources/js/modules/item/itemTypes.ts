@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { NamedResource } from '@/shared/types/common';
 
 export const itemTypes = ['stock', 'non_stock', 'service', 'labour', 'asset', 'consumable', 'package', 'combo'] as const;

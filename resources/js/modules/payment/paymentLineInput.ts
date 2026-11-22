@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { PaymentLinePayload, PaymentMethod } from './paymentApi';
 import type { PaymentLineDraft } from './components/PaymentLineTable';
 import { CARD_BRANDS } from './paymentCardBrands';

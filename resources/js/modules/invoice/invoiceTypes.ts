@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export enum InvoiceStatus {
     Draft = 'draft', Approved = 'approved', Posted = 'posted', PartiallyPaid = 'partially_paid',
     Paid = 'paid', Cancelled = 'cancelled', Void = 'void', Reversed = 'reversed',

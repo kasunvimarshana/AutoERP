@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiResource } from '@/shared/types/api';
 import { AGREEMENT_API, type Agreement, type AgreementKind } from './agreements';

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { InvoiceStatus } from '@/modules/invoice/invoiceTypes';

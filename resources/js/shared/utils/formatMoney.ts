@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export function formatMoney(value?: string | number | null, currency = 'LKR'): string {
     const decimal = normalizeDecimal(value, 2, 3);
     const symbol = currencySymbol(currency);

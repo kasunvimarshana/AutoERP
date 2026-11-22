@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { firstFieldError, fieldError, type ApiError } from '@/shared/api/apiError';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';

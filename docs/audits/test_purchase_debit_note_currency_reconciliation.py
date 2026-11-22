@@ -1,4 +1,9 @@
-"""Dependency-free regression tests for the read-only Purchase currency audit.
+"""AutoERP Enterprise System
+
+Author: Kasun Vimarshana <kasunvmail@gmail.com>
+Phone: +94713525253
+
+Dependency-free regression tests for the read-only Purchase currency audit.
 
 Run from the repository root:
     python -m unittest discover -s docs/audits -p 'test_*.py' -v

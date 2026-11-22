@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { ReportDefinition } from '../reportingTypes';
 
 export type ServiceJobFeedbackType = 'review' | 'internal_note' | 'customer_feedback' | 'complaint';

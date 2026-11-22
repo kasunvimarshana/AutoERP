@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 return [
     'whatsapp' => [
         'default_country_calling_code' => env('DOCUMENT_SHARE_DEFAULT_COUNTRY_CALLING_CODE', '94'),

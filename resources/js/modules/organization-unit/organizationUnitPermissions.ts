@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export const organizationUnitPermissions = {
     view: 'organization-units.view',
     create: 'organization-units.create',

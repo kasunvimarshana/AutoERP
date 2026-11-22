@@ -8,6 +8,13 @@
         "framework"
     ],
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Kasun Vimarshana",
+            "email": "kasunvmail@gmail.com",
+            "role": "Lead Architect & Developer"
+        }
+    ],
     "require": {
         "darkaonline/l5-swagger": "^11.0",
         "dompdf/dompdf": "^3.1",

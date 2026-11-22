@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 return [
     'internal_provider_key' => 'internal',
     'protected_route_guard' => env('MODULE_AUTH_PROTECTED_GUARD', 'auth-api'),

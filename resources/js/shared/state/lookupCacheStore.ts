@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { create } from 'zustand';
 import { AUTH_SESSION_INVALIDATED_EVENT } from '@/shared/api/authSessionStorage';
 import type { LookupResult } from '@/shared/types/lookup';

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 const PUBLIC_API_EXACT_PATHS = new Set([
     '/api/v1/auth/login',
     '/api/v1/auth/refresh',

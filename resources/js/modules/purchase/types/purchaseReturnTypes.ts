@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { NamedResource } from '@/shared/types/common';
 import type { PurchaseCapabilityDetails, SourceSummary } from '../purchaseTypes';
 

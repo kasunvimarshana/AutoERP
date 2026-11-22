@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { saveAgreement } from './agreementApi';
 import { useState, type FormEvent } from 'react';
 import { lookupApi } from '@/shared/api/lookupApi';

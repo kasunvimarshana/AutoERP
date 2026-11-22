@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export function resolveSameOriginUrl(value: string): string | null {
     const candidate = value.trim();
     if (candidate === '') return null;

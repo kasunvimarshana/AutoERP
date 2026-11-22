@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 const SCALE = 6;
 const FACTOR = 10n ** BigInt(SCALE);
 const decimalPattern = /^-?\d+(\.\d*)?$/;

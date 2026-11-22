@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 use Illuminate\Support\Facades\Route;
 use Modules\Warehouse\Http\Controllers\WarehouseController;
 use Modules\Warehouse\Http\Controllers\WarehouseLocationController;

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';

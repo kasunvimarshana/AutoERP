@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 use Illuminate\Support\Facades\Route;
 use Modules\Auth\Http\Controllers\TenantAuthController;
 use Modules\Auth\Http\Controllers\TenantOAuthController;

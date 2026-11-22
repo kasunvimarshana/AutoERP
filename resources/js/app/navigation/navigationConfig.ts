@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { NavigationSection } from "./navigationTypes";
 import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from "../routePaths";
 import { PLATFORM_PERMISSION } from '@/app/access/platformPermissions';

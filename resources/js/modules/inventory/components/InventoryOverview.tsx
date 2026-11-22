@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useDeferredValue, useMemo, useState } from 'react';
 import { DataTable } from '@/shared/components/DataTable';
 import { Button } from '@/shared/components/Button';

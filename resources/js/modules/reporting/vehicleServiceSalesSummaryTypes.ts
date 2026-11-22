@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export interface VehicleServiceSalesSummaryParams {
     export_section?: 'full' | 'stock' | 'combo';
     item_id?: number;

@@ -1,4 +1,9 @@
-"""Dependency-free fail-closed checks for AutoERP's MySQL PHPUnit bootstrap.
+"""AutoERP Enterprise System
+
+Author: Kasun Vimarshana <kasunvmail@gmail.com>
+Phone: +94713525253
+
+Dependency-free fail-closed checks for AutoERP's MySQL PHPUnit bootstrap.
 
 Run from the repository root:
     python -B -m unittest discover -s tests/bootstrap -p 'test_*.py' -v

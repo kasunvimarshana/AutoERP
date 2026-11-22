@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { AGREEMENT_API } from './agreements';
 import type { VehicleUse } from './vehicleUse';
 export enum RunningChartStatus { Draft = 'draft', Finalized = 'finalized', Reversed = 'reversed' }

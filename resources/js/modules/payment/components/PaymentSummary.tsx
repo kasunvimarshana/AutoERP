@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export function PaymentSummary({ total, lineCount }: { total: string; lineCount: number }) {
     return (
         <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700">

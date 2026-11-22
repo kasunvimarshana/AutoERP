@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export type InvoicePaperSize = 'a4' | 'a5' | 'thermal_80mm' | 'continuous_8_5_by_5_5' | 'letter';
 
 export type InvoiceOrientation = 'portrait' | 'landscape';

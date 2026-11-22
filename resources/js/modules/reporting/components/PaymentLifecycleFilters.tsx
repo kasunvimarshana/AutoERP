@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Select } from '@/shared/components/Select';
 import { humanize } from '@/shared/utils/object';
 import type { PaymentLifecycleFilterParams } from '../reportingTypes';

@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 use App\Providers\AppServiceProvider;
 use Modules\Audit\Providers\AuditServiceProvider;
 use Modules\Auth\Providers\AuthServiceProvider;

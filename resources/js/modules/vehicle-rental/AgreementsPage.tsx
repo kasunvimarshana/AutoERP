@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { DepositPanel } from './DepositPanel';
 import { DEPOSIT_PERMISSION } from './depositApi';
 import { BaseRentBillingPanel } from './BaseRentBillingPanel';

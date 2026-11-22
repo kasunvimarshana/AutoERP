@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export function parsePositiveInteger(value: string | number | null | undefined): number | null {
     if (value === null || value === undefined || value === '') return null;
 

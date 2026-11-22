@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import axios from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { errorDetail, toApiError } from './apiError';

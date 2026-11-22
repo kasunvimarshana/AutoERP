@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { LinkButton } from '@/shared/components/Button';
 import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
 import { PurchasePaymentCreateForm } from '../components/PurchasePaymentCreateForm';

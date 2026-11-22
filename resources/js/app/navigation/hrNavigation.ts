@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { TENANT_MODULE_CODE } from '@/app/access/tenantModules';
 import { hrPermissions } from '@/modules/hr/hrPermissions';
 import type { NavigationAccessRule, NavigationModuleItem } from './navigationTypes';

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Outlet, useLocation } from 'react-router-dom';
 import { resolveTenantRouteEntitlement } from '@/app/access/resolvedRouteEntitlements';
 import { parseEnabledTenantModules } from '@/app/access/tenantModules';

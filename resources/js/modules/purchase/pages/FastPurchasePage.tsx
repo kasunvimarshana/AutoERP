@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useSearchParams } from 'react-router-dom';
 import { fieldError, hasNestedFieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';

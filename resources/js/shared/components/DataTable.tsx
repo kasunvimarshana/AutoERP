@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 

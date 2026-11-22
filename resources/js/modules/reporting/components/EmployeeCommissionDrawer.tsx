@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Button, LinkButton } from '@/shared/components/Button';
 import { Drawer } from '@/shared/components/Drawer';
 import { Panel } from '@/shared/components/Panel';

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useMemo } from 'react';
 import { documentApi } from '../hrApi';
 import { SimpleEmployeeRelationTab } from './SimpleEmployeeRelationTab';

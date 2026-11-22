@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useEffect, useState } from 'react';
 import { toApiError } from '@/shared/api/apiError';
 import type { ItemLookupResource } from '@/shared/api/lookupApi';

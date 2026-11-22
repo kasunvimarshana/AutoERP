@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { searchItems } from '../itemApi';
 import type { ItemSummary } from '../itemTypes';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';

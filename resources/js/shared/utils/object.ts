@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { UnknownRecord } from '@/shared/types/common';
 
 export function compactObject<T extends UnknownRecord>(value: T): Partial<T> {

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { PaginationMeta } from '@/shared/types/pagination';
 
 export const uomTypes = ['unit', 'weight', 'volume', 'length', 'area', 'time', 'service', 'other'] as const;

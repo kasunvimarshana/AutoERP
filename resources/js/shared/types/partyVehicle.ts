@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export interface PartyVehicleParty { id: number | null; code: string; number: string; name: string; status: string }
 export interface PartyVehicleVehicle { id: number; number: string; registration_number?: string | null; chassis_number?: string | null; make?: string | null; model?: string | null }
 export interface PartyVehicleRelationship { id: number; row_version: number; owner_type: 'customer' | 'supplier' | 'company'; owner: { id: number | null; code: string; name: string }; customer?: PartyVehicleParty | null; supplier?: PartyVehicleParty | null; vehicle: PartyVehicleVehicle; organization?: { id: number; name: string } | null; relationship_type?: string | null; ownership_type?: string | null; started_at: string; ended_at?: string | null; is_current: boolean; notes?: string | null; created_at?: string; updated_at?: string }

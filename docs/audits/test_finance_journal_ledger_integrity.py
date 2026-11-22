@@ -1,4 +1,9 @@
-"""Dependency-free tests for the SELECT-only Finance journal/ledger audit.
+"""AutoERP Enterprise System
+
+Author: Kasun Vimarshana <kasunvmail@gmail.com>
+Phone: +94713525253
+
+Dependency-free tests for the SELECT-only Finance journal/ledger audit.
 
 Run: python -m unittest -v test_finance_journal_ledger_integrity.py
 Fixtures are disposable SQLite memory; no application/production database access.

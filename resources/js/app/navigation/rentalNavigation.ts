@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { USE_REGISTER_PATH, USE_PERMISSION } from '@/modules/vehicle-rental/vehicleUse';
 import { CHART_REGISTER_PATH, CHART_PERMISSION } from '@/modules/vehicle-rental/runningCharts';
 import { INCIDENT_PERMISSION, INCIDENT_REGISTER_PATH } from '@/modules/vehicle-rental/incidentEvidence';

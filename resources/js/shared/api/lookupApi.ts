@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { endpoints } from './endpoints';
 import { createQueryCachedLookupLoader } from './lookupCache';
 import { mapLookupResult, requestLookup } from './lookupRequest';

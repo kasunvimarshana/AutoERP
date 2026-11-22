@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useMemo, useState, type FormEvent } from 'react';
 import { listActiveReferenceRecords } from '@/modules/reference-data/referenceDataApi';
 import type { ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';

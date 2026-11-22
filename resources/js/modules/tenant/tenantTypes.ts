@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { TenantModuleCode } from '@/app/access/tenantModules';
 import type { PaginationMeta } from '@/shared/types/pagination';
 

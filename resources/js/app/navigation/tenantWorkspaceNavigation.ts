@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { rentalNavigationItem } from './rentalNavigation';
 import { inventoryRoutePermissions } from '@/modules/inventory/inventoryPermissions';
 import { voucherViewPermissions } from '@/app/access/voucherRouteEntitlements';

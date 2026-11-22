@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 use Modules\Inventory\Strategies\Allocation\BatchAllocationStrategy;
 use Modules\Inventory\Strategies\Allocation\FefoAllocationStrategy;
 use Modules\Inventory\Strategies\Allocation\FifoAllocationStrategy;

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import type { ChartRegisterFilters, ChartRegisterRow } from './runningCharts';
 import { apiClient } from '@/shared/api/apiClient';
 import { exportReportBlob } from '@/shared/utils/reportExport';

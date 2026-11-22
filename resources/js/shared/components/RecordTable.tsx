@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { DataTable, type DataColumn } from './DataTable';
 import { humanize, readableRelation } from '@/shared/utils/object';
 

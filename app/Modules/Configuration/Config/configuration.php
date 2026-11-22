@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 use Modules\Configuration\Constants\ConfigurationKey;
 use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Constants\ConfigurationValueType;

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { isPositiveDecimal, compareDecimalStrings } from '@/shared/utils/decimal';
 import { humanize } from '@/shared/utils/object';
 import type { Invoice } from '../invoiceTypes';

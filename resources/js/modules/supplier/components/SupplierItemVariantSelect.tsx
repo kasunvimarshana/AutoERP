@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useEffect, useEffectEvent, useState } from 'react';
 import { toApiError } from '@/shared/api/apiError';
 import { Select } from '@/shared/components/Select';

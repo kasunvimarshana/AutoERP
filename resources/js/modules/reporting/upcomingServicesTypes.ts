@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export type UpcomingUrgencyStatus = 'overdue' | 'due_today' | 'due_this_week' | 'due_this_month' | 'upcoming';
 
 export type UpcomingStatusPreset = 'all' | 'overdue' | 'due_today' | 'due_this_week' | 'due_this_month' | 'upcoming';

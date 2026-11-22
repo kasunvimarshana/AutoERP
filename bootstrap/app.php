@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 // Prevent secrets passed to service methods from appearing in exception stack traces.
 ini_set('zend.exception_ignore_args', '1');
 

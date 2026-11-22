@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useState } from 'react';
 import { platformAuditHref } from '@/modules/platform-administration/platformAdministrationPresentation';
 import { toApiError, type ApiError } from '@/shared/api/apiError';

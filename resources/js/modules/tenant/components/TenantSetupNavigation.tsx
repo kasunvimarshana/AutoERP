@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Button } from '@/shared/components/Button';
 import type { TenantRecord } from '../tenantTypes';
 import { humanize } from '../tenantPresentation';

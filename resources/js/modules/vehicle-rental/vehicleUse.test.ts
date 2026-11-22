@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { afterEach, describe, expect, it } from 'vitest';
 import { configureBusinessTimeZone } from '@/shared/utils/businessDate';
 import { localTimestampValue, operationalTimeZoneLabel, timestampWithOffset } from './vehicleUse';

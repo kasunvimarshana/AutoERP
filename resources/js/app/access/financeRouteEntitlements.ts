@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { expensePermissions } from '@/modules/expense/expensePermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
 import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';

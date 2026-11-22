@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
     AUTH_SESSION_MARKER_KEY,

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';

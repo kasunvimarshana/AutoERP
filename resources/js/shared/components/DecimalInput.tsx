@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { forwardRef, useEffect, useState, type ChangeEvent, type InputHTMLAttributes } from 'react';
 import { finalizeDecimalInput, formatDecimalInputDisplay, isDecimalString, normalizeDecimalInput } from '@/shared/utils/decimal';
 import { Input } from './Input';

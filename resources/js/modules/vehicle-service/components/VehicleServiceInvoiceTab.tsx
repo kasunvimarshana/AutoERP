@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Link } from 'react-router-dom';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';

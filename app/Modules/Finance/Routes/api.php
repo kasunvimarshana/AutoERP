@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Constants\FinancePermission;
 use Modules\Finance\Http\Controllers\AccountingPeriodController;

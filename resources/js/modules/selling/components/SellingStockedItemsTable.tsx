@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Fragment, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Button } from '@/shared/components/Button';

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 
 export interface PurchaseSummaryRow {

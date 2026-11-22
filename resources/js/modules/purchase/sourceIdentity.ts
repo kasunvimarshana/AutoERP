@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { parsePositiveInteger } from '@/shared/utils/routeParams';
 
 export function normalizeSourceId(id: number | string | null | undefined): number | null {

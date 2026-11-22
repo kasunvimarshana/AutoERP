@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { PartyVehicleListPage } from '@/modules/party-vehicle/PartyVehicleListPage';
 import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
 import { SupplierLookupSelect } from './components/SupplierLookupSelect';

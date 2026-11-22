@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 const WHATSAPP_SHARE_ORIGIN = 'https://wa.me';
 
 export function openPendingWhatsAppWindow(): Window | null {

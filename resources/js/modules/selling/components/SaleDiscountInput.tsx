@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import type { SaleDiscountType } from '../sellingApi';
 

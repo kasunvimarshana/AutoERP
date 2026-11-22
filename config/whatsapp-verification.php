@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 return [
     'code_ttl_minutes' => (int) env('WHATSAPP_VERIFICATION_CODE_TTL_MINUTES', 15),
     'maximum_attempts' => (int) env('WHATSAPP_VERIFICATION_MAXIMUM_ATTEMPTS', 5),

@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { Outlet } from 'react-router-dom';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
 import { useAuth } from './AuthProvider';

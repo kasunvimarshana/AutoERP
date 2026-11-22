@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { exportReportBlob } from './reportExport';
 import { apiClient } from '@/shared/api/apiClient';

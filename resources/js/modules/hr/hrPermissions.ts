@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export const hrPermissions = {
     employeesView: 'hr.employees.view',
     employeesCreate: 'hr.employees.create',

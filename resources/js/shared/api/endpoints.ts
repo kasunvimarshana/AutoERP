@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export const endpoints = {
     auth: '/api/v1/auth',
     auditLogs: '/api/v1/audit-logs',

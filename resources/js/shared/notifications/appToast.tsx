@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useEffect } from 'react';
 import { ToastContainer, toast, type ToastOptions, type Id } from 'react-toastify';
 import type { ApiError } from '@/shared/api/apiError';

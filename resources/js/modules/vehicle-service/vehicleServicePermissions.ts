@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export const vehicleServicePermissions = {
     jobsView: 'vehicle_service.jobs.view',
     jobsCreate: 'vehicle_service.jobs.create',

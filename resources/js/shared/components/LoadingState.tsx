@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 export function LoadingState({ label = 'Loading...', fullPage = false }: { label?: string; fullPage?: boolean }) {
     return (
         <div className={`flex items-center justify-center gap-3 rounded-xl border border-slate-200/80 bg-white text-sm font-medium text-slate-600 shadow-2xs ${fullPage ? 'min-h-screen border-0' : 'min-h-40'}`} role="status" aria-live="polite">

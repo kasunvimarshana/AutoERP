@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useEffect, useState } from 'react';
 import { DASHBOARD_PATH, PLATFORM_HOME_PATH } from '@/app/routePaths';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';

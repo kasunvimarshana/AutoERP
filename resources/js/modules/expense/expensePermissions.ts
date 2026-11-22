@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { hasPermission, type AccessSubject } from '@/modules/auth/accessControl';
 
 export const expensePermissions = {

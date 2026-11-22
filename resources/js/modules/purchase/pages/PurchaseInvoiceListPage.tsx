@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { LinkButton } from '@/shared/components/Button';
 import { InvoiceListWorkspace } from '@/modules/invoice/pages/InvoiceListPage';
 import { useAuth } from '@/modules/auth/AuthProvider';

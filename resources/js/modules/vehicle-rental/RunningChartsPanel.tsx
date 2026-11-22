@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';

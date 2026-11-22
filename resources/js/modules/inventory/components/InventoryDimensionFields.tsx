@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useCallback } from 'react';
 import { ItemVariantSelect } from '@/modules/item/components/ItemVariantSelect';
 import type { ItemVariant } from '@/modules/item/itemTypes';

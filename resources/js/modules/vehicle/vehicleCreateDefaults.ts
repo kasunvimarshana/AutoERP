@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { generateVehicleCode } from './vehicleApi';
 import type { VehiclePayload } from './vehicleTypes';
 

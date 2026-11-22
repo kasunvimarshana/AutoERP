@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { useEffect, useState, type FormEvent } from 'react';
 import { Drawer } from '@/shared/components/Drawer';
 import { Button } from '@/shared/components/Button';

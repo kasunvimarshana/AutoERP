@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { getInvoice, getInvoiceSignedPrintLink } from '@/modules/invoice/invoiceApi';
 import type { Invoice } from '@/modules/invoice/invoiceTypes';
 import type { Payment } from '@/modules/payment/paymentApi';

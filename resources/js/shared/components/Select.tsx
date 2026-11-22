@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import { forwardRef, useId, type SelectHTMLAttributes } from 'react';
 import type { SelectOption } from '@/shared/types/common';
 
