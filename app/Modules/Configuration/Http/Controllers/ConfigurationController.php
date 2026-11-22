@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use LogicException;
+use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Configuration\Http\Requests\CreateConfigurationEntryRequest;
 use Modules\Configuration\Http\Requests\DeleteConfigurationEntryRequest;
@@ -68,7 +69,31 @@ final class ConfigurationController extends Controller
 
     public function resolved(ViewConfigurationRequest $request, string $key): ResolvedConfigurationResource
     {
-        return new ResolvedConfigurationResource($this->entries->resolvedCurrent($key));
+        $explicitTarget = $request->query('scope') === ConfigurationScope::TENANT
+            || $request->has('organization_unit_id');
+        $organizationUnitId = $request->query('scope') === ConfigurationScope::TENANT
+            ? null
+            : ($request->integer('organization_unit_id') ?: null);
+
+        return new ResolvedConfigurationResource(
+            $this->entries->resolvedCurrent($key, $organizationUnitId, $explicitTarget),
+        );
+    }
+
+    public function resolvedIndex(ViewConfigurationRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $owner = isset($validated['owner']) ? (string) $validated['owner'] : null;
+        $search = isset($validated['search']) ? (string) $validated['search'] : null;
+        $organizationUnitId = $request->query('scope') === ConfigurationScope::TENANT
+            ? null
+            : ($request->integer('organization_unit_id') ?: null);
+
+        $resolved = $this->entries->resolvedAllCurrent($owner, $search, $organizationUnitId);
+
+        return response()->json([
+            'data' => ResolvedConfigurationResource::collection($resolved)->resolve($request),
+        ]);
     }
 
     public function store(CreateConfigurationEntryRequest $request): JsonResponse

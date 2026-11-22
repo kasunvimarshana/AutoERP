@@ -69,6 +69,17 @@ export async function getResolvedConfiguration(key: string, signal?: AbortSignal
     return response.data.data;
 }
 
+export async function listResolvedConfigurations(
+    params?: { owner?: string; search?: string; organization_unit_id?: number },
+    signal?: AbortSignal,
+): Promise<ResolvedConfiguration[]> {
+    const response = await apiClient.get<ApiCollection<ResolvedConfiguration>>(
+        `${tenantConfigurationBase}/resolved`,
+        { params, signal },
+    );
+    return response.data.data;
+}
+
 export async function exportGlobalConfiguration(signal?: AbortSignal): Promise<ConfigurationTransferDocument> {
     const response = await apiClient.get<ApiResource<ConfigurationTransferDocument>>(
         `${platformConfigurationBase}/export`,

@@ -88,6 +88,20 @@ final class PlatformConfigurationController extends Controller
         );
     }
 
+    public function resolvedIndex(ViewPlatformConfigurationRequest $request, int $tenant): JsonResponse
+    {
+        $validated = $request->validated();
+        $owner = isset($validated['owner']) ? (string) $validated['owner'] : null;
+        $search = isset($validated['search']) ? (string) $validated['search'] : null;
+        $organizationUnitId = $request->integer('organization_unit_id') ?: null;
+
+        $resolved = $this->entries->resolvedAllPlatform($tenant, $organizationUnitId, $owner, $search);
+
+        return response()->json([
+            'data' => ResolvedConfigurationResource::collection($resolved)->resolve($request),
+        ]);
+    }
+
     public function impact(ViewPlatformConfigurationRequest $request, string $key): JsonResponse
     {
         $impact = $this->impact->forKey($key);

@@ -121,15 +121,35 @@ final class ConfigurationEntryService
         );
     }
 
-    public function resolvedCurrent(string $key): ResolvedConfigurationValue
-    {
+    public function resolvedCurrent(
+        string $key,
+        ?int $organizationUnitId = null,
+        bool $explicitTarget = false,
+    ): ResolvedConfigurationValue {
         $this->assertCanView(ConfigurationScope::TENANT, false);
+
+        $orgUnitId = $explicitTarget
+            ? $organizationUnitId
+            : ($organizationUnitId ?? $this->currentOrganizationUnit->currentOrganizationUnitId());
 
         return $this->resolver->resolve(
             strtolower(trim($key)),
             $this->currentTenant->requireCurrent()->tenantId(),
-            $this->currentOrganizationUnit->currentOrganizationUnitId(),
+            $orgUnitId,
         );
+    }
+
+    /** @return list<ResolvedConfigurationValue> */
+    public function resolvedAllCurrent(
+        ?string $owner = null,
+        ?string $search = null,
+        ?int $organizationUnitId = null,
+    ): array {
+        $this->assertCanView(ConfigurationScope::TENANT, false);
+        $tenantId = $this->currentTenant->requireCurrent()->tenantId();
+        $orgUnitId = $organizationUnitId ?? $this->currentOrganizationUnit->currentOrganizationUnitId();
+
+        return $this->resolveDefinitions($tenantId, $orgUnitId, $owner, $search);
     }
 
     public function resolvedPlatform(
@@ -149,6 +169,57 @@ final class ConfigurationEntryService
         }
 
         return $this->resolver->resolve(strtolower(trim($key)), $tenantId, $organizationUnitId);
+    }
+
+    /** @return list<ResolvedConfigurationValue> */
+    public function resolvedAllPlatform(
+        int $tenantId,
+        ?int $organizationUnitId = null,
+        ?string $owner = null,
+        ?string $search = null,
+    ): array {
+        $this->assertCanView(ConfigurationScope::TENANT, true);
+        $this->targets->assertTenantReadable($tenantId);
+        if ($organizationUnitId !== null) {
+            $this->scopes->explicit(
+                ConfigurationScope::ORGANIZATION_UNIT,
+                $tenantId,
+                $organizationUnitId,
+                false,
+            );
+        }
+
+        return $this->resolveDefinitions($tenantId, $organizationUnitId, $owner, $search);
+    }
+
+    /** @return list<ResolvedConfigurationValue> */
+    private function resolveDefinitions(
+        int $tenantId,
+        ?int $organizationUnitId,
+        ?string $owner,
+        ?string $search,
+    ): array {
+        $owner = $owner !== null && trim($owner) !== '' ? strtolower(trim($owner)) : null;
+        $search = $search !== null && trim($search) !== '' ? strtolower(trim($search)) : null;
+
+        $resolved = [];
+        foreach ($this->definitions->all() as $definition) {
+            if ($owner !== null && strtolower($definition->owner) !== $owner) {
+                continue;
+            }
+            if ($search !== null) {
+                if (
+                    ! str_contains(strtolower($definition->key), $search)
+                    && ! str_contains(strtolower($definition->label), $search)
+                    && ! str_contains(strtolower($definition->description), $search)
+                ) {
+                    continue;
+                }
+            }
+            $resolved[] = $this->resolver->resolve($definition->key, $tenantId, $organizationUnitId);
+        }
+
+        return $resolved;
     }
 
     public function create(string $scope, string $key, mixed $value): ConfigurationEntryView

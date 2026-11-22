@@ -10,12 +10,16 @@ use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
 use Modules\Configuration\Contracts\ConfigurationTargetValidatorInterface;
 use Modules\Configuration\Contracts\ConfigurationValueRepositoryInterface;
+use Modules\Configuration\Contracts\MailConfigurationResolverInterface;
+use Modules\Configuration\Contracts\SystemPreferencesResolverInterface;
 use Modules\Configuration\Repositories\EloquentConfigurationValueRepository;
 use Modules\Configuration\Services\ConfigurationAuthorizationService;
 use Modules\Configuration\Services\ConfigurationDefinitionRegistry;
 use Modules\Configuration\Services\ConfigurationEntryService;
 use Modules\Configuration\Services\ConfigurationScopeResolver;
+use Modules\Configuration\Services\MailConfigurationResolver;
 use Modules\Configuration\Services\ResolveConfiguration;
+use Modules\Configuration\Services\SystemPreferencesResolver;
 use Modules\Configuration\Services\Targets\TenantBackedConfigurationTargetPopulation;
 use Modules\Configuration\Services\Targets\TenantBackedConfigurationTargetValidator;
 use Modules\Configuration\Constants\ConfigurationPermission;
@@ -48,6 +52,14 @@ final class ConfigurationServiceProvider extends ServiceProvider
         $this->app->scoped(
             ConfigurationResolverInterface::class,
             fn ($app): ConfigurationResolverInterface => $app->make(ResolveConfiguration::class),
+        );
+        $this->app->scoped(
+            MailConfigurationResolverInterface::class,
+            MailConfigurationResolver::class,
+        );
+        $this->app->scoped(
+            SystemPreferencesResolverInterface::class,
+            SystemPreferencesResolver::class,
         );
     }
 

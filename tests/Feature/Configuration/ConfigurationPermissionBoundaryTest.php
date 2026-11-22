@@ -16,6 +16,7 @@ final class ConfigurationPermissionBoundaryTest extends TestCase
 
         $expected = [
             'api.v1.configuration.definitions' => ConfigurationPermission::ENTRIES_VIEW,
+            'api.v1.configuration.resolved.index' => ConfigurationPermission::ENTRIES_VIEW,
             'api.v1.configuration.resolved' => ConfigurationPermission::ENTRIES_VIEW,
             'api.v1.configuration.tenant.index' => ConfigurationPermission::ENTRIES_VIEW,
             'api.v1.configuration.tenant.show' => ConfigurationPermission::ENTRIES_VIEW,

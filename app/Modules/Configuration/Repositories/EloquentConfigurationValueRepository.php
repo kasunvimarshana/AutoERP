@@ -18,23 +18,30 @@ use Modules\Configuration\Models\GlobalConfigurationValue;
 use Modules\Configuration\Models\OrganizationUnitConfigurationValue;
 use Modules\Configuration\Models\TenantConfigurationValue;
 use Modules\Core\Contracts\ClockInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class EloquentConfigurationValueRepository implements ConfigurationValueRepositoryInterface
 {
-    public function __construct(private readonly ClockInterface $clock) {}
+    public function __construct(
+        private readonly ClockInterface $clock,
+        private readonly TenantExecutionContextInterface $executionContext,
+    ) {}
+
     public function findExact(
         ConfigurationScopeContext $context,
         string $key,
     ): ?StoredConfigurationValue {
-        $model = $this->scopedQuery($context)
-            ->where('key', strtolower(trim($key)))
-            ->first();
+        return $this->withinBoundary($context, function () use ($context, $key): ?StoredConfigurationValue {
+            $model = $this->scopedQuery($context)
+                ->where('key', strtolower(trim($key)))
+                ->first();
 
-        return $model instanceof Model
-            ? $this->map($model, $context->scope)
-            : null;
+            return $model instanceof Model
+                ? $this->map($model, $context->scope)
+                : null;
+        });
     }
 
     public function paginate(
@@ -43,66 +50,74 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
         int $page,
         int $perPage,
     ): LengthAwarePaginator {
-        $query = $this->scopedQuery($context);
-        $keys === [] ? $query->whereRaw('1 = 0') : $query->whereIn('key', $keys);
+        return $this->withinBoundary($context, function () use ($context, $keys, $page, $perPage): LengthAwarePaginator {
+            $query = $this->scopedQuery($context);
+            $keys === [] ? $query->whereRaw('1 = 0') : $query->whereIn('key', $keys);
 
-        $paginator = $query
-            ->orderBy('key')
-            ->orderBy('id')
-            ->paginate(
-                min(max($perPage, 1), 100),
-                ['*'],
-                'page',
-                max($page, 1),
+            $paginator = $query
+                ->orderBy('key')
+                ->orderBy('id')
+                ->paginate(
+                    min(max($perPage, 1), 100),
+                    ['*'],
+                    'page',
+                    max($page, 1),
+                );
+
+            $paginator->setCollection(
+                $paginator->getCollection()->map(
+                    fn (Model $model): StoredConfigurationValue =>
+                        $this->map($model, $context->scope),
+                ),
             );
 
-        $paginator->setCollection(
-            $paginator->getCollection()->map(
-                fn (Model $model): StoredConfigurationValue =>
-                    $this->map($model, $context->scope),
-            ),
-        );
-
-        return $paginator;
+            return $paginator;
+        });
     }
 
     public function keys(ConfigurationScopeContext $context): array
     {
-        return $this->scopedQuery($context)
+        return $this->withinBoundary($context, fn (): array => $this->scopedQuery($context)
             ->orderBy('key')
             ->pluck('key')
             ->map(static fn (mixed $key): string => (string) $key)
-            ->all();
+            ->all());
     }
 
     public function countTenantOverrides(string $key): int
     {
-        return TenantConfigurationValue::query()
-            ->where('key', strtolower(trim($key)))
-            ->count();
+        return $this->executionContext->runAsControlPlane(
+            fn (): int => TenantConfigurationValue::query()
+                ->where('key', strtolower(trim($key)))
+                ->count(),
+        );
     }
 
     public function countOrganizationUnitOverrides(string $key): int
     {
-        return OrganizationUnitConfigurationValue::query()
-            ->where('key', strtolower(trim($key)))
-            ->count();
+        return $this->executionContext->runAsControlPlane(
+            fn (): int => OrganizationUnitConfigurationValue::query()
+                ->where('key', strtolower(trim($key)))
+                ->count(),
+        );
     }
 
     public function create(
         ConfigurationScopeContext $context,
         array $attributes,
     ): StoredConfigurationValue {
-        $class = $this->modelClass($context->scope);
-        $model = new $class();
-        $model->fill([
-            ...$this->scopeAttributes($context),
-            ...$attributes,
-        ]);
-        $model->setAttribute('row_version', 1);
-        $model->save();
+        return $this->withinBoundary($context, function () use ($context, $attributes): StoredConfigurationValue {
+            $class = $this->modelClass($context->scope);
+            $model = new $class();
+            $model->fill([
+                ...$this->scopeAttributes($context),
+                ...$attributes,
+            ]);
+            $model->setAttribute('row_version', 1);
+            $model->save();
 
-        return $this->map($model->refresh(), $context->scope);
+            return $this->map($model->refresh(), $context->scope);
+        });
     }
 
     public function updateExpected(
@@ -110,43 +125,68 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
         int $expectedVersion,
         array $attributes,
     ): StoredConfigurationValue {
-        $updated = $this->queryForStored($current)
-            ->whereKey($current->id)
-            ->where('row_version', $expectedVersion)
-            ->update([
-                ...$attributes,
-                'row_version' => $expectedVersion + 1,
-                'updated_at' => $this->clock->now(),
-            ]);
+        $context = new ConfigurationScopeContext(
+            scope: $current->scope,
+            tenantId: $current->tenantId,
+            organizationUnitId: $current->organizationUnitId,
+        );
 
-        if ($updated !== 1) {
-            throw new ConflictHttpException(
-                'This setting changed after it was loaded. Refresh and try again.',
-            );
-        }
+        return $this->withinBoundary($context, function () use ($current, $expectedVersion, $attributes): StoredConfigurationValue {
+            $updated = $this->queryForStored($current)
+                ->whereKey($current->id)
+                ->where('row_version', $expectedVersion)
+                ->update([
+                    ...$attributes,
+                    'row_version' => $expectedVersion + 1,
+                    'updated_at' => $this->clock->now(),
+                ]);
 
-        $model = $this->queryForStored($current)->find($current->id);
-        if (! $model instanceof Model) {
-            throw new NotFoundHttpException('Configuration value was not found.');
-        }
+            if ($updated !== 1) {
+                throw new ConflictHttpException(
+                    'This setting changed after it was loaded. Refresh and try again.',
+                );
+            }
 
-        return $this->map($model, $current->scope);
+            $model = $this->queryForStored($current)->find($current->id);
+            if (! $model instanceof Model) {
+                throw new NotFoundHttpException('Configuration value was not found.');
+            }
+
+            return $this->map($model, $current->scope);
+        });
     }
 
     public function deleteExpected(
         StoredConfigurationValue $current,
         int $expectedVersion,
     ): void {
-        $deleted = $this->queryForStored($current)
-            ->whereKey($current->id)
-            ->where('row_version', $expectedVersion)
-            ->delete();
+        $context = new ConfigurationScopeContext(
+            scope: $current->scope,
+            tenantId: $current->tenantId,
+            organizationUnitId: $current->organizationUnitId,
+        );
 
-        if ($deleted !== 1) {
-            throw new ConflictHttpException(
-                'This setting changed after it was loaded. Refresh and try again.',
-            );
+        $this->withinBoundary($context, function () use ($current, $expectedVersion): void {
+            $deleted = $this->queryForStored($current)
+                ->whereKey($current->id)
+                ->where('row_version', $expectedVersion)
+                ->delete();
+
+            if ($deleted !== 1) {
+                throw new ConflictHttpException(
+                    'This setting changed after it was loaded. Refresh and try again.',
+                );
+            }
+        });
+    }
+
+    private function withinBoundary(ConfigurationScopeContext $context, callable $callback): mixed
+    {
+        if ($context->tenantId !== null && $this->executionContext->tenantId() !== $context->tenantId) {
+            return $this->executionContext->runForTenant($context->tenantId, $callback);
         }
+
+        return $callback();
     }
 
     /** @return Builder<Model> */

@@ -19,16 +19,25 @@ final class TenantAuthenticationFixture
         }
 
         $now = now();
-        $providerId = (int) DB::table('auth_providers')->insertGetId([
-            'tenant_id' => $tenantId,
-            'provider_key' => 'internal',
-            'name' => 'Internal authentication',
-            'driver' => 'internal',
-            'status' => ProviderStatus::ACTIVE->value,
-            'row_version' => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $providerId = DB::table('auth_providers')
+            ->where('tenant_id', $tenantId)
+            ->where('provider_key', 'internal')
+            ->value('id');
+
+        if ($providerId === null) {
+            $providerId = (int) DB::table('auth_providers')->insertGetId([
+                'tenant_id' => $tenantId,
+                'provider_key' => 'internal',
+                'name' => 'Internal authentication',
+                'driver' => 'internal',
+                'status' => ProviderStatus::ACTIVE->value,
+                'row_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        } else {
+            $providerId = (int) $providerId;
+        }
 
         DB::table('auth_identities')->insert([
             'tenant_id' => $tenantId,

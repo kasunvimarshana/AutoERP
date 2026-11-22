@@ -43,7 +43,7 @@ $registerTenantScope = static function (
             ->where('key', '[a-z][a-z0-9._-]+')
             ->defaults('scope', $scope)
             ->name($scope.'.show');
-        Route::put('entries/{key}', [ConfigurationController::class, 'update'])
+        Route::match(['put', 'patch'], 'entries/{key}', [ConfigurationController::class, 'update'])
             ->middleware($writeMiddleware)
             ->where('key', '[a-z][a-z0-9._-]+')
             ->defaults('scope', $scope)
@@ -88,7 +88,7 @@ $registerPlatformScope = static function (
                 ->where('key', '[a-z][a-z0-9._-]+')
                 ->defaults('scope', $scope)
                 ->name('show');
-            Route::put('entries/{key}', [PlatformConfigurationController::class, 'update'])
+            Route::match(['put', 'patch'], 'entries/{key}', [PlatformConfigurationController::class, 'update'])
                 ->middleware($writeMiddleware)
                 ->where('key', '[a-z][a-z0-9._-]+')
                 ->defaults('scope', $scope)
@@ -171,6 +171,10 @@ Route::prefix('api/v1/platform/configuration')
             $writeMiddleware,
         );
 
+        Route::get('tenants/{tenant}/resolved', [PlatformConfigurationController::class, 'resolvedIndex'])
+            ->middleware($readMiddleware)
+            ->whereNumber('tenant')
+            ->name('resolved.index');
         Route::get('tenants/{tenant}/resolved/{key}', [PlatformConfigurationController::class, 'resolved'])
             ->middleware($readMiddleware)
             ->whereNumber('tenant')
@@ -186,6 +190,10 @@ Route::prefix('api/v1/configuration')
             ->middleware($requires(ConfigurationPermission::ENTRIES_VIEW))
             ->defaults('scope', ConfigurationScope::TENANT)
             ->name('definitions');
+        Route::get('resolved', [ConfigurationController::class, 'resolvedIndex'])
+            ->middleware([$currentOrganization.':optional', $requires(ConfigurationPermission::ENTRIES_VIEW)])
+            ->defaults('scope', ConfigurationScope::TENANT)
+            ->name('resolved.index');
         Route::get('resolved/{key}', [ConfigurationController::class, 'resolved'])
             ->middleware([$currentOrganization.':optional', $requires(ConfigurationPermission::ENTRIES_VIEW)])
             ->where('key', '[a-z][a-z0-9._-]+')

@@ -17,8 +17,13 @@ class ViewConfigurationRequest extends TenantScopedRequest
             && app(ConfigurationAuthorizationService::class)->canViewScopeCurrent($scope);
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [];
+        return [
+            'owner' => ['nullable', 'string', 'max:100'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+        ];
     }
 }
