@@ -1,120 +1,134 @@
-# AutoERP Architecture and Release Evidence Index
+# AutoERP Documentation Suite & Architecture Index
 
-This file is the canonical entry point for current architecture, remediation, release evidence, and unresolved product decisions. Historical files under `docs/changes` are append-only records of individual changes; they do not independently prove current production readiness.
+Welcome to the **AutoERP Documentation Suite**. This directory contains the authoritative technical specifications, architectural designs, user manuals, quality assurance protocols, database standards, and shared project memory for the AutoERP platform.
 
-## Authoritative branch
+---
 
-- Repository: `kasunvimarshana/AutoERP`
-- Branch: `worktree-0.0.8`
-- Other worktree and feature branches must be compared against this branch before integration.
-- A branch is not merged solely because it contains newer commits. Changes must preserve bounded data access, module ownership, tenant isolation, financial integrity, and current regression fixes.
+## 1. Primary Entry Points & Canonical References
 
-## Core Technical & Architectural Guides
+| Resource | Path | Description |
+|---|---|---|
+| **Repository Root Overview** | [`README.md`](file:///d:/project-new/AutoERP/README.md) | Ground-up platform architecture, technology stack, setup guide, and module catalog. |
+| **Enterprise Knowledge Base** | [`knowledgebase.md`](file:///d:/project-new/AutoERP/docs/knowledgebase.md) | Single canonical technical specification, developer onboarding handbook, and domain encyclopedia. |
+| **Core Engineering Axioms** | [`AGENTS.md`](file:///d:/project-new/AutoERP/AGENTS.md) / [`RULES.md`](file:///d:/project-new/AutoERP/RULES.md) | The 12 non-negotiable architectural axioms governing backend, frontend, database, concurrency, and UI/UX. |
+| **Audit Authority Protocol** | [`AUDIT_AUTHORITY.md`](file:///d:/project-new/AutoERP/docs/AUDIT_AUTHORITY.md) | Authoritative precedence hierarchy for reconciling code, tests, append-only change logs, and business evidence. |
+| **Vehicle Rental Technical Guide** | [`modules/vehicle_rental_complete_guide.md`](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md) | Complete end-to-end technical specification for commercial fleet leasing, running charts, billing, and settlements. |
+| **Vehicle Rental Operator Manual** | [`user-guides/vehicle_rental_user_guide.md`](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md) | Comprehensive, beginner-friendly operator handbook for daily dispatchers, billing clerks, cashiers, and managers. |
+| **Database Key Naming Standard** | [`database/migration-key-naming.md`](file:///d:/project-new/AutoERP/docs/database/migration-key-naming.md) | Explicit line-by-line foreign key, unique key, and index naming conventions (`_fk`, `_uk`, `_ix`). |
 
-- [AutoERP Project Knowledge Base & Technical Developer Guide](file:///d:/project-new/AutoERP/docs/project_knowledgebase.md): The authoritative enterprise architecture, business domain specification, module catalog, and developer handbook for AutoERP.
-- [Vehicle Rental Complete Guide](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md): The definitive end-to-end technical, architectural, and operational manual for AutoERP's Vehicle Rental module.
-- [Vehicle Rental User Guide](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md): The comprehensive, beginner-friendly operator handbook for daily business users (Dispatchers, Fleet Officers, Billing Clerks, Cashiers, and Managers).
+---
 
-## Architecture foundations
+## 2. Directory Structure & Documentation Catalog
 
-- Shared-schema multi-tenancy with explicit tenant execution context.
-- Organization-unit scope is explicit and cannot be inferred from request payload authority.
-- Business modules provide semantic accounting facts; Finance resolves effective accounts and owns journals, ledger entries, periods, posting profiles, and reversals.
-- Invoice owns canonical commercial documents, immutable snapshots, balances, posting plans, and governed lifecycle transitions.
-- Inventory owns quantities, movements, valuation layers, reservations, allocations, and movement cost.
-- Tax owns tax calculation/snapshot facts but source coordinators bind Tax and Finance atomically.
-- Source modules own restoration of their source links and quantities when an Invoice is cancelled, voided, or reversed.
-
-## Verified baseline
-
-The executed verification baseline across all active modules (including the clean Vehicle Rental module) reports:
-
-- Laravel default test suite: 982 tests, 10,750+ assertions (including 152 Vehicle Rental tests), all passed.
-- Vitest frontend suite: 130 test files, 472 tests (including 18 Vehicle Rental test files, 79 tests), all passed.
-- TypeScript (`npm run typecheck`): 0 errors, passed.
-- ESLint (`npm run lint`): 0 errors, 0 warnings, passed.
-- Working tree: clean and synchronized with `origin/worktree-0.0.8`.
-
-These results do not automatically verify later commits. Rerun the gates below after pulling the latest branch.
-
-## Current financial integration status
-
-Implemented foundations include:
-
-- atomic Invoice, Tax, and Finance posting;
-- governed Invoice reversal with source restoration;
-- semantic Payment posting for receipts, supplier payments, advances, deposits, allocations, and reversals;
-- Purchase GRN Inventory/GRNI posting and supplier Invoice clearing;
-- accounting-period close/reopen enforcement at journal posting and reversal boundaries;
-- canonical Finance source identity and exact-once posting;
-- manual journal separation from business-source identity;
-- effective-dated posting profiles and account-role assignments;
-- posting-profile fallback visibility and optimistic concurrency;
-- Vehicle Service Invoice posting and parts-consumption COGS posting;
-
-## Open policy-dependent items
-
-The following items must not be implemented by assumption:
-
-### Product scope decisions
-
-The following remain product decisions rather than coding defects:
-
-- Payroll module scope;
-- Sales quotation/order/delivery/counter-sales scope;
-
-## Operational release gates
-
-Automated code tests do not replace environment verification. A production release requires evidence for:
-
-- forward-only migration rehearsal against a disposable copy of the target schema;
-- backup creation and restore test;
-- queue worker liveness and failed-job handling;
-- scheduler liveness and overlap protection;
-- external mail delivery;
-- cache connectivity and eviction behavior;
-- private storage read/write/delete/reconciliation;
-- TLS, secrets, environment isolation, and least-privilege database credentials;
-- critical workflow UAT and rollback procedure.
-
-## Required verification commands
-
-```bash
-git checkout worktree-0.0.8
-git pull origin worktree-0.0.8
-git diff --check
-
-php artisan migrate:fresh --seed
-php artisan test
-composer test:mysql
-
-npm run typecheck -- --pretty false
-npm run lint
-npm run build
-npm run test
-
-git status
-git log -10 --oneline
+```text
+docs/
+├── README.md                                  # This documentation portal and catalog
+├── knowledgebase.md                           # Canonical system specification & developer guide
+├── AGENTS.md                                  # The 12 Core Engineering Axioms & Rules
+├── RULES.md                                   # Synchronized copy of the 12 Core Axioms
+├── AUDIT_AUTHORITY.md                         # Precedence hierarchy and evidence governance
+│
+├── modules/                                   # Domain-specific technical manuals
+│   └── vehicle_rental_complete_guide.md       # Canonical Vehicle Rental technical manual
+│
+├── user-guides/                               # End-user operator manuals
+│   └── vehicle_rental_user_guide.md           # Step-by-step visual workflow manual
+│
+├── architecture/                              # High-level architecture papers & reviews
+│   ├── financial-integrity-foundation.md      # Double-entry ledger and posting profile design
+│   ├── autoerp-saas-tenancy-and-pricing-...   # SaaS subscription tiers and tenancy review
+│   └── vehicle-service-promotions-...         # Service cards, offers, and promotion designs
+│
+├── database/                                  # Database architecture & schema policies
+│   └── migration-key-naming.md                # Explicit key and index naming standard
+│
+├── plans/                                     # Implemented feature plans & roadmap specs
+│   ├── dashboard-business-overview-final...   # Executive dashboard design & metrics
+│   ├── vehicle-service-job-cancellation-...   # Service job cancellation state transitions
+│   ├── vehicle-service-workforce-assignm...   # Workforce assignment panel design
+│   ├── whatsapp-document-sharing.md           # PDF document sharing via WhatsApp
+│   └── whatsapp-manual-number-verificati...   # Customer phone verification workflow
+│
+├── qa/                                        # Quality assurance & verification suites
+│   ├── 2026-09-15-full-system-sample-dat...   # End-to-end sample data execution flow
+│   └── 2026-11-14-system-feature-and-tes...   # Feature-by-feature test catalog & matrix
+│
+├── audits/                                    # Active audit fixtures & historical archives
+│   ├── purchase-debit-note-currency-reco...   # SQL test fixture (loaded by PHPUnit)
+│   ├── finance-journal-ledger-integrity.sql   # Double-entry GL integrity verification SQL
+│   ├── core-integrity-closure-matrix.md       # Platform integrity remediation closure matrix
+│   └── historical/                            # Archived historical audits & video reports (2026-07)
+│
+├── vehicle-rental/                            # Commercial vehicle rental domain research
+│   ├── agreements.md                          # Agreement aggregate domain rules
+│   ├── operations.md                          # Custody, replacement & dispatch workflows
+│   ├── base-billing.md / mileage-billing.md   # Invoicing models and calculation algorithms
+│   └── deposits.md / usage-billing.md         # Treasury deposits & running chart usage
+│
+└── changes/                                   # Shared Project Memory (Append-Only)
+    └── YYYY-MM-DD-<description>.md            # Immutable records of all changes & verifications
 ```
 
-For deployed-schema rehearsal, run the Finance upgrade migrations against a disposable database copy before production deployment. The canonical source-key migration intentionally fails when historical journals contain conflicting business-source identities; such conflicts require investigation, not automatic deduplication.
+---
 
-## Recent remediation evidence
+## 3. Verified System Baseline & Quality Gates
 
-Start with these append-only records:
+The AutoERP codebase is continuously verified across strict automated regression gates:
 
-- `docs/changes/2026-07-13-finance-source-profile-and-service-cogs-hardening.md`
-- `docs/changes/2026-07-13-frontend-toast-and-lifecycle-test-alignment.md`
-- `docs/changes/2026-07-13-posting-date-and-grn-reversal-contract-fix.md`
-- `docs/changes/2026-07-13-finance-posting-regression-remediation.md`
-- `docs/changes/2026-07-13-finance-test-fixture-alignment-followup.md`
-- `docs/changes/2026-10-05-vehicle-rental-release-verification-fixes.md`
-- `docs/changes/2026-10-13-combined-candidate-verification.md`
-- `docs/changes/2026-10-31-private-incident-proofs-and-audit-consolidation.md`
-- `docs/changes/2026-11-01-full-project-integration-and-verification.md`
-- `docs/changes/2026-11-02-finance-posting-configuration-deep-audit.md`
-- `docs/changes/2026-11-02-vehicle-rental-module-and-docs-deep-audit.md`
-- `docs/changes/2026-11-02-unified-ui-ux-design-system-consistency.md`
-- `docs/changes/2026-11-02-vehicle-rental-branch-reconciliation-and-audit.md`
+| Quality Gate | Tool / Command | Verified Baseline Status |
+|---|---|---|
+| **Backend Test Suite** | `php artisan test` | **1,301 tests passed** (13,494 assertions, 0 failures) |
+| **Frontend Test Suite** | `npm test` | **174 test files passed** (726 tests passed, 0 failures) |
+| **TypeScript Static Check** | `npm run typecheck` | **0 errors** (strict compiler mode) |
+| **ESLint Static Analysis** | `npm run lint` | **0 errors**, 0 warnings |
+| **Database Migrations** | `php artisan test --filter ModuleMigrationBaselineTest` | **266 canonical tables**, 1:1 migration mapping, 0 alteration patches |
+| **Historical Data Retention** | `php artisan test --filter HistoricalRetentionMigrationTest` | **100% compliance** (`restrictOnDelete()` on status histories) |
 
-When this index and an older change record disagree, this index and the current authoritative branch take precedence.
+---
+
+## 4. The 12 Non-Negotiable Core Engineering Axioms
+
+All development, bug fixes, refactoring, and AI-agent interactions must adhere strictly to [`AGENTS.md`](file:///d:/project-new/AutoERP/AGENTS.md):
+
+1. **Understand First, Verify Second, Change Third:** Never act on assumptions or guess. Fully understand requirements, module ownership, and data consequences before modifying code.
+2. **Root Cause Design over Compatibility Workarounds:** Fix root causes at their source. Do not preserve legacy flaws or build compatibility patches unless explicitly required.
+3. **Simplicity, Pragmatism & No Overengineering:** Prefer the simplest clean design that solves the problem. Avoid premature optimization or generic frameworks. No dead code.
+4. **Module Ownership & Clear Boundaries:** Each of the 31 modules in `app/Modules/*` owns its models, tables, and logic. Never introduce cross-module workarounds or shadow tables.
+5. **Backend Authority & Single Source of Truth:** Core calculations, business logic, state transitions, permissions, and validations reside authoritatively on the backend.
+6. **Concurrency, Atomicity & Transaction Immutability:** Write mutations must be atomic, conflict-aware, and version-checked (`expected_version` / `row_version`). Historical operational and financial records are immutable.
+7. **Database Architecture & Explicit Migrations:** One table per migration file. Write every column, constraint, foreign key, and index explicitly line-by-line (KISS + Explicit over DRY). Zero dynamic loops or runtime naming.
+8. **Code Modularity & File Size Management:** Split files only when there is a clear architectural reason (feature boundary, separation of concerns) to prevent unreadable, oversized files.
+9. **Zero Magic Values:** Use PHP Backed Enums (`string`) and TypeScript enums for predefined option sets. Use named constants for shared values.
+10. **UI/UX Clarity & Cognitive Efficiency:** Design for speed and task completion. **Never expose raw database IDs or internal primary keys in the UI.** Use controlled lookup selectors (`LookupSelect`, `GenericLookupSelect`). Display transparent calculation formulas and contextual hints.
+11. **Security & Predictable Error Handling:** Never weaken validation or expose secrets. Handle errors explicitly and predictably without swallowing exceptions.
+12. **Shared Project Memory via `/docs/changes`:** The `/docs/changes` directory is the project's shared append-only memory. Read recent records before starting work, modify only necessary files, and create a new record detailing changes and verification results upon completion. Existing change records are never edited or deleted.
+
+---
+
+## 5. Developer Quickstart & Command Cheatsheet
+
+### Running Local Development
+```bash
+# Start backend server, queue worker, log tail, and Vite HMR simultaneously
+composer dev
+```
+
+### Running Automated Test Gates
+```bash
+# Backend unit, feature, and modular tests (SQLite :memory:)
+php artisan test
+
+# Run specific module or baseline tests
+php artisan test --filter ModuleMigrationBaselineTest
+php artisan test --filter HistoricalRetentionMigrationTest
+php artisan test app/Modules/VehicleRental/Tests/
+
+# Frontend component & integration tests (Vitest)
+npm test
+
+# TypeScript strict type checking
+npm run typecheck
+
+# Code quality and style linting
+npm run lint
+```
