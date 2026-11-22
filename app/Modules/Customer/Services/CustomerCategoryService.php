@@ -63,6 +63,9 @@ final class CustomerCategoryService
 
     public function delete(CustomerCategory $category): void
     {
+        if ($category->children()->exists()) {
+            throw new InvalidArgumentException('Customer category cannot be deleted while child categories reference it.');
+        }
         if ($category->customers()->exists()) {
             throw new InvalidArgumentException('Customer category cannot be deleted while customers reference it.');
         }

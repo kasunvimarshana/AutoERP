@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\User\Constants\UserPermission;
 use Modules\User\Http\Controllers\PermissionController;
 use Modules\User\Http\Controllers\RoleController;
 use Modules\User\Http\Controllers\UserController;
@@ -27,44 +28,116 @@ Route::prefix('api/v1')
     ])
     ->name('api.v1.user.')
     ->group(function (): void {
-        Route::get('users', [UserController::class, 'index'])->name('users.index');
-        Route::post('users', [UserController::class, 'store'])->name('users.store');
-        Route::get('users/password-policy', [UserController::class, 'passwordPolicy'])->name('users.password-policy');
+        Route::get('users', [UserController::class, 'index'])
+            ->middleware('tenant.permission:'.UserPermission::USERS_VIEW)
+            ->name('users.index');
+        Route::post('users', [UserController::class, 'store'])
+            ->middleware('tenant.permission:'.UserPermission::USERS_CREATE)
+            ->name('users.store');
+        Route::get('users/password-policy', [UserController::class, 'passwordPolicy'])
+            ->middleware('tenant.permission:'.UserPermission::USERS_VIEW)
+            ->name('users.password-policy');
         Route::get('user/quick-access', [UserQuickAccessController::class, 'show'])->name('quick-access.show');
         Route::put('user/quick-access', [UserQuickAccessController::class, 'update'])->name('quick-access.update');
         Route::delete('user/quick-access', [UserQuickAccessController::class, 'destroy'])->name('quick-access.destroy');
         Route::get('users/{user}', [UserController::class, 'show'])->whereNumber('user')->name('users.show');
         Route::patch('users/{user}', [UserController::class, 'update'])->whereNumber('user')->name('users.update');
-        Route::patch('users/{user}/status', [UserController::class, 'changeStatus'])->whereNumber('user')->name('users.status');
-        Route::put('users/{user}/roles', [UserController::class, 'syncRoles'])->whereNumber('user')->name('users.roles.sync');
-        Route::put('users/{user}/permissions', [UserController::class, 'syncPermissions'])->whereNumber('user')->name('users.permissions.sync');
+        Route::patch('users/{user}/status', [UserController::class, 'changeStatus'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USERS_ACTIVATE.','.UserPermission::USERS_DEACTIVATE)
+            ->name('users.status');
+        Route::put('users/{user}/roles', [UserController::class, 'syncRoles'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USERS_ASSIGN_ROLES)
+            ->name('users.roles.sync');
+        Route::put('users/{user}/permissions', [UserController::class, 'syncPermissions'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USERS_ASSIGN_PERMISSIONS)
+            ->name('users.permissions.sync');
         Route::put('users/{user}/organization-access', [UserController::class, 'syncOrganizationAccess'])
-            ->whereNumber('user')->name('users.organization-access.sync');
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USERS_MANAGE_ORGANIZATION_ACCESS)
+            ->name('users.organization-access.sync');
         Route::delete('users/{user}', [UserController::class, 'destroy'])
-            ->whereNumber('user')->name('users.destroy');
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USERS_DELETE)
+            ->name('users.destroy');
 
-        Route::get('users/{user}/documents', [UserDocumentController::class, 'index'])->whereNumber('user')->name('users.documents.index');
-        Route::post('users/{user}/documents', [UserDocumentController::class, 'store'])->whereNumber('user')->name('users.documents.store');
-        Route::get('users/{user}/documents/{document}', [UserDocumentController::class, 'show'])->whereNumber('user')->whereNumber('document')->name('users.documents.show');
-        Route::patch('users/{user}/documents/{document}', [UserDocumentController::class, 'update'])->whereNumber('user')->whereNumber('document')->name('users.documents.update');
-        Route::delete('users/{user}/documents/{document}', [UserDocumentController::class, 'destroy'])->whereNumber('user')->whereNumber('document')->name('users.documents.destroy');
-        Route::get('users/{user}/documents/{document}/download', [UserDocumentController::class, 'download'])->whereNumber('user')->whereNumber('document')->name('users.documents.download');
+        Route::get('users/{user}/documents', [UserDocumentController::class, 'index'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USER_DOCUMENTS_VIEW)
+            ->name('users.documents.index');
+        Route::post('users/{user}/documents', [UserDocumentController::class, 'store'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USER_DOCUMENTS_MANAGE)
+            ->name('users.documents.store');
+        Route::get('users/{user}/documents/{document}', [UserDocumentController::class, 'show'])
+            ->whereNumber('user')->whereNumber('document')
+            ->middleware('tenant.permission:'.UserPermission::USER_DOCUMENTS_VIEW)
+            ->name('users.documents.show');
+        Route::patch('users/{user}/documents/{document}', [UserDocumentController::class, 'update'])
+            ->whereNumber('user')->whereNumber('document')
+            ->middleware('tenant.permission:'.UserPermission::USER_DOCUMENTS_MANAGE)
+            ->name('users.documents.update');
+        Route::delete('users/{user}/documents/{document}', [UserDocumentController::class, 'destroy'])
+            ->whereNumber('user')->whereNumber('document')
+            ->middleware('tenant.permission:'.UserPermission::USER_DOCUMENTS_MANAGE)
+            ->name('users.documents.destroy');
+        Route::get('users/{user}/documents/{document}/download', [UserDocumentController::class, 'download'])
+            ->whereNumber('user')->whereNumber('document')
+            ->middleware('tenant.permission:'.UserPermission::USER_DOCUMENTS_VIEW)
+            ->name('users.documents.download');
 
-        Route::get('users/{user}/devices', [UserDeviceController::class, 'index'])->whereNumber('user')->name('users.devices.index');
-        Route::post('users/{user}/devices', [UserDeviceController::class, 'store'])->whereNumber('user')->name('users.devices.store');
-        Route::post('users/{user}/devices/{device}/touch', [UserDeviceController::class, 'touch'])->whereNumber('user')->whereNumber('device')->name('users.devices.touch');
-        Route::post('users/{user}/devices/{device}/revoke', [UserDeviceController::class, 'revoke'])->whereNumber('user')->whereNumber('device')->name('users.devices.revoke');
+        Route::get('users/{user}/devices', [UserDeviceController::class, 'index'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USER_DEVICES_VIEW)
+            ->name('users.devices.index');
+        Route::post('users/{user}/devices', [UserDeviceController::class, 'store'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USER_DEVICES_MANAGE)
+            ->name('users.devices.store');
+        Route::post('users/{user}/devices/{device}/touch', [UserDeviceController::class, 'touch'])
+            ->whereNumber('user')->whereNumber('device')
+            ->middleware('tenant.permission:'.UserPermission::USER_DEVICES_MANAGE)
+            ->name('users.devices.touch');
+        Route::post('users/{user}/devices/{device}/revoke', [UserDeviceController::class, 'revoke'])
+            ->whereNumber('user')->whereNumber('device')
+            ->middleware('tenant.permission:'.UserPermission::USER_DEVICES_MANAGE)
+            ->name('users.devices.revoke');
 
-        Route::get('roles', [RoleController::class, 'index'])->name('roles.index');
-        Route::post('roles', [RoleController::class, 'store'])->name('roles.store');
-        Route::get('roles/{role}', [RoleController::class, 'show'])->whereNumber('role')->name('roles.show');
-        Route::patch('roles/{role}', [RoleController::class, 'update'])->whereNumber('role')->name('roles.update');
-        Route::delete('roles/{role}', [RoleController::class, 'destroy'])->whereNumber('role')->name('roles.destroy');
-        Route::put('roles/{role}/permissions', [RoleController::class, 'syncPermissions'])->whereNumber('role')->name('roles.permissions.sync');
+        Route::get('roles', [RoleController::class, 'index'])
+            ->middleware('tenant.permission:'.UserPermission::ROLES_VIEW)
+            ->name('roles.index');
+        Route::post('roles', [RoleController::class, 'store'])
+            ->middleware('tenant.permission:'.UserPermission::ROLES_CREATE)
+            ->name('roles.store');
+        Route::get('roles/{role}', [RoleController::class, 'show'])
+            ->whereNumber('role')
+            ->middleware('tenant.permission:'.UserPermission::ROLES_VIEW)
+            ->name('roles.show');
+        Route::patch('roles/{role}', [RoleController::class, 'update'])
+            ->whereNumber('role')
+            ->middleware('tenant.permission:'.UserPermission::ROLES_UPDATE)
+            ->name('roles.update');
+        Route::delete('roles/{role}', [RoleController::class, 'destroy'])
+            ->whereNumber('role')
+            ->middleware('tenant.permission:'.UserPermission::ROLES_DELETE)
+            ->name('roles.destroy');
+        Route::put('roles/{role}/permissions', [RoleController::class, 'syncPermissions'])
+            ->whereNumber('role')
+            ->middleware('tenant.permission:'.UserPermission::ROLES_ASSIGN_PERMISSIONS)
+            ->name('roles.permissions.sync');
 
-        Route::get('permissions/modules', [PermissionController::class, 'modules'])->name('permissions.modules');
-        Route::get('permissions', [PermissionController::class, 'index'])->name('permissions.index');
-        Route::get('permissions/{permission}', [PermissionController::class, 'show'])->whereNumber('permission')->name('permissions.show');
+        Route::get('permissions/modules', [PermissionController::class, 'modules'])
+            ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW)
+            ->name('permissions.modules');
+        Route::get('permissions', [PermissionController::class, 'index'])
+            ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW)
+            ->name('permissions.index');
+        Route::get('permissions/{permission}', [PermissionController::class, 'show'])
+            ->whereNumber('permission')
+            ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW)
+            ->name('permissions.show');
     });
 
 

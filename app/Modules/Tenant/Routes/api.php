@@ -16,6 +16,7 @@ use Modules\Tenant\Http\Controllers\Platform\PlatformTenantHealthController;
 use Modules\Tenant\Http\Controllers\Platform\PlatformTenantTargetController;
 use Modules\Core\Authorization\PlatformPermission;
 use Modules\Tenant\Constants\TenantDomainProbe;
+use Modules\Tenant\Constants\TenantPermission;
 use Modules\Tenant\Http\Controllers\Public\TenantDomainProbeController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -241,52 +242,63 @@ Route::prefix('api/v1/tenant')
     ->name('tenant.')
     ->group(function () use ($domainVerificationThrottle): void {
         Route::get('profile', [TenantProfileController::class, 'show'])
+            ->middleware('tenant.permission:'.TenantPermission::PROFILE_VIEW)
             ->name('profile.show');
         Route::patch('profile', [TenantProfileController::class, 'update'])
+            ->middleware('tenant.permission:'.TenantPermission::PROFILE_MANAGE)
             ->name('profile.update');
 
         Route::get('domains', [TenantDomainController::class, 'index'])
+            ->middleware('tenant.permission:'.TenantPermission::DOMAINS_VIEW)
             ->name('domains.index');
         Route::post('domains', [TenantDomainController::class, 'store'])
+            ->middleware('tenant.permission:'.TenantPermission::DOMAINS_MANAGE)
             ->name('domains.store');
         Route::get('domains/{tenantDomain}', [TenantDomainController::class, 'show'])
+            ->middleware('tenant.permission:'.TenantPermission::DOMAINS_VIEW)
             ->whereNumber('tenantDomain')
             ->name('domains.show');
         Route::post(
             'domains/{tenantDomain}/verification-challenge',
             [TenantDomainController::class, 'requestVerification'],
-        )->middleware($domainVerificationThrottle)->whereNumber('tenantDomain')->name('domains.challenge');
+        )->middleware([$domainVerificationThrottle, 'tenant.permission:'.TenantPermission::DOMAINS_MANAGE])->whereNumber('tenantDomain')->name('domains.challenge');
         Route::post('domains/{tenantDomain}/verify', [TenantDomainController::class, 'verify'])
-            ->middleware($domainVerificationThrottle)
+            ->middleware([$domainVerificationThrottle, 'tenant.permission:'.TenantPermission::DOMAINS_MANAGE])
             ->whereNumber('tenantDomain')
             ->name('domains.verify');
         Route::patch(
             'domains/{tenantDomain}/primary',
             [TenantDomainController::class, 'setPrimary'],
-        )->whereNumber('tenantDomain')->name('domains.primary');
+        )->middleware('tenant.permission:'.TenantPermission::DOMAINS_MANAGE)->whereNumber('tenantDomain')->name('domains.primary');
         Route::patch(
             'domains/{tenantDomain}/disable',
             [TenantDomainController::class, 'disable'],
-        )->whereNumber('tenantDomain')->name('domains.disable');
+        )->middleware('tenant.permission:'.TenantPermission::DOMAINS_MANAGE)->whereNumber('tenantDomain')->name('domains.disable');
         Route::delete('domains/{tenantDomain}', [TenantDomainController::class, 'destroy'])
+            ->middleware('tenant.permission:'.TenantPermission::DOMAINS_MANAGE)
             ->whereNumber('tenantDomain')
             ->name('domains.destroy');
 
         Route::get('documents', [TenantDocumentController::class, 'index'])
+            ->middleware('tenant.permission:'.TenantPermission::DOCUMENTS_VIEW)
             ->name('documents.index');
         Route::post('documents', [TenantDocumentController::class, 'store'])
+            ->middleware('tenant.permission:'.TenantPermission::DOCUMENTS_MANAGE)
             ->name('documents.store');
         Route::get('documents/{tenantDocument}', [TenantDocumentController::class, 'show'])
+            ->middleware('tenant.permission:'.TenantPermission::DOCUMENTS_VIEW)
             ->whereNumber('tenantDocument')
             ->name('documents.show');
         Route::patch('documents/{tenantDocument}', [TenantDocumentController::class, 'update'])
+            ->middleware('tenant.permission:'.TenantPermission::DOCUMENTS_MANAGE)
             ->whereNumber('tenantDocument')
             ->name('documents.update');
         Route::delete('documents/{tenantDocument}', [TenantDocumentController::class, 'destroy'])
+            ->middleware('tenant.permission:'.TenantPermission::DOCUMENTS_MANAGE)
             ->whereNumber('tenantDocument')
             ->name('documents.destroy');
         Route::get(
             'documents/{tenantDocument}/download',
             [TenantDocumentController::class, 'download'],
-        )->whereNumber('tenantDocument')->name('documents.download');
+        )->middleware('tenant.permission:'.TenantPermission::DOCUMENTS_VIEW)->whereNumber('tenantDocument')->name('documents.download');
     });

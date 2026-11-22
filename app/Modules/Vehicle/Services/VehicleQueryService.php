@@ -6,8 +6,11 @@ namespace Modules\Vehicle\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class VehicleQueryService
 {
@@ -59,7 +62,41 @@ final class VehicleQueryService
 
     public function delete(Vehicle $vehicle): void
     {
+        $this->assertUnused($vehicle);
         $vehicle->delete();
+    }
+
+    private function assertUnused(Vehicle $vehicle): void
+    {
+        $tables = [
+            'vehicle_service_jobs' => 'vehicle_id',
+            'vehicle_rental_owner_agreements' => 'vehicle_id',
+            'vehicle_rental_uses' => 'vehicle_id',
+            'vehicle_rental_running_charts' => 'vehicle_id',
+            'vehicle_rental_finance_agreements' => 'vehicle_id',
+            'vehicle_rental_expenses' => 'vehicle_id',
+            'vehicle_rental_reservations' => 'vehicle_id',
+            'promotion_cards' => 'vehicle_id',
+            'vehicle_ownerships' => 'vehicle_id',
+        ];
+
+        foreach ($tables as $table => $column) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            $query = DB::table($table)
+                ->where('tenant_id', (int) $vehicle->tenant_id)
+                ->where($column, (int) $vehicle->getKey());
+
+            if (Schema::hasColumn($table, 'deleted_at')) {
+                $query->whereNull('deleted_at');
+            }
+
+            if ($query->exists()) {
+                throw new ConflictHttpException('Vehicle is referenced by operational or financial history and cannot be deleted. Deactivate the vehicle instead.');
+            }
+        }
     }
 
     private function baseQuery(int $tenantId, ?int $organizationUnitId): Builder

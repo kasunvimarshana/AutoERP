@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Finance\Constants\FinancePermission;
+use Modules\Payment\Constants\PaymentPermission;
 use Modules\Voucher\Http\Controllers\VoucherController;
 
 $middleware = [
@@ -11,6 +13,7 @@ $middleware = [
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
+    'tenant.permission:'.PaymentPermission::PAYMENTS_VIEW.','.FinancePermission::JOURNALS_VIEW,
 ];
 
 Route::prefix('api/v1/vouchers')->middleware($middleware)->name('api.v1.vouchers.')->group(function (): void {

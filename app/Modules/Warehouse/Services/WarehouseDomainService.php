@@ -381,6 +381,7 @@ final class WarehouseDomainService
             'purchase_orders' => ['warehouse_id'],
             'goods_receipt_notes' => ['warehouse_id'],
             'purchase_returns' => ['warehouse_id'],
+            'sales' => ['warehouse_id'],
         ];
     }
 
@@ -403,6 +404,7 @@ final class WarehouseDomainService
             'purchase_orders' => ['warehouse_location_id'],
             'goods_receipt_notes' => ['warehouse_location_id'],
             'purchase_returns' => ['warehouse_location_id'],
+            'sales' => ['warehouse_location_id'],
         ];
     }
 }

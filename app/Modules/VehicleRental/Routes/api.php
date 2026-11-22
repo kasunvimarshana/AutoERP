@@ -30,44 +30,84 @@ use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
 use Modules\VehicleRental\Http\Controllers\VehicleDriverReassignmentController;
 use Modules\VehicleRental\Http\Controllers\VehicleFinanceController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
+use Modules\VehicleRental\Services\RentalAuthorization;
 
 Route::prefix('api/v1/vehicle-rental')->middleware([
     'api', 'auth:'.config('module-auth.protected_route_guard', 'auth-api'),
     config('core.current_user.middleware_alias', 'current.user'), config('core.current_tenant.middleware_alias', 'current.tenant'),
     config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required', 'tenant.feature:'.TenantFeature::VEHICLE_RENTAL,
 ])->group(function (): void {
-    Route::get('dashboard', [RentalDashboardController::class, 'show']);
-    Route::get('driver-employees', [DriverDirectoryController::class, 'index']);
+    Route::get('dashboard', [RentalDashboardController::class, 'show'])
+        ->middleware('tenant.permission:'.RentalAuthorization::DASHBOARD_VIEW);
+    Route::get('driver-employees', [DriverDirectoryController::class, 'index'])
+        ->middleware('tenant.permission:'.RentalAuthorization::USE_VIEW);
 
     Route::prefix('reservations')->group(function (): void {
-        Route::get('/', [RentalReservationController::class, 'index']);
-        Route::post('/', [RentalReservationController::class, 'store']);
-        Route::get('{reservation}', [RentalReservationController::class, 'show'])->whereNumber('reservation');
-        Route::put('{reservation}', [RentalReservationController::class, 'update'])->whereNumber('reservation');
-        Route::delete('{reservation}', [RentalReservationController::class, 'destroy'])->whereNumber('reservation');
-        Route::patch('{reservation}/transition', [RentalReservationController::class, 'transition'])->whereNumber('reservation');
-        Route::post('{reservation}/convert', [RentalReservationController::class, 'convert'])->whereNumber('reservation');
+        Route::get('/', [RentalReservationController::class, 'index'])
+            ->middleware('tenant.permission:'.RentalAuthorization::RESERVATION_VIEW);
+        Route::post('/', [RentalReservationController::class, 'store'])
+            ->middleware('tenant.permission:'.RentalAuthorization::RESERVATION_MANAGE);
+        Route::get('{reservation}', [RentalReservationController::class, 'show'])
+            ->middleware('tenant.permission:'.RentalAuthorization::RESERVATION_VIEW)
+            ->whereNumber('reservation');
+        Route::put('{reservation}', [RentalReservationController::class, 'update'])
+            ->middleware('tenant.permission:'.RentalAuthorization::RESERVATION_MANAGE)
+            ->whereNumber('reservation');
+        Route::delete('{reservation}', [RentalReservationController::class, 'destroy'])
+            ->middleware('tenant.permission:'.RentalAuthorization::RESERVATION_MANAGE)
+            ->whereNumber('reservation');
+        Route::patch('{reservation}/transition', [RentalReservationController::class, 'transition'])
+            ->middleware('tenant.permission:'.RentalAuthorization::RESERVATION_MANAGE)
+            ->whereNumber('reservation');
+        Route::post('{reservation}/convert', [RentalReservationController::class, 'convert'])
+            ->middleware('tenant.permission:'.RentalAuthorization::RESERVATION_MANAGE)
+            ->whereNumber('reservation');
     });
 
     Route::prefix('finance-agreements')->group(function (): void {
-        Route::get('/', [VehicleFinanceController::class, 'index']);
-        Route::post('/', [VehicleFinanceController::class, 'store']);
-        Route::get('{agreement}', [VehicleFinanceController::class, 'show'])->whereNumber('agreement');
-        Route::delete('{agreement}', [VehicleFinanceController::class, 'destroy'])->whereNumber('agreement');
-        Route::patch('{agreement}/activate', [VehicleFinanceController::class, 'activate'])->whereNumber('agreement');
-        Route::patch('{agreement}/cancel', [VehicleFinanceController::class, 'cancel'])->whereNumber('agreement');
-        Route::post('installments/{installment}/payable', [VehicleFinanceController::class, 'createPayable'])->whereNumber('installment');
-        Route::patch('installments/refresh-due-statuses', [VehicleFinanceController::class, 'refreshDueStatuses']);
+        Route::get('/', [VehicleFinanceController::class, 'index'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_VIEW);
+        Route::post('/', [VehicleFinanceController::class, 'store'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_MANAGE);
+        Route::get('{agreement}', [VehicleFinanceController::class, 'show'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_VIEW)
+            ->whereNumber('agreement');
+        Route::delete('{agreement}', [VehicleFinanceController::class, 'destroy'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_MANAGE)
+            ->whereNumber('agreement');
+        Route::patch('{agreement}/activate', [VehicleFinanceController::class, 'activate'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_MANAGE)
+            ->whereNumber('agreement');
+        Route::patch('{agreement}/cancel', [VehicleFinanceController::class, 'cancel'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_MANAGE)
+            ->whereNumber('agreement');
+        Route::post('installments/{installment}/payable', [VehicleFinanceController::class, 'createPayable'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_MANAGE)
+            ->whereNumber('installment');
+        Route::patch('installments/refresh-due-statuses', [VehicleFinanceController::class, 'refreshDueStatuses'])
+            ->middleware('tenant.permission:'.RentalAuthorization::FINANCE_MANAGE);
     });
 
     Route::prefix('expenses')->group(function (): void {
-        Route::get('/', [RentalExpenseController::class, 'index']);
-        Route::post('/', [RentalExpenseController::class, 'store']);
-        Route::get('{expense}', [RentalExpenseController::class, 'show'])->whereNumber('expense');
-        Route::delete('{expense}', [RentalExpenseController::class, 'destroy'])->whereNumber('expense');
-        Route::patch('{expense}/transition', [RentalExpenseController::class, 'transition'])->whereNumber('expense');
-        Route::post('allocations/{allocation}/bill', [RentalExpenseController::class, 'billAllocation'])->whereNumber('allocation');
-        Route::post('allocations/{allocation}/unlink-invoice', [RentalExpenseController::class, 'unlinkAllocationInvoice'])->whereNumber('allocation');
+        Route::get('/', [RentalExpenseController::class, 'index'])
+            ->middleware('tenant.permission:'.RentalAuthorization::EXPENSE_VIEW);
+        Route::post('/', [RentalExpenseController::class, 'store'])
+            ->middleware('tenant.permission:'.RentalAuthorization::EXPENSE_MANAGE);
+        Route::get('{expense}', [RentalExpenseController::class, 'show'])
+            ->middleware('tenant.permission:'.RentalAuthorization::EXPENSE_VIEW)
+            ->whereNumber('expense');
+        Route::delete('{expense}', [RentalExpenseController::class, 'destroy'])
+            ->middleware('tenant.permission:'.RentalAuthorization::EXPENSE_MANAGE)
+            ->whereNumber('expense');
+        Route::patch('{expense}/transition', [RentalExpenseController::class, 'transition'])
+            ->middleware('tenant.permission:'.RentalAuthorization::EXPENSE_MANAGE)
+            ->whereNumber('expense');
+        Route::post('allocations/{allocation}/bill', [RentalExpenseController::class, 'billAllocation'])
+            ->middleware('tenant.permission:'.RentalAuthorization::EXPENSE_MANAGE)
+            ->whereNumber('allocation');
+        Route::post('allocations/{allocation}/unlink-invoice', [RentalExpenseController::class, 'unlinkAllocationInvoice'])
+            ->middleware('tenant.permission:'.RentalAuthorization::EXPENSE_MANAGE)
+            ->whereNumber('allocation');
     });
 
     Route::prefix('incidents')->group(function (): void {
@@ -170,7 +210,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
 
     Route::get('vehicles/available', [VehicleUseController::class, 'available']);
 
-    Route::prefix('reports')->group(function (): void {
+    Route::prefix('reports')->middleware('tenant.permission:'.RentalAuthorization::REPORT_VIEW)->group(function (): void {
         Route::get('running-chart-sheet', [RunningChartReportController::class, 'show']);
         Route::get('running-chart-sheet/export/{format}', [RunningChartReportController::class, 'export'])->whereIn('format', ['pdf', 'print', 'html']);
 

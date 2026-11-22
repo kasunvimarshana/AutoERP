@@ -63,6 +63,9 @@ final class SupplierCategoryService
 
     public function delete(SupplierCategory $category): void
     {
+        if ($category->children()->exists()) {
+            throw new InvalidArgumentException('Supplier category cannot be deleted while child categories reference it.');
+        }
         if ($category->suppliers()->exists()) {
             throw new InvalidArgumentException('Supplier category cannot be deleted while suppliers reference it.');
         }

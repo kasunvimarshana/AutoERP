@@ -408,8 +408,10 @@ final class ItemQueryService
             'goods_receipt_note_lines' => ['item_id'],
             'purchase_return_lines' => ['item_id'],
             'invoice_lines' => ['item_id'],
+            'sale_lines' => ['item_id'],
             'vehicle_service_job_lines' => ['item_id'],
             'supplier_item_mappings' => ['item_id'],
+            'promotion_card_benefits' => ['item_id'],
         ];
     }
 

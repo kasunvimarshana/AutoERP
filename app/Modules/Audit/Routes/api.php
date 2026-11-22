@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Audit\Constants\AuditPermission;
 use Modules\Audit\Http\Controllers\AuditLogController;
 use Modules\Audit\Http\Controllers\Platform\PlatformAuditLogController;
 use Modules\Core\Authorization\PlatformPermission;
@@ -22,6 +23,7 @@ Route::prefix('api/v1/audit-logs')
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
+        'tenant.permission:'.AuditPermission::LOGS_VIEW,
     ])
     ->name('audit.logs.')
     ->group(function (): void {
