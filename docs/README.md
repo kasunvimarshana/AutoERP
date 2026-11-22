@@ -77,11 +77,11 @@ The AutoERP codebase is continuously verified across strict automated regression
 
 | Quality Gate | Tool / Command | Verified Baseline Status |
 |---|---|---|
-| **Backend Test Suite** | `php artisan test` | **1,301 tests passed** (13,494 assertions, 0 failures) |
-| **Frontend Test Suite** | `npm test` | **174 test files passed** (726 tests passed, 0 failures) |
+| **Backend Test Suite** | `php artisan test` | **1,364 tests passed** (14,218 assertions, 0 failures) |
+| **Frontend Test Suite** | `npm test` | **176 test files passed** (735 tests passed, 0 failures) |
 | **TypeScript Static Check** | `npm run typecheck` | **0 errors** (strict compiler mode) |
 | **ESLint Static Analysis** | `npm run lint` | **0 errors**, 0 warnings |
-| **Database Migrations** | `php artisan test --filter ModuleMigrationBaselineTest` | **266 canonical tables**, 1:1 migration mapping, 0 alteration patches |
+| **Database Migrations** | `php artisan test --filter ModuleMigrationBaselineTest` | **262 module tables** (267 total tables), 1:1 migration mapping, 0 alteration patches |
 | **Historical Data Retention** | `php artisan test --filter HistoricalRetentionMigrationTest` | **100% compliance** (`restrictOnDelete()` on status histories) |
 
 ---

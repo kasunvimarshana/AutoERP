@@ -1,6 +1,6 @@
 # AutoERP Table Catalog
 
-This catalog documents the schema produced by the module migrations. The enclosing section is the owning module for every listed table. Laravel infrastructure tables are included for completeness. The ownership catalogue was aligned with the canonical create migrations by static verification on 2026-06-28. Runtime database verification remains a release gate.
+This catalog documents the complete schema produced by the 267 canonical create migrations across all 31 modules and infrastructure. The enclosing section is the owning module for every listed table. The ownership catalogue reflects the fully verified baseline migrations with zero `Schema::table()` patches and strict single-table fresh-baseline compliance.
 
 Conventions:
 
@@ -16,10 +16,9 @@ Conventions:
 | --- | --- | --- | --- |
 | `cache` | Stores cache records used by the owning module. | No declared foreign keys. | Primary key and domain query indexes. |
 | `cache_locks` | Stores cache lock records used by the owning module. | No declared foreign keys. | Primary key and domain query indexes. |
-| `failed_jobs` | Stores failed job records used by the owning module. | No declared foreign keys. | unique `uuid` |
-| `job_batches` | Stores job batch records used by the owning module. | No declared foreign keys. | Primary key and domain query indexes. |
 | `jobs` | Stores job records used by the owning module. | No declared foreign keys. | Primary key and domain query indexes. |
-| `migrations` | Stores migration records used by the owning module. | No declared foreign keys. | Primary key and domain query indexes. |
+| `job_batches` | Stores job batch records used by the owning module. | No declared foreign keys. | Primary key and domain query indexes. |
+| `failed_jobs` | Stores failed job records used by the owning module. | No declared foreign keys. | unique `failed_jobs_uuid_uk` |
 
 ## Core
 
@@ -29,7 +28,7 @@ No business tables. Core contains technical primitives, concurrency abstractions
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `idempotency_records` | Owns replay-safe command/request result records for cross-module idempotent operations. | tenant and optional organization-unit scope; opaque source identity | unique idempotency identity per governed scope; explicit lifecycle and expiry |
+| `idempotency_records` | Owns replay-safe command/request result records for cross-module idempotent operations. | No declared foreign keys. | tenant scoped; organization-unit aware |
 
 ## PrivateObject
 
@@ -39,291 +38,400 @@ No database tables. PrivateObject owns the private-storage capability and canoni
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `tenant_documents` | Stores private tenant-owned file metadata and checksums. | `tenant_id` -> `tenants` | unique `tenant_id,name`; unique `storage_disk,storage_path`; tenant scoped; immutable storage ownership |
-| `tenant_domains` | Stores tenant hostnames and DNS ownership-verification state. | `tenant_id` -> `tenants` | unique `domain`; one primary marker per tenant; verified active primary required for activation |
-| `tenant_plans` | Stores SaaS subscription-plan definitions. | `currency_id` -> `currencies` | unique `slug`; status lifecycle; optimistic concurrency |
-| `tenants` | Stores tenant identity, authoritative lifecycle, plan assignment, and base-accounting-currency invariant. | `tenant_plan_id` -> `tenant_plans`; `base_currency_id` -> `currencies` | unique `code`; unique `slug`; unique `uuid`; status is the lifecycle source of truth; optimistic concurrency |
+| `tenant_plans` | Stores SaaS subscription-plan definitions. | No declared foreign keys. | unique `tenant_plans_slug_uk`; optimistic concurrency |
+| `tenant_plan_revisions` | Tracks historical parameter revisions and audit lineage for Tenant Plan. | No declared foreign keys. | optimistic concurrency |
+| `tenants` | Stores tenant identity, authoritative lifecycle, plan assignment, and base-accounting-currency invariant. | No declared foreign keys. | unique `tenants_uuid_uk`; unique `tenants_code_uk`; unique `tenants_slug_uk`; optimistic concurrency |
+| `tenant_subscriptions` | Governs business data, relationships, and lifecycle records for Tenant Subscriptions within the Tenant module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `tenant_current_subscriptions` | Governs business data, relationships, and lifecycle records for Tenant Current Subscriptions within the Tenant module. | No declared foreign keys. | unique `tenant_current_subscriptions_subscription_uk`; tenant scoped; optimistic concurrency |
+| `tenant_documents` | Stores private tenant-owned file metadata and checksums. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `tenant_domains` | Stores tenant hostnames and DNS ownership-verification state. | No declared foreign keys. | unique `tenant_domains_domain_uk`; tenant scoped; optimistic concurrency |
+| `tenant_primary_domains` | Governs business data, relationships, and lifecycle records for Tenant Primary Domains within the Tenant module. | No declared foreign keys. | unique `tenant_primary_domains_domain_uk`; tenant scoped; optimistic concurrency |
+| `tenant_storage_cleanup_jobs` | Governs business data, relationships, and lifecycle records for Tenant Storage Cleanup Jobs within the Tenant module. | No declared foreign keys. | tenant scoped |
+| `tenant_event_outbox` | Governs business data, relationships, and lifecycle records for Tenant Event Outbox within the Tenant module. | No declared foreign keys. | unique `tenant_event_outbox_uuid_uk`; tenant scoped |
+| `tenant_subscription_events` | Records domain lifecycle events and audit trail for Tenant Subscription. | No declared foreign keys. | tenant scoped |
+| `tenant_lifecycle_events` | Records domain lifecycle events and audit trail for Tenant Lifecycle. | No declared foreign keys. | tenant scoped |
+| `tenant_onboarding_states` | Governs business data, relationships, and lifecycle records for Tenant Onboarding States within the Tenant module. | No declared foreign keys. | unique `tenant_onboarding_operation_uk`; tenant scoped; organization-unit aware; optimistic concurrency |
+| `tenant_onboarding_steps` | Governs business data, relationships, and lifecycle records for Tenant Onboarding Steps within the Tenant module. | No declared foreign keys. | tenant scoped |
 
 ## OrganizationUnit
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `organization_unit_documents` | Stores document metadata associated with organization unit document. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,organization_unit_id,name`; tenant scoped; organization-unit aware |
-| `organization_unit_types` | Stores reusable type definitions for organization unit type. | `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
-| `organization_units` | Stores the tenant organization hierarchy used for operational scoping. | `parent_id` -> `organization_units`; `type_id` -> `organization_unit_types`; `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; soft deletes |
+| `organization_unit_types` | Stores reusable type definitions for organization unit type. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `organization_units` | Stores the tenant organization hierarchy used for operational scoping. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `organization_unit_documents` | Stores document metadata associated with organization unit document. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `organization_unit_legal_profiles` | Governs business data, relationships, and lifecycle records for Organization Unit Legal Profiles within the OrganizationUnit module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
 
 ## User
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `permissions` | Stores permission records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,name,guard_name`; tenant scoped; organization-unit aware; soft deletes |
-| `role_permissions` | Stores role permission records used by the owning module. | `permission_id` -> `permissions`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `role_id` -> `roles` | unique `tenant_id,role_id,permission_id`; tenant scoped; organization-unit aware |
-| `roles` | Stores role records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,name,guard_name`; tenant scoped; organization-unit aware; soft deletes |
-| `user_devices` | Stores user device records used by the owning module. | `organization_unit_id` -> `organization_units`; `user_id` -> `users`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,device_token`; tenant scoped; organization-unit aware |
-| `user_documents` | Stores document metadata associated with user document. | `organization_unit_id` -> `organization_units`; `user_id` -> `users`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,name`; tenant scoped; organization-unit aware |
-| `user_permissions` | Stores user permission records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `permission_id` -> `permissions`; `user_id` -> `users` | unique `tenant_id,user_id,permission_id`; tenant scoped; organization-unit aware |
-| `user_roles` | Stores user role records used by the owning module. | `role_id` -> `roles`; `user_id` -> `users`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,role_id`; tenant scoped; organization-unit aware |
-| `user_organization_units` | Stores explicit organization-unit access assignments for tenant-owned users. | composite (`user_id`,`tenant_id`) -> `users`; composite (`organization_unit_id`,`tenant_id`) -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,user_id,organization_unit_id`; at most one active default assignment per tenant user |
-| `users` | Stores tenant-owned user identities and separate tenant-less SaaS platform-operator identities. | nullable `tenant_id` -> `tenants` | tenant users require `tenant_id`; platform operators require a globally unique platform login and no tenant ownership; organization access is owned by `user_organization_units`; soft deletes |
+| `users` | Stores tenant-owned user identities and separate tenant-less SaaS platform-operator identities. | No declared foreign keys. | tenant scoped; soft deletes; optimistic concurrency |
+| `roles` | Stores role records used by the owning module. | No declared foreign keys. | tenant scoped; soft deletes; optimistic concurrency |
+| `permissions` | Stores permission records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `role_permissions` | Stores role permission records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `user_roles` | Stores user role records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `user_permissions` | Stores user permission records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `user_organization_units` | Stores explicit organization-unit access assignments for tenant-owned users. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `user_documents` | Stores document metadata associated with user document. | No declared foreign keys. | tenant scoped; soft deletes; optimistic concurrency |
+| `user_devices` | Stores user device records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `platform_operators` | Governs business data, relationships, and lifecycle records for Platform Operators within the User module. | No declared foreign keys. | unique `platform_operators_email_uk`; optimistic concurrency |
+| `platform_permissions` | Governs business data, relationships, and lifecycle records for Platform Permissions within the User module. | No declared foreign keys. | unique `platform_permissions_name_uk` |
+| `platform_operator_permissions` | Governs business data, relationships, and lifecycle records for Platform Operator Permissions within the User module. | No declared foreign keys. | Primary key and domain query indexes. |
+| `user_quick_access_settings` | Stores personalized quick access navigation shortcuts and display ordering per user. | No declared foreign keys. | tenant scoped; optimistic concurrency |
 
 ## Auth
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `auth_access_tokens` | Stores revocable authentication tokens for auth access token. | `identity_id` -> `auth_identities`; `provider_id` -> `auth_providers`; `tenant_id` -> `tenants`; `client_id` -> `auth_clients`; `organization_unit_id` -> `organization_units`; `session_id` -> `auth_sessions`; `user_id` -> `users` | globally unique `token_key`; explicit `tenant` or `platform` token scope; tenant scoped; organization-unit aware; soft deletes |
-| `auth_authorization_codes` | Stores auth authorization code records used by the owning module. | `client_id` -> `auth_clients`; `organization_unit_id` -> `organization_units`; `session_id` -> `auth_sessions`; `user_id` -> `users`; `identity_id` -> `auth_identities`; `provider_id` -> `auth_providers`; `tenant_id` -> `tenants` | unique `tenant_id,code_key`; tenant scoped; organization-unit aware; soft deletes |
-| `auth_clients` | Stores auth client records used by the owning module. | `provider_id` -> `auth_providers`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,client_key`; tenant scoped; organization-unit aware; soft deletes |
-| `auth_identities` | Stores auth identity records used by the owning module. | `provider_id` -> `auth_providers`; `user_id` -> `users`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,provider_id,provider_user_key`; tenant scoped; organization-unit aware; soft deletes |
-| `auth_login_attempts` | Records security attempts for monitoring and throttling. | `identity_id` -> `auth_identities`; `provider_id` -> `auth_providers`; `user_id` -> `users`; `client_id` -> `auth_clients`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `auth_providers` | Stores auth provider records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,provider_key`; tenant scoped; organization-unit aware; soft deletes |
-| `auth_refresh_tokens` | Stores revocable authentication tokens for auth refresh token. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `access_token_id` -> `auth_access_tokens`; `identity_id` -> `auth_identities`; `session_id` -> `auth_sessions`; `user_id` -> `users`; `client_id` -> `auth_clients` | globally unique `refresh_key`; explicit `tenant` or `platform` token scope; atomic rotation; tenant scoped; organization-unit aware; soft deletes |
-| `auth_sessions` | Stores authenticated session state for auth session. | `identity_id` -> `auth_identities`; `provider_id` -> `auth_providers`; `user_id` -> `users`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,session_key`; tenant scoped; organization-unit aware; soft deletes |
-| `auth_verification_challenges` | Stores auth verification challenge records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `identity_id` -> `auth_identities`; `provider_id` -> `auth_providers`; `user_id` -> `users` | unique `tenant_id,challenge_key`; tenant scoped; organization-unit aware; soft deletes |
+| `auth_providers` | Stores auth provider records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `auth_clients` | Stores auth client records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `auth_identities` | Stores auth identity records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `auth_sessions` | Stores authenticated session state for auth session. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `auth_access_tokens` | Stores revocable authentication tokens for auth access token. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `auth_refresh_tokens` | Stores revocable authentication tokens for auth refresh token. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `auth_authorization_codes` | Stores auth authorization code records used by the owning module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `auth_login_attempts` | Records security attempts for monitoring and throttling. | No declared foreign keys. | tenant scoped |
+| `auth_platform_login_attempts` | Governs business data, relationships, and lifecycle records for Auth Platform Login Attempts within the Auth module. | No declared foreign keys. | Primary key and domain query indexes. |
+| `auth_registration_invitations` | Governs business data, relationships, and lifecycle records for Auth Registration Invitations within the Auth module. | No declared foreign keys. | unique `auth_registration_invites_public_uk`; unique `auth_registration_invites_token_uk`; tenant scoped; organization-unit aware; optimistic concurrency |
+| `auth_processed_integration_events` | Records domain lifecycle events and audit trail for Auth Processed Integration. | No declared foreign keys. | tenant scoped |
+| `auth_registration_invitation_deliveries` | Governs business data, relationships, and lifecycle records for Auth Registration Invitation Deliveries within the Auth module. | No declared foreign keys. | unique `auth_reg_invite_deliveries_public_uk`; tenant scoped; optimistic concurrency |
+| `auth_platform_sessions` | Governs business data, relationships, and lifecycle records for Auth Platform Sessions within the Auth module. | No declared foreign keys. | optimistic concurrency |
+| `auth_platform_access_tokens` | Governs business data, relationships, and lifecycle records for Auth Platform Access Tokens within the Auth module. | No declared foreign keys. | optimistic concurrency |
+| `auth_platform_refresh_tokens` | Governs business data, relationships, and lifecycle records for Auth Platform Refresh Tokens within the Auth module. | No declared foreign keys. | optimistic concurrency |
+| `auth_user_password_credentials` | Governs business data, relationships, and lifecycle records for Auth User Password Credentials within the Auth module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `auth_platform_operator_password_credentials` | Governs business data, relationships, and lifecycle records for Auth Platform Operator Password Credentials within the Auth module. | No declared foreign keys. | optimistic concurrency |
 
 ## Configuration
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `countries` | Provides reference country codes and names used by addresses and localization. | No declared foreign keys. | unique `code`; soft deletes |
-| `currencies` | Provides currency definitions and precision used by financial documents. | No declared foreign keys. | unique `code`; soft deletes |
-| `languages` | Stores language records used by the owning module. | No declared foreign keys. | unique `code`; soft deletes |
-| `timezones` | Stores timezone records used by the owning module. | No declared foreign keys. | unique `name`; soft deletes |
+| `global_configuration_values` | Registered global configuration overrides. | No declared foreign keys. | unique `global_configuration_values_key_uk`; optimistic concurrency |
+| `tenant_configuration_values` | Registered tenant configuration overrides. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `organization_unit_configuration_values` | Registered organization-unit configuration overrides. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `global_configuration_value_revisions` | Tracks historical parameter revisions and audit lineage for Global Configuration Value. | No declared foreign keys. | optimistic concurrency |
+| `tenant_configuration_value_revisions` | Tracks historical parameter revisions and audit lineage for Tenant Configuration Value. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `organization_unit_configuration_value_revisions` | Tracks historical parameter revisions and audit lineage for Organization Unit Configuration Value. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+
+## ReferenceData
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `countries` | Provides reference country codes and names used by addresses and localization. | No declared foreign keys. | unique `countries_code_uk`; optimistic concurrency |
+| `currencies` | Provides currency definitions and precision used by financial documents. | No declared foreign keys. | unique `currencies_code_uk`; optimistic concurrency |
+| `languages` | Stores language records used by the owning module. | No declared foreign keys. | unique `languages_code_uk`; optimistic concurrency |
+| `timezones` | Stores timezone records used by the owning module. | No declared foreign keys. | unique `timezones_name_uk`; optimistic concurrency |
 
 ## Sequence
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `sequences` | Generates tenant- and scope-specific business document numbers without hardcoded IDs. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,document_type,scope_key`; tenant scoped; organization-unit aware; soft deletes |
+| `sequences` | Generates tenant- and scope-specific business document numbers without hardcoded IDs. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
 
 ## UOM
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `unit_of_measures` | Stores generic tenant UOM definitions without module-specific usage flags. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; unique `tenant_id,name`; tenant scoped; organization-unit aware; soft deletes |
-| `uom_conversions` | Stores uom conversion records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `to_uom_id` -> `unit_of_measures`; `from_uom_id` -> `unit_of_measures` | unique `tenant_id,from_uom_id,to_uom_id`; tenant scoped; organization-unit aware; soft deletes |
+| `unit_of_measures` | Stores generic tenant UOM definitions without module-specific usage flags. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `uom_conversions` | Stores uom conversion records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
 
 ## Warehouse
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `warehouse_locations` | Stores warehouse location records used by the owning module. | `parent_id` -> `warehouse_locations`; `warehouse_id` -> `warehouses`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,warehouse_id,name`; tenant scoped; organization-unit aware; soft deletes |
-| `warehouses` | Stores tenant warehouses and their organization-unit ownership. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; organization-unit aware; soft deletes |
+| `warehouses` | Stores tenant warehouses and their organization-unit ownership. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `warehouse_locations` | Stores warehouse location records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
 
 ## Expense
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `expense_types` | Stores tenant-wide, user-managed expense classifications reused by every branch. | `tenant_id` -> `tenants`; `created_by` -> `users` | unique `tenant_id,code`; tenant scoped; soft deletes; version checked |
-| `expenses` | Stores immutable branch-paid expense source documents and Cash/Bank posting traceability. | `expense_type_id` -> `expense_types`; `organization_unit_id` -> `organization_units`; `currency_id` -> `currencies`; `tenant_id` -> `tenants` | unique `tenant_id,expense_number`; tenant scoped; organization-unit required; posted records corrected by reversal |
+| `expense_types` | Stores tenant-wide, user-managed expense classifications reused by every branch. | No declared foreign keys. | tenant scoped; soft deletes; optimistic concurrency |
+| `expenses` | Stores immutable branch-paid expense source documents and Cash/Bank posting traceability. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
 
 ## Finance
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `finance_account_balances` | Stores current balances for finance accounts. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `account_id` -> `finance_accounts` | unique `tenant_id,account_id`; tenant scoped; organization-unit aware |
-| `finance_account_categories` | Stores reusable classifications for finance account category. | `account_type_id` -> `finance_account_types`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped |
-| `finance_account_types` | Stores reusable type definitions for finance account type. | `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped |
-| `finance_accounts` | Stores the chart of accounts used for posting, balances, budgets, and bank accounts. | `account_category_id` -> `finance_account_categories`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `account_type_id` -> `finance_account_types`; `parent_id` -> `finance_accounts` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `finance_bank_reconciliations` | Stores finance bank reconciliation records used by the owning module. | `organization_unit_id` -> `organization_units`; `bank_account_id` -> `finance_accounts`; `tenant_id` -> `tenants` | unique `tenant_id,organization_unit_id,bank_account_id,statement_reference`; tenant scoped; organization-unit aware |
-| `finance_bank_statement_lines` | Stores line-level detail and traceability for finance bank statement line. | `matched_ledger_entry_id` -> `finance_ledger_entries`; `reconciliation_id` -> `finance_bank_reconciliations`; `bank_account_id` -> `finance_accounts`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `finance_budget_lines` | Stores line-level detail and traceability for finance budget line. | `budget_id` -> `finance_budgets`; `tenant_id` -> `tenants`; `account_id` -> `finance_accounts`; `dimension_id` -> `finance_dimensions`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
-| `finance_budgets` | Stores finance budget records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,organization_unit_id,budget_year,name`; tenant scoped; organization-unit aware |
-| `finance_dimensions` | Stores finance dimension records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware |
-| `finance_journal_entries` | Stores balanced accounting journal headers and posting traceability. | `posting_profile_id` -> `finance_posting_profiles`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `reversal_of_id` -> `finance_journal_entries`; `currency_id` -> `currencies`; polymorphic `source_type`/`source_id` source | unique `tenant_id,journal_number`; tenant scoped; organization-unit aware; soft deletes |
-| `finance_journal_lines` | Stores line-level detail and traceability for finance journal line. | `organization_unit_id` -> `organization_units`; `account_id` -> `finance_accounts`; `journal_entry_id` -> `finance_journal_entries`; `tenant_id` -> `tenants`; `dimension_id` -> `finance_dimensions` | tenant scoped; organization-unit aware |
-| `finance_ledger_entries` | Stores immutable posted transaction-currency debit/credit evidence plus frozen-rate base-currency debit/credit and the rebuildable base-currency running balance by account and dimension. | `organization_unit_id` -> `organization_units`; `dimension_id` -> `finance_dimensions`; `journal_line_id` -> `finance_journal_lines`; `tenant_id` -> `tenants`; `account_id` -> `finance_accounts`; `journal_entry_id` -> `finance_journal_entries`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware; transaction and base amounts remain distinct |
-| `finance_posting_profile_rules` | Stores finance posting profile rule records used by the owning module. | `account_id` -> `finance_accounts`; `posting_profile_id` -> `finance_posting_profiles` | unique `posting_profile_id,line_key` |
-| `finance_posting_profiles` | Stores finance posting profile records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,organization_unit_id,code`; tenant scoped; organization-unit aware |
-
-## Tax
-
-`customer_tax_profiles` and `supplier_tax_profiles` are intentionally Tax-owned extension tables. Their migrations run after Customer and Supplier because they enforce FKs to those module-owned tables.
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `customer_tax_profiles` | Stores tax registration and default tax behavior for customer tax profile. | `customer_id` -> `customers`; `tax_group_id` -> `tax_groups`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `customer_id`; tenant scoped; organization-unit aware |
-| `supplier_tax_profiles` | Stores tax registration and default tax behavior for supplier tax profile. | `supplier_id` -> `suppliers`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `tax_group_id` -> `tax_groups` | unique `supplier_id`; tenant scoped; organization-unit aware |
-| `tax_document_snapshots` | Stores immutable calculation snapshots for tax document snapshot. | `tax_id` -> `taxes`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `tax_group_lines` | Stores line-level detail and traceability for tax group line. | `tax_group_id` -> `tax_groups`; `tax_id` -> `taxes` | unique `tax_group_id,sequence`; unique `tax_group_id,tax_id` |
-| `tax_groups` | Stores tax group records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,organization_unit_id,code`; tenant scoped; organization-unit aware |
-| `tax_posting_profiles` | Stores tax posting profile records used by the owning module. | `account_id` -> `finance_accounts`; `tax_id` -> `taxes`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,organization_unit_id,tax_id,direction`; tenant scoped; organization-unit aware |
-| `tax_rates` | Stores effective rates used by tax rate. | `tax_id` -> `taxes` | Primary key and domain query indexes. |
-| `tax_transactions` | Stores tax transaction records used by the owning module. | `account_id` -> `finance_accounts`; `tax_document_snapshot_id` -> `tax_document_snapshots`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `tax_id` -> `taxes`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `taxes` | Stores tenant tax definitions and calculation behavior. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware |
-
-## Item
-
-Tax override columns remain on the Item-owned `items` table because Item services, requests, resources, and frontend payloads directly own those fields. The Item create migration therefore runs after the Tax master tables.
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `item_base_uom_revisions` | Records controlled revisions and change context for item base uom revision. | `created_by` -> `users`; `new_base_uom_id` -> `unit_of_measures`; `organization_unit_id` -> `organization_units`; `applied_by` -> `users`; `item_id` -> `items`; `old_base_uom_id` -> `unit_of_measures`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `item_brands` | Stores item brand records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `item_bundles` | Stores item bundle records used by the owning module. | `tenant_id` -> `tenants`; `child_variant_id` -> `item_variants`; `parent_item_id` -> `items`; `uom_id` -> `unit_of_measures`; `child_item_id` -> `items`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
-| `item_categories` | Stores reusable classifications for item category. | `parent_id` -> `item_categories`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `item_codes` | Stores item code records used by the owning module. | `item_variant_id` -> `item_variants`; `tenant_id` -> `tenants`; `item_id` -> `items`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code_type,code`; tenant scoped; organization-unit aware |
-| `item_prices` | Stores item price records used by the owning module. | `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `uom_id` -> `unit_of_measures`; `currency_id` -> `currencies`; `item_variant_id` -> `item_variants`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `item_units` | Stores item unit records used by the owning module. | `item_id` -> `items`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `uom_id` -> `unit_of_measures` | unique `item_id,uom_id,unit_role`; tenant scoped; organization-unit aware |
-| `item_usage_rules` | Stores item usage rule records used by the owning module. | `organization_unit_id` -> `organization_units`; `item_id` -> `items`; `tenant_id` -> `tenants` | unique `tenant_id,item_id,module_code`; tenant scoped; organization-unit aware |
-| `item_variants` | Stores item variant records used by the owning module. | `item_id` -> `items`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `items` | Stores the tenant item master, base UOM, identifiers, and operational settings. | `item_category_id` -> `item_categories`; `purchase_tax_group_id` -> `tax_groups`; `tenant_id` -> `tenants`; `base_uom_id` -> `unit_of_measures`; `item_brand_id` -> `item_brands`; `organization_unit_id` -> `organization_units`; `sales_tax_group_id` -> `tax_groups`; `default_tax_group_id` -> `tax_groups` | unique `tenant_id,barcode`; unique `tenant_id,code`; unique `tenant_id,sku`; tenant scoped; organization-unit aware; soft deletes |
-
-## Supplier
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `supplier_addresses` | Stores address records and address roles for supplier address. | `supplier_id` -> `suppliers`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; soft deletes |
-| `supplier_bank_accounts` | Stores bank account details for supplier bank account. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `currency_id` -> `currencies`; `supplier_id` -> `suppliers` | unique `supplier_id,account_number`; tenant scoped; organization-unit aware; soft deletes |
-| `supplier_categories` | Stores reusable classifications for supplier category. | `parent_id` -> `supplier_categories`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `supplier_category_assignments` | Maps supplier category assignment records while preventing duplicate assignments. | `organization_unit_id` -> `organization_units`; `supplier_id` -> `suppliers`; `supplier_category_id` -> `supplier_categories`; `tenant_id` -> `tenants` | unique `supplier_id,supplier_category_id`; tenant scoped; organization-unit aware |
-| `supplier_contacts` | Stores contact persons and communication details for supplier contact. | `tenant_id` -> `tenants`; `supplier_id` -> `suppliers`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware; soft deletes |
-| `supplier_credit_profiles` | Stores credit terms, limits, and controls for supplier credit profile. | `supplier_id` -> `suppliers`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `supplier_id`; tenant scoped; organization-unit aware |
-| `supplier_documents` | Stores document metadata associated with supplier document. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `supplier_id` -> `suppliers` | tenant scoped; organization-unit aware; soft deletes |
-| `supplier_item_mappings` | Stores supplier item mapping records used by the owning module. | `item_variant_id` -> `item_variants`; `supplier_id` -> `suppliers`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `default_purchase_uom_id` -> `unit_of_measures` | unique `supplier_id,item_id,item_variant_id`; tenant scoped; organization-unit aware; soft deletes |
-| `supplier_status_histories` | Records status transitions and audit context for supplier status history. | `tenant_id` -> `tenants`; `supplier_id` -> `suppliers`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
-| `suppliers` | Stores supplier master data and tenant-scoped supplier identifiers. | `default_currency_id` -> `currencies`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; unique `tenant_id,supplier_number`; tenant scoped; organization-unit aware; soft deletes |
+| `finance_account_types` | Stores reusable type definitions for finance account type. | No declared foreign keys. | tenant scoped |
+| `finance_account_categories` | Stores reusable classifications for finance account category. | No declared foreign keys. | tenant scoped |
+| `finance_accounts` | Stores the chart of accounts used for posting, balances, budgets, and bank accounts. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `finance_dimensions` | Stores finance dimension records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_posting_profiles` | Stores finance posting profile records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `finance_journal_entries` | Stores balanced accounting journal headers and posting traceability. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `finance_journal_lines` | Stores line-level detail and traceability for finance journal line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_ledger_entries` | Stores immutable posted transaction-currency debit/credit evidence plus frozen-rate base-currency debit/credit and the rebuildable base-currency running balance by account and dimension. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_account_balances` | Stores current balances for finance accounts. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_bank_reconciliations` | Stores finance bank reconciliation records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_bank_statement_lines` | Stores line-level detail and traceability for finance bank statement line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_budgets` | Stores finance budget records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_budget_lines` | Stores line-level detail and traceability for finance budget line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_account_roles` | Governs business data, relationships, and lifecycle records for Finance Account Roles within the Finance module. | No declared foreign keys. | tenant scoped |
+| `finance_account_assignments` | Governs business data, relationships, and lifecycle records for Finance Account Assignments within the Finance module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `finance_posting_profile_rules` | Stores finance posting profile rule records used by the owning module. | No declared foreign keys. | tenant scoped |
+| `finance_accounting_periods` | Governs business data, relationships, and lifecycle records for Finance Accounting Periods within the Finance module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `finance_accounting_period_events` | Records domain lifecycle events and audit trail for Finance Accounting Period. | No declared foreign keys. | tenant scoped; organization-unit aware |
 
 ## Customer
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `customer_addresses` | Stores address records and address roles for customer address. | `organization_unit_id` -> `organization_units`; `customer_id` -> `customers`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; soft deletes |
-| `customer_bank_accounts` | Stores bank account details for customer bank account. | `organization_unit_id` -> `organization_units`; `customer_id` -> `customers`; `tenant_id` -> `tenants`; `currency_id` -> `currencies` | unique `customer_id,account_number`; tenant scoped; organization-unit aware; soft deletes |
-| `customer_categories` | Stores reusable classifications for customer category. | `parent_id` -> `customer_categories`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `customer_category_assignments` | Maps customer category assignment records while preventing duplicate assignments. | `customer_category_id` -> `customer_categories`; `organization_unit_id` -> `organization_units`; `customer_id` -> `customers`; `tenant_id` -> `tenants` | unique `customer_id,customer_category_id`; tenant scoped; organization-unit aware |
-| `customer_contacts` | Stores contact persons and communication details for customer contact. | `customer_id` -> `customers`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware; soft deletes |
-| `customer_credit_profiles` | Stores credit terms, limits, and controls for customer credit profile. | `organization_unit_id` -> `organization_units`; `customer_id` -> `customers`; `tenant_id` -> `tenants` | unique `customer_id`; tenant scoped; organization-unit aware |
-| `customer_documents` | Stores document metadata associated with customer document. | `customer_id` -> `customers`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware; soft deletes |
-| `customer_status_histories` | Records status transitions and audit context for customer status history. | `customer_id` -> `customers`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
-| `customers` | Stores customer master data and tenant-scoped customer identifiers. | `default_currency_id` -> `currencies`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; unique `tenant_id,customer_number`; tenant scoped; organization-unit aware; soft deletes |
+| `customers` | Stores customer master data and tenant-scoped customer identifiers. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `customer_contacts` | Stores contact persons and communication details for customer contact. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `customer_addresses` | Stores address records and address roles for customer address. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `customer_bank_accounts` | Stores bank account details for customer bank account. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `customer_categories` | Stores reusable classifications for customer category. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `customer_category_assignments` | Maps customer category assignment records while preventing duplicate assignments. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `customer_documents` | Stores document metadata associated with customer document. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `customer_credit_profiles` | Stores credit terms, limits, and controls for customer credit profile. | No declared foreign keys. | unique `customer_credit_profiles_cust_uk`; tenant scoped; organization-unit aware; optimistic concurrency |
+| `customer_status_histories` | Records status transitions and audit context for customer status history. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `customer_whatsapp_verifications` | Stores verification code challenges, validation timestamps, and employee confirmations for Customer Whatsapp Verifications. | No declared foreign keys. | tenant scoped; organization-unit aware |
 
-## Vehicle
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `vehicle_attributes` | Stores vehicle attribute records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_id` -> `vehicles` | unique `vehicle_id,attribute_key`; tenant scoped; organization-unit aware |
-| `vehicle_categories` | Stores reusable classifications for vehicle category. | `parent_id` -> `vehicle_categories`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `vehicle_documents` | Stores document metadata associated with vehicle document. | `organization_unit_id` -> `organization_units`; `vehicle_id` -> `vehicles`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; soft deletes |
-| `vehicle_makes` | Stores vehicle make records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `vehicle_models` | Stores vehicle model records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_make_id` -> `vehicle_makes` | unique `tenant_id,vehicle_make_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `vehicle_ownerships` | Stores vehicle ownership records used by the owning module. | `owner_type` + `owner_id` identify the owning party; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_id` -> `vehicles` | tenant scoped; organization-unit aware |
-| `vehicle_status_histories` | Records status transitions and audit context for vehicle status history. | `vehicle_id` -> `vehicles`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
-| `vehicle_types` | Stores reusable type definitions for vehicle type. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `vehicles` | Stores vehicle master, identity numbers, and classifications. Ownership is stored in `vehicle_ownerships`. | `vehicle_make_id` -> `vehicle_makes`; `vehicle_type_id` -> `vehicle_types`; `organization_unit_id` -> `organization_units`; `vehicle_category_id` -> `vehicle_categories`; `vehicle_model_id` -> `vehicle_models`; `tenant_id` -> `tenants` | unique `tenant_id,chassis_number`; unique `tenant_id,code`; unique `tenant_id,engine_number`; unique `tenant_id,vehicle_number`; unique `tenant_id,registration_number`; unique `tenant_id,vin_number`; tenant scoped; organization-unit aware; soft deletes |
-
-## Hr
+## Supplier
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `hr_certifications` | Stores hr certification records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `hr_departments` | Stores hr department records used by the owning module. | `parent_id` -> `hr_departments`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `hr_designations` | Stores hr designation records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `hr_employee_addresses` | Stores address records and address roles for hr employee address. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `employee_id` -> `hr_employees` | tenant scoped; organization-unit aware; soft deletes |
-| `hr_employee_availabilities` | Stores hr employee availability records used by the owning module. | `organization_unit_id` -> `organization_units`; `employee_id` -> `hr_employees`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `hr_employee_certification_assignments` | Maps hr employee certification assignment records while preventing duplicate assignments. | `tenant_id` -> `tenants`; `employee_id` -> `hr_employees`; `organization_unit_id` -> `organization_units`; `certification_id` -> `hr_certifications` | unique `employee_id,certification_id`; tenant scoped; organization-unit aware |
-| `hr_employee_contacts` | Stores contact persons and communication details for hr employee contact. | `organization_unit_id` -> `organization_units`; `employee_id` -> `hr_employees`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; soft deletes |
-| `hr_employee_documents` | Stores document metadata associated with hr employee document. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `employee_id` -> `hr_employees` | tenant scoped; organization-unit aware; soft deletes |
-| `hr_employee_license_assignments` | Maps hr employee license assignment records while preventing duplicate assignments. | `employee_id` -> `hr_employees`; `tenant_id` -> `tenants`; `license_id` -> `hr_licenses`; `organization_unit_id` -> `organization_units` | unique `employee_id,license_id`; tenant scoped; organization-unit aware |
-| `hr_employee_rates` | Stores effective rates used by hr employee rate. | `tenant_id` -> `tenants`; `employee_id` -> `hr_employees`; `organization_unit_id` -> `organization_units`; `currency_id` -> `currencies` | tenant scoped; organization-unit aware |
-| `hr_employee_skill_assignments` | Maps hr employee skill assignment records while preventing duplicate assignments. | `tenant_id` -> `tenants`; `skill_id` -> `hr_skills`; `organization_unit_id` -> `organization_units`; `employee_id` -> `hr_employees` | unique `employee_id,skill_id`; tenant scoped; organization-unit aware |
-| `hr_employee_status_histories` | Records status transitions and audit context for hr employee status history. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `employee_id` -> `hr_employees` | tenant scoped; organization-unit aware |
-| `hr_employees` | Stores hr employee records used by the owning module. | `employment_type_id` -> `hr_employment_types`; `reporting_manager_id` -> `hr_employees`; `designation_id` -> `hr_designations`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `department_id` -> `hr_departments` | unique `tenant_id,code`; unique `tenant_id,employee_number`; tenant scoped; organization-unit aware; soft deletes |
-| `hr_employment_types` | Stores reusable type definitions for hr employment type. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `hr_licenses` | Stores hr license records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `hr_skills` | Stores hr skill records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
+| `suppliers` | Stores supplier master data and tenant-scoped supplier identifiers. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `supplier_contacts` | Stores contact persons and communication details for supplier contact. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `supplier_addresses` | Stores address records and address roles for supplier address. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `supplier_bank_accounts` | Stores bank account details for supplier bank account. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `supplier_categories` | Stores reusable classifications for supplier category. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `supplier_category_assignments` | Maps supplier category assignment records while preventing duplicate assignments. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `supplier_documents` | Stores document metadata associated with supplier document. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `supplier_item_mappings` | Stores supplier item mapping records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `supplier_credit_profiles` | Stores credit terms, limits, and controls for supplier credit profile. | No declared foreign keys. | unique `supplier_credit_profiles_supp_uk`; tenant scoped; organization-unit aware |
+| `supplier_status_histories` | Records status transitions and audit context for supplier status history. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `supplier_whatsapp_verifications` | Stores verification code challenges, validation timestamps, and employee confirmations for Supplier Whatsapp Verifications. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## Item
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `item_categories` | Stores reusable classifications for item category. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `item_brands` | Stores item brand records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `items` | Stores the tenant item master, base UOM, identifiers, and operational settings. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `item_units` | Stores item unit records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `item_variants` | Stores item variant records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `item_bundles` | Stores item bundle records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `item_prices` | Stores item price records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `item_codes` | Stores item code records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `item_usage_rules` | Stores item usage rule records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `item_base_uom_revisions` | Records controlled revisions and change context for item base uom revision. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
 
 ## Inventory
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `inventory_adjustment_lines` | Stores line-level detail and traceability for inventory adjustment line. | `batch_id` -> `inventory_batches`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `inventory_adjustment_id` -> `inventory_adjustments`; `item_variant_id` -> `item_variants`; `serial_number_id` -> `inventory_serial_numbers` | tenant scoped; organization-unit aware |
-| `inventory_adjustments` | Stores inventory adjustment records used by the owning module. | `organization_unit_id` -> `organization_units`; `warehouse_id` -> `warehouses`; `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations` | unique `tenant_id,adjustment_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_allocation_issues` | Stores inventory allocation issue records used by the owning module. | `allocation_line_id` -> `inventory_allocation_lines`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `allocation_id` -> `inventory_allocations`; `movement_id` -> `inventory_movements`; `reversal_movement_id` -> `inventory_movements` | unique `movement_id`; tenant scoped; organization-unit aware |
-| `inventory_allocation_lines` | Stores line-level detail and traceability for inventory allocation line. | `serial_number_id` -> `inventory_serial_numbers`; `tenant_id` -> `tenants`; `allocation_id` -> `inventory_allocations`; `organization_unit_id` -> `organization_units`; `stock_balance_id` -> `inventory_stock_balances`; `batch_id` -> `inventory_batches` | tenant scoped; organization-unit aware |
-| `inventory_allocations` | Stores controlled allocations between related inventory allocation records. | `serial_number_id` -> `inventory_serial_numbers`; `warehouse_id` -> `warehouses`; `batch_id` -> `inventory_batches`; `item_variant_id` -> `item_variants`; `reservation_id` -> `inventory_reservations`; `tenant_id` -> `tenants`; `base_uom_id` -> `unit_of_measures`; `warehouse_location_id` -> `warehouse_locations`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; polymorphic `source_type`/`source_id` source | unique `tenant_id,allocation_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_batches` | Stores inventory batch records used by the owning module. | `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `item_variant_id` -> `item_variants`; `tenant_id` -> `tenants` | unique `tenant_id,item_id,batch_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_cost_adjustment_lines` | Stores line-level detail and traceability for inventory cost adjustment line. | `organization_unit_id` -> `organization_units`; `valuation_layer_id` -> `inventory_valuation_layers`; `inventory_cost_adjustment_id` -> `inventory_cost_adjustments`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `inventory_cost_adjustments` | Stores inventory cost adjustment records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,adjustment_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_movements` | Stores traceable stock state and location movements from business documents. | `organization_unit_id` -> `organization_units`; `batch_id` -> `inventory_batches`; `serial_number_id` -> `inventory_serial_numbers`; `warehouse_id` -> `warehouses`; `item_variant_id` -> `item_variants`; `base_uom_id` -> `unit_of_measures`; `reversal_of_id` -> `inventory_movements`; `item_id` -> `items`; `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; polymorphic `source_type`/`source_id` source | unique `tenant_id,movement_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_reservations` | Stores inventory reservation records used by the owning module. | `warehouse_location_id` -> `warehouse_locations`; `base_uom_id` -> `unit_of_measures`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `warehouse_id` -> `warehouses`; `batch_id` -> `inventory_batches`; `item_variant_id` -> `item_variants`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | unique `tenant_id,reservation_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_serial_numbers` | Stores inventory serial number records used by the owning module. | `organization_unit_id` -> `organization_units`; `warehouse_id` -> `warehouses`; `batch_id` -> `inventory_batches`; `item_variant_id` -> `item_variants`; `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `item_id` -> `items`; polymorphic `source_type`/`source_id` source | unique `tenant_id,serial_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_stock_balances` | Stores current quantity buckets by item, warehouse, location, batch, and scope. | `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `warehouse_id` -> `warehouses`; `batch_id` -> `inventory_batches`; `item_variant_id` -> `item_variants` | unique `tenant_id,organization_unit_id,item_id,item_variant_id,warehouse_id,warehouse_location_id,batch_id`; tenant scoped; organization-unit aware |
-| `inventory_stock_count_lines` | Stores line-level detail and traceability for inventory stock count line. | `item_variant_id` -> `item_variants`; `serial_number_id` -> `inventory_serial_numbers`; `inventory_adjustment_line_id` -> `inventory_adjustment_lines`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `batch_id` -> `inventory_batches`; `inventory_stock_count_id` -> `inventory_stock_counts` | tenant scoped; organization-unit aware |
-| `inventory_stock_counts` | Stores inventory stock count records used by the owning module. | `warehouse_id` -> `warehouses`; `inventory_adjustment_id` -> `inventory_adjustments`; `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `organization_unit_id` -> `organization_units` | unique `tenant_id,count_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_stock_state_changes` | Stores inventory stock state change records used by the owning module. | `serial_number_id` -> `inventory_serial_numbers`; `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `stock_balance_id` -> `inventory_stock_balances`; `warehouse_id` -> `warehouses`; `batch_id` -> `inventory_batches`; `item_variant_id` -> `item_variants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `inventory_transfer_lines` | Stores line-level detail and traceability for inventory transfer line. | `tenant_id` -> `tenants`; `inbound_movement_id` -> `inventory_movements`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `serial_number_id` -> `inventory_serial_numbers`; `batch_id` -> `inventory_batches`; `inventory_transfer_id` -> `inventory_transfers`; `item_variant_id` -> `item_variants`; `outbound_movement_id` -> `inventory_movements` | tenant scoped; organization-unit aware |
-| `inventory_transfers` | Stores inventory transfer records used by the owning module. | `from_warehouse_location_id` -> `warehouse_locations`; `tenant_id` -> `tenants`; `to_warehouse_location_id` -> `warehouse_locations`; `from_warehouse_id` -> `warehouses`; `organization_unit_id` -> `organization_units`; `to_warehouse_id` -> `warehouses` | unique `tenant_id,transfer_number`; tenant scoped; organization-unit aware; soft deletes |
-| `inventory_valuation_consumptions` | Stores inventory valuation consumption records used by the owning module. | `issue_movement_id` -> `inventory_movements`; `reversed_by_movement_id` -> `inventory_movements`; `valuation_layer_id` -> `inventory_valuation_layers`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `issue_movement_id,valuation_layer_id`; tenant scoped; organization-unit aware |
-| `inventory_valuation_layers` | Stores inventory cost layers used to value and consume stock. | `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `batch_id` -> `inventory_batches`; `item_variant_id` -> `item_variants`; `organization_unit_id` -> `organization_units`; `warehouse_id` -> `warehouses`; `base_uom_id` -> `unit_of_measures`; `item_id` -> `items`; `movement_id` -> `inventory_movements`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-
-## Invoice
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `invoice_adjustment_allocations` | Stores controlled allocations between related invoice adjustment allocation records. | `invoice_id` -> `invoices`; `tenant_id` -> `tenants`; `invoice_adjustment_id` -> `invoice_adjustments`; `organization_unit_id` -> `organization_units`; polymorphic `source_type`/`source_id` source | unique `invoice_id,source_adjustment_type,source_adjustment_id`; tenant scoped; organization-unit aware |
-| `invoice_adjustments` | Stores invoice adjustment records used by the owning module. | `organization_unit_id` -> `organization_units`; `invoice_id` -> `invoices`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `invoice_balances` | Stores current or period balances for invoice balance. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `invoice_id` -> `invoices` | unique `invoice_id`; tenant scoped; organization-unit aware |
-| `invoice_credit_allocations` | Stores controlled allocations between related invoice credit allocation records. | `invoice_id` -> `invoices`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
-| `invoice_lines` | Stores line-level detail and traceability for invoice line. | `organization_unit_id` -> `organization_units`; `uom_id` -> `unit_of_measures`; `invoice_id` -> `invoices`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `invoice_source_lines` | Stores line-level detail and traceability for invoice source line. | `invoice_id` -> `invoices`; `organization_unit_id` -> `organization_units`; `invoice_line_id` -> `invoice_lines`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `invoice_sources` | Stores invoice source records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `invoice_id` -> `invoices`; polymorphic `source_type`/`source_id` source | unique `invoice_id,source_type,source_id`; tenant scoped; organization-unit aware |
-| `invoices` | Stores receivable and payable invoice headers independent of source documents. | `currency_id` -> `currencies`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | unique `tenant_id,invoice_number`; tenant scoped; organization-unit aware; soft deletes |
-
-## Payment
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `cheque_print_logs` | Records operational events for cheque print log. | `cheque_template_id` -> `cheque_templates`; `payment_id` -> `payments`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `cheque_templates` | Stores cheque template records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware; soft deletes |
-| `payment_allocations` | Stores controlled allocations between related payment allocation records. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `invoice_id` -> `invoices`; `payment_id` -> `payments` | tenant scoped; organization-unit aware |
-| `payment_lines` | Stores line-level detail and traceability for payment line. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `payment_method_id` -> `payment_methods`; `payment_id` -> `payments` | tenant scoped; organization-unit aware |
-| `payment_methods` | Stores payment method records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,code`; tenant scoped; organization-unit aware; soft deletes |
-| `payment_refunds` | Stores payment refund records used by the owning module. | `organization_unit_id` -> `organization_units`; `payment_method_id` -> `payment_methods`; `payment_id` -> `payments`; `tenant_id` -> `tenants` | unique `tenant_id,refund_number`; tenant scoped; organization-unit aware; soft deletes |
-| `payment_reversals` | Stores payment reversal records used by the owning module. | `payment_id` -> `payments`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `payment_id`; unique `tenant_id,reversal_number`; tenant scoped; organization-unit aware |
-| `payment_status_histories` | Records status transitions and audit context for payment status history. | `tenant_id` -> `tenants`; `payment_id` -> `payments`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware |
-| `payment_unapplied_balances` | Stores current or period balances for payment unapplied balance. | `payment_id` -> `payments`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | unique `payment_id`; tenant scoped; organization-unit aware |
-| `payments` | Stores inbound and outbound payment headers, source traceability, and cheque details. | `currency_id` -> `currencies`; `tenant_id` -> `tenants`; `bank_account_id` -> `finance_accounts`; `organization_unit_id` -> `organization_units`; polymorphic `source_type`/`source_id` source | unique `tenant_id,payment_number`; tenant scoped; organization-unit aware; soft deletes |
-| `global_configuration_values` | Registered global configuration overrides. | No foreign keys. | unique `key`; compare-and-swap `row_version` |
-| `tenant_configuration_values` | Registered tenant configuration overrides. | `tenant_id` -> `tenants` | unique `tenant_id,key`; tenant scoped; compare-and-swap `row_version` |
-| `organization_unit_configuration_values` | Registered organization-unit configuration overrides. | composite `organization_unit_id,tenant_id` -> `organization_units.id,tenant_id`; `tenant_id` -> `tenants` | unique scope + `key`; cross-tenant ownership prevented |
+| `inventory_batches` | Stores inventory batch records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `inventory_serial_numbers` | Stores inventory serial number records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `inventory_stock_balances` | Stores current quantity buckets by item, warehouse, location, batch, and scope. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `inventory_movements` | Stores traceable stock state and location movements from business documents. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `inventory_reservations` | Stores inventory reservation records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `inventory_allocations` | Stores controlled allocations between related inventory allocation records. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `inventory_adjustments` | Stores inventory adjustment records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `inventory_adjustment_lines` | Stores line-level detail and traceability for inventory adjustment line. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `inventory_transfers` | Stores inventory transfer records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `inventory_transfer_lines` | Stores line-level detail and traceability for inventory transfer line. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `inventory_valuation_layers` | Stores inventory cost layers used to value and consume stock. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `inventory_allocation_lines` | Stores line-level detail and traceability for inventory allocation line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `inventory_allocation_issues` | Stores inventory allocation issue records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `inventory_valuation_consumptions` | Stores inventory valuation consumption records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `inventory_stock_state_changes` | Stores inventory stock state change records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `inventory_cost_adjustments` | Stores inventory cost adjustment records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `inventory_cost_adjustment_lines` | Stores line-level detail and traceability for inventory cost adjustment line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `inventory_stock_counts` | Stores inventory stock count records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `inventory_stock_count_lines` | Stores line-level detail and traceability for inventory stock count line. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `inventory_number_sequences` | Governs business data, relationships, and lifecycle records for Inventory Number Sequences within the Inventory module. | No declared foreign keys. | tenant scoped |
+| `inventory_batch_price_revisions` | Tracks historical parameter revisions and audit lineage for Inventory Batch Price. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
 
 ## Purchase
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `goods_receipt_note_lines` | Stores line-level detail and traceability for goods receipt note line. | `goods_receipt_note_id` -> `goods_receipt_notes`; `item_id` -> `items`; `ordered_uom_id` -> `unit_of_measures`; `purchase_order_line_id` -> `purchase_order_lines`; `base_uom_id` -> `unit_of_measures`; `uom_id` -> `unit_of_measures`; `inventory_movement_id` -> `inventory_movements`; `item_variant_id` -> `item_variants`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `goods_receipt_notes` | Stores goods receipt note records used by the owning module. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `purchase_order_id` -> `purchase_orders`; `warehouse_id` -> `warehouses` | unique `tenant_id,grn_number`; tenant scoped; organization-unit aware; soft deletes |
-| `purchase_debit_notes` | Stores purchase debit note records used by the owning module. | `purchase_return_id` -> `purchase_returns`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | unique `tenant_id,debit_note_number`; tenant scoped; organization-unit aware; soft deletes |
-| `purchase_header_adjustments` | Stores purchase header adjustment records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware; soft deletes |
-| `purchase_invoice_links` | Stores traceable links between purchase invoice link and downstream documents. | `invoice_id` -> `invoices`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; polymorphic `source_type`/`source_id` source | unique `invoice_id,source_type,source_id`; tenant scoped; organization-unit aware |
-| `purchase_order_lines` | Stores line-level detail and traceability for purchase order line. | `purchase_order_id` -> `purchase_orders`; `uom_id` -> `unit_of_measures`; `base_uom_id` -> `unit_of_measures`; `item_variant_id` -> `item_variants`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `item_id` -> `items`; `ordered_uom_id` -> `unit_of_measures` | tenant scoped; organization-unit aware |
-| `purchase_orders` | Stores supplier purchase order headers, totals, approvals, and lifecycle state. | `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `organization_unit_id` -> `organization_units`; `warehouse_id` -> `warehouses` | unique `tenant_id,purchase_order_number`; tenant scoped; organization-unit aware; soft deletes |
-| `purchase_return_adjustment_allocations` | Stores controlled allocations between related purchase return adjustment allocation records. | `purchase_header_adjustment_id` -> `purchase_header_adjustments`; `purchase_return_id` -> `purchase_returns`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `purchase_return_lines` | Stores line-level detail and traceability for purchase return line. | `inventory_movement_id` -> `inventory_movements`; `item_variant_id` -> `item_variants`; `purchase_return_id` -> `purchase_returns`; `uom_id` -> `unit_of_measures`; `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
-| `purchase_returns` | Stores purchase return records used by the owning module. | `tenant_id` -> `tenants`; `warehouse_location_id` -> `warehouse_locations`; `organization_unit_id` -> `organization_units`; `warehouse_id` -> `warehouses`; polymorphic `source_type`/`source_id` source | unique `tenant_id,return_number`; tenant scoped; organization-unit aware; soft deletes |
+| `purchase_orders` | Stores supplier purchase order headers, totals, approvals, and lifecycle state. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `purchase_order_lines` | Stores line-level detail and traceability for purchase order line. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `purchase_header_adjustments` | Stores purchase header adjustment records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `goods_receipt_notes` | Stores goods receipt note records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `goods_receipt_note_lines` | Stores line-level detail and traceability for goods receipt note line. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `purchase_invoice_links` | Stores traceable links between purchase invoice link and downstream documents. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `purchase_returns` | Stores purchase return records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `purchase_return_lines` | Stores line-level detail and traceability for purchase return line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `purchase_return_adjustment_allocations` | Stores controlled allocations between related purchase return adjustment allocation records. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `purchase_debit_notes` | Stores purchase debit note records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `purchase_adjustment_allocations` | Maintains settlement and payment/inventory allocation records for Purchase Adjustment. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `goods_receipt_note_line_batch_allocations` | Maintains settlement and payment/inventory allocation records for Goods Receipt Note Line Batch. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## Selling
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `sales` | Governs business data, relationships, and lifecycle records for Sales within the Selling module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `sale_lines` | Stores individual itemized line entries for Sale. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `sale_returns` | Governs business data, relationships, and lifecycle records for Sale Returns within the Selling module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `sale_return_lines` | Stores individual itemized line entries for Sale Return. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## Invoice
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `invoice_layouts` | Stores multi-format invoice print layout templates, typography, and company presentation configurations. | No declared foreign keys. | tenant scoped; soft deletes; optimistic concurrency |
+| `invoices` | Stores receivable and payable invoice headers independent of source documents. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `invoice_lines` | Stores line-level detail and traceability for invoice line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `invoice_sources` | Stores invoice source records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `invoice_source_lines` | Stores line-level detail and traceability for invoice source line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `invoice_adjustments` | Stores invoice adjustment records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `invoice_adjustment_allocations` | Stores controlled allocations between related invoice adjustment allocation records. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `invoice_balances` | Stores current or period balances for invoice balance. | No declared foreign keys. | unique `invoice_balances_invoice_uk`; tenant scoped; organization-unit aware |
+| `invoice_credit_allocations` | Stores controlled allocations between related invoice credit allocation records. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `invoice_posting_plans` | Governs business data, relationships, and lifecycle records for Invoice Posting Plans within the Invoice module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `invoice_document_snapshots` | Governs business data, relationships, and lifecycle records for Invoice Document Snapshots within the Invoice module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## Payment
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `payments` | Stores inbound and outbound payment headers, source traceability, and cheque details. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `payment_methods` | Stores payment method records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `payment_lines` | Stores line-level detail and traceability for payment line. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payment_allocations` | Stores controlled allocations between related payment allocation records. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payment_unapplied_balances` | Stores current or period balances for payment unapplied balance. | No declared foreign keys. | unique `payment_unapplied_balances_payment_uk`; tenant scoped; organization-unit aware; optimistic concurrency |
+| `payment_reversals` | Stores payment reversal records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `payment_refunds` | Stores payment refund records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `payment_lifecycle_events` | Records domain lifecycle events and audit trail for Payment Lifecycle. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `cheque_templates` | Stores cheque template records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `cheque_print_logs` | Records operational events for cheque print log. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## Promotion
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `promotion_offers` | Governs business data, relationships, and lifecycle records for Promotion Offers within the Promotion module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `promotion_card_templates` | Governs business data, relationships, and lifecycle records for Promotion Card Templates within the Promotion module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `promotion_card_benefits` | Governs business data, relationships, and lifecycle records for Promotion Card Benefits within the Promotion module. | No declared foreign keys. | tenant scoped |
+| `promotion_cards` | Governs business data, relationships, and lifecycle records for Promotion Cards within the Promotion module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `promotion_offer_assignments` | Governs business data, relationships, and lifecycle records for Promotion Offer Assignments within the Promotion module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `promotion_job_line_choices` | Governs business data, relationships, and lifecycle records for Promotion Job Line Choices within the Promotion module. | No declared foreign keys. | tenant scoped; optimistic concurrency |
+| `promotion_qualification_events` | Records domain lifecycle events and audit trail for Promotion Qualification. | No declared foreign keys. | tenant scoped |
+| `promotion_redemption_events` | Records domain lifecycle events and audit trail for Promotion Redemption. | No declared foreign keys. | tenant scoped |
+| `promotion_card_lifecycle_events` | Records domain lifecycle events and audit trail for Promotion Card Lifecycle. | No declared foreign keys. | tenant scoped |
+| `promotion_offer_lifecycle_events` | Records domain lifecycle events and audit trail for Promotion Offer Lifecycle. | No declared foreign keys. | tenant scoped |
+
+## Tax
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `taxes` | Stores tenant tax definitions and calculation behavior. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `tax_rates` | Stores effective rates used by tax rate. | No declared foreign keys. | tenant scoped |
+| `tax_groups` | Stores tax group records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `tax_group_lines` | Stores line-level detail and traceability for tax group line. | No declared foreign keys. | tenant scoped |
+| `tax_posting_profiles` | Stores tax posting profile records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `tax_document_snapshots` | Stores immutable calculation snapshots for tax document snapshot. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `tax_transactions` | Stores tax transaction records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `customer_tax_profiles` | Stores tax registration and default tax behavior for customer tax profile. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `supplier_tax_profiles` | Stores tax registration and default tax behavior for supplier tax profile. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## Hr
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `hr_departments` | Stores hr department records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_designations` | Stores hr designation records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_employment_types` | Stores reusable type definitions for hr employment type. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_skills` | Stores hr skill records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_certifications` | Stores hr certification records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_licenses` | Stores hr license records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_employees` | Stores hr employee records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `hr_employee_contacts` | Stores contact persons and communication details for hr employee contact. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_employee_addresses` | Stores address records and address roles for hr employee address. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_employee_documents` | Stores document metadata associated with hr employee document. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `hr_employee_skill_assignments` | Maps hr employee skill assignment records while preventing duplicate assignments. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `hr_employee_certification_assignments` | Maps hr employee certification assignment records while preventing duplicate assignments. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `hr_employee_license_assignments` | Maps hr employee license assignment records while preventing duplicate assignments. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `hr_employee_rates` | Stores effective rates used by hr employee rate. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `hr_employee_availabilities` | Stores hr employee availability records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `hr_employee_status_histories` | Records status transitions and audit context for hr employee status history. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## Vehicle
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `vehicle_makes` | Stores vehicle make records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `vehicle_types` | Stores reusable type definitions for vehicle type. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `vehicle_categories` | Stores reusable classifications for vehicle category. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `vehicle_models` | Stores vehicle model records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `vehicles` | Stores vehicle master, identity numbers, and classifications. Ownership is stored in `vehicle_ownerships`. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `vehicle_documents` | Stores document metadata associated with vehicle document. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `vehicle_ownerships` | Stores vehicle ownership records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_attributes` | Stores vehicle attribute records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_status_histories` | Records status transitions and audit context for vehicle status history. | No declared foreign keys. | tenant scoped; organization-unit aware |
+
+## VehicleRental
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `vehicle_rental_customer_agreements` | Governs business data, relationships, and lifecycle records for Vehicle Rental Customer Agreements within the VehicleRental module. | `tenant_id` -> `tenants`; `currency_id` -> `currencies` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_customer_agreements_history` | Stores immutable lifecycle and state transition history for Vehicle Rental Customer Agreements. | `tenant_id` -> `tenants` | tenant scoped; optimistic concurrency |
+| `vehicle_rental_owner_agreements` | Governs business data, relationships, and lifecycle records for Vehicle Rental Owner Agreements within the VehicleRental module. | `tenant_id` -> `tenants`; `currency_id` -> `currencies` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_owner_agreements_history` | Stores immutable lifecycle and state transition history for Vehicle Rental Owner Agreements. | `tenant_id` -> `tenants` | tenant scoped; optimistic concurrency |
+| `vehicle_rental_uses` | Governs business data, relationships, and lifecycle records for Vehicle Rental Uses within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_use_history` | Stores immutable lifecycle and state transition history for Vehicle Rental Use. | `tenant_id` -> `tenants` | tenant scoped; optimistic concurrency |
+| `vehicle_rental_running_charts` | Governs business data, relationships, and lifecycle records for Vehicle Rental Running Charts within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_running_chart_history` | Stores immutable lifecycle and state transition history for Vehicle Rental Running Chart. | `tenant_id` -> `tenants` | tenant scoped; optimistic concurrency |
+| `vehicle_rental_customer_base_charges` | Governs business data, relationships, and lifecycle records for Vehicle Rental Customer Base Charges within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_owner_base_charges` | Governs business data, relationships, and lifecycle records for Vehicle Rental Owner Base Charges within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_customer_usage_charges` | Governs business data, relationships, and lifecycle records for Vehicle Rental Customer Usage Charges within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_owner_usage_charges` | Governs business data, relationships, and lifecycle records for Vehicle Rental Owner Usage Charges within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_incidents` | Governs business data, relationships, and lifecycle records for Vehicle Rental Incidents within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_incident_events` | Records domain lifecycle events and audit trail for Vehicle Rental Incident. | `tenant_id` -> `tenants` | tenant scoped |
+| `vehicle_rental_incident_attachments` | Governs business data, relationships, and lifecycle records for Vehicle Rental Incident Attachments within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped |
+| `vehicle_rental_reservations` | Governs business data, relationships, and lifecycle records for Vehicle Rental Reservations within the VehicleRental module. | `tenant_id` -> `tenants`; `currency_id` -> `currencies` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_reservation_histories` | Stores immutable lifecycle and state transition history for Vehicle Rental Reservation. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
+| `vehicle_rental_finance_agreements` | Governs business data, relationships, and lifecycle records for Vehicle Rental Finance Agreements within the VehicleRental module. | `tenant_id` -> `tenants`; `currency_id` -> `currencies` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_finance_installments` | Governs business data, relationships, and lifecycle records for Vehicle Rental Finance Installments within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_finance_status_histories` | Stores immutable lifecycle and state transition history for Vehicle Rental Finance Status. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware |
+| `vehicle_rental_expenses` | Governs business data, relationships, and lifecycle records for Vehicle Rental Expenses within the VehicleRental module. | `tenant_id` -> `tenants`; `currency_id` -> `currencies` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_expense_allocations` | Maintains settlement and payment/inventory allocation records for Vehicle Rental Expense. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_agreement_adjustments` | Governs business data, relationships, and lifecycle records for Vehicle Rental Agreement Adjustments within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_agreement_adjustments_history` | Stores immutable lifecycle and state transition history for Vehicle Rental Agreement Adjustments. | `tenant_id` -> `tenants` | tenant scoped |
+| `vehicle_rental_billing_cycles` | Governs business data, relationships, and lifecycle records for Vehicle Rental Billing Cycles within the VehicleRental module. | `tenant_id` -> `tenants`; `currency_id` -> `currencies` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_rental_billing_cycle_charts` | Governs business data, relationships, and lifecycle records for Vehicle Rental Billing Cycle Charts within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped |
+| `vehicle_rental_billing_cycle_items` | Stores individual itemized line entries for Vehicle Rental Billing Cycle. | `tenant_id` -> `tenants` | tenant scoped |
+| `vehicle_rental_reassignments` | Governs business data, relationships, and lifecycle records for Vehicle Rental Reassignments within the VehicleRental module. | `tenant_id` -> `tenants` | tenant scoped |
 
 ## VehicleService
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `vehicle_service_documents` | Stores document metadata associated with vehicle service document. | `vehicle_service_job_id` -> `vehicle_service_jobs`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units` | tenant scoped; organization-unit aware; soft deletes |
-| `vehicle_service_inspections` | Stores vehicle service inspection records used by the owning module. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_service_job_id` -> `vehicle_service_jobs` | unique `vehicle_service_job_id`; tenant scoped; organization-unit aware |
-| `vehicle_service_invoice_links` | Stores traceable links between vehicle service invoice link and downstream documents. | `invoice_id` -> `invoices`; `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_service_job_id` -> `vehicle_service_jobs` | unique `vehicle_service_job_id,invoice_id`; tenant scoped; organization-unit aware |
-| `vehicle_service_job_lines` | Stores line-level detail and traceability for vehicle service job line. | `item_id` -> `items`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; `vehicle_service_job_id` -> `vehicle_service_jobs`; `inventory_movement_id` -> `inventory_movements`; `item_variant_id` -> `item_variants`; `parent_line_id` -> `vehicle_service_job_lines`; `uom_id` -> `unit_of_measures` | unique `vehicle_service_job_id,line_number`; tenant scoped; organization-unit aware |
-| `vehicle_service_jobs` | Stores vehicle service job headers, customer/vehicle context, totals, and status. | `customer_id` -> `customers`; `supervisor_employee_id` -> `hr_employees`; `vehicle_id` -> `vehicles`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,job_number`; tenant scoped; organization-unit aware; soft deletes |
-| `vehicle_service_line_employees` | Stores vehicle service line employee records used by the owning module. | `employee_id` -> `hr_employees`; `organization_unit_id` -> `organization_units`; `vehicle_service_job_id` -> `vehicle_service_jobs`; `vehicle_service_job_line_id` -> `vehicle_service_job_lines`; `tenant_id` -> `tenants` | unique `vehicle_service_job_line_id,employee_id,role_type`; tenant scoped; organization-unit aware |
-| `vehicle_service_payment_links` | Stores traceable links between vehicle service payment link and downstream documents. | `tenant_id` -> `tenants`; `invoice_id` -> `invoices`; `payment_id` -> `payments`; `vehicle_service_job_id` -> `vehicle_service_jobs`; `organization_unit_id` -> `organization_units` | unique `vehicle_service_job_id,payment_id,invoice_id`; tenant scoped; organization-unit aware |
-| `vehicle_service_status_histories` | Records status transitions and audit context for vehicle service status history. | `tenant_id` -> `tenants`; `organization_unit_id` -> `organization_units`; `vehicle_service_job_id` -> `vehicle_service_jobs` | tenant scoped; organization-unit aware |
+| `vehicle_service_job_types` | Governs business data, relationships, and lifecycle records for Vehicle Service Job Types within the VehicleService module. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `vehicle_service_jobs` | Stores vehicle service job headers, customer/vehicle context, totals, and status. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
+| `vehicle_service_inspections` | Stores vehicle service inspection records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_job_lines` | Stores line-level detail and traceability for vehicle service job line. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_line_employees` | Stores vehicle service line employee records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_documents` | Stores document metadata associated with vehicle service document. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes |
+| `vehicle_service_invoice_links` | Stores traceable links between vehicle service invoice link and downstream documents. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_payment_links` | Stores traceable links between vehicle service payment link and downstream documents. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_status_histories` | Records status transitions and audit context for vehicle service status history. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_supervisor_commission_policies` | Governs business data, relationships, and lifecycle records for Vehicle Service Supervisor Commission Policies within the VehicleService module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_service_labor_item_commission_rules` | Governs business data, relationships, and lifecycle records for Vehicle Service Labor Item Commission Rules within the VehicleService module. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `vehicle_service_job_discounts` | Governs business data, relationships, and lifecycle records for Vehicle Service Job Discounts within the VehicleService module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_legacy_import_batches` | Governs business data, relationships, and lifecycle records for Vehicle Service Legacy Import Batches within the VehicleService module. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_legacy_histories` | Stores immutable lifecycle and state transition history for Vehicle Service Legacy. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_legacy_history_items` | Stores individual itemized line entries for Vehicle Service Legacy History. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `vehicle_service_job_feedbacks` | Stores customer reviews, star ratings, and internal workshop notes for vehicle service jobs. | No declared foreign keys. | tenant scoped; organization-unit aware; soft deletes; optimistic concurrency |
 
 ## Reporting
 
-No persisted tables. Reporting reads domain-owned data and does not duplicate business records.
+No database tables. Reporting coordinates printable views, cash reconciliation analysis, and multi-format document streaming from source modules.
+
+## Voucher
+
+No independent database tables. Voucher provides unified debit/credit financial instrument printing over Payment and General Ledger records.
 
 ## Audit
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
-| `audit_logs` | Immutable, append-only audit events with actor/scope snapshots and bounded sanitized payloads. | canonical subject/source references; no lifecycle foreign keys | tenant and organization scoped; permission-controlled reads; no updates or deletes |
+| `audit_logs` | Immutable, append-only audit events with actor/scope snapshots and bounded sanitized payloads. | No declared foreign keys. | unique `audit_logs_event_uuid_uk`; unique `audit_logs_producer_fingerprint_uk`; tenant scoped; organization-unit aware |
 
 ---
 
@@ -332,3 +440,4 @@ No persisted tables. Reporting reads domain-owned data and does not duplicate bu
 - **Lead Architect & Developer:** Kasun Vimarshana
 - **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
 - **Phone:** [+94713525253](tel:+94713525253)
+- **Repository:** [kasunvimarshana/AutoERP](https://github.com/kasunvimarshana/AutoERP)

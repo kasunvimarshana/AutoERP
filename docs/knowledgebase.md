@@ -172,9 +172,9 @@ Every change to the codebase must pass all verification gates with zero errors:
 
 | Check | Command | Description |
 |---|---|---|
-| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,300+ PHPUnit tests across all 31 modules using SQLite in-memory. |
+| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,364 PHPUnit tests (14,218 assertions) across all 31 modules using SQLite in-memory. |
 | **MySQL Integration Tests** | `composer test:mysql` | Runs integration tests against a live MySQL instance (`phpunit.mysql.xml`). |
-| **Frontend Unit Tests** | `npm test` | Runs 174 Vitest test suites (726+ tests) in JSDOM mode. |
+| **Frontend Unit Tests** | `npm test` | Runs 176 Vitest test suites (735 tests) in JSDOM mode. |
 | **TypeScript Typecheck** | `npm run typecheck` | Validates TypeScript types across `resources/js` with zero emissions (`tsc --noEmit`). |
 | **ESLint Quality Check** | `npm run lint` | Lints React 19 / TypeScript code (`eslint resources/js`). |
 | **PHP Code Style (Pint)** | `vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |
@@ -325,14 +325,14 @@ In AutoERP, database migrations are treated as **immutable database schema speci
 
 ### 4.2 Migration Inventory & Discovery
 
-The system comprises **266 canonical database tables**:
+The system comprises **267 canonical database tables**:
 - **5 Infrastructure Migrations** in `database/migrations/`:
   1. `0001_01_01_000001_create_cache_table.php`
   2. `0001_01_01_000002_create_cache_locks_table.php`
   3. `0001_01_01_000003_create_jobs_table.php`
   4. `0001_01_01_000004_create_job_batches_table.php`
   5. `0001_01_01_000005_create_failed_jobs_table.php`
-- **261 Modular Migrations** distributed across 27 database-owning modules in `app/Modules/<ModuleName>/Database/Migrations/`.
+- **262 Modular Migrations** distributed across 27 database-owning modules in `app/Modules/<ModuleName>/Database/Migrations/`.
 - Every module service provider loads its migrations uniformly:
   ```php
   $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
@@ -590,6 +590,7 @@ Fleet expenses (fuel, tolls, repairs, fines, maintenance) are recorded in `Renta
 - Tracks mechanical inspection checklists, labor operation lines, technician assignments, and spare parts issue requests.
 - **Stock Consumption:** Approving a parts issue automatically triggers inventory issue allocations, consuming stock at current valuation layers and posting COGS to `Finance`.
 - **Mechanical Custody Blocker:** Admitting a vehicle into the workshop for repairs sets its mechanical status to off-road, immediately blocking commercial rental dispatch until the job card is formally signed off and closed.
+- **Customer Feedback, Reviews & Service Notes:** Governed by `VehicleServiceJobFeedback` and the `vehicle_service_job_feedbacks` table. Supports customer reviews with star ratings (1–5), internal workshop notes, feedback types (`review`, `feedback`, `note`), author contact information, and submitter user tracking. All non-essential fields (comment, rating, reviewer name/email) are optional to eliminate workflow blockers. Features real-time rating summary breakdowns, search by author or submitter, and optimistic concurrency locking.
 
 ### 8.4 Corporate Overhead Expenses (`Expense`)
 
@@ -653,6 +654,13 @@ flowchart TD
 
 - `Invoice` is the single authoritative source of truth for commercial billing across sales, service, rental, and purchases.
 - **Document Lifecycles:** `draft` &rarr; `approved` &rarr; `posted` &rarr; `paid` (or `cancelled`, `voided`, `reversed`).
+- **Flexible Multi-Format Invoice Layouts:** Supported by the `invoice_layouts` baseline table and `invoice_layout_id` direct assignment on `invoices`. Supports 5 distinct modular Blade templates:
+  - `standard`: A4 portrait corporate document with comprehensive itemization and payment schedules.
+  - `compact`: Space-saving A5 portrait format for retail counter operations and quick billing.
+  - `modern`: Clean contemporary aesthetic with visual brand accents and dynamic metadata blocks.
+  - `thermal`: 80mm continuous roll receipt layout optimized for POS thermal receipt printers.
+  - `continuous`: Dot-matrix tractor-feed stationery layout tailored for multipart carbon pre-printed forms.
+- **Interactive Layout Customizer Drawer:** Built into the frontend (`InvoiceLayoutEditorDrawer.tsx`), allowing operators to toggle logos, company headers, tax IDs, banking instructions, and custom terms in real time.
 - **Focused Document Printing:** Service and supplier invoices render in compact A5/A4 portrait formats with focused tables (Item, Quantity, Unit Price, Amount) and payment-gated copy labels (Original vs. Duplicate).
 
 ### 9.2 Treasury & Money Movement (`Payment`)
@@ -692,6 +700,7 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 | **Finance** | **Trial Balance, P&L, Balance Sheet, Cash Flow** | **A4 Portrait / Landscape** | Authoritative double-entry financial statements generated from posted general ledger transactions. |
 | **Inventory**| **Stock Availability & Reorder Health** | **A4 Landscape** | Multi-warehouse stock health: on-hand, reserved, available quantities, reorder thresholds, and bin locations. |
 | **Service**  | **Vehicle Service History & Costing** | **A4 Portrait** | Complete workshop repair history, labor costs, parts issues, and technician performance. |
+| **Reporting** | **Daily Cashier Reconciliation & Shift Handover** | **A4 Portrait / Landscape** | Comprehensive cashier settlement report (`cashier-report.blade.php`) detailing daily collections by tender method (Cash, Card, Cheque, Bank Transfer), terminal opening balances, system receipts, declared drawer cash, over/short variances, and dual-signature shift handover sign-offs. |
 
 ---
 
@@ -701,7 +710,7 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 
 To reset the database cleanly from scratch and verify full baseline integrity:
 ```bash
-# Drops all tables, re-runs all 266 canonical migrations, and seeds master baseline
+# Drops all tables, re-runs all 267 canonical migrations, and seeds master baseline
 php artisan migrate:fresh --seed
 ```
 

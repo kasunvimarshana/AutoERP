@@ -6,7 +6,7 @@ Scope: canonical create migrations and the architecture-foundation ownership mil
 
 ## Verified result
 
-- 246 migration files create 246 unique tables.
+- 267 migration files create 267 unique tables (262 modular migrations across 27 modules + 5 infrastructure migrations).
 - Every migration creates exactly one table and drops the same table in `down()`.
 - No migration uses `Schema::table()` patching.
 - No duplicate migration timestamps or table creations remain.
@@ -41,11 +41,11 @@ Tables (14): `tenant_plans`, `tenant_plan_revisions`, `tenants`, `tenant_subscri
 
 ### OrganizationUnit
 
-Tables (3): `organization_unit_types`, `organization_units`, `organization_unit_documents`.
+Tables (4): `organization_unit_types`, `organization_units`, `organization_unit_documents`, `organization_unit_legal_profiles`.
 
 ### User
 
-Tables (12): `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_organization_units`, `user_documents`, `user_devices`, `platform_operators`, `platform_permissions`, `platform_operator_permissions`.
+Tables (13): `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_organization_units`, `user_documents`, `user_devices`, `platform_operators`, `platform_permissions`, `platform_operator_permissions`, `user_quick_access_settings`.
 
 ### Auth
 
@@ -73,7 +73,7 @@ Tables (2): `expense_types`, `expenses`.
 
 ### Finance
 
-Tables (14): `finance_account_types`, `finance_account_categories`, `finance_accounts`, `finance_dimensions`, `finance_posting_profiles`, `finance_posting_profile_rules`, `finance_journal_entries`, `finance_journal_lines`, `finance_ledger_entries`, `finance_account_balances`, `finance_bank_reconciliations`, `finance_bank_statement_lines`, `finance_budgets`, `finance_budget_lines`.
+Tables (18): `finance_account_types`, `finance_account_categories`, `finance_accounts`, `finance_dimensions`, `finance_posting_profiles`, `finance_journal_entries`, `finance_journal_lines`, `finance_ledger_entries`, `finance_account_balances`, `finance_bank_reconciliations`, `finance_bank_statement_lines`, `finance_budgets`, `finance_budget_lines`, `finance_account_roles`, `finance_account_assignments`, `finance_posting_profile_rules`, `finance_accounting_periods`, `finance_accounting_period_events`.
 
 ### Tax
 
@@ -85,11 +85,11 @@ Tables (10): `item_categories`, `item_brands`, `items`, `item_units`, `item_vari
 
 ### Supplier
 
-Tables (10): `suppliers`, `supplier_contacts`, `supplier_addresses`, `supplier_bank_accounts`, `supplier_categories`, `supplier_category_assignments`, `supplier_documents`, `supplier_item_mappings`, `supplier_credit_profiles`, `supplier_status_histories`.
+Tables (11): `suppliers`, `supplier_contacts`, `supplier_addresses`, `supplier_bank_accounts`, `supplier_categories`, `supplier_category_assignments`, `supplier_documents`, `supplier_item_mappings`, `supplier_credit_profiles`, `supplier_status_histories`, `supplier_whatsapp_verifications`.
 
 ### Customer
 
-Tables (9): `customers`, `customer_contacts`, `customer_addresses`, `customer_bank_accounts`, `customer_categories`, `customer_category_assignments`, `customer_documents`, `customer_credit_profiles`, `customer_status_histories`.
+Tables (10): `customers`, `customer_contacts`, `customer_addresses`, `customer_bank_accounts`, `customer_categories`, `customer_category_assignments`, `customer_documents`, `customer_credit_profiles`, `customer_status_histories`, `customer_whatsapp_verifications`.
 
 ### Vehicle
 
@@ -101,23 +101,35 @@ Tables (16): `hr_departments`, `hr_designations`, `hr_employment_types`, `hr_ski
 
 ### Inventory
 
-Tables (20): `inventory_batches`, `inventory_serial_numbers`, `inventory_stock_balances`, `inventory_movements`, `inventory_reservations`, `inventory_allocations`, `inventory_adjustments`, `inventory_adjustment_lines`, `inventory_transfers`, `inventory_transfer_lines`, `inventory_valuation_layers`, `inventory_allocation_lines`, `inventory_allocation_issues`, `inventory_valuation_consumptions`, `inventory_stock_state_changes`, `inventory_cost_adjustments`, `inventory_cost_adjustment_lines`, `inventory_stock_counts`, `inventory_stock_count_lines`, `inventory_number_sequences`.
+Tables (21): `inventory_batches`, `inventory_serial_numbers`, `inventory_stock_balances`, `inventory_movements`, `inventory_reservations`, `inventory_allocations`, `inventory_adjustments`, `inventory_adjustment_lines`, `inventory_transfers`, `inventory_transfer_lines`, `inventory_valuation_layers`, `inventory_allocation_lines`, `inventory_allocation_issues`, `inventory_valuation_consumptions`, `inventory_stock_state_changes`, `inventory_cost_adjustments`, `inventory_cost_adjustment_lines`, `inventory_stock_counts`, `inventory_stock_count_lines`, `inventory_number_sequences`, `inventory_batch_price_revisions`.
 
 ### Invoice
 
-Tables (8): `invoices`, `invoice_lines`, `invoice_sources`, `invoice_source_lines`, `invoice_adjustments`, `invoice_adjustment_allocations`, `invoice_balances`, `invoice_credit_allocations`.
+Tables (11): `invoice_layouts`, `invoices`, `invoice_lines`, `invoice_sources`, `invoice_source_lines`, `invoice_adjustments`, `invoice_adjustment_allocations`, `invoice_balances`, `invoice_credit_allocations`, `invoice_posting_plans`, `invoice_document_snapshots`.
 
 ### Payment
 
-Tables (10): `payments`, `payment_methods`, `payment_lines`, `payment_allocations`, `payment_unapplied_balances`, `payment_reversals`, `payment_refunds`, `payment_status_histories`, `cheque_templates`, `cheque_print_logs`.
+Tables (10): `payments`, `payment_methods`, `payment_lines`, `payment_allocations`, `payment_unapplied_balances`, `payment_reversals`, `payment_refunds`, `payment_lifecycle_events`, `cheque_templates`, `cheque_print_logs`.
 
 ### Purchase
 
-Tables (11): `purchase_orders`, `purchase_order_lines`, `purchase_header_adjustments`, `goods_receipt_notes`, `goods_receipt_note_lines`, `purchase_invoice_links`, `purchase_returns`, `purchase_return_lines`, `purchase_return_adjustment_allocations`, `purchase_debit_notes`, `purchase_adjustment_allocations`.
+Tables (12): `purchase_orders`, `purchase_order_lines`, `purchase_header_adjustments`, `goods_receipt_notes`, `goods_receipt_note_lines`, `purchase_invoice_links`, `purchase_returns`, `purchase_return_lines`, `purchase_return_adjustment_allocations`, `purchase_debit_notes`, `purchase_adjustment_allocations`, `goods_receipt_note_line_batch_allocations`.
+
+### Selling
+
+Tables (4): `sales`, `sale_lines`, `sale_returns`, `sale_return_lines`.
+
+### Promotion
+
+Tables (10): `promotion_offers`, `promotion_card_templates`, `promotion_card_benefits`, `promotion_cards`, `promotion_offer_assignments`, `promotion_job_line_choices`, `promotion_qualification_events`, `promotion_redemption_events`, `promotion_card_lifecycle_events`, `promotion_offer_lifecycle_events`.
+
+### VehicleRental
+
+Tables (28): `vehicle_rental_customer_agreements`, `vehicle_rental_customer_agreements_history`, `vehicle_rental_owner_agreements`, `vehicle_rental_owner_agreements_history`, `vehicle_rental_uses`, `vehicle_rental_use_history`, `vehicle_rental_running_charts`, `vehicle_rental_running_chart_history`, `vehicle_rental_customer_base_charges`, `vehicle_rental_owner_base_charges`, `vehicle_rental_customer_usage_charges`, `vehicle_rental_owner_usage_charges`, `vehicle_rental_incidents`, `vehicle_rental_incident_events`, `vehicle_rental_incident_attachments`, `vehicle_rental_reservations`, `vehicle_rental_reservation_histories`, `vehicle_rental_finance_agreements`, `vehicle_rental_finance_installments`, `vehicle_rental_finance_status_histories`, `vehicle_rental_expenses`, `vehicle_rental_expense_allocations`, `vehicle_rental_agreement_adjustments`, `vehicle_rental_agreement_adjustments_history`, `vehicle_rental_billing_cycles`, `vehicle_rental_billing_cycle_charts`, `vehicle_rental_billing_cycle_items`, `vehicle_rental_reassignments`.
 
 ### VehicleService
 
-Tables (8): `vehicle_service_jobs`, `vehicle_service_inspections`, `vehicle_service_job_lines`, `vehicle_service_line_employees`, `vehicle_service_documents`, `vehicle_service_invoice_links`, `vehicle_service_payment_links`, `vehicle_service_status_histories`.
+Tables (16): `vehicle_service_job_types`, `vehicle_service_jobs`, `vehicle_service_inspections`, `vehicle_service_job_lines`, `vehicle_service_line_employees`, `vehicle_service_documents`, `vehicle_service_invoice_links`, `vehicle_service_payment_links`, `vehicle_service_status_histories`, `vehicle_service_supervisor_commission_policies`, `vehicle_service_labor_item_commission_rules`, `vehicle_service_job_discounts`, `vehicle_service_legacy_import_batches`, `vehicle_service_legacy_histories`, `vehicle_service_legacy_history_items`, `vehicle_service_job_feedbacks`.
 
 ### Audit
 
