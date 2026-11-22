@@ -1,5 +1,5 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
-import { refreshAccessToken, shouldAttemptAuthRefresh } from './authRefreshCoordinator';
+import { isRefreshInProgress, refreshAccessToken, shouldAttemptAuthRefresh } from './authRefreshCoordinator';
 import { getStoredApiContext } from './authSessionStorage';
 import { toApiError } from './apiError';
 import { isPublicApiRequest, requestPath } from './requestClassification';
@@ -22,9 +22,17 @@ export const apiClient = axios.create({
     },
 });
 
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use(async (config) => {
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
         config.headers.delete('Content-Type');
+    }
+
+    if (!isPublicApiRequest(config.url) && isRefreshInProgress()) {
+        try {
+            await refreshAccessToken();
+        } catch {
+            // In-flight refresh failed; allow request to proceed and be handled downstream.
+        }
     }
 
     const context = getStoredApiContext();
@@ -56,7 +64,16 @@ apiClient.interceptors.response.use(
 
         config.autoerpAuthRetried = true;
         try {
-            const accessToken = await refreshAccessToken();
+            const currentContext = getStoredApiContext();
+            const usedToken = typeof config.headers.Authorization === 'string'
+                ? config.headers.Authorization.replace(/^Bearer\s+/i, '').trim()
+                : '';
+
+            let accessToken = currentContext.accessToken;
+            if (!accessToken || accessToken === usedToken) {
+                accessToken = await refreshAccessToken();
+            }
+
             config.headers.Authorization = `Bearer ${accessToken}`;
             return await apiClient.request(config);
         } catch (refreshError: unknown) {

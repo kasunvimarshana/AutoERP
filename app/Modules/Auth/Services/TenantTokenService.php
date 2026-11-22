@@ -14,6 +14,7 @@ use Modules\Auth\Enums\GrantType;
 use Modules\Auth\Enums\SessionStatus;
 use Modules\Auth\Enums\TokenStatus;
 use Modules\Auth\Exceptions\AuthFailure;
+use Modules\Auth\Exceptions\AuthFamilyCompromiseRequested;
 use Modules\Auth\Models\AuthAccessTokenModel;
 use Modules\Auth\Models\AuthClientModel;
 use Modules\Auth\Models\AuthRefreshTokenModel;
@@ -102,88 +103,106 @@ final readonly class TenantTokenService
         }
 
         return $this->runForTenant($locator['tenant_id'], function () use ($locator, $parsed): array {
-            return $this->database->transaction(function () use ($locator, $parsed): array {
-                $refresh = AuthRefreshTokenModel::query()
-                    ->whereKey($locator['id'])
-                    ->where('tenant_id', $locator['tenant_id'])
-                    ->lockForUpdate()
-                    ->first();
+            try {
+                return $this->database->transaction(function () use ($locator, $parsed): array {
+                    $refresh = AuthRefreshTokenModel::query()
+                        ->whereKey($locator['id'])
+                        ->where('tenant_id', $locator['tenant_id'])
+                        ->lockForUpdate()
+                        ->first();
 
-                if (! $refresh instanceof AuthRefreshTokenModel
-                    || ! hash_equals((string) $refresh->getAttribute('refresh_digest'), $parsed['digest'])) {
-                    throw $this->invalidToken();
-                }
+                    if (! $refresh instanceof AuthRefreshTokenModel
+                        || ! hash_equals((string) $refresh->getAttribute('refresh_digest'), $parsed['digest'])) {
+                        throw $this->invalidToken();
+                    }
 
-                if ((string) $refresh->getAttribute('status') !== TokenStatus::ACTIVE->value) {
-                    $this->compromiseTenantFamily($refresh, 'refresh_token_reuse_detected');
-                    throw new AuthFailure(
-                        AuthErrorCode::TOKEN_REVOKED,
-                        'The refresh session is no longer valid.',
-                        401,
+                    $status = (string) $refresh->getAttribute('status');
+                    $rotatedAt = $refresh->getAttribute('rotated_at');
+                    $isWithinGrace = $status === TokenStatus::ROTATED->value
+                        && $rotatedAt !== null
+                        && ($this->clock->now()->getTimestamp() - $this->values->timestamp($rotatedAt)) <= $this->config->rotationGraceSeconds;
+
+                    if ($status !== TokenStatus::ACTIVE->value && ! $isWithinGrace) {
+                        if ($status === TokenStatus::ROTATED->value) {
+                            throw new AuthFamilyCompromiseRequested($refresh, 'refresh_token_reuse_detected');
+                        }
+
+                        throw new AuthFailure(
+                            AuthErrorCode::TOKEN_REVOKED,
+                            'The refresh session is no longer valid.',
+                            401,
+                        );
+                    }
+
+                    if ($this->values->isExpired($refresh->getAttribute('expires_at'))) {
+                        $this->expireTenantRefresh($refresh);
+                        throw new AuthFailure(AuthErrorCode::TOKEN_EXPIRED, 'The refresh session has expired.', 401);
+                    }
+
+                    $session = AuthSessionModel::query()
+                        ->whereKey((int) $refresh->getAttribute('session_id'))
+                        ->where('tenant_id', (int) $refresh->getAttribute('tenant_id'))
+                        ->where('user_id', (int) $refresh->getAttribute('user_id'))
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $session instanceof AuthSessionModel) {
+                        throw new AuthFamilyCompromiseRequested($refresh, 'refresh_session_graph_invalid');
+                    }
+
+                    $this->assertTenantSessionActive($session);
+                    $tenantId = (int) $session->getAttribute('tenant_id');
+                    $userId = (int) $session->getAttribute('user_id');
+                    if ($this->tenantUsers->findActiveTenantById($tenantId, $userId) === null) {
+                        $this->revokeTenantSessionLocked($session, 'tenant_user_inactive');
+                        throw $this->invalidToken();
+                    }
+
+                    $access = AuthAccessTokenModel::query()
+                        ->whereKey((int) $refresh->getAttribute('access_token_id'))
+                        ->where('tenant_id', $tenantId)
+                        ->where('session_id', (int) $session->getKey())
+                        ->where('user_id', $userId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $access instanceof AuthAccessTokenModel) {
+                        throw new AuthFamilyCompromiseRequested($refresh, 'refresh_access_graph_invalid');
+                    }
+
+                    $client = $this->loadTenantClient(
+                        $tenantId,
+                        $this->values->positiveInt($refresh->getAttribute('client_id')),
+                        GrantType::REFRESH_TOKEN,
                     );
-                }
 
-                if ($this->values->isExpired($refresh->getAttribute('expires_at'))) {
-                    $this->expireTenantRefresh($refresh);
-                    throw new AuthFailure(AuthErrorCode::TOKEN_EXPIRED, 'The refresh session has expired.', 401);
-                }
+                    if ($status === TokenStatus::ACTIVE->value) {
+                        $now = $this->clock->now();
+                        $refresh->forceFill([
+                            'status' => TokenStatus::ROTATED->value,
+                            'rotated_at' => $now,
+                            'row_version' => (int) $refresh->getAttribute('row_version') + 1,
+                        ])->save();
+                        $this->revokeAccessTokenModel($access, 'refresh_rotated');
+                    }
 
-                $session = AuthSessionModel::query()
-                    ->whereKey((int) $refresh->getAttribute('session_id'))
-                    ->where('tenant_id', (int) $refresh->getAttribute('tenant_id'))
-                    ->where('user_id', (int) $refresh->getAttribute('user_id'))
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $session instanceof AuthSessionModel) {
-                    $this->compromiseTenantFamily($refresh, 'refresh_session_graph_invalid');
-                    throw $this->invalidSession();
-                }
-
-                $this->assertTenantSessionActive($session);
-                $tenantId = (int) $session->getAttribute('tenant_id');
-                $userId = (int) $session->getAttribute('user_id');
-                if ($this->tenantUsers->findActiveTenantById($tenantId, $userId) === null) {
-                    $this->revokeTenantSessionLocked($session, 'tenant_user_inactive');
-                    throw $this->invalidToken();
-                }
-
-                $access = AuthAccessTokenModel::query()
-                    ->whereKey((int) $refresh->getAttribute('access_token_id'))
-                    ->where('tenant_id', $tenantId)
-                    ->where('session_id', (int) $session->getKey())
-                    ->where('user_id', $userId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $access instanceof AuthAccessTokenModel) {
-                    $this->compromiseTenantFamily($refresh, 'refresh_access_graph_invalid');
-                    throw $this->invalidToken();
-                }
-
-                $client = $this->loadTenantClient(
-                    $tenantId,
-                    $this->values->positiveInt($refresh->getAttribute('client_id')),
-                    GrantType::REFRESH_TOKEN,
+                    return $this->createTenantPair(
+                        $session,
+                        $client,
+                        $this->normalizeTenantScopes($access->getAttribute('scopes')),
+                        GrantType::REFRESH_TOKEN,
+                        (string) $refresh->getAttribute('family_id'),
+                        (int) $refresh->getKey(),
+                    );
+                }, 3);
+            } catch (AuthFamilyCompromiseRequested $compromise) {
+                $this->compromiseTenantFamily($compromise->refreshToken, $compromise->reason);
+                throw new AuthFailure(
+                    AuthErrorCode::TOKEN_REVOKED,
+                    'The refresh session is no longer valid.',
+                    401,
                 );
-
-                $now = $this->clock->now();
-                $refresh->forceFill([
-                    'status' => TokenStatus::ROTATED->value,
-                    'rotated_at' => $now,
-                    'row_version' => (int) $refresh->getAttribute('row_version') + 1,
-                ])->save();
-                $this->revokeAccessTokenModel($access, 'refresh_rotated');
-
-                return $this->createTenantPair(
-                    $session,
-                    $client,
-                    $this->normalizeTenantScopes($access->getAttribute('scopes')),
-                    GrantType::REFRESH_TOKEN,
-                    (string) $refresh->getAttribute('family_id'),
-                    (int) $refresh->getKey(),
-                );
-            }, 3);
+            }
         });
     }
 
@@ -427,21 +446,23 @@ final readonly class TenantTokenService
 
     private function compromiseTenantFamily(AuthRefreshTokenModel $refresh, string $reason): void
     {
-        $familyId = (string) $refresh->getAttribute('family_id');
-        foreach (AuthRefreshTokenModel::query()
-            ->where('family_id', $familyId)
-            ->lockForUpdate()
-            ->get() as $familyToken) {
-            $this->revokeRefreshTokenModel($familyToken, $reason);
-        }
+        $this->database->transaction(function () use ($refresh, $reason): void {
+            $familyId = (string) $refresh->getAttribute('family_id');
+            foreach (AuthRefreshTokenModel::query()
+                ->where('family_id', $familyId)
+                ->lockForUpdate()
+                ->get() as $familyToken) {
+                $this->revokeRefreshTokenModel($familyToken, $reason);
+            }
 
-        $session = AuthSessionModel::query()
-            ->whereKey((int) $refresh->getAttribute('session_id'))
-            ->lockForUpdate()
-            ->first();
-        if ($session instanceof AuthSessionModel) {
-            $this->revokeTenantSessionLocked($session, $reason);
-        }
+            $session = AuthSessionModel::query()
+                ->whereKey((int) $refresh->getAttribute('session_id'))
+                ->lockForUpdate()
+                ->first();
+            if ($session instanceof AuthSessionModel) {
+                $this->revokeTenantSessionLocked($session, $reason);
+            }
+        }, 3);
     }
 
     private function expireTenantRefresh(AuthRefreshTokenModel $refresh): void

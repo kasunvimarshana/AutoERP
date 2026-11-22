@@ -28,6 +28,7 @@ const AUTH_REFRESH_LEASE_KEY = 'autoerp.auth_refresh_lease';
 const AUTH_REFRESH_CHANNEL = 'autoerp.auth_refresh';
 const REFRESH_LEASE_DURATION_MS = 35_000;
 const REFRESH_WAIT_GRACE_MS = 2_000;
+const REFRESH_DEDUPE_WINDOW_MS = 5_000;
 
 const refreshClient = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/',
@@ -37,6 +38,32 @@ const refreshClient = axios.create({
 });
 
 let refreshPromise: Promise<string> | null = null;
+let lastRefreshedAt = 0;
+let crossTabChannel: BroadcastChannel | null = null;
+
+if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+    try {
+        crossTabChannel = new BroadcastChannel(AUTH_REFRESH_CHANNEL);
+        crossTabChannel.onmessage = (event: MessageEvent<RefreshBroadcastMessage>) => {
+            const message = event.data;
+            if (message?.type === 'refreshed' && message.accessToken) {
+                updateRefreshedSession(message.accessToken);
+                lastRefreshedAt = Date.now();
+            }
+        };
+    } catch {
+        crossTabChannel = null;
+    }
+}
+
+export function isRefreshInProgress(): boolean {
+    return refreshPromise !== null;
+}
+
+export function resetRefreshCoordinatorState(): void {
+    refreshPromise = null;
+    lastRefreshedAt = 0;
+}
 
 export function refreshAccessToken(): Promise<string> {
     if (refreshPromise) return refreshPromise;
@@ -93,11 +120,36 @@ async function performRefresh(): Promise<string> {
 
 async function withCrossTabRefreshLock(task: () => Promise<string>): Promise<string> {
     if (typeof navigator !== 'undefined' && 'locks' in navigator && navigator.locks) {
-        return navigator.locks.request(AUTH_REFRESH_LOCK_NAME, task);
+        return navigator.locks.request(AUTH_REFRESH_LOCK_NAME, async () => {
+            const context = getStoredApiContext();
+            if (context.hasSession && context.accessToken && (Date.now() - lastRefreshedAt) < REFRESH_DEDUPE_WINDOW_MS) {
+                return context.accessToken;
+            }
+
+            const owner = createCoordinatorId();
+            try {
+                const accessToken = await task();
+                lastRefreshedAt = Date.now();
+                broadcastRefresh({
+                    type: 'refreshed',
+                    owner,
+                    accessToken,
+                });
+                return accessToken;
+            } catch (error) {
+                broadcastRefresh({ type: 'failed', owner });
+                throw error;
+            }
+        });
     }
 
     if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
         return task();
+    }
+
+    const context = getStoredApiContext();
+    if (context.hasSession && context.accessToken && (Date.now() - lastRefreshedAt) < REFRESH_DEDUPE_WINDOW_MS) {
+        return context.accessToken;
     }
 
     const owner = createCoordinatorId();
@@ -114,6 +166,7 @@ async function withCrossTabRefreshLock(task: () => Promise<string>): Promise<str
 
     try {
         const accessToken = await task();
+        lastRefreshedAt = Date.now();
         broadcastRefresh({
             type: 'refreshed',
             owner,
@@ -194,10 +247,22 @@ function releaseRefreshLease(owner: string): void {
 }
 
 function broadcastRefresh(message: RefreshBroadcastMessage): void {
+    if (crossTabChannel) {
+        try {
+            crossTabChannel.postMessage(message);
+            return;
+        } catch {
+            // Re-create if channel closed
+        }
+    }
     if (typeof BroadcastChannel === 'undefined') return;
-    const channel = new BroadcastChannel(AUTH_REFRESH_CHANNEL);
-    channel.postMessage(message);
-    channel.close();
+    try {
+        const channel = new BroadcastChannel(AUTH_REFRESH_CHANNEL);
+        channel.postMessage(message);
+        channel.close();
+    } catch {
+        // BroadcastChannel unavailable
+    }
 }
 
 function createCoordinatorId(): string {

@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { AUTH_SESSION_MARKER_KEY, clearStoredAuthSession } from './authSessionStorage';
-import { shouldAttemptAuthRefresh } from './authRefreshCoordinator';
+import { isRefreshInProgress, resetRefreshCoordinatorState, shouldAttemptAuthRefresh } from './authRefreshCoordinator';
 
 describe('shouldAttemptAuthRefresh', () => {
     afterEach(() => {
         clearStoredAuthSession();
+        resetRefreshCoordinatorState();
     });
 
     it('never refreshes an authenticated session for public login endpoints', () => {
@@ -17,5 +18,9 @@ describe('shouldAttemptAuthRefresh', () => {
         window.localStorage.setItem(AUTH_SESSION_MARKER_KEY, 'test-session');
 
         expect(shouldAttemptAuthRefresh('/api/v1/items')).toBe(true);
+    });
+
+    it('reports refresh in progress state correctly', () => {
+        expect(isRefreshInProgress()).toBe(false);
     });
 });

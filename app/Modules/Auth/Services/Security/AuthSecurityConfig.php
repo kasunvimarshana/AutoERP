@@ -24,6 +24,7 @@ final readonly class AuthSecurityConfig
         public int $loginWindowSeconds,
         public int $passwordMinimumLength,
         public array $oauthScopes,
+        public int $rotationGraceSeconds = 30,
     ) {
         $this->assertValid();
     }
@@ -64,11 +65,16 @@ final readonly class AuthSecurityConfig
             loginWindowSeconds: (int) config('module-auth.rate_limits.window_seconds'),
             passwordMinimumLength: (int) config('module-auth.password.minimum_length'),
             oauthScopes: array_values(array_unique($oauthScopes)),
+            rotationGraceSeconds: (int) config('module-auth.tokens.rotation_grace_seconds', 30),
         );
     }
 
     private function assertValid(): void
     {
+        if ($this->rotationGraceSeconds < 0 || $this->rotationGraceSeconds > 300) {
+            throw new ConfigurationException('Auth refresh-token rotation grace must be between 0 and 300 seconds.');
+        }
+
         if ($this->accessTokenTtlSeconds < 60 || $this->accessTokenTtlSeconds > 86400) {
             throw new ConfigurationException('Auth access-token TTL must be between 60 seconds and 24 hours.');
         }

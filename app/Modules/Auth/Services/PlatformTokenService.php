@@ -13,6 +13,7 @@ use Modules\Auth\Enums\GrantType;
 use Modules\Auth\Enums\SessionStatus;
 use Modules\Auth\Enums\TokenStatus;
 use Modules\Auth\Exceptions\AuthFailure;
+use Modules\Auth\Exceptions\PlatformAuthFamilyCompromiseRequested;
 use Modules\Auth\Models\AuthPlatformAccessTokenModel;
 use Modules\Auth\Models\AuthPlatformRefreshTokenModel;
 use Modules\Auth\Models\AuthPlatformSessionModel;
@@ -72,77 +73,95 @@ final readonly class PlatformTokenService
         }
 
         return $this->runAsControlPlane(function () use ($key, $parsed): array {
-            return $this->database->transaction(function () use ($key, $parsed): array {
-                $refresh = AuthPlatformRefreshTokenModel::query()
-                    ->where('refresh_key', $key)
-                    ->lockForUpdate()
-                    ->first();
+            try {
+                return $this->database->transaction(function () use ($key, $parsed): array {
+                    $refresh = AuthPlatformRefreshTokenModel::query()
+                        ->where('refresh_key', $key)
+                        ->lockForUpdate()
+                        ->first();
 
-                if (! $refresh instanceof AuthPlatformRefreshTokenModel
-                    || ! hash_equals((string) $refresh->getAttribute('refresh_digest'), $parsed['digest'])) {
-                    throw $this->invalidToken();
-                }
+                    if (! $refresh instanceof AuthPlatformRefreshTokenModel
+                        || ! hash_equals((string) $refresh->getAttribute('refresh_digest'), $parsed['digest'])) {
+                        throw $this->invalidToken();
+                    }
 
-                if ((string) $refresh->getAttribute('status') !== TokenStatus::ACTIVE->value) {
-                    $this->compromisePlatformFamily($refresh, 'refresh_token_reuse_detected');
-                    throw new AuthFailure(
-                        AuthErrorCode::TOKEN_REVOKED,
-                        'The refresh session is no longer valid.',
-                        401,
+                    $status = (string) $refresh->getAttribute('status');
+                    $rotatedAt = $refresh->getAttribute('rotated_at');
+                    $isWithinGrace = $status === TokenStatus::ROTATED->value
+                        && $rotatedAt !== null
+                        && ($this->clock->now()->getTimestamp() - $this->values->timestamp($rotatedAt)) <= $this->config->rotationGraceSeconds;
+
+                    if ($status !== TokenStatus::ACTIVE->value && ! $isWithinGrace) {
+                        if ($status === TokenStatus::ROTATED->value) {
+                            throw new PlatformAuthFamilyCompromiseRequested($refresh, 'refresh_token_reuse_detected');
+                        }
+
+                        throw new AuthFailure(
+                            AuthErrorCode::TOKEN_REVOKED,
+                            'The refresh session is no longer valid.',
+                            401,
+                        );
+                    }
+
+                    if ($this->values->isExpired($refresh->getAttribute('expires_at'))) {
+                        $this->expirePlatformRefresh($refresh);
+                        throw new AuthFailure(AuthErrorCode::TOKEN_EXPIRED, 'The refresh session has expired.', 401);
+                    }
+
+                    $session = AuthPlatformSessionModel::query()
+                        ->whereKey((int) $refresh->getAttribute('platform_session_id'))
+                        ->where('platform_operator_id', (int) $refresh->getAttribute('platform_operator_id'))
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $session instanceof AuthPlatformSessionModel) {
+                        throw new PlatformAuthFamilyCompromiseRequested($refresh, 'refresh_session_graph_invalid');
+                    }
+
+                    $this->assertPlatformSessionActive($session);
+                    $operatorId = (int) $session->getAttribute('platform_operator_id');
+                    if ($this->platformOperators->findActivePlatformById($operatorId) === null) {
+                        $this->revokePlatformSessionLocked($session, 'platform_operator_inactive');
+                        throw $this->invalidToken();
+                    }
+
+                    $access = AuthPlatformAccessTokenModel::query()
+                        ->whereKey((int) $refresh->getAttribute('access_token_id'))
+                        ->where('platform_session_id', (int) $session->getKey())
+                        ->where('platform_operator_id', $operatorId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $access instanceof AuthPlatformAccessTokenModel) {
+                        throw new PlatformAuthFamilyCompromiseRequested($refresh, 'refresh_access_graph_invalid');
+                    }
+
+                    if ($status === TokenStatus::ACTIVE->value) {
+                        $now = $this->clock->now();
+                        $refresh->forceFill([
+                            'status' => TokenStatus::ROTATED->value,
+                            'rotated_at' => $now,
+                            'row_version' => (int) $refresh->getAttribute('row_version') + 1,
+                        ])->save();
+                        $this->revokePlatformAccessTokenModel($access, 'refresh_rotated');
+                    }
+
+                    return $this->createPlatformPair(
+                        $session,
+                        ['platform'],
+                        GrantType::REFRESH_TOKEN,
+                        (string) $refresh->getAttribute('family_id'),
+                        (int) $refresh->getKey(),
                     );
-                }
-
-                if ($this->values->isExpired($refresh->getAttribute('expires_at'))) {
-                    $this->expirePlatformRefresh($refresh);
-                    throw new AuthFailure(AuthErrorCode::TOKEN_EXPIRED, 'The refresh session has expired.', 401);
-                }
-
-                $session = AuthPlatformSessionModel::query()
-                    ->whereKey((int) $refresh->getAttribute('platform_session_id'))
-                    ->where('platform_operator_id', (int) $refresh->getAttribute('platform_operator_id'))
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $session instanceof AuthPlatformSessionModel) {
-                    $this->compromisePlatformFamily($refresh, 'refresh_session_graph_invalid');
-                    throw $this->invalidSession();
-                }
-
-                $this->assertPlatformSessionActive($session);
-                $operatorId = (int) $session->getAttribute('platform_operator_id');
-                if ($this->platformOperators->findActivePlatformById($operatorId) === null) {
-                    $this->revokePlatformSessionLocked($session, 'platform_operator_inactive');
-                    throw $this->invalidToken();
-                }
-
-                $access = AuthPlatformAccessTokenModel::query()
-                    ->whereKey((int) $refresh->getAttribute('access_token_id'))
-                    ->where('platform_session_id', (int) $session->getKey())
-                    ->where('platform_operator_id', $operatorId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $access instanceof AuthPlatformAccessTokenModel) {
-                    $this->compromisePlatformFamily($refresh, 'refresh_access_graph_invalid');
-                    throw $this->invalidToken();
-                }
-
-                $now = $this->clock->now();
-                $refresh->forceFill([
-                    'status' => TokenStatus::ROTATED->value,
-                    'rotated_at' => $now,
-                    'row_version' => (int) $refresh->getAttribute('row_version') + 1,
-                ])->save();
-                $this->revokePlatformAccessTokenModel($access, 'refresh_rotated');
-
-                return $this->createPlatformPair(
-                    $session,
-                    ['platform'],
-                    GrantType::REFRESH_TOKEN,
-                    (string) $refresh->getAttribute('family_id'),
-                    (int) $refresh->getKey(),
+                }, 3);
+            } catch (PlatformAuthFamilyCompromiseRequested $compromise) {
+                $this->compromisePlatformFamily($compromise->refreshToken, $compromise->reason);
+                throw new AuthFailure(
+                    AuthErrorCode::TOKEN_REVOKED,
+                    'The refresh session is no longer valid.',
+                    401,
                 );
-            }, 3);
+            }
         });
     }
 
@@ -333,21 +352,23 @@ final readonly class PlatformTokenService
 
     private function compromisePlatformFamily(AuthPlatformRefreshTokenModel $refresh, string $reason): void
     {
-        $familyId = (string) $refresh->getAttribute('family_id');
-        foreach (AuthPlatformRefreshTokenModel::query()
-            ->where('family_id', $familyId)
-            ->lockForUpdate()
-            ->get() as $familyToken) {
-            $this->revokePlatformRefreshTokenModel($familyToken, $reason);
-        }
+        $this->database->transaction(function () use ($refresh, $reason): void {
+            $familyId = (string) $refresh->getAttribute('family_id');
+            foreach (AuthPlatformRefreshTokenModel::query()
+                ->where('family_id', $familyId)
+                ->lockForUpdate()
+                ->get() as $familyToken) {
+                $this->revokePlatformRefreshTokenModel($familyToken, $reason);
+            }
 
-        $session = AuthPlatformSessionModel::query()
-            ->whereKey((int) $refresh->getAttribute('platform_session_id'))
-            ->lockForUpdate()
-            ->first();
-        if ($session instanceof AuthPlatformSessionModel) {
-            $this->revokePlatformSessionLocked($session, $reason);
-        }
+            $session = AuthPlatformSessionModel::query()
+                ->whereKey((int) $refresh->getAttribute('platform_session_id'))
+                ->lockForUpdate()
+                ->first();
+            if ($session instanceof AuthPlatformSessionModel) {
+                $this->revokePlatformSessionLocked($session, $reason);
+            }
+        }, 3);
     }
 
     private function expirePlatformRefresh(AuthPlatformRefreshTokenModel $refresh): void

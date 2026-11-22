@@ -14,6 +14,7 @@ return [
     'tokens' => [
         'access_ttl_seconds' => (int) env('AUTH_ACCESS_TOKEN_TTL', 3600),
         'refresh_ttl_seconds' => (int) env('AUTH_REFRESH_TOKEN_TTL', 2592000),
+        'rotation_grace_seconds' => (int) env('AUTH_REFRESH_ROTATION_GRACE_SECONDS', 30),
     ],
     'sessions' => [
         'tenant_ttl_seconds' => (int) env('AUTH_TENANT_SESSION_TTL', 2592000),
