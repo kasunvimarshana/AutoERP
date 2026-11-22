@@ -105,6 +105,12 @@ final class StoreInvoiceRequest extends TenantScopedRequest
             'place_of_supply' => ['nullable', 'string', 'max:1000'],
             'payment_mode' => ['nullable', 'string', 'max:100'],
             'payment_terms' => ['nullable', 'string', 'max:255'],
+            'invoice_layout_id' => [
+                'nullable',
+                'integer',
+                'min:1',
+                Rule::exists('invoice_layouts', 'id')->where('tenant_id', $this->tenantId()),
+            ],
             'idempotency_key' => $this->routeIs('api.v1.invoices.store')
                 ? ['required', 'string', 'max:'.self::IDEMPOTENCY_KEY_MAX_LENGTH]
                 : ['prohibited'],
@@ -175,6 +181,7 @@ final class StoreInvoiceRequest extends TenantScopedRequest
             placeOfSupply: $this->stringOrNull('place_of_supply'),
             paymentMode: $this->stringOrNull('payment_mode'),
             paymentTerms: $this->stringOrNull('payment_terms'),
+            invoiceLayoutId: $this->intOrNull('invoice_layout_id'),
         );
     }
 

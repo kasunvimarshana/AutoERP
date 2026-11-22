@@ -21,7 +21,7 @@ import {
     reverseInvoice,
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
-import { listInvoiceLayouts } from '../invoiceLayoutApi';
+import { assignInvoiceLayout, listInvoiceLayouts } from '../invoiceLayoutApi';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
@@ -82,6 +82,7 @@ export default function InvoiceDetailPage() {
     const canPost = hasInvoicePermission(auth, invoicePermissions.post);
     const canReverse = hasInvoicePermission(auth, invoicePermissions.reverse);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
+    const canManageLayouts = hasInvoicePermission(auth, invoicePermissions.layoutsManage);
     const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
     const canCreatePayment = hasPaymentPermission(auth, paymentPermissions.create);
     const canOpenPaymentEntry = useTenantRouteAccess('/payments/create');
@@ -95,6 +96,7 @@ export default function InvoiceDetailPage() {
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
     const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+    const [assigningLayout, setAssigningLayout] = useState(false);
     const tabState = useOnDemandTab<Tab>('summary');
     const tabs: TabItem<Tab>[] = [
         summaryTab,
@@ -260,6 +262,25 @@ export default function InvoiceDetailPage() {
         window.open(fallbackPdfUrl, '_blank');
     };
 
+    const handleAssignLayout = async (layoutId: number | null) => {
+        setAssigningLayout(true);
+        setActionError(null);
+        try {
+            const res = await assignInvoiceLayout(id, layoutId);
+            if (invoice.data) {
+                invoice.setData({
+                    ...invoice.data,
+                    invoice_layout_id: res.invoice_layout_id,
+                    layout: res.layout,
+                });
+            }
+        } catch (caught: unknown) {
+            setActionError(toApiError(caught));
+        } finally {
+            setAssigningLayout(false);
+        }
+    };
+
     return (
         <>
             <ContentHeader
@@ -294,9 +315,42 @@ export default function InvoiceDetailPage() {
                         ) : null}
                         <Button variant="secondary" onClick={() => void handlePrintWithLayout()}>Print</Button>
                         <Button variant="secondary" onClick={() => void handleDownloadPdfWithLayout()}>Download PDF</Button>
-                        {availableLayouts.data && availableLayouts.data.length > 1 && (
+                        {availableLayouts.data && availableLayouts.data.length > 0 && (
                             <ActionMenu label="Layouts" triggerClassName="min-h-9 py-1 px-2.5 text-xs">
-                                <div className="py-1 min-w-[220px]">
+                                <div className="py-1 min-w-[240px]">
+                                    {canManageLayouts && (
+                                        <>
+                                            <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                                                Assigned Template
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs ${
+                                                    value.invoice_layout_id == null ? 'bg-slate-50 font-semibold text-slate-900' : 'text-slate-700 hover:bg-slate-100'
+                                                }`}
+                                                onClick={() => void handleAssignLayout(null)}
+                                                disabled={assigningLayout}
+                                            >
+                                                <span>Default (Auto Resolve)</span>
+                                                {value.invoice_layout_id == null && <span className="text-emerald-600 font-bold">✓</span>}
+                                            </button>
+                                            {availableLayouts.data.map((l) => (
+                                                <button
+                                                    key={`assign-${l.id}`}
+                                                    type="button"
+                                                    className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs ${
+                                                        value.invoice_layout_id === l.id ? 'bg-slate-50 font-semibold text-slate-900' : 'text-slate-700 hover:bg-slate-100'
+                                                    }`}
+                                                    onClick={() => void handleAssignLayout(l.id)}
+                                                    disabled={assigningLayout}
+                                                >
+                                                    <span>{l.name}</span>
+                                                    {value.invoice_layout_id === l.id && <span className="text-emerald-600 font-bold">✓</span>}
+                                                </button>
+                                            ))}
+                                            <div className="my-1 border-t border-slate-100" />
+                                        </>
+                                    )}
                                     <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                                         Print with layout
                                     </div>
@@ -304,7 +358,7 @@ export default function InvoiceDetailPage() {
                                         <button
                                             key={l.code}
                                             type="button"
-                                            className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-100"
+                                            className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100"
                                             onClick={() => void handlePrintWithLayout(l.code)}
                                         >
                                             <span className="font-medium text-slate-900">{l.name}</span>
@@ -341,6 +395,7 @@ export default function InvoiceDetailPage() {
                         { label: 'Party', value: readableRelation(value.party) },
                         { label: 'Type', value: humanize(value.invoice_type) },
                         { label: 'Direction', value: humanize(value.direction) },
+                        { label: 'Print layout', value: value.layout ? `${value.layout.name} (${value.layout.paper_size_label})` : 'Default (Auto Resolve)' },
                         { label: 'Due date', value: formatDate(value.due_date) },
                         { label: 'Currency', value: value.currency?.code ?? '-' },
                         { label: 'Exchange rate', value: value.exchange_rate ?? '-' },

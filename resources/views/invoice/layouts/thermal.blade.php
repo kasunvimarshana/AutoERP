@@ -2,8 +2,14 @@
     $zeroMoney = static fn (array $amount): bool => bccomp((string) ($amount['raw'] ?? '0.000000'), '0', 6) === 0;
     $amounts = $document['amounts'];
     $lines = $document['lines'] ?? [];
-    $showTax = (bool) ($layout['settings']['show_tax_summary'] ?? true);
-    $showPayment = (bool) ($layout['settings']['show_payment_details'] ?? true);
+
+    $settings = $layout['settings'] ?? [];
+    $showTax = (bool) ($settings['show_tax_summary'] ?? $settings['show_tax_breakdown'] ?? true);
+    $showPayment = (bool) ($settings['show_payment_details'] ?? $settings['show_payment_stub'] ?? true);
+    $showSignatures = (bool) ($settings['show_signatures'] ?? false);
+    $showNotes = (bool) ($settings['show_notes'] ?? true);
+    $customNotes = ! empty($settings['notes']) ? $settings['notes'] : ($document['notes'] ?? null);
+    $customTerms = ! empty($settings['terms']) ? $settings['terms'] : ($document['payment_terms'] ?? null);
 @endphp
 
 <div class="thermal-receipt" style="width: 76mm; margin: 0 auto; font-family: 'Courier New', Courier, monospace; font-size: 11px; line-height: 1.25; color: #000;">
@@ -21,6 +27,9 @@
                 @if (! empty($document['supplier']['tin']))TIN: {{ $document['supplier']['tin'] }}@endif
                 @if (! empty($document['supplier']['vat_registration_number'])) | VAT: {{ $document['supplier']['vat_registration_number'] }}@endif
             </div>
+        @endif
+        @if (! empty($layout['header_content']))
+            <div style="font-size: 9px; font-style: italic; margin-top: 2px;">{{ $layout['header_content'] }}</div>
         @endif
     </div>
 
@@ -40,6 +49,16 @@
         @if (! empty($document['purchaser']['name']))
             <div style="margin-top: 1px;">
                 <span>Customer: {{ $document['purchaser']['name'] }}</span>
+            </div>
+        @endif
+        @if (! empty($document['purchaser_reference_fields']))
+            <div style="margin-top: 2px; border-top: 1px dotted #ccc; padding-top: 2px;">
+                @foreach ($document['purchaser_reference_fields'] as $ref)
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: #333;">
+                        <span>{{ $ref['label'] }}:</span>
+                        <span>{{ $ref['value'] }}</span>
+                    </div>
+                @endforeach
             </div>
         @endif
     </div>
@@ -98,46 +117,60 @@
             </tr>
         @endif
         <tr style="font-size: 13px; font-weight: bold; border-top: 1px solid #000;">
-            <td style="padding: 3px 0;">TOTAL:</td>
-            <td style="text-align: right; padding: 3px 0;">{{ $amounts['grand_total']['display'] }}</td>
+            <td style="padding: 2px 0;">TOTAL:</td>
+            <td style="text-align: right; padding: 2px 0;">{{ $amounts['grand_total']['display'] }}</td>
         </tr>
         @if (! $zeroMoney($amounts['paid_total']))
             <tr>
                 <td style="padding: 1px 0;">Paid:</td>
                 <td style="text-align: right; padding: 1px 0;">{{ $amounts['paid_total']['display'] }}</td>
             </tr>
-            <tr style="font-weight: bold;">
+        @endif
+        @if (! $zeroMoney($amounts['balance_due']))
+            <tr style="font-weight: bold; color: #b91c1c;">
                 <td style="padding: 1px 0;">Balance Due:</td>
                 <td style="text-align: right; padding: 1px 0;">{{ $amounts['balance_due']['display'] }}</td>
             </tr>
         @endif
     </table>
 
-    <!-- Divider -->
-    <div style="border-top: 1px dashed #000; margin: 2mm 0;"></div>
-
     @if ($showPayment)
-        <div style="font-size: 9px; margin-bottom: 2mm;">
+        <!-- Divider -->
+        <div style="border-top: 1px dashed #000; margin: 2mm 0;"></div>
+
+        <div style="font-size: 10px;">
             <div>Payment: {{ $document['resolved_payment_mode'] ?? 'Cash' }}</div>
-            @if (! empty($document['payment_terms']))
-                <div>Terms: {{ $document['payment_terms'] }}</div>
+            @if (! empty($customTerms))
+                <div>Terms: {{ $customTerms }}</div>
             @endif
         </div>
     @endif
 
-    @if (! empty($layout['footer_content']))
-        <div style="text-align: center; font-size: 9px; margin: 2mm 0;">
-            {{ $layout['footer_content'] }}
-        </div>
-    @else
-        <div style="text-align: center; font-size: 9px; margin: 2mm 0;">
-            Thank you for your business!
+    @if ($showNotes && ! empty($customNotes))
+        <div style="margin-top: 2mm; font-size: 9px; text-align: center; color: #333;">
+            {{ $customNotes }}
         </div>
     @endif
 
-    @if (! empty($print_context))
-        <div style="text-align: center; font-size: 8px; color: #555; margin-top: 2mm;">
-            {{ $print_context['printed_at'] }} | {{ $print_context['printed_by'] }}
+    <!-- Footer Policy -->
+    <div style="text-align: center; margin-top: 3mm; font-size: 9px; line-height: 1.3;">
+        @if (! empty($layout['footer_content']))
+            <div>{{ $layout['footer_content'] }}</div>
+        @else
+            <div>Thank you for your business!</div>
+            <div>Exchange possible within 7 days with receipt.</div>
+        @endif
+    </div>
+
+    @if ($showSignatures)
+        <div style="margin-top: 6mm; text-align: center; font-size: 9px;">
+            <div style="border-top: 1px dotted #000; width: 60%; margin: 0 auto; padding-top: 1mm;">
+                Customer Signature
+            </div>
         </div>
     @endif
+
+    <div style="text-align: center; margin-top: 2mm; font-size: 8px; color: #666;">
+        Printed: {{ $print_context['printed_at'] ?? now()->format('Y-m-d H:i') }}
+    </div>
 </div>

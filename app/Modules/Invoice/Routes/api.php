@@ -77,6 +77,10 @@ Route::prefix('api/v1/invoices')->middleware($middleware)->name('api.v1.invoices
         ->whereNumber('invoice')
         ->middleware($requires(InvoicePermission::VIEW))
         ->name('whatsapp-share');
+    Route::patch('{invoice}/layout', [InvoiceController::class, 'assignLayout'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
+        ->name('assign-layout');
 });
 
 Route::prefix('api/v1/invoice-layouts')->middleware($middleware)->name('api.v1.invoice-layouts.')->group(function () use ($requires): void {

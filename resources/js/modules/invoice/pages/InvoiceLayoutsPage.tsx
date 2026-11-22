@@ -106,6 +106,19 @@ export default function InvoiceLayoutsPage() {
                 ? `branch (${auth.organizationUnit?.name ?? 'current organization unit'})`
                 : 'organization';
             setActionSuccess(`Layout "${layout.name}" set as default for ${scopeLabel}.`);
+            if (layouts) {
+                setLayouts(
+                    layouts.map((item) => {
+                        if (scope === 'tenant') {
+                            return { ...item, is_tenant_default: item.code === layout.code };
+                        }
+                        if (scope === 'organization_unit') {
+                            return { ...item, is_branch_default: item.code === layout.code };
+                        }
+                        return item;
+                    }),
+                );
+            }
         } catch (caught: unknown) {
             setActionError(toApiError(caught));
         }
@@ -225,7 +238,17 @@ export default function InvoiceLayoutsPage() {
                                         <h3 className="font-semibold text-slate-900">{layout.name}</h3>
                                         <span className="font-mono text-xs text-slate-500">{layout.code}</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {layout.is_tenant_default && (
+                                            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                                                Tenant Default
+                                            </span>
+                                        )}
+                                        {layout.is_branch_default && (
+                                            <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 border border-sky-200">
+                                                Branch Default
+                                            </span>
+                                        )}
                                         <StatusBadge
                                             status={layout.is_active ? 'active' : 'inactive'}
                                             label={layout.is_active ? 'Active' : 'Inactive'}
@@ -268,20 +291,22 @@ export default function InvoiceLayoutsPage() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
+                                                disabled={layout.is_tenant_default}
                                                 onClick={() => void handleSetDefault(layout, 'tenant')}
-                                                title="Set as Tenant Default"
+                                                title={layout.is_tenant_default ? 'Current Tenant Default' : 'Set as Tenant Default'}
                                             >
-                                                Tenant Default
+                                                {layout.is_tenant_default ? 'Default ✓' : 'Tenant Default'}
                                             </Button>
 
                                             {auth.organizationUnit && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
+                                                    disabled={layout.is_branch_default}
                                                     onClick={() => void handleSetDefault(layout, 'organization_unit')}
-                                                    title="Set as Branch Default"
+                                                    title={layout.is_branch_default ? 'Current Branch Default' : 'Set as Branch Default'}
                                                 >
-                                                    Branch Default
+                                                    {layout.is_branch_default ? 'Branch ✓' : 'Branch Default'}
                                                 </Button>
                                             )}
 

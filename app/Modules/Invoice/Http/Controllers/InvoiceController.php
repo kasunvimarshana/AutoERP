@@ -32,6 +32,7 @@ use Modules\Invoice\Http\Requests\InvoiceActionRequest;
 use Modules\Invoice\Http\Requests\ListInvoiceRequest;
 use Modules\Invoice\Http\Requests\StoreInvoiceRequest;
 use Modules\Invoice\Http\Resources\InvoiceAdjustmentResource;
+use Modules\Invoice\Http\Resources\InvoiceLayoutResource;
 use Modules\Invoice\Http\Resources\InvoiceResource;
 use Modules\Invoice\Http\Resources\InvoiceSourceLineResource;
 use Modules\Invoice\Http\Resources\InvoiceSourceResource;
@@ -88,9 +89,12 @@ final class InvoiceController
 
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
     {
-        return new InvoiceResource($this->scope(Invoice::query(), $request)
+        $model = $this->scope(Invoice::query(), $request)
             ->with(['lines', 'sources', 'postingPlan'])
-            ->findOrFail($invoice));
+            ->findOrFail($invoice);
+        $model->loadMissing('layout');
+
+        return new InvoiceResource($model);
     }
 
     public function preview(StoreInvoiceRequest $request, ManualInvoiceService $service): JsonResponse
@@ -480,6 +484,67 @@ final class InvoiceController
         }
 
         return $parameters;
+    }
+
+    public function assignLayout(Request $request, int $invoice): JsonResponse
+    {
+        $tenantId = $this->currentTenantId($request);
+        $organizationUnitId = $this->currentOrganizationUnitId($request);
+
+        $model = $this->prints->findScoped($invoice, $tenantId, $organizationUnitId);
+        if ($model === null) {
+            abort(404, 'Invoice not found.');
+        }
+
+        $layoutId = $request->input('invoice_layout_id');
+        $layoutCode = $request->input('layout_code');
+
+        if ($layoutId === null && $layoutCode === null) {
+            $model->invoice_layout_id = null;
+            $model->save();
+
+            return response()->json([
+                'data' => [
+                    'success' => true,
+                    'invoice_id' => (int) $model->id,
+                    'invoice_layout_id' => null,
+                    'layout' => null,
+                ],
+            ]);
+        }
+
+        $layout = null;
+        if ($layoutId !== null && is_numeric($layoutId)) {
+            $layout = InvoiceLayout::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', (int) $layoutId)
+                ->active()
+                ->first();
+        } elseif (is_string($layoutCode) && trim($layoutCode) !== '') {
+            $layout = InvoiceLayout::query()
+                ->where('tenant_id', $tenantId)
+                ->where('code', trim($layoutCode))
+                ->active()
+                ->first();
+        }
+
+        if ($layout === null) {
+            throw ValidationException::withMessages([
+                'layout' => ['The specified invoice layout was not found or is inactive.'],
+            ]);
+        }
+
+        $model->invoice_layout_id = (int) $layout->id;
+        $model->save();
+
+        return response()->json([
+            'data' => [
+                'success' => true,
+                'invoice_id' => (int) $model->id,
+                'invoice_layout_id' => (int) $layout->id,
+                'layout' => new InvoiceLayoutResource($layout),
+            ],
+        ]);
     }
 
     private function signedPrintContext(Request $request): ?InvoicePrintContext

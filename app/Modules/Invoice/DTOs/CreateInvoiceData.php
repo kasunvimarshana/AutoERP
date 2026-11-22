@@ -54,5 +54,6 @@ final readonly class CreateInvoiceData
         public ?string $paymentMode = null,
         public ?string $paymentTerms = null,
         public array $purchaserReferenceFields = [],
+        public ?int $invoiceLayoutId = null,
     ) {}
 }

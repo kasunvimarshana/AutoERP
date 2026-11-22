@@ -5,13 +5,17 @@
     $settlementRowsVisible = ! $zeroMoney($amounts['paid_total'])
         || ! $zeroMoney($amounts['credit_total'])
         || bccomp((string) $amounts['balance_due']['raw'], (string) $amounts['grand_total']['raw'], 6) !== 0;
-    $primaryColor = $layout['settings']['primary_color'] ?? '#173956';
-    $showLogo = (bool) ($layout['settings']['show_company_logo'] ?? true);
-    $showTax = (bool) ($layout['settings']['show_tax_summary'] ?? true);
-    $showPayment = (bool) ($layout['settings']['show_payment_details'] ?? true);
-    $showSignatures = (bool) ($layout['settings']['show_signatures'] ?? true);
-    $showWords = (bool) ($layout['settings']['show_amount_in_words'] ?? true);
-    $showNotes = (bool) ($layout['settings']['show_notes'] ?? true);
+
+    $settings = $layout['settings'] ?? [];
+    $primaryColor = $settings['primary_color'] ?? '#173956';
+    $showLogo = (bool) ($settings['show_company_logo'] ?? $settings['show_logo'] ?? true);
+    $showTax = (bool) ($settings['show_tax_summary'] ?? $settings['show_tax_breakdown'] ?? true);
+    $showPayment = (bool) ($settings['show_payment_details'] ?? $settings['show_payment_stub'] ?? true);
+    $showSignatures = (bool) ($settings['show_signatures'] ?? true);
+    $showWords = (bool) ($settings['show_amount_in_words'] ?? true);
+    $showNotes = (bool) ($settings['show_notes'] ?? true);
+    $customNotes = ! empty($settings['notes']) ? $settings['notes'] : ($document['notes'] ?? null);
+    $customTerms = ! empty($settings['terms']) ? $settings['terms'] : ($document['payment_terms'] ?? null);
 @endphp
 
 <div class="modern-invoice">
@@ -142,8 +146,8 @@
                 @if ($showPayment)
                     <div style="font-size: 9px; font-weight: 700; text-transform: uppercase; color: {{ $primaryColor }}; margin-bottom: 4px;">Payment Information</div>
                     <div style="font-size: 10px; color: #334155; margin-bottom: 3px;"><strong>Method:</strong> {{ $document['resolved_payment_mode'] ?? 'Standard terms' }}</div>
-                    @if (! empty($document['payment_terms']))
-                        <div style="font-size: 10px; color: #334155; margin-bottom: 3px;"><strong>Terms:</strong> {{ $document['payment_terms'] }}</div>
+                    @if (! empty($customTerms))
+                        <div style="font-size: 10px; color: #334155; margin-bottom: 3px;"><strong>Terms:</strong> {{ $customTerms }}</div>
                     @endif
                 @endif
                 @if ($showWords && ! empty($document['amount_in_words']))
@@ -152,9 +156,9 @@
                         <em>{{ $document['amount_in_words'] }}</em>
                     </div>
                 @endif
-                @if ($showNotes && ! empty($document['notes']))
+                @if ($showNotes && ! empty($customNotes))
                     <div style="margin-top: 4px; font-size: 10px; color: #475569; border-top: 1px dotted #cbd5e1; padding-top: 4px;">
-                        <strong>Notes:</strong> {{ $document['notes'] }}
+                        <strong>Notes:</strong> {{ $customNotes }}
                     </div>
                 @endif
             </td>

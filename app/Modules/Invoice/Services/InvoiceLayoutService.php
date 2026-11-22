@@ -347,6 +347,40 @@ final readonly class InvoiceLayoutService
         });
     }
 
+    /** @return array{tenant_default: string, branch_default: ?string} */
+    public function getActiveDefaults(int $tenantId, ?int $organizationUnitId = null): array
+    {
+        return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId): array {
+            $tenantVal = $this->configurationResolver->value(InvoiceLayoutResolverInterface::DEFAULT_LAYOUT_KEY, $tenantId, null);
+            $tenantCode = is_string($tenantVal) && trim($tenantVal) !== '' ? trim($tenantVal) : InvoiceLayoutProvisioner::SYSTEM_STANDARD_A4;
+
+            $branchCode = null;
+            if ($organizationUnitId !== null && $organizationUnitId > 0) {
+                $context = new ConfigurationScopeContext(
+                    scope: ConfigurationScope::ORGANIZATION_UNIT,
+                    tenantId: $tenantId,
+                    organizationUnitId: $organizationUnitId,
+                );
+                $existing = $this->configurationRepository->findExact($context, InvoiceLayoutResolverInterface::DEFAULT_LAYOUT_KEY);
+                if ($existing !== null && is_string($existing->storedValue)) {
+                    try {
+                        $decoded = json_decode($existing->storedValue, true, 512, JSON_THROW_ON_ERROR);
+                        if (is_string($decoded) && trim($decoded) !== '') {
+                            $branchCode = trim($decoded);
+                        }
+                    } catch (\Throwable) {
+                        $branchCode = is_string($existing->storedValue) ? trim($existing->storedValue) : null;
+                    }
+                }
+            }
+
+            return [
+                'tenant_default' => $tenantCode,
+                'branch_default' => $branchCode,
+            ];
+        });
+    }
+
     /** @return array<string, string> */
     public function getPrinterAssignments(int $tenantId, ?int $organizationUnitId = null): array
     {

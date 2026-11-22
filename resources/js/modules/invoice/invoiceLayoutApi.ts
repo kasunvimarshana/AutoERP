@@ -94,3 +94,19 @@ export async function deletePrinterAssignment(printer: string, organizationUnitI
     );
     return response.data.data;
 }
+
+export async function assignInvoiceLayout(
+    invoiceId: number,
+    layoutId: number | null,
+    signal?: AbortSignal,
+): Promise<{ success: boolean; invoice_id: number; invoice_layout_id: number | null; layout: InvoiceLayout | null }> {
+    const response = await apiClient.patch<ApiResource<{
+        success: boolean;
+        invoice_id: number;
+        invoice_layout_id: number | null;
+        layout: InvoiceLayout | null;
+    }>>(`${endpoints.invoices}/${invoiceId}/layout`, {
+        invoice_layout_id: layoutId,
+    }, { signal });
+    return response.data.data;
+}

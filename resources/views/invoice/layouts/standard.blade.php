@@ -2,9 +2,38 @@
     <div class="title-box">{{ $document['title'] }}</div>
 </div>
 
+@if (! empty($layout['header_content']))
+    <div class="header-content-banner" style="margin-bottom: 8px; padding: 6px 10px; background: #f3f4f6; border-left: 3px solid {{ $layout['settings']['primary_color'] ?? '#111827' }}; font-size: 11px; color: #374151;">
+        {{ $layout['header_content'] }}
+    </div>
+@endif
+
 @foreach (($document['warnings'] ?? []) as $warning)
     <div class="warning">{{ $warning }}</div>
 @endforeach
+
+@php
+    $zeroMoney = static fn (array $amount): bool => bccomp((string) ($amount['raw'] ?? '0.000000'), '0', 6) === 0;
+    $amounts = $document['amounts'];
+    $lines = $document['lines'] ?? [];
+    $minimumPrintableLineRows = 5;
+    $blankLineRows = max(0, $minimumPrintableLineRows - count($lines));
+    $summaryColumnSpan = $usesFocusedPrint ? 3 : 4;
+    $settlementRowsVisible = ! $zeroMoney($amounts['paid_total'])
+        || ! $zeroMoney($amounts['credit_total'])
+        || bccomp((string) $amounts['balance_due']['raw'], (string) $amounts['grand_total']['raw'], 6) !== 0;
+
+    $settings = $layout['settings'] ?? [];
+    $showLogo = (bool) ($settings['show_company_logo'] ?? $settings['show_logo'] ?? true);
+    $showTax = (bool) ($settings['show_tax_summary'] ?? $settings['show_tax_breakdown'] ?? true);
+    $showPayment = (bool) ($settings['show_payment_details'] ?? $settings['show_payment_stub'] ?? true);
+    $showSignatures = (bool) ($settings['show_signatures'] ?? true);
+    $showWords = (bool) ($settings['show_amount_in_words'] ?? true);
+    $showNotes = (bool) ($settings['show_notes'] ?? true);
+    $showQr = (bool) ($settings['show_qr_code'] ?? false);
+    $customNotes = ! empty($settings['notes']) ? $settings['notes'] : ($document['notes'] ?? null);
+    $customTerms = ! empty($settings['terms']) ? $settings['terms'] : ($document['payment_terms'] ?? null);
+@endphp
 
 <table class="field-table">
     <tr>
@@ -70,19 +99,20 @@
     </tr>
 </table>
 
-<table class="field-table">
-    <tr>
-        <td class="additional-field">
-            <span class="label">Additional Information if any:</span>
-            @if (! empty($document['due_date']) || ! empty($document['notes']))
+@if ($showNotes && (! empty($document['due_date']) || ! empty($customNotes) || ($showWords && ! empty($document['amount_in_words']))))
+    <table class="field-table">
+        <tr>
+            <td class="additional-field">
+                <span class="label">Additional Information if any:</span>
                 <div class="additional-content">
                     @if (! empty($document['due_date']))<div>Due date: {{ $document['due_date'] }}</div>@endif
-                    @if (! empty($document['notes']))<div>{{ $document['notes'] }}</div>@endif
+                    @if ($showWords && ! empty($document['amount_in_words']))<div>Amount in words: <em>{{ $document['amount_in_words'] }}</em></div>@endif
+                    @if (! empty($customNotes))<div>{{ $customNotes }}</div>@endif
                 </div>
-            @endif
-        </td>
-    </tr>
-</table>
+            </td>
+        </tr>
+    </table>
+@endif
 
 <table class="invoice-lines">
     <thead>
@@ -142,10 +172,12 @@
                 </tr>
             @endif
         @endforeach
-        <tr>
-            <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['tax_total']['label'] }}:</td>
-            <td class="number">{{ $amounts['tax_total']['display'] }}</td>
-        </tr>
+        @if ($showTax)
+            <tr>
+                <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['tax_total']['label'] }}:</td>
+                <td class="number">{{ $amounts['tax_total']['display'] }}</td>
+            </tr>
+        @endif
     @endunless
     <tr>
         <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['grand_total']['label'] }}:</td>
@@ -160,13 +192,21 @@
     </tbody>
 </table>
 
-<table class="footer-fields">
-    <tr>
-        <td>
-            <span class="label">Mode of Payment:</span> {{ $document['resolved_payment_mode'] ?? '' }}
-            @if (! empty($document['payment_terms']))
-                <div class="muted">Terms: {{ $document['payment_terms'] }}</div>
-            @endif
-        </td>
-    </tr>
-</table>
+@if ($showPayment)
+    <table class="footer-fields">
+        <tr>
+            <td>
+                <span class="label">Mode of Payment:</span> {{ $document['resolved_payment_mode'] ?? '' }}
+                @if (! empty($customTerms))
+                    <div class="muted">Terms: {{ $customTerms }}</div>
+                @endif
+            </td>
+        </tr>
+    </table>
+@endif
+
+@if (! empty($layout['footer_content']))
+    <div class="footer-content-notice" style="margin-top: 8px; padding: 6px 10px; background: #fafafa; border-top: 1px solid #e5e7eb; font-size: 10px; color: #4b5563; text-align: center;">
+        {{ $layout['footer_content'] }}
+    </div>
+@endif

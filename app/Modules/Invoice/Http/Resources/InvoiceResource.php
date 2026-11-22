@@ -93,6 +93,11 @@ final class InvoiceResource extends JsonResource
                 fn () => InvoiceCreditAllocationResource::collection($this->creditAllocations)->resolve($request),
                 [],
             ),
+            'invoice_layout_id' => $this->invoice_layout_id === null ? null : (int) $this->invoice_layout_id,
+            'layout' => $this->whenLoaded(
+                'layout',
+                fn () => $this->layout === null ? null : (new InvoiceLayoutResource($this->layout))->resolve($request),
+            ),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

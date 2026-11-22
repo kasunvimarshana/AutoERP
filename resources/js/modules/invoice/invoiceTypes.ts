@@ -11,6 +11,8 @@ export enum InvoiceStatus {
     Paid = 'paid', Cancelled = 'cancelled', Void = 'void', Reversed = 'reversed',
 }
 
+import type { InvoiceLayout } from './invoiceLayoutTypes';
+
 export interface InvoicePartySnapshot extends Record<string, unknown> {
     id?: number | null;
     number?: string | null;
@@ -180,6 +182,8 @@ export interface Invoice extends Record<string, unknown> {
     posting_plan?: InvoicePostingPlan | null;
     lines?: InvoiceLine[];
     sources?: InvoiceSource[];
+    invoice_layout_id?: number | null;
+    layout?: InvoiceLayout | null;
 }
 
 export interface InvoiceSourcesResult {

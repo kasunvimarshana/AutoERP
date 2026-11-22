@@ -11,11 +11,18 @@ export type InvoicePaperSize = 'a4' | 'a5' | 'thermal_80mm' | 'continuous_8_5_by
 export type InvoiceOrientation = 'portrait' | 'landscape';
 
 export interface InvoiceLayoutSettings {
+    primary_color?: string;
+    font_family?: string;
     show_logo?: boolean;
+    show_company_logo?: boolean;
     show_tax_breakdown?: boolean;
+    show_tax_summary?: boolean;
     show_payment_stub?: boolean;
+    show_payment_details?: boolean;
     show_signatures?: boolean;
     show_qr_code?: boolean;
+    show_amount_in_words?: boolean;
+    show_notes?: boolean;
     notes?: string | null;
     terms?: string | null;
 }
@@ -31,6 +38,8 @@ export interface InvoiceLayout {
     view_template: string;
     is_system: boolean;
     is_active: boolean;
+    is_tenant_default?: boolean;
+    is_branch_default?: boolean;
     custom_css: string | null;
     header_content: string | null;
     footer_content: string | null;
@@ -73,6 +82,11 @@ export interface SetDefaultInvoiceLayoutPayload {
     organization_unit_id?: number | null;
     scope?: 'tenant' | 'organization_unit' | 'printer';
     printer?: string;
+}
+
+export interface AssignInvoiceLayoutPayload {
+    invoice_layout_id?: number | null;
+    layout_code?: string | null;
 }
 
 export interface PrinterAssignmentsResponse {

@@ -98,6 +98,7 @@ final class ManualInvoiceService
             supplyDate: $this->nullableTrimmed($data->supplyDate), supplyPeriodStart: $this->nullableTrimmed($data->supplyPeriodStart),
             supplyPeriodEnd: $this->nullableTrimmed($data->supplyPeriodEnd), placeOfSupply: $this->nullableTrimmed($data->placeOfSupply),
             paymentMode: $this->nullableTrimmed($data->paymentMode), paymentTerms: $this->nullableTrimmed($data->paymentTerms),
+            invoiceLayoutId: $data->invoiceLayoutId,
         );
 
         return $this->sourceInvoices->prepare($source,

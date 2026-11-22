@@ -31,6 +31,7 @@ final class InvoiceLayoutController
     public function index(Request $request): JsonResponse
     {
         $tenantId = $this->currentTenantId($request);
+        $organizationUnitId = $this->currentOrganizationUnitId($request);
         $search = $request->query('search');
         $paperSize = $request->query('paper_size');
         $isActive = $request->has('is_active')
@@ -44,8 +45,18 @@ final class InvoiceLayoutController
             $isActive,
         );
 
+        $defaults = $this->layouts->getActiveDefaults($tenantId, $organizationUnitId);
+
+        foreach ($items as $item) {
+            $item->setAttribute('is_tenant_default', $item->code === $defaults['tenant_default']);
+            $item->setAttribute('is_branch_default', $defaults['branch_default'] !== null && $item->code === $defaults['branch_default']);
+        }
+
         return response()->json([
             'data' => InvoiceLayoutResource::collection($items),
+            'meta' => [
+                'defaults' => $defaults,
+            ],
         ]);
     }
 

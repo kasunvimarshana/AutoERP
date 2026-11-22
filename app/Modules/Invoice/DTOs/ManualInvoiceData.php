@@ -37,5 +37,6 @@ final readonly class ManualInvoiceData
         public ?string $placeOfSupply = null,
         public ?string $paymentMode = null,
         public ?string $paymentTerms = null,
+        public ?int $invoiceLayoutId = null,
     ) {}
 }

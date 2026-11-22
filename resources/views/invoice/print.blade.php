@@ -303,6 +303,14 @@
         @include('invoice.layouts.modern')
     @elseif (($layout['view_template'] ?? '') === 'invoice.layouts.thermal')
         @include('invoice.layouts.thermal')
+    @elseif (($layout['view_template'] ?? '') === 'invoice.layouts.continuous')
+        @if ($isOutboundContinuous)
+            @include('invoice.partials.outbound')
+        @else
+            @include('invoice.layouts.continuous')
+        @endif
+    @elseif (($layout['view_template'] ?? '') === 'invoice.layouts.compact')
+        @include('invoice.layouts.compact')
     @elseif ($isOutboundA4 || $isOutboundContinuous)
         @include('invoice.partials.outbound')
     @else

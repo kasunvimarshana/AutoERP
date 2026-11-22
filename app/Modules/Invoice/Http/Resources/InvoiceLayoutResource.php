@@ -40,6 +40,8 @@ final class InvoiceLayoutResource extends JsonResource
             'header_content' => $this->header_content,
             'footer_content' => $this->footer_content,
             'settings' => $this->settings ?? [],
+            'is_tenant_default' => (bool) ($this->getAttribute('is_tenant_default') ?? false),
+            'is_branch_default' => (bool) ($this->getAttribute('is_branch_default') ?? false),
             'row_version' => (int) $this->row_version,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

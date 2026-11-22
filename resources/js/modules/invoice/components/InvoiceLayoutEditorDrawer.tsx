@@ -18,6 +18,7 @@ import { createInvoiceLayout, updateInvoiceLayout } from '../invoiceLayoutApi';
 import type {
     CreateInvoiceLayoutPayload,
     InvoiceLayout,
+    InvoiceLayoutSettings,
     InvoiceOrientation,
     InvoicePaperSize,
     UpdateInvoiceLayoutPayload,
@@ -44,11 +45,17 @@ const ORIENTATION_OPTIONS = [
 ];
 
 const TEMPLATE_OPTIONS = [
-    { value: 'invoice.layouts.standard', label: 'Classic Standard (Traditional bordered invoice)' },
+    { value: 'invoice.layouts.standard', label: 'Classic Standard (Traditional corporate bordered format)' },
     { value: 'invoice.layouts.modern', label: 'Modern Clean (Contemporary card-style accent headers)' },
-    { value: 'invoice.layouts.compact', label: 'Compact Slip (Condensed half-sheet format)' },
+    { value: 'invoice.layouts.compact', label: 'Compact Slip (Condensed half-sheet counter format)' },
     { value: 'invoice.layouts.thermal', label: 'Thermal Receipt (Continuous 80mm POS slip)' },
     { value: 'invoice.layouts.continuous', label: 'Continuous Feed (Pre-printed or carbonized dot-matrix)' },
+];
+
+const FONT_FAMILY_OPTIONS = [
+    { value: 'sans-serif', label: 'Sans-Serif (Modern / Clean)' },
+    { value: 'serif', label: 'Serif (Traditional / Formal)' },
+    { value: 'monospace', label: 'Monospace (Receipt / Matrix)' },
 ];
 
 export function InvoiceLayoutEditorDrawer({
@@ -72,10 +79,14 @@ export function InvoiceLayoutEditorDrawer({
     const [footerContent, setFooterContent] = useState('');
 
     // Settings
+    const [primaryColor, setPrimaryColor] = useState('#173956');
+    const [fontFamily, setFontFamily] = useState('sans-serif');
     const [showLogo, setShowLogo] = useState(true);
     const [showTaxBreakdown, setShowTaxBreakdown] = useState(true);
     const [showPaymentStub, setShowPaymentStub] = useState(true);
     const [showSignatures, setShowSignatures] = useState(true);
+    const [showAmountInWords, setShowAmountInWords] = useState(true);
+    const [showNotes, setShowNotes] = useState(true);
     const [showQrCode, setShowQrCode] = useState(false);
     const [notes, setNotes] = useState('');
     const [terms, setTerms] = useState('');
@@ -97,13 +108,19 @@ export function InvoiceLayoutEditorDrawer({
             setCustomCss(layout.custom_css ?? '');
             setHeaderContent(layout.header_content ?? '');
             setFooterContent(layout.footer_content ?? '');
-            setShowLogo(layout.settings?.show_logo ?? true);
-            setShowTaxBreakdown(layout.settings?.show_tax_breakdown ?? true);
-            setShowPaymentStub(layout.settings?.show_payment_stub ?? true);
-            setShowSignatures(layout.settings?.show_signatures ?? true);
-            setShowQrCode(layout.settings?.show_qr_code ?? false);
-            setNotes(layout.settings?.notes ?? '');
-            setTerms(layout.settings?.terms ?? '');
+
+            const s = layout.settings ?? {};
+            setPrimaryColor(s.primary_color ?? '#173956');
+            setFontFamily(s.font_family ?? 'sans-serif');
+            setShowLogo(s.show_logo ?? s.show_company_logo ?? true);
+            setShowTaxBreakdown(s.show_tax_breakdown ?? s.show_tax_summary ?? true);
+            setShowPaymentStub(s.show_payment_stub ?? s.show_payment_details ?? true);
+            setShowSignatures(s.show_signatures ?? true);
+            setShowAmountInWords(s.show_amount_in_words ?? true);
+            setShowNotes(s.show_notes ?? true);
+            setShowQrCode(s.show_qr_code ?? false);
+            setNotes(s.notes ?? '');
+            setTerms(s.terms ?? '');
         } else {
             setName('');
             setCode('');
@@ -115,10 +132,14 @@ export function InvoiceLayoutEditorDrawer({
             setCustomCss('');
             setHeaderContent('');
             setFooterContent('');
+            setPrimaryColor('#173956');
+            setFontFamily('sans-serif');
             setShowLogo(true);
             setShowTaxBreakdown(true);
             setShowPaymentStub(true);
             setShowSignatures(true);
+            setShowAmountInWords(true);
+            setShowNotes(true);
             setShowQrCode(false);
             setNotes('');
             setTerms('');
@@ -131,10 +152,18 @@ export function InvoiceLayoutEditorDrawer({
         setViewTemplate(newTemplate);
         if (newTemplate === 'invoice.layouts.thermal') {
             setPaperSize('thermal_80mm');
+            setFontFamily('monospace');
+            setPrimaryColor('#000000');
         } else if (newTemplate === 'invoice.layouts.compact') {
             setPaperSize('a5');
+            setFontFamily('sans-serif');
         } else if (newTemplate === 'invoice.layouts.continuous') {
             setPaperSize('continuous_8_5_by_5_5');
+            setFontFamily('sans-serif');
+        } else if (newTemplate === 'invoice.layouts.standard') {
+            setPaperSize('a4');
+            setFontFamily('serif');
+            setPrimaryColor('#111827');
         }
     };
 
@@ -143,11 +172,18 @@ export function InvoiceLayoutEditorDrawer({
         setSaving(true);
         setError(null);
 
-        const settingsPayload = {
+        const settingsPayload: InvoiceLayoutSettings = {
+            primary_color: primaryColor,
+            font_family: fontFamily,
             show_logo: showLogo,
+            show_company_logo: showLogo,
             show_tax_breakdown: showTaxBreakdown,
+            show_tax_summary: showTaxBreakdown,
             show_payment_stub: showPaymentStub,
+            show_payment_details: showPaymentStub,
             show_signatures: showSignatures,
+            show_amount_in_words: showAmountInWords,
+            show_notes: showNotes,
             show_qr_code: showQrCode,
             notes: notes.trim() !== '' ? notes.trim() : null,
             terms: terms.trim() !== '' ? terms.trim() : null,
@@ -207,7 +243,7 @@ export function InvoiceLayoutEditorDrawer({
 
                 {isSystem && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                        <strong>System Layout:</strong> Core system templates are managed by the application. Changes to code and core layout identifiers are restricted.
+                        <strong>System Layout:</strong> Core system templates are managed by the application. Changes to code and core layout identifiers are restricted, but visual styles, banners, policies, and settings can be customized.
                     </div>
                 )}
 
@@ -285,9 +321,42 @@ export function InvoiceLayoutEditorDrawer({
                     </div>
                 </div>
 
-                {/* Content Elements & Settings */}
+                {/* Styling & Typography */}
                 <div className="space-y-4 border-t border-slate-100 pt-4">
-                    <h3 className="text-sm font-semibold text-slate-800">Visual Elements</h3>
+                    <h3 className="text-sm font-semibold text-slate-800">Styling & Typography</h3>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="block text-xs font-medium text-slate-700 mb-1">
+                                Brand Primary Color
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="color"
+                                    value={primaryColor}
+                                    onChange={(e) => setPrimaryColor(e.target.value)}
+                                    className="h-9 w-12 cursor-pointer rounded border border-slate-300 p-0.5"
+                                />
+                                <Input
+                                    value={primaryColor}
+                                    onChange={(e) => setPrimaryColor(e.target.value)}
+                                    placeholder="#173956"
+                                    className="flex-1 font-mono text-xs"
+                                />
+                            </div>
+                        </div>
+
+                        <Select
+                            label="Font Family"
+                            value={fontFamily}
+                            onChange={(e) => setFontFamily(e.target.value)}
+                            options={FONT_FAMILY_OPTIONS}
+                        />
+                    </div>
+                </div>
+
+                {/* Visual Elements & Sections */}
+                <div className="space-y-4 border-t border-slate-100 pt-4">
+                    <h3 className="text-sm font-semibold text-slate-800">Visual Elements & Sections</h3>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="flex items-center gap-2 text-sm text-slate-700">
                             <input
@@ -314,7 +383,7 @@ export function InvoiceLayoutEditorDrawer({
                                 onChange={(e) => setShowPaymentStub(e.target.checked)}
                                 className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                             />
-                            Show Payment Stub / Bank Box
+                            Show Payment Details / Stub
                         </label>
                         <label className="flex items-center gap-2 text-sm text-slate-700">
                             <input
@@ -328,6 +397,24 @@ export function InvoiceLayoutEditorDrawer({
                         <label className="flex items-center gap-2 text-sm text-slate-700">
                             <input
                                 type="checkbox"
+                                checked={showAmountInWords}
+                                onChange={(e) => setShowAmountInWords(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                            />
+                            Show Amount in Words
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={showNotes}
+                                onChange={(e) => setShowNotes(e.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                            />
+                            Show Policy / Notes Section
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
                                 checked={showQrCode}
                                 onChange={(e) => setShowQrCode(e.target.checked)}
                                 className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
@@ -335,9 +422,22 @@ export function InvoiceLayoutEditorDrawer({
                             Show QR Verification Code
                         </label>
                     </div>
+                </div>
+
+                {/* Header & Footer Custom Content */}
+                <div className="space-y-4 border-t border-slate-100 pt-4">
+                    <h3 className="text-sm font-semibold text-slate-800">Header & Footer Content</h3>
+                    <Textarea
+                        label="Top Header Announcement / Greeting"
+                        value={headerContent}
+                        onChange={(e) => setHeaderContent(e.target.value)}
+                        placeholder="e.g. Welcome to our flagship store! Seasonal promotions apply..."
+                        rows={2}
+                        hint="Displayed prominently at the top of the invoice document."
+                    />
 
                     <Textarea
-                        label="Standard Notes / Policy"
+                        label="Standard Policy / Notes Override"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="e.g. Goods once sold will not be accepted back after 7 days..."
@@ -345,11 +445,20 @@ export function InvoiceLayoutEditorDrawer({
                     />
 
                     <Textarea
-                        label="Payment Terms"
+                        label="Payment Terms & Bank Details Override"
                         value={terms}
                         onChange={(e) => setTerms(e.target.value)}
-                        placeholder="e.g. Net 30 days. Please transfer to account 123456789..."
+                        placeholder="e.g. Net 30 days. Please wire to Bank Account: 123-456-789 (IBAN: ...)"
                         rows={2}
+                    />
+
+                    <Textarea
+                        label="Bottom Footer Notice / Warranty Clause"
+                        value={footerContent}
+                        onChange={(e) => setFooterContent(e.target.value)}
+                        placeholder="e.g. Certified ISO 9001 Facility. Thank you for your continued patronage."
+                        rows={2}
+                        hint="Displayed at the bottom of the invoice page."
                     />
                 </div>
 

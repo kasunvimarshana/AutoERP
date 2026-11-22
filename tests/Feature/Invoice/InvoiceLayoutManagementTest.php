@@ -15,10 +15,9 @@ namespace Tests\Feature\Invoice;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Contracts\InvoiceLayoutResolverInterface;
-use Modules\Invoice\DTOs\CreateInvoiceData;
-use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLayoutTemplate;
 use Modules\Invoice\Enums\InvoiceOrientation;
@@ -26,10 +25,7 @@ use Modules\Invoice\Enums\InvoicePaperSize;
 use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Models\InvoiceLayout;
-use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceLayoutProvisioner;
-use Modules\Invoice\Services\InvoiceLayoutResolver;
 use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantAuthenticationFixture;
@@ -419,7 +415,7 @@ final class InvoiceLayoutManagementTest extends TestCase
 
     private function createInvoiceWithLayout(int $tenantId, int $organizationUnitId, int $customerId, ?int $layoutId = null): Invoice
     {
-        return app(\Modules\Core\Contracts\TenantExecutionContextInterface::class)->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId, $customerId, $layoutId): Invoice {
+        return app(TenantExecutionContextInterface::class)->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId, $customerId, $layoutId): Invoice {
             $invoice = new Invoice;
             $invoice->tenant_id = $tenantId;
             $invoice->organization_unit_id = $organizationUnitId;
@@ -440,6 +436,66 @@ final class InvoiceLayoutManagementTest extends TestCase
 
             return $invoice;
         });
+    }
+
+    public function test_index_includes_active_defaults_and_layout_assignment_to_invoice(): void
+    {
+        $context = $this->createAuthContext([
+            InvoicePermission::LAYOUTS_VIEW,
+            InvoicePermission::LAYOUTS_MANAGE,
+            InvoicePermission::VIEW,
+        ]);
+
+        // 1. List layouts and verify meta defaults
+        $response = $this->withAuth($context)->getJson('/api/v1/invoice-layouts')->assertOk();
+        $this->assertSame('standard_a4', $response->json('meta.defaults.tenant_default'));
+        $data = $response->json('data');
+        $standardLayout = collect($data)->firstWhere('code', 'standard_a4');
+        $this->assertNotNull($standardLayout);
+        $this->assertTrue($standardLayout['is_tenant_default']);
+
+        // 2. Create custom layout
+        $custom = $this->withAuth($context)->postJson('/api/v1/invoice-layouts', [
+            'code' => 'assigned_layout_v1',
+            'name' => 'Assigned Special Layout',
+            'paper_size' => 'a4',
+            'orientation' => 'portrait',
+            'view_template' => 'invoice.layouts.modern',
+            'is_active' => true,
+        ])->assertCreated()->json('data');
+
+        // 3. Create an invoice
+        $customerId = $this->customer($context['tenant_id'], $context['organization_unit_id']);
+        $invoice = $this->createInvoiceWithLayout($context['tenant_id'], $context['organization_unit_id'], $customerId);
+
+        $resolver = app(InvoiceLayoutResolverInterface::class);
+        $resolvedDefault = $resolver->resolve($invoice);
+        $this->assertSame('standard_a4', $resolvedDefault->code);
+
+        // 4. Assign custom layout to invoice
+        $patchResponse = $this->withAuth($context)->patchJson("/api/v1/invoices/{$invoice->id}/layout", [
+            'invoice_layout_id' => $custom['id'],
+        ])->assertOk();
+
+        $this->assertSame($custom['id'], $patchResponse->json('data.invoice_layout_id'));
+        $this->assertSame('assigned_layout_v1', $patchResponse->json('data.layout.code'));
+
+        // 5. Verify resolver now automatically picks the assigned layout
+        $invoice->refresh();
+        $this->assertSame($custom['id'], (int) $invoice->invoice_layout_id);
+        $resolvedAssigned = $resolver->resolve($invoice);
+        $this->assertSame('assigned_layout_v1', $resolvedAssigned->code);
+
+        // 6. Reset assigned layout back to null (inheriting default)
+        $resetResponse = $this->withAuth($context)->patchJson("/api/v1/invoices/{$invoice->id}/layout", [
+            'invoice_layout_id' => null,
+        ])->assertOk();
+
+        $this->assertNull($resetResponse->json('data.invoice_layout_id'));
+        $invoice->refresh();
+        $this->assertNull($invoice->invoice_layout_id);
+        $resolvedReset = $resolver->resolve($invoice);
+        $this->assertSame('standard_a4', $resolvedReset->code);
     }
 
     private function customer(int $tenantId, int $organizationUnitId): int

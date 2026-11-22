@@ -66,7 +66,7 @@ final class InvoiceCreationService
 
             // Creation has exactly one persisted initial state. Requested approved
             // or posted targets are applied below through legal lifecycle commands.
-            $invoice = new Invoice();
+            $invoice = new Invoice;
             $invoice->forceFill([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -90,6 +90,7 @@ final class InvoiceCreationService
                 'paid_total' => '0.000000',
                 'credit_total' => '0.000000',
                 'balance_due' => $calculation->grandTotal,
+                'invoice_layout_id' => $data->invoiceLayoutId,
                 'notes' => $data->notes,
                 'created_by' => $data->createdBy,
             ]);
