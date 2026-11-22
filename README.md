@@ -252,6 +252,7 @@ AutoERP/
 │   └── seeders/                  # Canonical DatabaseSeeder and module seeders
 ├── docs/
 │   ├── changes/                  # Shared append-only project memory records
+│   ├── project_knowledgebase.md  # Central technical knowledge base & developer guide
 │   └── knowledgebase.md          # Comprehensive canonical system specification
 ├── resources/
 │   ├── css/                      # Global styles and Tailwind CSS 4 directives
@@ -927,7 +928,7 @@ php artisan view:cache
 When modifying code or implementing new features:
 1. **Identify Module Responsibility:** Determine which of the 31 modules owns the capability. If logic belongs elsewhere, implement it in the owning module.
 2. **Check Single Source of Truth:** Ensure no business rule or calculation is duplicated.
-3. **Verify Evidence & Policies:** Consult `docs/knowledgebase.md`. If no commercial policy exists, physical facts may be recorded, but **no monetary transaction may be invented**.
+3. **Verify Evidence & Policies:** Consult `docs/project_knowledgebase.md` (and `docs/knowledgebase.md`). If no commercial policy exists, physical facts may be recorded, but **no monetary transaction may be invented**.
 4. **Enforce Optimistic Concurrency:** Require `expected_version` and increment `row_version` on every write.
 5. **Preserve Immutable History:** Record complete transition snapshots in append-only history tables.
 6. **Maintain UI Ergonomics:** Use `LookupSelect`, human-readable labels, progressive disclosure, and business date utilities.

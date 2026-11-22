@@ -1278,3 +1278,12 @@ These points must be clarified before implementation; guessing would risk incorr
 The videos provide a strong functional blueprint for a two-sided rental business: customer billing and vehicle-owner settlement are driven by a common daily usage record but governed by separate agreements. The most important target architecture decision is to make agreements versioned, running charts controlled and finalized, calculations transparent, and every financial posting immutable and atomic.
 
 The new AutoERP implementation should preserve the demonstrated business capabilities but must not clone the legacy desktop structure, raw-code-driven UX, numeric security levels or potentially mutable accounting behavior. The correct foundation is a modular rental domain with explicit states, human-readable relationships, concurrency-safe allocations, balanced journal posting and append-only audit history.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

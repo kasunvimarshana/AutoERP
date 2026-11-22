@@ -1533,3 +1533,12 @@ When extending or maintaining `VehicleRental`, developers must follow these engi
 ---
 
 *This guide represents the authoritative, complete specification of the AutoERP Vehicle Rental module. For inquiries or updates, refer to recent change records in `docs/changes/`.*
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

@@ -48,3 +48,12 @@ Tests cover leap/non-leap February, 31-day months, month-end anchor recovery, co
 No schema or relationship changes. Rental owns this estimate and uses Core decimal arithmetic. Tax, Invoice, Payment and Finance ownership stays unchanged.
 
 Mileage, driver/OT, AC, night-out, replacement charging, downtime deductions, deposits, tax and downstream financial creation are not included in `base_rent`. Do not display it as an all-inclusive rental bill. The wider commercial and release requirements remain governed by the module TODO; this endpoint cannot substitute for their implementation or UAT.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

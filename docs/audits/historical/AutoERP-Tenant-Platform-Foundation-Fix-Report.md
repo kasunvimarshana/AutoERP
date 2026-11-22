@@ -311,3 +311,12 @@ A fresh development database is required because the corrected source consolidat
 The previous legacy hierarchy, false readiness, incomplete administrator provisioning, unsafe domain readiness, mutable commercial lifecycle, weak Platform Administration, and unsafe storage contracts have been corrected at their owning modules.
 
 The source package is **statically verified and frontend-regression verified**, but final production readiness remains conditional on the listed Laravel/infrastructure runtime gates.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

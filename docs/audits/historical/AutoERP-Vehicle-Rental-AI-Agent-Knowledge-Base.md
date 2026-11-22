@@ -1895,3 +1895,12 @@ The recordings describe a dual-sided Vehicle Rental ERP domain:
 
 > **Canonical architecture rule:**  
 > Use one authoritative rental-usage stream, then derive separate customer-revenue and owner-cost streams with independent agreements, rates, calculations, taxes, documents, postings, and settlements.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

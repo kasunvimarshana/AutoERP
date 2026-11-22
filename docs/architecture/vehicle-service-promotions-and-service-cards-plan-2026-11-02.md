@@ -75,3 +75,12 @@ Eligibility evaluation, balance consumption, invoice posting, and immutable hist
 5. Add redemption/progress reports and reconcile posted invoice totals, promotion events, card balances, and reversals. Roll out behind the tenant feature entitlement after migration and role setup. Do not backfill historical invoices without an approved rule and reconciliation plan.
 
 Success means a customer or vehicle's fifth paid qualifying service earns exactly one reward, a sixth eligible service can consume it once, an issued card cannot exceed any benefit's use limit, two staff members cannot redeem the same remaining use, and invoice cancellation produces an auditable correction without rewriting history.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

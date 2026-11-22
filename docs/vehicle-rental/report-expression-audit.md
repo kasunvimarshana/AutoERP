@@ -51,3 +51,12 @@ Each referenced report needs both its table and memo file to reproduce the expre
 No runtime, schema, relationship or module ownership change is justified by these static findings. Keep general financial reporting with its owner modules. Rental must not compensate for possible legacy report presentation defects or import legacy option/account codes as modern rules.
 
 Remaining evidence needed for complete commercial implementation includes the accessible dedicated Rental agreement/Running Chart dataset or application outputs, verified narration/transcript for the four supplied videos, and authoritative resolution of the policy questions in the knowledge base. The password-protected nested backup remains uninspected. This audit neither recovers its password nor substitutes for that missing review.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

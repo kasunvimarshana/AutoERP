@@ -28,3 +28,12 @@ Extend the Business Overview dashboard with decision-ready employee performance 
 
 - Cross-organization-unit consolidation requires a separate authorized aggregation contract because current Finance and operational services intentionally scope one organization unit.
 - Historical as-of aging requires an authoritative historical invoice-balance service. Current invoice balance fields represent the present position and must not be used to invent past balances.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

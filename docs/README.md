@@ -9,7 +9,8 @@ Welcome to the **AutoERP Documentation Suite**. This directory contains the auth
 | Resource | Path | Description |
 |---|---|---|
 | **Repository Root Overview** | [`README.md`](file:///d:/project-new/AutoERP/README.md) | Ground-up platform architecture, technology stack, setup guide, and module catalog. |
-| **Enterprise Knowledge Base** | [`knowledgebase.md`](file:///d:/project-new/AutoERP/docs/knowledgebase.md) | Single canonical technical specification, developer onboarding handbook, and domain encyclopedia. |
+| **Project Knowledge Base & Technical Guide** | [`project_knowledgebase.md`](file:///d:/project-new/AutoERP/docs/project_knowledgebase.md) | Central technical knowledge base, developer onboarding handbook, module encyclopedia, and architecture manual. |
+| **Enterprise Knowledge Base** | [`knowledgebase.md`](file:///d:/project-new/AutoERP/docs/knowledgebase.md) | Canonical technical specification, developer onboarding handbook, and domain encyclopedia. |
 | **Core Engineering Axioms** | [`AGENTS.md`](file:///d:/project-new/AutoERP/AGENTS.md) / [`RULES.md`](file:///d:/project-new/AutoERP/RULES.md) | The 12 non-negotiable architectural axioms governing backend, frontend, database, concurrency, and UI/UX. |
 | **Audit Authority Protocol** | [`AUDIT_AUTHORITY.md`](file:///d:/project-new/AutoERP/docs/AUDIT_AUTHORITY.md) | Authoritative precedence hierarchy for reconciling code, tests, append-only change logs, and business evidence. |
 | **Vehicle Rental Technical Guide** | [`modules/vehicle_rental_complete_guide.md`](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md) | Complete end-to-end technical specification for commercial fleet leasing, running charts, billing, and settlements. |
@@ -23,6 +24,7 @@ Welcome to the **AutoERP Documentation Suite**. This directory contains the auth
 ```text
 docs/
 ├── README.md                                  # This documentation portal and catalog
+├── project_knowledgebase.md                   # Central technical knowledge base & developer guide
 ├── knowledgebase.md                           # Canonical system specification & developer guide
 ├── AGENTS.md                                  # The 12 Core Engineering Axioms & Rules
 ├── RULES.md                                   # Synchronized copy of the 12 Core Axioms

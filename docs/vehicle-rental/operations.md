@@ -104,3 +104,12 @@ Relationship review: no new tables, foreign keys, inverse links or duplicated id
 `GET vehicles/{vehicle}/sources` now requires `starts_at` and a present nullable `ends_at`. Both known timestamps require explicit numeric offsets and a nonempty increasing period. For an open-ended HTTP query send `ends_at=`; request normalization maps the explicit empty value to null. The UI sends the currently entered period and resets the selected owner agreement whenever either date or the vehicle changes.
 
 Only active source agreements for the selected physical vehicle and current tenant/organization are returned. Their start must cover the local input start date; a finite end must cover the last included second before the planned return. Null source ends are unbounded; a null planned end requires an unbounded source. This mirrors existing plan coverage, not a new financial calendar rule. Search remains grouped within scope and results retain normal pagination. Source selection does not inspect financial rates or certify availability, and the final command still validates source, agreement version and shared physical availability under locks. No schema, relationship or module boundary changes.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

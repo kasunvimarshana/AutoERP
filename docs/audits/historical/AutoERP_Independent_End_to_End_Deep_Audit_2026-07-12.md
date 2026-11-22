@@ -1115,3 +1115,12 @@ The correct correction is focused:
 > Keep each module’s business ownership, but complete the governed source-to-ledger contract at the Invoice, Payment, Tax, Purchase/Inventory, Vehicle Service, and Vehicle Rental boundaries.
 
 Until Invoice posting/reversal, Payment classification, accounting periods, generic Purchase/Inventory posting, Tax atomicity, posting-profile correctness, persistent schema strategy, and operational gates are corrected and verified, the project must not be approved for production financial use.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

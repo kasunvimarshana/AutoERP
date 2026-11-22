@@ -34,3 +34,12 @@ Status meanings:
 ## Closure rule
 
 A row moves to **Closed** only when the owning module contains the fix, focused regression coverage exists, and all required runtime gates have passed. Documentation or compatibility aliases alone never close a finding.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

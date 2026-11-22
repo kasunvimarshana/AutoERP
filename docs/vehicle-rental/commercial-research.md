@@ -153,3 +153,12 @@ Real MySQL/MariaDB concurrency and browser/UAT are separate acceptance evidence.
 The protected backup remains encrypted after previously documented exact-candidate checks. No candidate succeeded; no guessed variants or brute force were used. Source review continued without it. Thirty-second video sampling, selected full-resolution screens and an unsuccessful transcription experiment do not constitute full continuous review.
 
 Financial workflows, full video coverage and release gates remain visible in the TODO until actually delivered. External research resolves the design direction and narrows policy choices; it cannot honestly turn unimplemented workflows or unexecuted acceptance tests into completed work.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

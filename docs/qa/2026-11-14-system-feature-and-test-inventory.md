@@ -103,3 +103,12 @@ For exact sample amounts and a connected reconciliation dataset, use [the existi
 - Affected regression rows pass; source document, inventory, receivable/payable, ledger, dashboard/report and audit totals reconcile.
 - No unauthorized or cross-tenant access; invalid and conflicting writes create no partial state.
 - Record gaps between this source inventory and the deployed build as separate defects or scope decisions. Do not silently mark unverified features as passed.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

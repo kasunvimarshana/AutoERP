@@ -65,3 +65,12 @@ Then refresh signed-in sessions and assign:
 - both cancellation permissions to the intended administrator roles.
 
 The protected Super Admin role receives the complete active permission catalogue during synchronization.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

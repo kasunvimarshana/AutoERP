@@ -1419,3 +1419,12 @@ The correct AutoERP foundation is:
 > **allocation-first, agreement-versioned, Running-Chart-driven, source-consumption-safe, audit-immutable, concurrency-aware, and atomically accounting-integrated.**
 
 This design resolves the root cause instead of preserving legacy mistakes through compatibility workarounds.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

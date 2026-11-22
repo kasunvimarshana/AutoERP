@@ -82,3 +82,12 @@ Use append-only offer and card lifecycle events for create, pause, issue, transf
 - No voucher-module coupling, automatic historical invoice backfill, or editing of posted financial events.
 - Card artwork/printing is outside the transaction workflow. The system records the physical card number and benefits; printable artwork can be a later feature.
 - If the target environment has legacy promotion records, migration and reconciliation need a separate evidence-based mapping before the new feature is enabled.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

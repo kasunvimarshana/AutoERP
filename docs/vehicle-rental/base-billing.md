@@ -58,3 +58,12 @@ The separate base-rent estimate remains read-only. A preview alone does not rese
 ## Verification limits
 
 Automated coverage includes same-side overlap, independent sides, stale revisions, unknown/zero and precision handling, immutable values, cancellation/reissue, recorded voids, tenant/permission/feature enforcement, tax/plan reconciliation and actual Invoice-to-Finance posting/reversal in SQLite. These tests are not a real InnoDB contention run, an installed-production migration exercise, or human UAT. Two new table migrations require execution before enabling billing. Existing table migrations and historical financial records are not rewritten.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

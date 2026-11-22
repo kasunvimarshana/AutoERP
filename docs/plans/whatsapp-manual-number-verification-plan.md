@@ -216,3 +216,11 @@ Opening WhatsApp and sending a message are separate actions. If WhatsApp opens b
 
 If fully automatic verification becomes necessary later, replace only the transport and reply-confirmation portion with an official WhatsApp Business Platform integration and webhook. Keep normalization, challenge rules, audit history, authorization, status semantics, and number-change invalidation as the stable domain foundation.
 
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

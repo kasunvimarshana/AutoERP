@@ -81,3 +81,12 @@ Still outstanding: full source/audio review, protected backup contents, successo
 The customer agreement at `1.mp4` 03:15 and owner payable agreement context at 16:45 distinguish executing date from agreement/start/end dates. Capture it in both fresh aggregates, show it in review/history and validate calendar syntax. No cross-date ordering or mandatory-value rule is added without evidence. Draft edits and clearing the field preserve prior snapshots; activation freezes the recorded value. A pre-field history snapshot remains unknown rather than being backfilled from another date.
 
 The repository's fresh-only migration convention places the nullable column explicitly in each original agreement creation migration. This supports fresh installation, not automatic upgrade of an already migrated database. If previous fresh commits were installed, inspect the actual schema/migration journal and prepare a deployment-specific nullable-column upgrade without backfilling guessed dates or dropping records. No production database was inspected or modified here. Relationships and module ownership are unchanged.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

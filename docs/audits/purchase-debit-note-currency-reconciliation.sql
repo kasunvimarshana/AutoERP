@@ -1,3 +1,7 @@
+-- AutoERP Enterprise System
+-- Author: Kasun Vimarshana <kasunvmail@gmail.com>
+-- Phone: +94713525253
+--
 -- AutoERP Purchase debit-note currency/invoice reconciliation: READ ONLY.
 -- Execute manually on an authorized isolated copy of production-like MySQL data, after
 -- the Purchase currency-column upgrade is applied. Do NOT use a production connection.

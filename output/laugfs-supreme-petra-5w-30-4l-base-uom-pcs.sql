@@ -1,3 +1,7 @@
+-- AutoERP Enterprise System
+-- Author: Kasun Vimarshana <kasunvmail@gmail.com>
+-- Phone: +94713525253
+--
 -- MySQL/MariaDB maintenance script for item LAUGFS SUPREME PETRA 5W 30 4L.
 -- The supplied dump identifies item 683 in tenant 1 / organization unit 1,
 -- with PCS UOM 1, current stock 0.500000, an active PCS service item unit,

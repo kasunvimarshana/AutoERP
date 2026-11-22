@@ -527,3 +527,11 @@ Final pass criteria:
 - No raw relationship IDs, duplicate postings, negative unintended stock, stale overwrites, lost history, or cross-tenant data leakage is observed.
 - Every failed case leaves the database in its pre-action consistent state.
 
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

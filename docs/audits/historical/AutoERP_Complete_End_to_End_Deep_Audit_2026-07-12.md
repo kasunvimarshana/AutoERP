@@ -1488,3 +1488,12 @@ The current principal weakness is architectural: **Finance ownership is correct 
 The project should not be rewritten. The correct path is to retain the strong module foundations and fix the source-to-ledger contract at its owning boundaries.
 
 Until Invoice posting/reversal, Payment classification, accounting periods, generic Purchase/Inventory posting, Tax atomicity, and migration/operational gates are corrected and verified, the system must not be approved for production financial use.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

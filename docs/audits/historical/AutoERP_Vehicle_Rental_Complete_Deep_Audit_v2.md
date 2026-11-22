@@ -1247,3 +1247,12 @@ The correct AutoERP foundation is:
 10. Append-only audit and explicit document states.
 
 The legacy business capabilities should be preserved, but the legacy design mistakes—raw-code UI, duplicate lessor modules, mutable-looking financial forms, after-the-fact error checks, numeric security levels, and implicit vehicle allocation—must not be copied into the new AutoERP architecture.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

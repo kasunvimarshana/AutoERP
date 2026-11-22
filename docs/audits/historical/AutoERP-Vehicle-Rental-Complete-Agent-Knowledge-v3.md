@@ -2468,3 +2468,11 @@ Before declaring Vehicle Rental complete, verify:
 - [ ] Reports drill down to source documents.
 - [ ] Migrations, seeders, rollback, tests and build pass.
 
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

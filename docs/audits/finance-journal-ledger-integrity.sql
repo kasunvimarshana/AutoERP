@@ -1,3 +1,7 @@
+-- AutoERP Enterprise System
+-- Author: Kasun Vimarshana <kasunvmail@gmail.com>
+-- Phone: +94713525253
+--
 -- AutoERP Finance journal/ledger integrity audit. READ ONLY.
 -- Run against an authorized isolated MySQL 8+ restoration, not production.
 -- Amounts in debit/credit are journal transaction currency, not base currency.

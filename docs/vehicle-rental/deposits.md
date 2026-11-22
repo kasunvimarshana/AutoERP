@@ -41,3 +41,12 @@ The activated customer agreement already owns an immutable requirement and canno
 The customer agreement review exposes an optional deposit panel with human-readable payment links, method controls, received/applied/refunded/unapplied values and explicit document/posting states. Amounts on voided/reversed rows are history, not available money. Refresh after work in Payment. The read summary is informational; every creation rechecks capacity under the agreement lock. Payment allocations/refunds/reversals retain their own payment locks and version checks; no cross-module reverse dependency is added.
 
 Authenticated API tests cover receipt/retry/rollback, unknown/zero/draft rejection, stale agreement, source-field spoof rejection, authorization, entitlements, tenant isolation, partial receipts, posting, invoice application, partial refund, stale refund, refund reversal, receipt reversal and void/replacement. Frontend tests cover uncertain retry identity, over-collection prevention, guided methods, payment navigation and read-only access. Test ledger accounts are synthetic fixtures, not production configuration.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

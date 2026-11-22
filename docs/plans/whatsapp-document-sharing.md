@@ -100,3 +100,11 @@ The event means only that AutoERP opened the WhatsApp handoff. It does not claim
 - Existing Invoice and Purchase Order PDF regression suites.
 - Full frontend TypeScript validation.
 
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

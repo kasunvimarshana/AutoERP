@@ -193,3 +193,12 @@ The changed PHP files were syntax-checked and their internal imports were verifi
 ## 8. Migration and compatibility note
 
 The changes deliberately correct the current design instead of preserving flawed frontend contracts or plan lifecycle behavior. They do not add compatibility aliases for the removed plan-delete flow or the old Tenant error payload. API consumers must use the canonical versioned contracts in this package.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

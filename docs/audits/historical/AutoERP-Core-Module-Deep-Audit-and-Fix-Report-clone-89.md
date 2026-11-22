@@ -441,3 +441,12 @@ No workaround for these issues was added to Core.
 `app/Modules/Core` is now a smaller and stricter technical foundation. It no longer provides unsafe decimal fallback, permissive model defaults, implicit user-scope inference, reusable sequence rollback, feature-aware seed logic or no-op abstractions.
 
 The next recommended step is the coordinated `Tenant + OrganizationUnit + User/Auth + Authorization` schema and service refactor, using these corrected Core contracts.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

@@ -54,3 +54,12 @@ The backend derives agreement relationships from the selected chart; users never
 Service and authenticated HTTP coverage checks independent rates, all four categories, exact minute arithmetic, read-only quotes, unknown/zero handling, overflow, policy rejection, duplicate prevention, revision conflicts, tenant/permission/entitlement boundaries, immutable history, release/void/reissue, chart-reversal guards and rollback on incomplete Tax configuration. Both commercial sides execute Invoice approval, Finance posting, reversal and reissue with test-only account mappings. Frontend tests cover explicit acceptance, server quotes, unknown-value prevention, conflicts and governed correction actions.
 
 See the append-only [delivery record](../changes/2026-09-12-rental-usage-billing.md) for suite and migration results. Production-data migration, real database contention and human acceptance require their own execution evidence.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

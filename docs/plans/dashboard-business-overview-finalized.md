@@ -99,3 +99,12 @@ Zero-count actions are omitted. If every count is zero, the panel shows a clear 
 - Employee commission ranking. This remains in the Employee Commission Report until a dedicated compact dashboard contract is defined.
 - Cross-organization-unit aggregation. Users switch organization unit through the existing application header.
 - Historical as-of aging. The first release reports current balances grouped by due-date age.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

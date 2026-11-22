@@ -33,3 +33,12 @@ The Reporting module owns the read-only report projection. Vehicle lookup stays 
 - Backend feature coverage for authorization, tenant isolation, normalized vehicle registration lookup, Vehicle Service-only history, job links/identifiers, pagination, and commission grouping.
 - Frontend coverage for current-month defaults, progressive filters, employee drill-down, vehicle search/selection, expandable job history, and job navigation.
 - Targeted backend tests, targeted frontend tests, and a production frontend build.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

@@ -171,3 +171,12 @@ The PHP source was linted and frontend runtime contracts were compiled/tested, b
 ## Migration note
 
 This package is intended for the project’s current development stage. It corrects original create migrations and removes legacy design mistakes instead of adding compatibility migrations. Use a **fresh database migration and seed**. Do not apply these create-migration changes blindly to an existing production database.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

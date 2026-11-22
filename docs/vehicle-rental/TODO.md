@@ -420,3 +420,12 @@ No external provider's standard fee schedule, historic TACGL account ID or guess
 - Vitest frontend: 129 files / 468 tests passed.
 - TypeScript, ESLint, Vite build, Composer audit, and npm audit all passed with zero errors and zero vulnerabilities.
 See `docs/changes/2026-11-01-full-project-integration-and-verification.md` for complete verification evidence.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

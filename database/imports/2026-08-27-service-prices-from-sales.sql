@@ -1,3 +1,7 @@
+-- AutoERP Enterprise System
+-- Author: Kasun Vimarshana <kasunvmail@gmail.com>
+-- Phone: +94713525253
+--
 -- AutoERP service-price backfill from current sales prices
 -- Target: run after selecting the intended AutoERP database in phpMyAdmin.
 -- Behavior: copy current sales prices only for items that have no current service price.

@@ -45,3 +45,12 @@ Under `/api/v1/vehicle-rental/running-charts/{chart}/{kind}/charges/mileage`:
 The chart charge screen has an **Assess mileage** view, shows backend pricing and policy before acceptance, clears stale quotes after conflicts and reports zero-cost completion without claiming an invoice exists.
 
 See [the delivery record](../changes/2026-09-15-rental-mileage-assessment.md) for verification. This contract does not define whole-distance hire minimums, AC/driver-base tariffs, deposit disposition or downtime credits.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

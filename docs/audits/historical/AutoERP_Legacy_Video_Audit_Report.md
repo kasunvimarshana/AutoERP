@@ -538,3 +538,12 @@ Posted or finalized records must not be physically deleted.
 ## 12. Final conclusion
 
 The four videos collectively provide a strong functional blueprint for both the **rental** and **workshop** areas of AutoERP. The most important implementation principle is to preserve the real workflow and calculation behavior while redesigning security, data integrity, auditability, usability and module ownership. The target system should not copy the legacy screen structure or mutable accounting behavior.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

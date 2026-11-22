@@ -286,3 +286,12 @@ The cleanup will remain behavior-preserving and avoid schema or architecture cha
    adjustment remain broad `Record<string, unknown>` contracts.
 8. There is no frontend component-test infrastructure; frontend verification is
    currently typecheck and production build coverage.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

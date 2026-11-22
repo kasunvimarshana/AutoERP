@@ -1046,3 +1046,12 @@ Navigate to **Vehicle Rental** > **Reports & Matrix Sheet** (`/vehicle-rental/re
 ---
 
 *End of User Guide. For technical issues, database schemas, or system integration details, please refer to the [Vehicle Rental Developer Manual](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md).*
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

@@ -62,3 +62,12 @@ The response contains the created assignment resources. The client then refreshe
 - A failed batch cannot leave partial assignments.
 - Stale Job Card data is detected using `expected_version`.
 - Backend and frontend focused tests, TypeScript validation, and production build pass.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

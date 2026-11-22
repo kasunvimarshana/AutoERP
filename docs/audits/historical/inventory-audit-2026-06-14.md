@@ -104,3 +104,12 @@ Baseline verification:
 - Add only the schema needed for uniqueness, UOM traceability, numbering safety, and audit preservation.
 - Split large services and frontend components only along existing workflow responsibilities.
 - Reject stale or ambiguous operations rather than silently reconciling unverifiable data.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

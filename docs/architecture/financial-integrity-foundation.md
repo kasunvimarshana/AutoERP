@@ -52,3 +52,12 @@ Invoice header snapshots retain party number, code, name, legal name, tax regist
 ## Follow-up boundaries
 
 This slice does not replace mutable Payment lifecycle state, introduce Finance account roles, or make ledger projections authoritative. Complete source-provider registry hardening and concurrent owner-source adversarial execution remain part of the following milestone batches and must not be implemented through compatibility code in Invoice.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

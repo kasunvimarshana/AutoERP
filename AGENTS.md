@@ -77,3 +77,12 @@
 - **Before starting any task**: Read recent records in `/docs/changes` to understand context and avoid repeating or conflicting work.
 - **During the task**: Modify only the files necessary for the requested feature or fix; avoid touching unrelated files.
 - **After completing the task**: Create a new record in `/docs/changes` detailing what was changed, why, and the verification results. Never edit or delete existing change records.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

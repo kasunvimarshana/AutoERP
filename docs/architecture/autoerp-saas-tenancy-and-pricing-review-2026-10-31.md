@@ -202,3 +202,12 @@ Evidence: [Tenant configuration](../../app/Modules/Tenant/Config/tenant.php), [e
 - Focused Tenant tests passed: 23 tests, 43 assertions, covering domain rules, the supported database strategy, subscription command dates and subscription mutation policy.
 - A broader Tenant test run was stopped after prolonged lack of progress; it did not produce a completed result. No full-suite success is claimed. The focused passing tests do not cover the cross-service inconsistencies identified above.
 - No application-code fixes, migrations, DNS changes or production acceptance testing were performed.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+

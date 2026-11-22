@@ -54,3 +54,12 @@ This column alone is insufficient: it cannot identify the card, offer, customer 
 Create each new table in its own explicit migration in dependency order, followed by the single additive Vehicle Service line migration. Use Laravel's portable schema APIs and explicit columns, foreign keys, and indexes. The current base migrations are already part of deployed history, so do not rewrite them for this feature. No data backfill is needed: cards and offers start empty, old job lines get zero promotional discount, and past invoices do not qualify before assignment.
 
 This is a schema design review, not a claim that current production data was inspected or migrated. Confirm branch/day eligibility details and replacement/transfer permissions before writing migrations.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+
