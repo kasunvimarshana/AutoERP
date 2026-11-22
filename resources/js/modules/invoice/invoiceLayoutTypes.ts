@@ -63,7 +63,13 @@ export interface UpdateInvoiceLayoutPayload {
 export interface SetDefaultInvoiceLayoutPayload {
     code: string;
     organization_unit_id?: number | null;
-    scope?: 'tenant' | 'organization_unit';
+    scope?: 'tenant' | 'organization_unit' | 'printer';
+    printer?: string;
+}
+
+export interface PrinterAssignmentsResponse {
+    assignments: Record<string, string>;
+    organization_unit_id: number | null;
 }
 
 export interface InvoiceLayoutFilterParams {

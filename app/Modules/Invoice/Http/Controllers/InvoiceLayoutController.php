@@ -115,22 +115,61 @@ final class InvoiceLayoutController
     {
         $tenantId = $this->currentTenantId($request);
         $userId = $this->currentUserId($request);
+        $scope = $request->scope();
+        $printer = $request->printer();
         $organizationUnitId = $request->has('organization_unit_id')
             ? $request->organizationUnitId()
-            : ($request->input('scope') === 'tenant' ? null : $this->currentOrganizationUnitId($request));
+            : ($scope === 'tenant' ? null : $this->currentOrganizationUnitId($request));
 
         $this->layouts->setDefault(
             $tenantId,
             $organizationUnitId,
             $request->code(),
             $userId,
+            $printer,
         );
 
         return response()->json([
             'data' => [
                 'success' => true,
                 'code' => $request->code(),
-                'scope' => $organizationUnitId === null ? 'tenant' : 'organization_unit',
+                'scope' => $scope,
+                'printer' => $printer,
+                'organization_unit_id' => $organizationUnitId,
+            ],
+        ]);
+    }
+
+    public function printerAssignments(Request $request): JsonResponse
+    {
+        $tenantId = $this->currentTenantId($request);
+        $organizationUnitId = $request->has('organization_unit_id')
+            ? (int) $request->query('organization_unit_id')
+            : $this->currentOrganizationUnitId($request);
+
+        $assignments = $this->layouts->getPrinterAssignments($tenantId, $organizationUnitId);
+
+        return response()->json([
+            'data' => [
+                'assignments' => $assignments,
+                'organization_unit_id' => $organizationUnitId,
+            ],
+        ]);
+    }
+
+    public function deletePrinterAssignment(Request $request, string $printer): JsonResponse
+    {
+        $tenantId = $this->currentTenantId($request);
+        $organizationUnitId = $request->has('organization_unit_id')
+            ? (int) $request->input('organization_unit_id')
+            : $this->currentOrganizationUnitId($request);
+
+        $this->layouts->removePrinterAssignment($tenantId, $organizationUnitId, $printer);
+
+        return response()->json([
+            'data' => [
+                'success' => true,
+                'printer' => $printer,
             ],
         ]);
     }

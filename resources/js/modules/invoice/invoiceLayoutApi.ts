@@ -6,6 +6,7 @@ import type {
     InvoiceLayout,
     InvoiceLayoutFilterParams,
     SetDefaultInvoiceLayoutPayload,
+    PrinterAssignmentsResponse,
     UpdateInvoiceLayoutPayload,
 } from './invoiceLayoutTypes';
 
@@ -52,16 +53,36 @@ export async function previewInvoiceLayout(
 }
 
 export async function setDefaultInvoiceLayout(payload: SetDefaultInvoiceLayoutPayload): Promise<{
-    message: string;
+    success: boolean;
     scope: string;
     code: string;
+    printer?: string;
     organization_unit_id: number | null;
 }> {
     const response = await apiClient.post<ApiResource<{
-        message: string;
+        success: boolean;
         scope: string;
         code: string;
+        printer?: string;
         organization_unit_id: number | null;
     }>>(`${endpoints.invoiceLayouts}/set-default`, payload);
+    return response.data.data;
+}
+
+export async function listPrinterAssignments(organizationUnitId?: number, signal?: AbortSignal): Promise<Record<string, string>> {
+    const response = await apiClient.get<ApiResource<PrinterAssignmentsResponse>>(`${endpoints.invoiceLayouts}/printer-assignments`, {
+        params: organizationUnitId ? { organization_unit_id: organizationUnitId } : undefined,
+        signal,
+    });
+    return response.data.data.assignments;
+}
+
+export async function deletePrinterAssignment(printer: string, organizationUnitId?: number): Promise<{ success: boolean; printer: string }> {
+    const response = await apiClient.delete<ApiResource<{ success: boolean; printer: string }>>(
+        `${endpoints.invoiceLayouts}/printer-assignments/${encodeURIComponent(printer)}`,
+        {
+            data: organizationUnitId ? { organization_unit_id: organizationUnitId } : undefined,
+        },
+    );
     return response.data.data;
 }

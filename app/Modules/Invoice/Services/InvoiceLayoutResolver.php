@@ -19,14 +19,14 @@ final readonly class InvoiceLayoutResolver implements InvoiceLayoutResolverInter
         private InvoiceLayoutProvisioner $provisioner,
     ) {}
 
-    public function resolve(Invoice $invoice, ?string $explicitLayoutCode = null): InvoiceLayout
+    public function resolve(Invoice $invoice, ?string $explicitLayoutCode = null, ?string $printer = null): InvoiceLayout
     {
         $tenantId = (int) $invoice->tenant_id;
         $organizationUnitId = $invoice->organization_unit_id === null
             ? null
             : (int) $invoice->organization_unit_id;
 
-        return $this->executionContext->runForTenant($tenantId, function () use ($invoice, $tenantId, $organizationUnitId, $explicitLayoutCode): InvoiceLayout {
+        return $this->executionContext->runForTenant($tenantId, function () use ($invoice, $tenantId, $organizationUnitId, $explicitLayoutCode, $printer): InvoiceLayout {
             $this->ensureProvisioned($tenantId);
 
             if ($explicitLayoutCode !== null && trim($explicitLayoutCode) !== '') {
@@ -38,6 +38,13 @@ final readonly class InvoiceLayoutResolver implements InvoiceLayoutResolverInter
 
                 if ($layout instanceof InvoiceLayout) {
                     return $layout;
+                }
+            }
+
+            if ($printer !== null && trim($printer) !== '') {
+                $printerLayout = $this->resolvePrinterLayout($tenantId, $organizationUnitId, trim($printer));
+                if ($printerLayout instanceof InvoiceLayout) {
+                    return $printerLayout;
                 }
             }
 
@@ -53,21 +60,47 @@ final readonly class InvoiceLayoutResolver implements InvoiceLayoutResolverInter
                 }
             }
 
-            return $this->resolveForScopeInternal($tenantId, $organizationUnitId);
+            return $this->resolveForScopeInternal($tenantId, $organizationUnitId, $printer);
         });
     }
 
-    public function resolveForScope(int $tenantId, ?int $organizationUnitId = null): InvoiceLayout
+    public function resolveForScope(int $tenantId, ?int $organizationUnitId = null, ?string $printer = null): InvoiceLayout
     {
         return $this->executionContext->runForTenant(
             $tenantId,
-            fn (): InvoiceLayout => $this->resolveForScopeInternal($tenantId, $organizationUnitId),
+            fn (): InvoiceLayout => $this->resolveForScopeInternal($tenantId, $organizationUnitId, $printer),
         );
     }
 
-    private function resolveForScopeInternal(int $tenantId, ?int $organizationUnitId): InvoiceLayout
+    private function resolvePrinterLayout(int $tenantId, ?int $organizationUnitId, string $printer): ?InvoiceLayout
+    {
+        $printerMap = $this->configurationValue($tenantId, $organizationUnitId, self::PRINTER_LAYOUTS_KEY);
+        if (is_array($printerMap) && isset($printerMap[$printer]) && is_string($printerMap[$printer]) && trim($printerMap[$printer]) !== '') {
+            $layout = InvoiceLayout::query()
+                ->where('tenant_id', $tenantId)
+                ->where('code', trim($printerMap[$printer]))
+                ->active()
+                ->first();
+
+            if ($layout instanceof InvoiceLayout) {
+                return $layout;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveForScopeInternal(int $tenantId, ?int $organizationUnitId, ?string $printer = null): InvoiceLayout
     {
         $this->ensureProvisioned($tenantId);
+
+        // 0. Try printer-specific layout if printer is supplied
+        if ($printer !== null && trim($printer) !== '') {
+            $printerLayout = $this->resolvePrinterLayout($tenantId, $organizationUnitId, trim($printer));
+            if ($printerLayout instanceof InvoiceLayout) {
+                return $printerLayout;
+            }
+        }
 
         // 1. Try invoice.default_layout configuration
         $configuredCode = $this->configurationValue($tenantId, $organizationUnitId, self::DEFAULT_LAYOUT_KEY);

@@ -81,6 +81,12 @@ Route::prefix('api/v1/invoice-layouts')->middleware($middleware)->name('api.v1.i
     Route::post('set-default', [InvoiceLayoutController::class, 'setDefault'])
         ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
         ->name('set-default');
+    Route::get('printer-assignments', [InvoiceLayoutController::class, 'printerAssignments'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
+        ->name('printer-assignments');
+    Route::delete('printer-assignments/{printer}', [InvoiceLayoutController::class, 'deletePrinterAssignment'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
+        ->name('delete-printer-assignment');
     Route::get('{layout}', [InvoiceLayoutController::class, 'show'])
         ->whereNumber('layout')
         ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))

@@ -22,6 +22,7 @@ import {
 import type { InvoiceLayout } from '../invoiceLayoutTypes';
 import { InvoiceLayoutPreviewModal } from '../components/InvoiceLayoutPreviewModal';
 import { InvoiceLayoutEditorDrawer } from '../components/InvoiceLayoutEditorDrawer';
+import { InvoicePrinterAssignmentsModal } from '../components/InvoicePrinterAssignmentsModal';
 
 export default function InvoiceLayoutsPage() {
     const auth = useAuth();
@@ -35,6 +36,7 @@ export default function InvoiceLayoutsPage() {
     const [previewLayout, setPreviewLayout] = useState<InvoiceLayout | null>(null);
     const [editingLayout, setEditingLayout] = useState<InvoiceLayout | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [printerModalOpen, setPrinterModalOpen] = useState(false);
     const [deletingLayout, setDeletingLayout] = useState<InvoiceLayout | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -139,9 +141,14 @@ export default function InvoiceLayoutsPage() {
                 description="Manage and customize printable invoice formats, templates, and default layouts for your organization and branches."
                 actions={
                     canManage ? (
-                        <Button onClick={handleCreateNew}>
-                            + New Custom Layout
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button variant="secondary" onClick={() => setPrinterModalOpen(true)}>
+                                Printer Defaults
+                            </Button>
+                            <Button onClick={handleCreateNew}>
+                                + New Custom Layout
+                            </Button>
+                        </div>
                     ) : undefined
                 }
             />
@@ -334,6 +341,15 @@ export default function InvoiceLayoutsPage() {
                 loading={deleteLoading}
                 onConfirm={() => void handleDeleteConfirm()}
                 onCancel={() => setDeletingLayout(null)}
+            />
+
+            {/* Printer Assignments Modal */}
+            <InvoicePrinterAssignmentsModal
+                open={printerModalOpen}
+                layouts={layouts ?? []}
+                organizationUnitId={auth.organizationUnit?.id != null ? Number(auth.organizationUnit.id) : null}
+                organizationUnitName={auth.organizationUnit?.name}
+                onClose={() => setPrinterModalOpen(false)}
             />
         </div>
     );

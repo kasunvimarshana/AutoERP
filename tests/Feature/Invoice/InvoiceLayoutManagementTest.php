@@ -343,7 +343,73 @@ final class InvoiceLayoutManagementTest extends TestCase
             ->assertNotFound();
     }
 
-    private function createInvoiceWithLayout(int $tenantId, int $organizationUnitId, int $customerId, int $layoutId): Invoice
+    public function test_printer_scope_layout_assignment_and_resolution(): void
+    {
+        $context = $this->createAuthContext([
+            InvoicePermission::LAYOUTS_VIEW,
+            InvoicePermission::LAYOUTS_MANAGE,
+            InvoicePermission::VIEW,
+        ]);
+        $tenantId = (int) $context['tenant_id'];
+        $ouId = (int) $context['organization_unit_id'];
+
+        // 1. Assign printer pos_front_desk to thermal layout
+        $assignPos = $this->withAuth($context)->postJson('/api/v1/invoice-layouts/set-default', [
+            'code' => InvoiceLayoutProvisioner::SYSTEM_POS_THERMAL,
+            'scope' => 'printer',
+            'printer' => 'pos_front_desk',
+        ]);
+        $assignPos->assertOk();
+        $assignPos->assertJsonPath('data.scope', 'printer');
+        $assignPos->assertJsonPath('data.printer', 'pos_front_desk');
+        $assignPos->assertJsonPath('data.code', InvoiceLayoutProvisioner::SYSTEM_POS_THERMAL);
+
+        // 2. Assign printer dotmatrix_wh to continuous layout
+        $assignContinuous = $this->withAuth($context)->postJson('/api/v1/invoice-layouts/set-default', [
+            'code' => InvoiceLayoutProvisioner::SYSTEM_CONTINUOUS,
+            'scope' => 'printer',
+            'printer' => 'dotmatrix_wh',
+        ]);
+        $assignContinuous->assertOk();
+
+        // 3. Query printer assignments list endpoint
+        $listRes = $this->withAuth($context)->getJson('/api/v1/invoice-layouts/printer-assignments');
+        $listRes->assertOk();
+        $listRes->assertJsonPath('data.assignments.pos_front_desk', InvoiceLayoutProvisioner::SYSTEM_POS_THERMAL);
+        $listRes->assertJsonPath('data.assignments.dotmatrix_wh', InvoiceLayoutProvisioner::SYSTEM_CONTINUOUS);
+
+        // 4. Test resolution via InvoiceLayoutResolverInterface
+        /** @var InvoiceLayoutResolverInterface $resolver */
+        $resolver = app(InvoiceLayoutResolverInterface::class);
+
+        $resolvedPos = $resolver->resolveForScope($tenantId, $ouId, 'pos_front_desk');
+        $this->assertSame(InvoiceLayoutProvisioner::SYSTEM_POS_THERMAL, $resolvedPos->code);
+
+        $resolvedDm = $resolver->resolveForScope($tenantId, $ouId, 'dotmatrix_wh');
+        $this->assertSame(InvoiceLayoutProvisioner::SYSTEM_CONTINUOUS, $resolvedDm->code);
+
+        // Unassigned printer falls back to standard_a4
+        $resolvedDefault = $resolver->resolveForScope($tenantId, $ouId, 'unassigned_printer');
+        $this->assertSame(InvoiceLayoutProvisioner::SYSTEM_STANDARD_A4, $resolvedDefault->code);
+
+        // 5. Create invoice and verify invoice resolution with printer parameter
+        $customerId = $this->customer($tenantId, $ouId);
+        $invoice = $this->createInvoiceWithLayout($tenantId, $ouId, $customerId, null);
+
+        $resolvedInvoicePos = $resolver->resolve($invoice, printer: 'pos_front_desk');
+        $this->assertSame(InvoiceLayoutProvisioner::SYSTEM_POS_THERMAL, $resolvedInvoicePos->code);
+
+        // 6. Delete printer assignment
+        $delRes = $this->withAuth($context)->deleteJson('/api/v1/invoice-layouts/printer-assignments/pos_front_desk');
+        $delRes->assertOk();
+        $delRes->assertJsonPath('data.printer', 'pos_front_desk');
+
+        // After deletion, pos_front_desk falls back to default layout
+        $resolvedAfterDel = $resolver->resolveForScope($tenantId, $ouId, 'pos_front_desk');
+        $this->assertSame(InvoiceLayoutProvisioner::SYSTEM_STANDARD_A4, $resolvedAfterDel->code);
+    }
+
+    private function createInvoiceWithLayout(int $tenantId, int $organizationUnitId, int $customerId, ?int $layoutId = null): Invoice
     {
         return app(\Modules\Core\Contracts\TenantExecutionContextInterface::class)->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId, $customerId, $layoutId): Invoice {
             $invoice = new Invoice;

@@ -19,13 +19,26 @@ final class SetDefaultInvoiceLayoutRequest extends FormRequest
         return [
             'code' => ['required', 'string', 'max:64'],
             'organization_unit_id' => ['nullable', 'integer'],
-            'scope' => ['nullable', 'string', 'in:tenant,organization_unit'],
+            'scope' => ['nullable', 'string', 'in:tenant,organization_unit,printer'],
+            'printer' => ['required_if:scope,printer', 'nullable', 'string', 'max:128', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
         ];
     }
 
     public function code(): string
     {
         return trim((string) $this->validated('code'));
+    }
+
+    public function scope(): string
+    {
+        return (string) ($this->validated('scope') ?? ($this->organizationUnitId() !== null ? 'organization_unit' : 'tenant'));
+    }
+
+    public function printer(): ?string
+    {
+        $value = $this->validated('printer');
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
     public function organizationUnitId(): ?int

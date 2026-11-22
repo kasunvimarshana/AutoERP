@@ -233,9 +233,9 @@ final readonly class InvoiceLayoutService
         });
     }
 
-    public function setDefault(int $tenantId, ?int $organizationUnitId, string $layoutCode, int $userId): void
+    public function setDefault(int $tenantId, ?int $organizationUnitId, string $layoutCode, int $userId, ?string $printer = null): void
     {
-        $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId, $layoutCode): void {
+        $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId, $layoutCode, $printer): void {
             if (InvoiceLayout::query()->where('tenant_id', $tenantId)->count() === 0) {
                 $this->provisioner->provision($tenantId);
             }
@@ -261,6 +261,52 @@ final readonly class InvoiceLayoutService
                 tenantId: $tenantId,
                 organizationUnitId: $organizationUnitId,
             );
+
+            if ($printer !== null && trim($printer) !== '') {
+                $cleanPrinter = trim($printer);
+                $key = InvoiceLayoutResolverInterface::PRINTER_LAYOUTS_KEY;
+                $existing = $this->configurationRepository->findExact($context, $key);
+
+                $currentMap = [];
+                if ($existing !== null && is_string($existing->storedValue)) {
+                    try {
+                        $decoded = json_decode($existing->storedValue, true, 512, JSON_THROW_ON_ERROR);
+                        $currentMap = is_array($decoded) ? $decoded : [];
+                    } catch (\Throwable) {
+                        $currentMap = [];
+                    }
+                }
+
+                $currentMap[$cleanPrinter] = $layout->code;
+                $encodedValue = json_encode($currentMap, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+                if ($existing !== null) {
+                    $this->configurationRepository->updateExpected(
+                        $existing,
+                        $existing->rowVersion,
+                        [
+                            'value' => $encodedValue,
+                            'value_type' => 'json',
+                            'is_sensitive' => false,
+                            'definition_version' => 1,
+                        ],
+                    );
+                } else {
+                    $this->configurationRepository->create($context, [
+                        'key' => $key,
+                        'value' => $encodedValue,
+                        'value_type' => 'json',
+                        'is_sensitive' => false,
+                        'definition_version' => 1,
+                    ]);
+                }
+
+                if ($this->configurationResolver instanceof ResolveConfiguration) {
+                    $this->configurationResolver->forget($context, $key);
+                }
+
+                return;
+            }
 
             $key = InvoiceLayoutResolverInterface::DEFAULT_LAYOUT_KEY;
             $existing = $this->configurationRepository->findExact($context, $key);
@@ -289,6 +335,82 @@ final readonly class InvoiceLayoutService
 
             if ($this->configurationResolver instanceof ResolveConfiguration) {
                 $this->configurationResolver->forget($context, $key);
+            }
+        });
+    }
+
+    /** @return array<string, string> */
+    public function getPrinterAssignments(int $tenantId, ?int $organizationUnitId = null): array
+    {
+        return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId): array {
+            $scope = $organizationUnitId === null
+                ? ConfigurationScope::TENANT
+                : ConfigurationScope::ORGANIZATION_UNIT;
+
+            $context = new ConfigurationScopeContext(
+                scope: $scope,
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+            );
+
+            $existing = $this->configurationRepository->findExact($context, InvoiceLayoutResolverInterface::PRINTER_LAYOUTS_KEY);
+            if ($existing === null || ! is_string($existing->storedValue)) {
+                return [];
+            }
+
+            try {
+                $decoded = json_decode($existing->storedValue, true, 512, JSON_THROW_ON_ERROR);
+
+                return is_array($decoded) ? $decoded : [];
+            } catch (\Throwable) {
+                return [];
+            }
+        });
+    }
+
+    public function removePrinterAssignment(int $tenantId, ?int $organizationUnitId, string $printer): void
+    {
+        $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $organizationUnitId, $printer): void {
+            $scope = $organizationUnitId === null
+                ? ConfigurationScope::TENANT
+                : ConfigurationScope::ORGANIZATION_UNIT;
+
+            $context = new ConfigurationScopeContext(
+                scope: $scope,
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+            );
+
+            $key = InvoiceLayoutResolverInterface::PRINTER_LAYOUTS_KEY;
+            $existing = $this->configurationRepository->findExact($context, $key);
+            if ($existing === null || ! is_string($existing->storedValue)) {
+                return;
+            }
+
+            try {
+                $currentMap = json_decode($existing->storedValue, true, 512, JSON_THROW_ON_ERROR);
+                if (! is_array($currentMap) || ! isset($currentMap[trim($printer)])) {
+                    return;
+                }
+                unset($currentMap[trim($printer)]);
+                $encodedValue = json_encode($currentMap, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+                $this->configurationRepository->updateExpected(
+                    $existing,
+                    $existing->rowVersion,
+                    [
+                        'value' => $encodedValue,
+                        'value_type' => 'json',
+                        'is_sensitive' => false,
+                        'definition_version' => 1,
+                    ],
+                );
+
+                if ($this->configurationResolver instanceof ResolveConfiguration) {
+                    $this->configurationResolver->forget($context, $key);
+                }
+            } catch (\Throwable) {
+                // Ignore decoding errors
             }
         });
     }

@@ -81,6 +81,7 @@ final class InvoicePrintService
         string $mode = 'print',
         ?InvoicePrintContext $printContext = null,
         ?InvoiceLayout $requestedLayout = null,
+        ?string $printer = null,
     ): array {
         $this->executionContext->runForTenant((int) $invoice->tenant_id, static fn () => $invoice->loadMissing([
             'tenant',
@@ -102,7 +103,7 @@ final class InvoicePrintService
             ? $this->snapshotParty($snapshot, 'buyer')
             : $this->purchaser($invoice);
         $taxLabel = $this->taxLabel($invoice->lines);
-        $resolvedLayout = $requestedLayout ?? $this->resolveLayout($invoice);
+        $resolvedLayout = $requestedLayout ?? $this->resolveLayout($invoice, printer: $printer);
         $layout = $resolvedLayout->toLegacyPrintLayout();
         $usesFocusedPrint = $this->usesFocusedPrint($invoice);
         $usesOutboundLayout = $this->isOutbound($invoice)
@@ -187,14 +188,14 @@ final class InvoicePrintService
         ];
     }
 
-    public function layout(Invoice $invoice, ?string $explicitCode = null): InvoicePrintLayout
+    public function layout(Invoice $invoice, ?string $explicitCode = null, ?string $printer = null): InvoicePrintLayout
     {
-        return $this->resolveLayout($invoice, $explicitCode)->toLegacyPrintLayout();
+        return $this->resolveLayout($invoice, $explicitCode, $printer)->toLegacyPrintLayout();
     }
 
-    public function resolveLayout(Invoice $invoice, ?string $explicitCode = null): InvoiceLayout
+    public function resolveLayout(Invoice $invoice, ?string $explicitCode = null, ?string $printer = null): InvoiceLayout
     {
-        return $this->layoutResolver->resolve($invoice, $explicitCode);
+        return $this->layoutResolver->resolve($invoice, $explicitCode, $printer);
     }
 
     public function filename(Invoice $invoice): string
