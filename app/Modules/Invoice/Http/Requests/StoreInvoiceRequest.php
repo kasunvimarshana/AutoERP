@@ -109,7 +109,7 @@ final class StoreInvoiceRequest extends TenantScopedRequest
                 'nullable',
                 'integer',
                 'min:1',
-                Rule::exists('invoice_layouts', 'id')->where('tenant_id', $this->tenantId()),
+                $this->tenantExists('invoice_layouts'),
             ],
             'idempotency_key' => $this->routeIs('api.v1.invoices.store')
                 ? ['required', 'string', 'max:'.self::IDEMPOTENCY_KEY_MAX_LENGTH]

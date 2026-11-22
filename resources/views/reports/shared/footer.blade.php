@@ -1,3 +1,10 @@
+{{--
+AutoERP Enterprise System
+
+@author Kasun Vimarshana <kasunvmail@gmail.com>
+
+Phone: +94713525253
+--}}
 <table class="report-footer" role="presentation">
     <tr>
         <td>{{ $branding['tenant_name'] ?? $branding['company_name'] }}</td>

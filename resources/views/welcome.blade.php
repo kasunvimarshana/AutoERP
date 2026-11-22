@@ -1,3 +1,10 @@
+{{--
+AutoERP Enterprise System
+
+@author Kasun Vimarshana <kasunvmail@gmail.com>
+
+Phone: +94713525253
+--}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>

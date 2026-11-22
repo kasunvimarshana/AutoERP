@@ -1,3 +1,11 @@
+"""
+AutoERP Enterprise System
+
+@author Kasun Vimarshana <kasunvmail@gmail.com>
+
+Phone: +94713525253
+"""
+
 from pathlib import Path
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor

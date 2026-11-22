@@ -324,3 +324,11 @@ No persisted tables. Reporting reads domain-owned data and does not duplicate bu
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
 | `audit_logs` | Immutable, append-only audit events with actor/scope snapshots and bounded sanitized payloads. | canonical subject/source references; no lifecycle foreign keys | tenant and organization scoped; permission-controlled reads; no updates or deletes |
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

@@ -50,3 +50,11 @@ $table->primary(
     'reference_values_tenant_code_pk',
 );
 ```
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

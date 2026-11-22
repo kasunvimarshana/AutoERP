@@ -139,3 +139,11 @@ A release environment must run:
 6. refresh reuse/family compromise tests;
 7. Tenant-A/Tenant-B and OU-A/OU-B adversarial tests;
 8. browser tests using verified tenant hosts and HTTP-only refresh cookies.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

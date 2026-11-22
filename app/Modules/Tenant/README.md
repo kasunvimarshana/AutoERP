@@ -135,3 +135,11 @@ Before release:
 6. configure database permissions that prevent direct mutation of append-only audit/history tables.
 
 Corrected create migrations are intended for a fresh development schema. Existing deployed databases require a reviewed data/schema migration plan; do not apply them blindly.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

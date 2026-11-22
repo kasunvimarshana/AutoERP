@@ -1,3 +1,10 @@
+{{--
+AutoERP Enterprise System
+
+@author Kasun Vimarshana <kasunvmail@gmail.com>
+
+Phone: +94713525253
+--}}
 <div class="document-title">
     <div class="title-box">{{ $document['title'] }}</div>
 </div>

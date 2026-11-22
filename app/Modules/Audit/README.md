@@ -41,3 +41,11 @@ Use the canonical values from `AuditEventCategory`; feature modules must not inv
 - Purchase: `purchase.fast_purchase.completed`
 
 Additional modules must emit events from their own application services at confirmed business transition points. Do not add generic model observers or Audit-owned business inference.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

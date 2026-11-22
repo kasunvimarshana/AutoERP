@@ -1,3 +1,10 @@
+{{--
+AutoERP Enterprise System
+
+@author Kasun Vimarshana <kasunvmail@gmail.com>
+
+Phone: +94713525253
+--}}
 @php($formatter = app(\Modules\Reporting\Services\ReportValueFormatter::class))
 @if ($rows === [])
     <div class="empty-state">No records matched the selected report filters.</div>

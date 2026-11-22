@@ -29,3 +29,11 @@ Each module registers only the settings it owns under `configuration.definitions
 - Configuration changes are recorded through the Audit module.
 
 Reference catalogs are owned by `Modules/ReferenceData`.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

@@ -41,6 +41,7 @@ return new class extends Migration
             $table->char('currency_code_snapshot', 3)->nullable();
             $table->string('currency_name_snapshot', 150)->nullable();
             $table->string('currency_symbol_snapshot', 16)->nullable();
+            $table->unsignedBigInteger('invoice_layout_id')->nullable();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
             $table->string('status', 40)->default('draft');
             $table->decimal('subtotal', 20, 6)->default('0');
@@ -71,6 +72,11 @@ return new class extends Migration
             $table->index(['party_type', 'party_id'], 'invoices_party_ix');
 
             $table->unique(['id', 'tenant_id'], 'invoices_id_tenant_uk');
+            $table->index(['tenant_id', 'invoice_layout_id'], 'invoices_tenant_layout_ix');
+            $table->foreign(['invoice_layout_id', 'tenant_id'], 'invoices_invoice_layout_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('invoice_layouts')
+                ->restrictOnDelete();
             $table->foreign(['organization_unit_id', 'tenant_id'], 'invoices_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')

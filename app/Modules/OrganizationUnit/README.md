@@ -76,3 +76,11 @@ Deactivation and retirement run registered lifecycle blockers. User assignments 
 ## API
 
 Tenant APIs are versioned under `/api/v1` and never expose raw storage paths or require users to type foreign keys. The frontend uses paginated human-readable parent/type selectors, impact confirmations, optimistic concurrency, and an authenticated scope switcher.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

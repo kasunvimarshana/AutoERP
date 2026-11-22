@@ -1,3 +1,11 @@
+/**
+ * AutoERP Enterprise System
+ *
+ * @author Kasun Vimarshana <kasunvmail@gmail.com>
+ *
+ * Phone: +94713525253
+ */
+
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';

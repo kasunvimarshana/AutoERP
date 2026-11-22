@@ -137,3 +137,11 @@ Tables (4): `countries`, `currencies`, `languages`, `timezones`.
 ## Deployment note
 
 These are corrected create migrations for a refactor/development baseline. Do not apply the archive blindly to an existing production schema. Existing deployments require a reviewed data-migration, backfill, reconciliation, and rollback plan.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)

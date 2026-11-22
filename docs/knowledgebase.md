@@ -785,3 +785,13 @@ A task is complete only when:
 - [x] TypeScript compile checks (`npm run typecheck`) report zero errors.
 - [x] ESLint (`npm run lint`) reports zero errors.
 - [x] An append-only change record is added to `docs/changes/`.
+
+---
+
+## Author & Maintainer
+
+- **Lead Architect & Developer:** Kasun Vimarshana
+- **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
+- **Phone:** [+94713525253](tel:+94713525253)
+- **Repository:** [kasunvimarshana/AutoERP](https://github.com/kasunvimarshana/AutoERP)
+
