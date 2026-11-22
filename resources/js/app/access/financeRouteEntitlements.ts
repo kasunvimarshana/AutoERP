@@ -61,6 +61,7 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     operational('/tax/posting-profiles', ['finance'], [taxPermissions.postingProfilesView]),
     operational('/tax/reports', ['finance'], [taxPermissions.reportsView]),
 
+    operational('/reports/cashier', ['reporting'], [reportingPermissions.view]),
     operational('/reports/*', ['reporting'], [reportingPermissions.view]),
 
 ];

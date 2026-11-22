@@ -25,6 +25,7 @@ final class ReportDefinitionRegistry
         private readonly GoodsReceiptSummaryReportService $goodsReceiptSummary,
         private readonly StockBalanceReportService $stockBalance,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
+        private readonly CashierReportService $cashierReport,
     ) {}
 
     /**
@@ -69,6 +70,7 @@ final class ReportDefinitionRegistry
             $this->goodsReceiptSummary->definition(),
             $this->stockBalance->definition(),
             $this->detailedVehicleService->definition(),
+            $this->cashierReport->definition(),
         ];
     }
 }

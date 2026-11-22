@@ -24,6 +24,7 @@ import type {
 } from './types/serviceJobFeedbackReportTypes';
 import type { StockBalanceDetail, StockBalanceReportParams, StockBalanceReportResult, StockBalanceReportRow } from './stockBalanceReportTypes';
 import type { PaymentMethodWiseDay } from './paymentMethodWiseSummaryTypes';
+import type { CashierLookupUser, CashierReportParams, CashierReportResult } from './cashierReportTypes';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
@@ -76,7 +77,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
 export async function exportReport(
     key: string,
     format: ReportFormat,
-    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | VehicleServiceSalesSummaryParams | ExpenseReportParams | PaymentMethodWiseParams | UpcomingServicesParams | ServiceJobsByJobTypeParams | ServiceJobFeedbackReportParams,
+    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | VehicleServiceSalesSummaryParams | ExpenseReportParams | PaymentMethodWiseParams | UpcomingServicesParams | ServiceJobsByJobTypeParams | ServiceJobFeedbackReportParams | CashierReportParams,
     previewWindow?: Window | null,
 ): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {
@@ -255,3 +256,32 @@ export async function runExpenseReport(
 
     return response.data;
 }
+
+export async function runCashierReport(
+    params: CashierReportParams,
+    signal?: AbortSignal,
+): Promise<CashierReportResult> {
+    const response = await apiClient.get<ApiResource<CashierReportResult>>(`${endpoints.reports}/cashier`, {
+        params,
+        signal,
+    });
+
+    return response.data.data;
+}
+
+export function searchCashiers(
+    params: LookupLoadParams,
+): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(`${endpoints.reports}/cashier/cashiers`, params);
+}
+
+export async function loadCashiersList(
+    signal?: AbortSignal,
+): Promise<CashierLookupUser[]> {
+    const response = await apiClient.get<ApiResource<CashierLookupUser[]>>(`${endpoints.reports}/cashier/cashiers`, {
+        signal,
+    });
+
+    return response.data.data;
+}
+

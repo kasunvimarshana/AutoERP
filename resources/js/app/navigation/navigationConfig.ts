@@ -1041,6 +1041,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         },
                     },
                     {
+                        id: "cashier-report",
+                        type: "link",
+                        label: "Cashier Report",
+                        to: "/reports/cashier",
+                        match: ["/reports/cashier"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
                         id: "payment-method-wise-summary",
                         type: "link",
                         label: "Payment Method Wise Summary",

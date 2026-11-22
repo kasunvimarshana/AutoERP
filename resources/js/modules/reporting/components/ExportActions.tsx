@@ -20,10 +20,11 @@ import type { VehicleServiceSalesSummaryParams } from '../vehicleServiceSalesSum
 import type { UpcomingServicesParams } from '../upcomingServicesTypes';
 import type { ServiceJobsByJobTypeParams } from '../types/serviceJobsByJobTypeReportTypes';
 import type { ServiceJobFeedbackReportParams } from '../types/serviceJobFeedbackReportTypes';
+import type { CashierReportParams } from '../cashierReportTypes';
 
 const defaultFormats: ReportFormat[] = ['html', 'print', 'pdf', 'xlsx', 'csv'];
 
-export function ExportActions({ reportKey, params, formats = defaultFormats, compact = false }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams | VehicleServiceSalesSummaryParams | UpcomingServicesParams | ServiceJobsByJobTypeParams | ServiceJobFeedbackReportParams; formats?: ReportFormat[]; compact?: boolean }) {
+export function ExportActions({ reportKey, params, formats = defaultFormats, compact = false }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams | VehicleServiceSalesSummaryParams | UpcomingServicesParams | ServiceJobsByJobTypeParams | ServiceJobFeedbackReportParams | CashierReportParams; formats?: ReportFormat[]; compact?: boolean }) {
     const auth = useAuth();
     const [busy, setBusy] = useState<ReportFormat | null>(null);
     const [error, setError] = useState<ApiError | null>(null);

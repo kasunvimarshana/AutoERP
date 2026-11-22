@@ -253,6 +253,7 @@ describe('navigation access and matching', () => {
         expect(reports?.type).toBe('module');
         expect(reports?.type === 'module' ? reports.children.map((child) => child.label) : []).toEqual([
             'Summary Reports',
+            'Cashier Report',
             'Payment Method Wise Summary',
             'Expense Report',
             'All Reports',
@@ -265,6 +266,7 @@ describe('navigation access and matching', () => {
             'Service Sales Summary',
         ]);
         expect(findNavigationMatch('/reports/summary', '', tenantNavigationSections)?.item.id).toBe('summary-reports');
+        expect(findNavigationMatch('/reports/cashier', '', tenantNavigationSections)?.item.id).toBe('cashier-report');
         expect(findNavigationMatch('/reports/payment-method-wise-summary', '', tenantNavigationSections)?.item.id).toBe('payment-method-wise-summary');
         expect(findNavigationMatch('/reports/expenses', '', tenantNavigationSections)?.item.id).toBe('expense-report');
         expect(findNavigationMatch('/reports/vehicle-service/sales-summary', '', tenantNavigationSections)?.item.id).toBe('vehicle-service-sales-summary-report');

@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Constants\FinancePermission;
+use Modules\Reporting\Http\Controllers\CashierReportController;
 use Modules\Reporting\Http\Controllers\CustomerOutstandingReportController;
 use Modules\Reporting\Http\Controllers\DashboardController;
 use Modules\Reporting\Http\Controllers\EmployeeCommissionReportController;
@@ -59,6 +60,8 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
+        Route::get('cashier', [CashierReportController::class, 'index'])->name('cashier.index');
+        Route::get('cashier/cashiers', [CashierReportController::class, 'cashiers'])->name('cashier.cashiers');
         Route::get('payment-method-wise-summary', [PaymentMethodWiseSummaryReportController::class, 'index'])->name('payment-method-wise-summary');
         Route::get('inventory.stock-balance/run', [StockBalanceReportController::class, 'index'])->name('inventory.stock-balance.run');
         Route::get('inventory.stock-balance/details', [StockBalanceReportController::class, 'details'])->name('inventory.stock-balance.details');
@@ -102,6 +105,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('payment-method-wise-summary/export/{format}', [PaymentMethodWiseSummaryReportController::class, 'export'])
             ->whereIn('format', $exportFormats)
             ->name('payment-method-wise-summary.export');
+        Route::get('cashier/export/{format}', [CashierReportController::class, 'export'])
+            ->whereIn('format', $exportFormats)
+            ->name('cashier.export');
         Route::get('expenses/export/{format}', [OperationalReportController::class, 'exportExpenses'])
             ->whereIn('format', $exportFormats)
             ->name('expenses.export');

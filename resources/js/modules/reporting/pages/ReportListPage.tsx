@@ -33,7 +33,16 @@ export default function ReportListPage() {
     return (
         <>
             <ContentHeader title="Reports" description="Operational and financial reports from existing AutoERP data." />
-            <Link to="/reports/payment-method-wise-summary" className="mb-5 block rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm font-semibold text-blue-900 shadow-2xs transition hover:bg-blue-100/70">Payment Method Wise Summary — daily receipts and new unpaid sales</Link>
+            <div className="mb-5 grid gap-3 sm:grid-cols-2">
+                <Link to="/reports/cashier" className="block rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm font-semibold text-emerald-950 shadow-2xs transition hover:bg-emerald-100/70">
+                    <div>💵 Cashier Report</div>
+                    <div className="text-xs font-normal text-emerald-700 mt-1">Cash drawer balancing, front-desk collections, payouts, and cashier audit trail</div>
+                </Link>
+                <Link to="/reports/payment-method-wise-summary" className="block rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm font-semibold text-blue-900 shadow-2xs transition hover:bg-blue-100/70">
+                    <div>💳 Payment Method Wise Summary</div>
+                    <div className="text-xs font-normal text-blue-700 mt-1">Daily receipts and new unpaid sales</div>
+                </Link>
+            </div>
             <ErrorAlert error={reports.error} />
             {reports.loading ? <LoadingState label="Loading reports..." /> : (
                 <div className="grid gap-5 xl:grid-cols-2">
@@ -71,6 +80,7 @@ function groupReports(reports: ReportDefinition[]): Record<string, ReportDefinit
 }
 
 function reportPath(key: string): string {
+    if (key === 'cashier' || key === 'cashier-report') return '/reports/cashier';
     if (key === 'purchase/detailed') return '/reports/purchase/detailed';
     if (key === 'purchase/grn-payables') return '/reports/purchase/grn-payables';
     if (key === 'purchase/goods-receipt-summary') return '/reports/purchase/goods-receipt-summary';

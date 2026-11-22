@@ -384,6 +384,9 @@ const StockBalanceReportPage = lazy(() => import("@/modules/reporting/pages/Stoc
 const SummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/SummaryReportPage"),
 );
+const CashierReportPage = lazy(
+    () => import("@/modules/reporting/pages/CashierReportPage"),
+);
 const PaymentMethodWiseSummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/PaymentMethodWiseSummaryReportPage"),
 );
@@ -1022,6 +1025,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/summary"
                             element={<SummaryReportPage />}
+                        />
+                        <Route
+                            path="/reports/cashier"
+                            element={<CashierReportPage />}
                         />
                         <Route
                             path="/reports/payment-method-wise-summary"
