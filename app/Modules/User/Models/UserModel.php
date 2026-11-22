@@ -36,15 +36,14 @@ final class UserModel extends Authenticatable
         'deleted_by_user_id',
     ];
 
-
     protected static function booted(): void
     {
-        static::creating(function (self $user): void {
+        self::creating(function (self $user): void {
             $user->assertTenantContext();
             $user->normalizeIdentityFields();
         });
 
-        static::updating(function (self $user): void {
+        self::updating(function (self $user): void {
             if ($user->isDirty('tenant_id')) {
                 throw new LogicException('User tenant ownership cannot be changed after creation.');
             }
@@ -65,6 +64,11 @@ final class UserModel extends Authenticatable
             'deactivated_at' => 'datetime',
             'suspended_at' => 'datetime',
         ];
+    }
+
+    public function getNameAttribute(): string
+    {
+        return trim("{$this->first_name} {$this->last_name}");
     }
 
     public function roles(): HasMany

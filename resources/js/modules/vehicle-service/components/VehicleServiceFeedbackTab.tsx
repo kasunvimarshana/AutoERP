@@ -365,9 +365,13 @@ export default function VehicleServiceFeedbackTab({
                                 <h4 className="mt-2 text-sm font-semibold text-slate-900">{item.title}</h4>
                             )}
 
-                            <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-slate-700">
-                                {item.comment}
-                            </p>
+                            {item.comment ? (
+                                <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-slate-700">
+                                    {item.comment}
+                                </p>
+                            ) : !item.title ? (
+                                <p className="mt-1 text-xs italic text-slate-400">No additional comments provided.</p>
+                            ) : null}
 
                             {canManage && (
                                 <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-2.5">

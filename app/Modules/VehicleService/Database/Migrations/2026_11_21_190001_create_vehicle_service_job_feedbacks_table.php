@@ -29,7 +29,7 @@ return new class extends Migration
             $table->string('feedback_type', 30)->default('review');
             $table->unsignedTinyInteger('rating')->nullable();
             $table->string('title', 255)->nullable();
-            $table->text('comment');
+            $table->text('comment')->nullable();
             $table->boolean('is_customer_visible')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();

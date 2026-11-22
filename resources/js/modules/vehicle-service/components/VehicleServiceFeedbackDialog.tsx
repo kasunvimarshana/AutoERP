@@ -87,8 +87,8 @@ export function VehicleServiceFeedbackDialog({
         setError(null);
 
         const payload: VehicleServiceJobFeedbackPayload = {
-            feedback_type: type,
-            comment: comment.trim(),
+            feedback_type: type || 'review',
+            comment: comment.trim() || null,
             rating: rating !== null ? rating : null,
             title: title.trim() || null,
             author_name: authorName.trim() || null,
@@ -132,7 +132,6 @@ export function VehicleServiceFeedbackDialog({
                         onChange={(e) => handleTypeChange(e.target.value)}
                         options={FEEDBACK_TYPE_OPTIONS}
                         error={fieldError(error, 'feedback_type')}
-                        required
                     />
 
                     <Input
@@ -221,7 +220,6 @@ export function VehicleServiceFeedbackDialog({
                     onChange={(e) => setComment(e.target.value)}
                     error={fieldError(error, 'comment')}
                     rows={4}
-                    required
                 />
 
                 <div className="flex items-start gap-2.5 pt-1">

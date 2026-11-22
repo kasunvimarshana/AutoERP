@@ -17,11 +17,11 @@ use Modules\VehicleService\Enums\VehicleServiceFeedbackType;
 final readonly class VehicleServiceJobFeedbackData
 {
     public function __construct(
-        public VehicleServiceFeedbackType $feedbackType,
-        public string $comment,
+        public ?VehicleServiceFeedbackType $feedbackType = null,
+        public ?string $comment = null,
         public ?int $rating = null,
         public ?string $title = null,
-        public bool $isCustomerVisible = true,
+        public ?bool $isCustomerVisible = null,
         public ?string $authorName = null,
         public ?int $userId = null,
         public ?int $expectedVersion = null,

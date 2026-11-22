@@ -223,21 +223,6 @@ final class VehicleServiceJobFeedbackTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['rating']);
 
-        // Empty comment
-        $response = $this->tenantPostJson(
-            $context['tenant_id'],
-            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks",
-            [
-                'tenant_id' => $context['tenant_id'],
-                'organization_unit_id' => $context['organization_unit_id'],
-                'feedback_type' => 'review',
-                'rating' => 5,
-                'comment' => '',
-            ],
-        );
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors(['comment']);
-
         // Invalid feedback_type
         $response = $this->tenantPostJson(
             $context['tenant_id'],
@@ -251,6 +236,105 @@ final class VehicleServiceJobFeedbackTest extends TestCase
         );
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['feedback_type']);
+    }
+
+    public function test_can_create_feedback_with_all_optional_fields_omitted(): void
+    {
+        $context = $this->createContext();
+        $job = $this->createJob($context);
+
+        $response = $this->tenantPostJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks",
+            [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+            ],
+        );
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.feedback_type', 'review');
+        $response->assertJsonPath('data.rating', null);
+        $response->assertJsonPath('data.title', null);
+        $response->assertJsonPath('data.comment', null);
+        $response->assertJsonPath('data.is_customer_visible', true);
+
+        $this->assertDatabaseHas('vehicle_service_job_feedbacks', [
+            'tenant_id' => $context['tenant_id'],
+            'vehicle_service_job_id' => $job->id,
+            'feedback_type' => 'review',
+            'rating' => null,
+            'title' => null,
+            'comment' => null,
+        ]);
+    }
+
+    public function test_can_update_feedback_with_all_optional_fields(): void
+    {
+        $context = $this->createContext();
+        $job = $this->createJob($context);
+
+        /** @var VehicleServiceJobFeedback $feedback */
+        $feedback = $this->withTenantExecutionContext($context['tenant_id'], function () use ($context, $job) {
+            return VehicleServiceJobFeedback::query()->create([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'vehicle_service_job_id' => $job->id,
+                'user_id' => $context['user_id'],
+                'feedback_type' => VehicleServiceFeedbackType::Review,
+                'rating' => 4,
+                'title' => 'Initial Title',
+                'comment' => 'Initial comment',
+                'is_customer_visible' => true,
+                'row_version' => 1,
+            ]);
+        });
+
+        // Update without expected_version, without feedback_type, without comment
+        $updateResponse = $this->tenantPutJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks/{$feedback->id}",
+            [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'title' => 'Updated title only',
+            ],
+        );
+
+        $updateResponse->assertOk();
+        $updateResponse->assertJsonPath('data.title', 'Updated title only');
+        $updateResponse->assertJsonPath('data.feedback_type', 'review');
+        $updateResponse->assertJsonPath('data.row_version', 2);
+    }
+
+    public function test_search_matches_submitter_user_name_when_author_name_is_null(): void
+    {
+        $context = $this->createContext();
+        $job = $this->createJob($context);
+
+        $this->withTenantExecutionContext($context['tenant_id'], function () use ($context, $job): void {
+            VehicleServiceJobFeedback::query()->create([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'vehicle_service_job_id' => $job->id,
+                'user_id' => $context['user_id'],
+                'author_name' => null,
+                'feedback_type' => VehicleServiceFeedbackType::Review,
+                'rating' => 5,
+                'title' => 'Great oil change',
+                'comment' => 'Completed smoothly',
+                'row_version' => 1,
+            ]);
+        });
+
+        // Search by user's first name 'Service' or 'Admin'
+        $response = $this->tenantGetJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks?tenant_id={$context['tenant_id']}&organization_unit_id={$context['organization_unit_id']}&search=Service Admin",
+        );
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('Great oil change', $response->json('data.0.title'));
     }
 
     public function test_can_update_feedback_with_optimistic_concurrency(): void

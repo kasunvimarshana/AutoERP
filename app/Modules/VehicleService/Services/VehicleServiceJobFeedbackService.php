@@ -49,11 +49,26 @@ final class VehicleServiceJobFeedbackService
         }
 
         if (! empty($filters['search'])) {
-            $term = '%'.trim((string) $filters['search']).'%';
-            $query->where(function ($subQuery) use ($term): void {
+            $rawSearch = trim((string) $filters['search']);
+            $term = '%'.$rawSearch.'%';
+            $query->where(function ($subQuery) use ($term, $rawSearch): void {
                 $subQuery->where('comment', 'like', $term)
                     ->orWhere('title', 'like', $term)
-                    ->orWhere('author_name', 'like', $term);
+                    ->orWhere('author_name', 'like', $term)
+                    ->orWhereHas('user', function ($userQuery) use ($term, $rawSearch): void {
+                        $userQuery->where('first_name', 'like', $term)
+                            ->orWhere('last_name', 'like', $term)
+                            ->orWhere('username', 'like', $term)
+                            ->orWhere('email', 'like', $term);
+
+                        $words = preg_split('/\s+/', $rawSearch, -1, PREG_SPLIT_NO_EMPTY);
+                        if ($words && count($words) > 1) {
+                            $userQuery->orWhere(function ($multiQuery) use ($words): void {
+                                $multiQuery->where('first_name', 'like', '%'.$words[0].'%')
+                                    ->where('last_name', 'like', '%'.$words[count($words) - 1].'%');
+                            });
+                        }
+                    });
             });
         }
 
@@ -141,6 +156,9 @@ final class VehicleServiceJobFeedbackService
                 $this->bumpJobVersion($job);
             }
 
+            $feedbackType = $data->feedbackType ?? VehicleServiceFeedbackType::Review;
+            $isCustomerVisible = $data->isCustomerVisible ?? ($feedbackType !== VehicleServiceFeedbackType::InternalNote);
+
             /** @var VehicleServiceJobFeedback $feedback */
             $feedback = VehicleServiceJobFeedback::query()->create([
                 'tenant_id' => $job->tenant_id,
@@ -148,11 +166,11 @@ final class VehicleServiceJobFeedbackService
                 'vehicle_service_job_id' => $job->id,
                 'user_id' => $data->userId ?? $actorId,
                 'author_name' => $data->authorName,
-                'feedback_type' => $data->feedbackType,
+                'feedback_type' => $feedbackType,
                 'rating' => $data->rating,
                 'title' => $data->title,
                 'comment' => $data->comment,
-                'is_customer_visible' => $data->isCustomerVisible,
+                'is_customer_visible' => $isCustomerVisible,
                 'row_version' => 1,
                 'created_by' => $actorId,
                 'updated_by' => $actorId,
@@ -182,12 +200,15 @@ final class VehicleServiceJobFeedbackService
                 $this->bumpJobVersion($job);
             }
 
+            $feedbackType = $data->feedbackType ?? $feedback->feedback_type;
+            $isCustomerVisible = $data->isCustomerVisible ?? $feedback->is_customer_visible;
+
             $feedback->fill([
-                'feedback_type' => $data->feedbackType,
+                'feedback_type' => $feedbackType,
                 'rating' => $data->rating,
                 'title' => $data->title,
                 'comment' => $data->comment,
-                'is_customer_visible' => $data->isCustomerVisible,
+                'is_customer_visible' => $isCustomerVisible,
                 'author_name' => $data->authorName,
                 'row_version' => (int) $feedback->row_version + 1,
                 'updated_by' => $actorId,

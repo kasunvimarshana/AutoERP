@@ -214,6 +214,49 @@ describe('VehicleServiceFeedbackTab', () => {
         });
     });
 
+    it('submits a new feedback with all optional fields omitted', async () => {
+        const user = userEvent.setup();
+        const created: VehicleServiceJobFeedback = {
+            id: 104,
+            row_version: 1,
+            tenant_id: 1,
+            vehicle_service_job_id: 7,
+            feedback_type: 'review',
+            feedback_type_label: 'Customer Review',
+            rating: 5,
+            title: null,
+            comment: null,
+            is_customer_visible: true,
+            author_name: 'Staff',
+            created_at: '2026-11-21T09:30:00Z',
+        };
+        apiMocks.createVehicleServiceFeedback.mockResolvedValue(created);
+
+        render(<VehicleServiceFeedbackTab jobId={7} expectedVersion={3} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('+ Add Review or Note')).toBeInTheDocument();
+        });
+
+        await user.click(screen.getByText('+ Add Review or Note'));
+
+        // Submit without typing any title, author, or comment
+        await user.click(screen.getByRole('button', { name: 'Submit Feedback' }));
+
+        await waitFor(() => {
+            expect(apiMocks.createVehicleServiceFeedback).toHaveBeenCalledWith(
+                7,
+                expect.objectContaining({
+                    feedback_type: 'review',
+                    title: null,
+                    author_name: null,
+                    comment: null,
+                    rating: 5,
+                }),
+            );
+        });
+    });
+
     it('opens edit dialog and updates existing feedback', async () => {
         const user = userEvent.setup();
         const updated: VehicleServiceJobFeedback = {

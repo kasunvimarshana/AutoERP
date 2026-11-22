@@ -43,7 +43,7 @@ final class VehicleServiceJobFeedbackResource extends JsonResource
             'feedback_type_label' => $type?->label() ?? ucfirst((string) $this->feedback_type),
             'rating' => $this->rating === null ? null : (int) $this->rating,
             'title' => $this->title === null ? null : (string) $this->title,
-            'comment' => (string) $this->comment,
+            'comment' => $this->comment === null ? null : (string) $this->comment,
             'is_customer_visible' => (bool) $this->is_customer_visible,
             'created_by' => $this->created_by === null ? null : (int) $this->created_by,
             'created_by_name' => $this->creator?->name,

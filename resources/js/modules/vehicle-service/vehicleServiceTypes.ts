@@ -529,7 +529,7 @@ export interface VehicleServiceJobFeedback {
     feedback_type_label: string;
     rating?: number | null;
     title?: string | null;
-    comment: string;
+    comment?: string | null;
     is_customer_visible: boolean;
     created_by?: number | null;
     created_by_name?: string | null;
@@ -558,8 +558,8 @@ export interface VehicleServiceFeedbackListResult {
 }
 
 export interface VehicleServiceJobFeedbackPayload {
-    feedback_type: VehicleServiceFeedbackType;
-    comment: string;
+    feedback_type?: VehicleServiceFeedbackType;
+    comment?: string | null;
     rating?: number | null;
     title?: string | null;
     is_customer_visible?: boolean;

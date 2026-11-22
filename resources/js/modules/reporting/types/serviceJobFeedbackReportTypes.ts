@@ -31,7 +31,7 @@ export interface ServiceJobFeedbackReportRow {
     feedback_type_label: string;
     rating: number | null;
     title: string | null;
-    comment: string;
+    comment: string | null;
     author_name: string;
     is_customer_visible: boolean;
     created_at: string;

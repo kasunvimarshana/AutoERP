@@ -655,7 +655,8 @@ export default function ServiceJobFeedbackReportPage() {
 
 function TableRow({ row }: { row: ServiceJobFeedbackReportRow }) {
     const [expanded, setExpanded] = useState(false);
-    const isLongComment = row.comment.length > 120;
+    const commentText = row.comment ?? '';
+    const isLongComment = commentText.length > 120;
 
     return (
         <tr className="hover:bg-slate-50/70 transition-colors">
@@ -721,7 +722,10 @@ function TableRow({ row }: { row: ServiceJobFeedbackReportRow }) {
                         </div>
                     )}
                     <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">
-                        {expanded || !isLongComment ? row.comment : `${row.comment.slice(0, 120)}...`}
+                        {commentText
+                            ? (expanded || !isLongComment ? commentText : `${commentText.slice(0, 120)}...`)
+                            : <span className="italic text-slate-400">No comment provided</span>
+                        }
                     </p>
                     {isLongComment && (
                         <button
@@ -763,7 +767,8 @@ function TableRow({ row }: { row: ServiceJobFeedbackReportRow }) {
 
 function MobileCard({ row }: { row: ServiceJobFeedbackReportRow }) {
     const [expanded, setExpanded] = useState(false);
-    const isLongComment = row.comment.length > 120;
+    const commentText = row.comment ?? '';
+    const isLongComment = commentText.length > 120;
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
@@ -805,7 +810,10 @@ function MobileCard({ row }: { row: ServiceJobFeedbackReportRow }) {
             <div className="bg-slate-50 rounded-lg p-3 text-xs space-y-1">
                 {row.title && <div className="font-semibold text-slate-900">{row.title}</div>}
                 <p className="text-slate-700 whitespace-pre-wrap">
-                    {expanded || !isLongComment ? row.comment : `${row.comment.slice(0, 120)}...`}
+                    {commentText
+                        ? (expanded || !isLongComment ? commentText : `${commentText.slice(0, 120)}...`)
+                        : <span className="italic text-slate-400">No comment provided</span>
+                    }
                 </p>
                 {isLongComment && (
                     <button
