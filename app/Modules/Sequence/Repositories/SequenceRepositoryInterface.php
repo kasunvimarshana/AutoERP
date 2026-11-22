@@ -10,6 +10,8 @@ use Modules\Core\DTOs\PagedResult;
 
 interface SequenceRepositoryInterface extends RepositoryPortInterface
 {
+    public function findByIdInTenant(int|string $id, int $tenantId): ?DataRecord;
+
     public function findByScope(
         int $tenantId,
         ?int $organizationUnitId,

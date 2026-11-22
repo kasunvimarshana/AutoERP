@@ -40,8 +40,14 @@ Route::prefix('api/v1')
         Route::get('user/quick-access', [UserQuickAccessController::class, 'show'])->name('quick-access.show');
         Route::put('user/quick-access', [UserQuickAccessController::class, 'update'])->name('quick-access.update');
         Route::delete('user/quick-access', [UserQuickAccessController::class, 'destroy'])->name('quick-access.destroy');
-        Route::get('users/{user}', [UserController::class, 'show'])->whereNumber('user')->name('users.show');
-        Route::patch('users/{user}', [UserController::class, 'update'])->whereNumber('user')->name('users.update');
+        Route::get('users/{user}', [UserController::class, 'show'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USERS_VIEW)
+            ->name('users.show');
+        Route::patch('users/{user}', [UserController::class, 'update'])
+            ->whereNumber('user')
+            ->middleware('tenant.permission:'.UserPermission::USERS_UPDATE)
+            ->name('users.update');
         Route::patch('users/{user}/status', [UserController::class, 'changeStatus'])
             ->whereNumber('user')
             ->middleware('tenant.permission:'.UserPermission::USERS_ACTIVATE.','.UserPermission::USERS_DEACTIVATE)

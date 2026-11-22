@@ -25,4 +25,6 @@ final class UomErrorCode
     public const CONVERSION_NOT_FOUND = 'UOM_CONVERSION_NOT_FOUND';
 
     public const CANNOT_CONVERT = 'UOM_CANNOT_CONVERT';
+
+    public const CONFLICT = 'UOM_CONFLICT';
 }

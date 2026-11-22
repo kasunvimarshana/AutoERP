@@ -7,6 +7,7 @@ namespace Modules\Hr\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Hr\Models\HrEmployee;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -48,8 +49,55 @@ final class EmployeeQueryService
                 throw new ConflictHttpException('Employee was changed by someone else. Reload before deleting.');
             }
 
+            $this->assertUnused($employee);
+
             $employee->delete();
         });
+    }
+
+    private function assertUnused(HrEmployee $employee): void
+    {
+        $tenantId = (int) $employee->tenant_id;
+        $employeeId = (int) $employee->getKey();
+
+        if (HrEmployee::query()->where('tenant_id', $tenantId)->where('reporting_manager_id', $employeeId)->exists()) {
+            throw new ConflictHttpException('Employee cannot be deleted while other employees report to them.');
+        }
+
+        if (Schema::hasTable('vehicle_rental_running_charts')
+            && DB::table('vehicle_rental_running_charts')
+                ->where('tenant_id', $tenantId)
+                ->where('driver_employee_id', $employeeId)
+                ->exists()) {
+            throw new ConflictHttpException('Employee cannot be deleted while assigned as driver in vehicle rental running charts.');
+        }
+
+        if (Schema::hasTable('vehicle_rental_reassignments')
+            && DB::table('vehicle_rental_reassignments')
+                ->where('tenant_id', $tenantId)
+                ->where(function ($query) use ($employeeId): void {
+                    $query->where('previous_driver_employee_id', $employeeId)
+                        ->orWhere('new_driver_employee_id', $employeeId);
+                })
+                ->exists()) {
+            throw new ConflictHttpException('Employee cannot be deleted while referenced in driver reassignments.');
+        }
+
+        if (Schema::hasTable('vehicle_service_jobs')
+            && DB::table('vehicle_service_jobs')
+                ->where('tenant_id', $tenantId)
+                ->where('supervisor_employee_id', $employeeId)
+                ->exists()) {
+            throw new ConflictHttpException('Employee cannot be deleted while assigned as supervisor in service jobs.');
+        }
+
+        if (Schema::hasTable('vehicle_service_line_employees')
+            && DB::table('vehicle_service_line_employees')
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $employeeId)
+                ->exists()) {
+            throw new ConflictHttpException('Employee cannot be deleted while assigned to service job lines.');
+        }
     }
 
     public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage, string $kind = 'all'): LengthAwarePaginator

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Payment\Enums\PaymentDirection;
@@ -134,6 +135,31 @@ final class PaymentMethodService
     {
         if ($method->lines()->exists()) {
             throw new InvalidArgumentException('Payment methods used by payments cannot be deleted; deactivate the method instead.');
+        }
+
+        if (Schema::hasTable('expenses')) {
+            $hasColumnId = Schema::hasColumn('expenses', 'payment_method_id');
+            $hasColumnSnapshot = Schema::hasColumn('expenses', 'payment_method_id_snapshot');
+
+            if ($hasColumnId || $hasColumnSnapshot) {
+                $expenseExists = DB::table('expenses')
+                    ->where('tenant_id', (int) $method->tenant_id)
+                    ->where(function ($q) use ($method, $hasColumnId, $hasColumnSnapshot): void {
+                        if ($hasColumnId) {
+                            $q->where('payment_method_id', $method->getKey());
+                        }
+                        if ($hasColumnSnapshot) {
+                            $hasColumnId
+                                ? $q->orWhere('payment_method_id_snapshot', $method->getKey())
+                                : $q->where('payment_method_id_snapshot', $method->getKey());
+                        }
+                    })
+                    ->exists();
+
+                if ($expenseExists) {
+                    throw new InvalidArgumentException('Payment methods used by expenses cannot be deleted; deactivate the method instead.');
+                }
+            }
         }
 
         $method->delete();

@@ -254,6 +254,82 @@ final class PaymentCrudTest extends TestCase
         self::assertSame('0.000000', (string) $updated->allocated_amount);
     }
 
+    public function test_payment_method_cannot_be_deleted_when_referenced_by_expenses(): void
+    {
+        $tenantId = $this->tenantId();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $method = PaymentMethod::query()->create([
+                'tenant_id' => $tenantId,
+                'code' => 'EXP-CASH',
+                'name' => 'Expense Cash Method',
+                'method_type' => PaymentMethodType::Cash,
+                'requires_reference' => false,
+                'requires_instrument_details' => false,
+                'is_active' => true,
+            ]);
+
+            $orgId = (int) \Tests\Support\OrganizationUnitFixture::create([
+                'tenant_id' => $tenantId,
+                'name' => 'Expense Branch',
+                'code' => 'EXPB-'.Str::upper(Str::random(4)),
+            ]);
+
+            $expenseTypeId = DB::table('expense_types')->insertGetId([
+                'tenant_id' => $tenantId,
+                'code' => 'OFFICE-SUPPLIES',
+                'name' => 'Office Supplies',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table('expenses')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expense_type_id' => $expenseTypeId,
+                'expense_number' => 'EXP-'.Str::upper(Str::random(6)),
+                'expense_date' => '2026-11-22',
+                'amount' => '1500.000000',
+                'expense_type_code_snapshot' => 'OFFICE-SUPPLIES',
+                'expense_type_name_snapshot' => 'Office Supplies',
+                'payment_method_id_snapshot' => $method->id,
+                'payment_method_code_snapshot' => (string) $method->code,
+                'payment_method_name_snapshot' => (string) $method->name,
+                'payment_method_type_snapshot' => 'cash',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $service = app(\Modules\Payment\Services\PaymentMethodService::class);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Payment methods used by expenses cannot be deleted; deactivate the method instead.');
+
+            $service->delete($method);
+        });
+    }
+
+    public function test_unreferenced_payment_method_can_be_deleted(): void
+    {
+        $tenantId = $this->tenantId();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $method = PaymentMethod::query()->create([
+                'tenant_id' => $tenantId,
+                'code' => 'SOLO-MTH',
+                'name' => 'Solo Payment Method',
+                'method_type' => PaymentMethodType::Cash,
+                'requires_reference' => false,
+                'requires_instrument_details' => false,
+                'is_active' => true,
+            ]);
+
+            $service = app(\Modules\Payment\Services\PaymentMethodService::class);
+            $service->delete($method);
+
+            $this->assertSoftDeleted('payment_methods', ['id' => $method->id]);
+        });
+    }
+
     private function fixture(): array
     {
         $tenantId = $this->tenantId();

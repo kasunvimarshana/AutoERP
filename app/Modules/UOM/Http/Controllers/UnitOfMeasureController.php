@@ -187,9 +187,13 @@ final class UnitOfMeasureController extends Controller
         return $this->changeActiveState($id, false);
     }
 
-    public function destroy(int|string $id): JsonResponse
+    public function destroy(ListUnitOfMeasureRequest $request, int|string $id): JsonResponse
     {
-        $result = $this->deleteService->execute($id);
+        $expectedVersion = $request->filled('expected_version')
+            ? (int) $request->input('expected_version')
+            : ($request->filled('row_version') ? (int) $request->input('row_version') : null);
+
+        $result = $this->deleteService->execute($id, $expectedVersion);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -242,6 +246,7 @@ final class UnitOfMeasureController extends Controller
         return match ($code) {
             UomErrorCode::FORBIDDEN => 403,
             UomErrorCode::NOT_FOUND => 404,
+            UomErrorCode::CONFLICT => 409,
             default => 422,
         };
     }

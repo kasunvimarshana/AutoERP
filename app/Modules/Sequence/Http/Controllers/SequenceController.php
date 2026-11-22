@@ -52,9 +52,9 @@ final class SequenceController extends Controller
         ]);
     }
 
-    public function show(int|string $sequence): JsonResponse|SequenceResource
+    public function show(ListSequenceRequest $request, int|string $sequence): JsonResponse|SequenceResource
     {
-        $result = $this->getSequence->execute($sequence);
+        $result = $this->getSequence->execute($sequence, $request->tenantId());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
@@ -79,7 +79,7 @@ final class SequenceController extends Controller
 
     public function update(UpsertSequenceRequest $request, int|string $sequence): JsonResponse|SequenceResource
     {
-        $result = $this->updateSequence->execute($sequence, $request->validated());
+        $result = $this->updateSequence->execute($sequence, $request->validated(), $request->tenantId());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -95,12 +95,15 @@ final class SequenceController extends Controller
         return new SequenceResource($result->valueOrFail());
     }
 
-    public function destroy(int|string $sequence): JsonResponse
+    public function destroy(ListSequenceRequest $request, int|string $sequence): JsonResponse
     {
-        $result = $this->deleteSequence->execute($sequence);
+        $result = $this->deleteSequence->execute($sequence, $request->tenantId());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            $error = $result->errorOrFail();
+            $status = $error->code === SequenceErrorCode::CONFLICT ? 409 : 404;
+
+            return response()->json(['message' => $error->message], $status);
         }
 
         return response()->json(null, 204);

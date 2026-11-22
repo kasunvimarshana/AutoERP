@@ -40,6 +40,21 @@ final class UpdateUomConversionService
                 return Result::failure(new Error(UomErrorCode::NOT_FOUND, 'UomConversion not found.'));
             }
 
+            $expectedVersion = isset($payload['expected_version'])
+                ? (int) $payload['expected_version']
+                : (isset($payload['row_version']) ? (int) $payload['row_version'] : null);
+
+            $currentVersion = (int) $current->get('row_version', 1);
+            if ($expectedVersion !== null && $expectedVersion !== $currentVersion) {
+                return Result::failure(new Error(
+                    UomErrorCode::CONFLICT,
+                    'Uom conversion was changed by another transaction. Reload before updating.',
+                ));
+            }
+
+            $payload['row_version'] = $currentVersion + 1;
+            unset($payload['expected_version']);
+
             $payload['tenant_id'] = $tenantId;
             $payload['organization_unit_id'] ??= $current->get('organization_unit_id') ?? $this->currentOrganizationUnit->currentOrganizationUnitId();
             if (! $this->validation->organizationBelongsToTenant(

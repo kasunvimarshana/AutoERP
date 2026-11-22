@@ -32,6 +32,7 @@ final class UpsertSequenceRequest extends TenantScopedRequest
             'period_value' => ['nullable', 'string', 'max:255'],
             'metadata' => ['nullable', 'array'],
             'row_version' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

@@ -18,20 +18,35 @@ final class UpdateSequenceService
         private readonly SequenceDomainServiceInterface $domain,
     ) {}
 
-    public function execute(int|string $id, array $payload): Result
+    public function execute(int|string $id, array $payload, ?int $tenantId = null): Result
     {
         try {
-            $existing = $this->sequences->findById($id);
+            $existing = $tenantId !== null
+                ? $this->sequences->findByIdInTenant($id, $tenantId)
+                : $this->sequences->findById($id);
+
             if ($existing === null) {
                 return Result::failure(new Error(SequenceErrorCode::NOT_FOUND, 'Sequence not found.'));
             }
 
-            $tenantId = array_key_exists('tenant_id', $payload)
+            $resolvedTenantId = $tenantId ?? (array_key_exists('tenant_id', $payload)
                 ? (int) $payload['tenant_id']
-                : (int) $existing->require('tenant_id');
+                : (int) $existing->require('tenant_id'));
 
-            if ($tenantId < 1) {
+            if ($resolvedTenantId < 1) {
                 return Result::failure(new Error(SequenceErrorCode::INVALID_VALUE, 'Tenant id is required.'));
+            }
+
+            $expectedVersion = isset($payload['expected_version'])
+                ? (int) $payload['expected_version']
+                : (isset($payload['row_version']) ? (int) $payload['row_version'] : null);
+
+            $currentVersion = (int) $existing->get('row_version', 1);
+            if ($expectedVersion !== null && $expectedVersion !== $currentVersion) {
+                return Result::failure(new Error(
+                    SequenceErrorCode::CONFLICT,
+                    'Sequence was modified by another transaction. Reload and retry.',
+                ));
             }
 
             $existingOrganizationUnitId = $existing->get('organization_unit_id');

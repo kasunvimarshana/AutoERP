@@ -14,10 +14,12 @@ final class GetSequenceService
 {
     public function __construct(private readonly SequenceRepositoryInterface $sequences) {}
 
-    public function execute(int|string $id): Result
+    public function execute(int|string $id, ?int $tenantId = null): Result
     {
         try {
-            $record = $this->sequences->findById($id);
+            $record = $tenantId !== null
+                ? $this->sequences->findByIdInTenant($id, $tenantId)
+                : $this->sequences->findById($id);
 
             if ($record === null) {
                 return Result::failure(new Error(SequenceErrorCode::NOT_FOUND, 'Sequence not found.'));

@@ -17,6 +17,16 @@ final class EloquentSequenceRepository extends EloquentRepository implements Seq
         parent::__construct($model);
     }
 
+    public function findByIdInTenant(int|string $id, int $tenantId): ?DataRecord
+    {
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($id)
+            ->first();
+
+        return $model !== null ? $this->toRecord($model) : null;
+    }
+
     public function findByScope(
         int $tenantId,
         ?int $organizationUnitId,

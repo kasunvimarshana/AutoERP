@@ -14,11 +14,22 @@ final class DeleteSequenceService
 {
     public function __construct(private readonly SequenceRepositoryInterface $sequences) {}
 
-    public function execute(int|string $id): Result
+    public function execute(int|string $id, ?int $tenantId = null): Result
     {
         try {
-            if ($this->sequences->findById($id) === null) {
+            $existing = $tenantId !== null
+                ? $this->sequences->findByIdInTenant($id, $tenantId)
+                : $this->sequences->findById($id);
+
+            if ($existing === null) {
                 return Result::failure(new Error(SequenceErrorCode::NOT_FOUND, 'Sequence not found.'));
+            }
+
+            if ((int) $existing->get('next_number', 1) > 1) {
+                return Result::failure(new Error(
+                    SequenceErrorCode::CONFLICT,
+                    'Sequences that have already generated document numbers cannot be deleted.',
+                ));
             }
 
             return Result::success($this->sequences->delete($id));

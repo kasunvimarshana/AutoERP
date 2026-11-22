@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\IncidentPermission;
 use Modules\VehicleRental\Enums\IncidentReviewAction;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\VehicleUseAction;
@@ -110,7 +111,9 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
             ->whereNumber('allocation');
     });
 
-    Route::prefix('incidents')->group(function (): void {
+    Route::prefix('incidents')->middleware(
+        'tenant.permission:'.IncidentPermission::View->value.','.IncidentPermission::Record->value.','.IncidentPermission::Review->value
+    )->group(function (): void {
         Route::post('{incident}/attachments', [RentalIncidentAttachmentController::class, 'store'])->whereNumber('incident');
         Route::get('{incident}/attachments/{attachment}', [RentalIncidentAttachmentController::class, 'download'])->whereNumber(['incident', 'attachment']);
         Route::get('vehicle-use-options', [RentalIncidentController::class, 'vehicleUseOptions']);

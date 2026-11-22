@@ -159,8 +159,20 @@ final class UserAccessApiTest extends TestCase
             [UserPermission::USERS_VIEW],
             null,
         );
+        $noPermUser = $this->createAuthContext(
+            ['code' => 'NONE', 'email' => 'noperms@example.test'],
+            [UserPermission::ROLES_VIEW],
+            null,
+        );
 
         $this->withAuth($viewer)->getJson('/api/v1/users')->assertOk();
+        $this->withAuth($viewer)->getJson("/api/v1/users/{$viewer['user_id']}")->assertOk();
+        $this->withAuth($noPermUser)->getJson("/api/v1/users/{$viewer['user_id']}")->assertForbidden();
+        $this->withAuth($viewer)->patchJson("/api/v1/users/{$viewer['user_id']}", [
+            'expected_version' => 1,
+            'first_name' => 'Attempted',
+        ])->assertForbidden();
+
         $this->withAuth($viewer)->postJson('/api/v1/users', [
             'first_name' => 'Forbidden',
             'email' => 'forbidden@example.test',
