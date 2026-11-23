@@ -6,6 +6,7 @@
  * Phone: +94713525253
  */
 
+import { businessDateTimeInputValue } from '@/shared/utils/businessDate';
 import type {
     TenantCurrentSubscription,
     TenantPlanRevision,
@@ -67,8 +68,7 @@ export function toLocalDateTime(value: string | null | undefined): string {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    const offset = date.getTimezoneOffset() * 60_000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+    return businessDateTimeInputValue(date);
 }
 
 export function subscriptionAssignmentPayload(

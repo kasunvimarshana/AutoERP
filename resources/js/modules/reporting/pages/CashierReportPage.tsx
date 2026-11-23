@@ -16,7 +16,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { businessDateInputValue, formatBusinessDateTime, shiftBusinessDate } from '@/shared/utils/businessDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { ExportActions } from '../components/ExportActions';
 import { loadCashiersList, runCashierReport } from '../reportingApi';
@@ -116,20 +116,17 @@ export default function CashierReportPage() {
 
     const setDatePreset = (preset: 'today' | 'yesterday' | 'this_week' | 'this_month') => {
         const todayStr = businessDateInputValue();
-        const todayDate = new Date(todayStr);
         let fromStr = todayStr;
         let toStr = todayStr;
 
         if (preset === 'yesterday') {
-            const yesterday = new Date(todayDate);
-            yesterday.setDate(yesterday.getDate() - 1);
-            fromStr = yesterday.toISOString().slice(0, 10);
+            fromStr = shiftBusinessDate(todayStr, -1);
             toStr = fromStr;
         } else if (preset === 'this_week') {
-            const dayOfWeek = todayDate.getDay();
-            const diff = todayDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-            const monday = new Date(todayDate.setDate(diff));
-            fromStr = monday.toISOString().slice(0, 10);
+            const [y, m, d] = todayStr.split('-').map(Number);
+            const utcDate = new Date(Date.UTC(y, m - 1, d));
+            const dayOfWeek = (utcDate.getUTCDay() + 6) % 7;
+            fromStr = shiftBusinessDate(todayStr, -dayOfWeek);
             toStr = todayStr;
         } else if (preset === 'this_month') {
             fromStr = `${todayStr.slice(0, 7)}-01`;
@@ -457,7 +454,7 @@ export default function CashierReportPage() {
                                                                 {row.payment_date}
                                                             </div>
                                                             <div className="text-xs text-slate-400">
-                                                                {row.created_at ? new Date(row.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                                {row.created_at ? formatBusinessDateTime(row.created_at) : '-'}
                                                             </div>
                                                         </td>
                                                         <td className="whitespace-nowrap px-4 py-3 font-mono font-medium text-blue-600">

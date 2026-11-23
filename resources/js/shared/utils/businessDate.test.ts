@@ -17,6 +17,7 @@ import {
     configureBusinessTimeZone,
     formatBusinessDate,
     formatBusinessDateTime,
+    shiftBusinessDate,
     toHourFloor,
 } from './businessDate';
 
@@ -91,5 +92,31 @@ describe('business date utilities', () => {
         expect(toHourFloor(null)).toBeUndefined();
         expect(toHourFloor(undefined)).toBeUndefined();
         expect(toHourFloor('   ')).toBeUndefined();
+    });
+
+    it('dynamically shifts civil business dates across month and year boundaries', () => {
+        expect(shiftBusinessDate('2026-10-31', 1)).toBe('2026-11-01');
+        expect(shiftBusinessDate('2026-03-01', -1)).toBe('2026-02-28');
+        expect(shiftBusinessDate('2026-12-31', 1)).toBe('2027-01-01');
+        expect(shiftBusinessDate('invalid-date', 1)).toBe('invalid-date');
+    });
+
+    it('supports arbitrary dynamic timezones without static hardcoding', () => {
+        const instant = new Date('2026-06-15T23:30:00.000Z');
+
+        configureBusinessTimeZone('America/New_York'); // UTC-4 in summer
+        expect(businessTimeZone()).toBe('America/New_York');
+        expect(businessDateInputValue(instant)).toBe('2026-06-15');
+
+        configureBusinessTimeZone('Asia/Tokyo'); // UTC+9
+        expect(businessTimeZone()).toBe('Asia/Tokyo');
+        expect(businessDateInputValue(instant)).toBe('2026-06-16');
+
+        configureBusinessTimeZone('Europe/London'); // UTC+1 in summer
+        expect(businessTimeZone()).toBe('Europe/London');
+        expect(businessDateInputValue(instant)).toBe('2026-06-16');
+
+        // Shifting with calendarDays offset parameter
+        expect(businessDateInputValue(instant, 'Asia/Tokyo', -1)).toBe('2026-06-15');
     });
 });

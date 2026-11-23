@@ -14,6 +14,7 @@ namespace Modules\Item\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\DTOs\ItemPriceResolutionResult;
 use Modules\Item\Enums\ItemPriceType;
@@ -24,12 +25,19 @@ use Modules\Tenant\Models\TenantModel;
 final class ItemPriceResolutionService
 {
     public const CONTEXT_SALES = 'sales';
+
     public const CONTEXT_SERVICE = 'service';
+
     public const CONTEXT_INVOICE = 'invoice';
+
     public const CONTEXT_PURCHASE = 'purchase';
+
     public const CONTEXT_RENTAL = 'rental';
 
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
+    ) {}
 
     public function resolvePrice(
         Item $item,
@@ -40,7 +48,9 @@ final class ItemPriceResolutionService
         ?string $date = null,
         ?int $variantId = null,
     ): ItemPriceResolutionResult {
-        $effectiveDate = $date ?? CarbonImmutable::now()->toDateString();
+        $effectiveDate = $date ?? ($this->timezoneResolver !== null
+            ? $this->timezoneResolver->todayDateString((int) $item->tenant_id, $organizationUnitId)
+            : CarbonImmutable::now()->toDateString());
         $resolvedUomId = $uomId ?? ($item->base_uom_id === null ? null : (int) $item->base_uom_id);
         $resolvedCurrencyId = $currencyId ?? $this->tenantBaseCurrencyId((int) $item->tenant_id);
 

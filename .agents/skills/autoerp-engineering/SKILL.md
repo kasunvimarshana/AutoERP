@@ -77,7 +77,7 @@ The following practices are **strictly prohibited** across AutoERP:
 4. **Fictitious Owner Costs:** Never manufacture artificial Owner Agreements or payable vouchers for company-owned vehicles.
 5. **Hardcoded Magic Account Numbers:** Never hardcode legacy account codes in business logic; all GL postings must resolve through `Finance` semantic posting profiles.
 6. **Exposing Raw Database IDs in the UI:** The user interface must never display raw integer IDs. Relational inputs must use controlled selection components (`LookupSelect`, `GenericLookupSelect`).
-7. **Client Timezone Drift:** Never rely on browser UTC string slicing (`.toISOString()`). All business dates and timestamps must be formatted using `businessDate.ts` against the operational `Asia/Colombo` civil timezone.
+7. **Client Timezone Drift & Hardcoded Timezones:** Never rely on browser UTC string slicing (`.toISOString()`) or hardcode a static timezone. All business dates and timestamps must be formatted using `businessDate.ts` against the workspace's dynamically configured civil timezone (`localization.timezone` / application configuration).
 8. **Dynamic Migration Code:** Never use dynamic loops, runtime conditionals, or raw SQL statements in migration files.
 
 ---

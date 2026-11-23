@@ -16,6 +16,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Reporting\DTOs\ReportColumn;
@@ -32,6 +33,7 @@ final class GrnPayablesReportService
         private readonly OperationalReportResponseBuilder $responses,
         private readonly ReportBrandingResolver $branding,
         private readonly GrnPayablesReportQuery $queries,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     /**
@@ -40,6 +42,14 @@ final class GrnPayablesReportService
      */
     public function run(array $params): array
     {
+        $tenantId = (int) ($params['tenant_id'] ?? 0);
+        $organizationUnitId = isset($params['organization_unit_id']) && is_numeric($params['organization_unit_id'])
+            ? (int) $params['organization_unit_id']
+            : null;
+        $today = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->today($tenantId, $organizationUnitId)
+            : CarbonImmutable::now()->startOfDay();
+
         $query = $this->queries->build($params);
         $summary = $this->summary(clone $query);
         $suppliers = $this->supplierBreakdown(clone $query);
@@ -47,7 +57,7 @@ final class GrnPayablesReportService
 
         $response = $this->responses->paginate(
             $query,
-            fn (object $row): array => $this->row($row),
+            fn (object $row): array => $this->row($row, $today),
             $this->definition(),
             $summary,
             max(1, (int) ($params['page'] ?? 1)),
@@ -194,8 +204,9 @@ final class GrnPayablesReportService
     }
 
     /** @return array<string, mixed> */
-    private function row(object $row): array
+    private function row(object $row, ?CarbonImmutable $today = null): array
     {
+        $today ??= CarbonImmutable::now()->startOfDay();
         $money = [
             'receipt_total', 'linked_invoice_amount', 'finalized_invoice_amount', 'pending_invoice_amount',
             'uninvoiced_amount', 'settled_invoice_amount', 'ap_outstanding', 'return_amount',
@@ -206,7 +217,7 @@ final class GrnPayablesReportService
             'received_date' => (string) $row->received_date,
             'grn_number' => (string) $row->grn_number,
             'supplier' => trim((string) ($row->supplier_code ?? '').' '.(string) ($row->supplier_name ?? '')),
-            'age_days' => max(0, (int) CarbonImmutable::parse((string) $row->received_date)->startOfDay()->diffInDays(now()->startOfDay())),
+            'age_days' => max(0, (int) CarbonImmutable::parse((string) $row->received_date)->startOfDay()->diffInDays($today)),
             'invoice_progress' => (string) $row->invoice_progress,
             'invoice_count' => (int) $row->invoice_count,
             'accepted_quantity' => $this->decimal($row->accepted_quantity),

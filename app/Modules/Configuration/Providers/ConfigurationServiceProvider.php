@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Configuration\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Configuration\Constants\ConfigurationPermission;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
@@ -24,14 +25,18 @@ use Modules\Configuration\Repositories\EloquentConfigurationValueRepository;
 use Modules\Configuration\Services\ConfigurationAuthorizationService;
 use Modules\Configuration\Services\ConfigurationDefinitionRegistry;
 use Modules\Configuration\Services\ConfigurationEntryService;
+use Modules\Configuration\Services\ConfigurationGlobalImpactService;
+use Modules\Configuration\Services\ConfigurationRevisionService;
 use Modules\Configuration\Services\ConfigurationScopeResolver;
+use Modules\Configuration\Services\ConfigurationTransferService;
 use Modules\Configuration\Services\MailConfigurationResolver;
 use Modules\Configuration\Services\ResolveConfiguration;
 use Modules\Configuration\Services\SystemPreferencesResolver;
 use Modules\Configuration\Services\Targets\TenantBackedConfigurationTargetPopulation;
 use Modules\Configuration\Services\Targets\TenantBackedConfigurationTargetValidator;
-use Modules\Configuration\Constants\ConfigurationPermission;
+use Modules\Configuration\Services\TimezoneResolver;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 
 final class ConfigurationServiceProvider extends ServiceProvider
 {
@@ -53,9 +58,9 @@ final class ConfigurationServiceProvider extends ServiceProvider
         $this->app->scoped(ConfigurationScopeResolver::class);
         $this->app->scoped(ConfigurationAuthorizationService::class);
         $this->app->scoped(ConfigurationEntryService::class);
-        $this->app->scoped(\Modules\Configuration\Services\ConfigurationGlobalImpactService::class);
-        $this->app->scoped(\Modules\Configuration\Services\ConfigurationTransferService::class);
-        $this->app->scoped(\Modules\Configuration\Services\ConfigurationRevisionService::class);
+        $this->app->scoped(ConfigurationGlobalImpactService::class);
+        $this->app->scoped(ConfigurationTransferService::class);
+        $this->app->scoped(ConfigurationRevisionService::class);
         $this->app->scoped(ResolveConfiguration::class);
         $this->app->scoped(
             ConfigurationResolverInterface::class,
@@ -68,6 +73,10 @@ final class ConfigurationServiceProvider extends ServiceProvider
         $this->app->scoped(
             SystemPreferencesResolverInterface::class,
             SystemPreferencesResolver::class,
+        );
+        $this->app->scoped(
+            TimezoneResolverInterface::class,
+            TimezoneResolver::class,
         );
     }
 

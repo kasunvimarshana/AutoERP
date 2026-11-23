@@ -15,13 +15,21 @@ namespace Modules\Audit\Services;
 use DateTimeImmutable;
 use DateTimeZone;
 use Modules\Audit\Data\AuditQueryData;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 
 final class AuditQueryFactory
 {
+    public function __construct(
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
+    ) {}
+
     /** @param array<string, mixed> $validated */
     public function fromValidated(array $validated): AuditQueryData
     {
-        $timezone = new DateTimeZone((string) config('audit.display_timezone', 'UTC'));
+        $tz = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->resolve()
+            : (string) config('audit.display_timezone', 'UTC');
+        $timezone = new DateTimeZone($tz);
         $from = $this->dateBoundary($validated['from_date'] ?? null, $timezone, false);
         $to = $this->dateBoundary($validated['to_date'] ?? null, $timezone, true);
         $max = max(1, (int) config('audit.pagination.max_per_page', 100));

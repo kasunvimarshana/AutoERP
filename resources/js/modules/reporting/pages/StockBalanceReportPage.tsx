@@ -19,6 +19,7 @@ import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referen
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { ExportActions } from '../components/ExportActions';
 import { loadStockBalanceDetails, runStockBalanceReport } from '../reportingApi';
 import type { StockBalanceDetail, StockBalanceReportParams, StockBalanceReportResult, StockBalanceReportRow } from '../stockBalanceReportTypes';
@@ -117,7 +118,7 @@ export default function StockBalanceReportPage() {
             {!result && loading && <LoadingState label="Loading stock balances..." />}
             {result && <>
                 <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
-                    <span>{loading ? 'Refreshing...' : `${result.meta?.total ?? 0} item/location rows`} · Current balance, generated {new Date(result.generated_at).toLocaleString()}</span>
+                    <span>{loading ? 'Refreshing...' : `${result.meta?.total ?? 0} item/location rows`} · Current balance, generated {formatBusinessDateTime(result.generated_at)}</span>
                     <ExportActions reportKey={REPORT_KEY} params={filters} />
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">

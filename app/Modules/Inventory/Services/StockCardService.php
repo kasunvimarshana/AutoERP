@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Configuration\Constants\ConfigurationKey;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryStatus;
@@ -36,6 +37,7 @@ class StockCardService
         private readonly InventoryValidationService $validation,
         private readonly InventorySourceDocumentResolver $documents,
         private readonly ConfigurationResolverInterface $configuration,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     public function build(array $filters, int $tenantId, ?int $organizationUnitId): array
@@ -58,9 +60,13 @@ class StockCardService
 
         $timezone = (string) (
             $filters['timezone']
-            ?? $this->configuration->value(ConfigurationKey::WORKSPACE_TIMEZONE, $tenantId, $organizationUnitId)
-            ?? config('app.timezone')
+            ?? ($this->timezoneResolver !== null
+                ? $this->timezoneResolver->resolve($tenantId, $organizationUnitId)
+                : ($this->configuration->value(ConfigurationKey::WORKSPACE_TIMEZONE, $tenantId, $organizationUnitId) ?: config('app.timezone', 'UTC')))
         );
+        if (! in_array($timezone, \DateTimeZone::listIdentifiers(), true)) {
+            $timezone = (string) config('app.timezone', 'UTC');
+        }
         $from = CarbonImmutable::parse($filters['date_from'], $timezone)->startOfDay()->utc();
         $to = CarbonImmutable::parse($filters['date_to'], $timezone)->addDay()->startOfDay()->utc();
         $snapshot = CarbonImmutable::now('UTC');

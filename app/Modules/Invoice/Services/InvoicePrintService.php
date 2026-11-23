@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceLayoutResolverInterface;
 use Modules\Invoice\Contracts\InvoicePaymentMethodProviderInterface;
@@ -57,6 +58,7 @@ final class InvoicePrintService
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly InvoicePaymentMethodProviderInterface $paymentMethods,
         private readonly InvoiceLayoutResolverInterface $layoutResolver,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     /** @return Builder<Invoice> */
@@ -564,7 +566,12 @@ final class InvoicePrintService
             return null;
         }
 
-        $timezone = (string) $this->configurationValue($invoice, self::TIMEZONE_CONFIGURATION_KEY);
+        $timezone = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->resolve((int) $invoice->tenant_id, $invoice->organization_unit_id === null ? null : (int) $invoice->organization_unit_id)
+            : (string) $this->configurationValue($invoice, self::TIMEZONE_CONFIGURATION_KEY);
+        if ($timezone === '' || ! in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
+            $timezone = (string) config('app.timezone', 'UTC');
+        }
         $printedAt = DateTimeImmutable::createFromInterface($context->printedAt)
             ->setTimezone(new DateTimeZone($timezone));
 

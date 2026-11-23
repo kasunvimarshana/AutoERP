@@ -19,6 +19,7 @@ use InvalidArgumentException;
 use Modules\Configuration\Constants\ConfigurationKey;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Payment\Constants\PaymentPermission;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentMethodType;
@@ -31,6 +32,7 @@ final class PaymentCashReceiptDatePolicy
     public function __construct(
         private readonly ConfigurationResolverInterface $configuration,
         private readonly PermissionCheckerInterface $permissions,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     public function assertCanPost(Payment $payment, ?int $postedBy): void
@@ -44,12 +46,15 @@ final class PaymentCashReceiptDatePolicy
             return;
         }
 
-        $timezone = (string) $this->configuration->value(
-            ConfigurationKey::WORKSPACE_TIMEZONE,
-            (int) $payment->tenant_id,
-            $payment->organization_unit_id,
-        );
-        $today = CarbonImmutable::now($timezone)->toDateString();
+        $today = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->todayDateString((int) $payment->tenant_id, $payment->organization_unit_id)
+            : CarbonImmutable::now(
+                (string) ($this->configuration->value(
+                    ConfigurationKey::WORKSPACE_TIMEZONE,
+                    (int) $payment->tenant_id,
+                    $payment->organization_unit_id,
+                ) ?: config('app.timezone', 'UTC'))
+            )->toDateString();
         $paymentDate = $payment->payment_date->toDateString();
         if ($paymentDate > $today) {
             throw new InvalidArgumentException('Cash receipt date cannot be in the future.');

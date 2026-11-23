@@ -6,12 +6,10 @@
  * Phone: +94713525253
  */
 
+import { formatBusinessDateTimeWithSeconds } from '@/shared/utils/businessDate';
+
 export function formatPlatformDateTime(value: string | null | undefined): string {
-    if (!value) return 'Not available';
-    const date = new Date(value);
-    return Number.isNaN(date.getTime())
-        ? value
-        : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(date);
+    return formatBusinessDateTimeWithSeconds(value, 'Not available');
 }
 
 export function humanizePlatformValue(value: string | null | undefined): string {

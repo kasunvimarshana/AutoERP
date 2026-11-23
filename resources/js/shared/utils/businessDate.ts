@@ -53,9 +53,28 @@ export function businessTimeZone(): string {
     return configuredTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export function businessDateInputValue(date = new Date(), timeZone = configuredTimeZone): string {
+export function businessDateInputValue(
+    date = new Date(),
+    timeZone = configuredTimeZone,
+    calendarDays = 0,
+): string {
     const parts = dateParts(date, timeZone);
-    return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+    const adjusted = new Date(Date.UTC(
+        parts.year,
+        parts.month - 1,
+        parts.day + calendarDays,
+    ));
+    return `${adjusted.getUTCFullYear()}-${pad(adjusted.getUTCMonth() + 1)}-${pad(adjusted.getUTCDate())}`;
+}
+
+export function shiftBusinessDate(value: string, calendarDays: number): string {
+    const match = LOCAL_DATE_PATTERN.exec(value);
+    if (!match) return value;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const adjusted = new Date(Date.UTC(year, month - 1, day + calendarDays));
+    return `${adjusted.getUTCFullYear()}-${pad(adjusted.getUTCMonth() + 1)}-${pad(adjusted.getUTCDate())}`;
 }
 
 export function formatBusinessDate(

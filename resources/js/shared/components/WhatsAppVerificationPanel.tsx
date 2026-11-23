@@ -11,6 +11,7 @@ import type { ApiError } from '@/shared/api/apiError';
 import { toApiError } from '@/shared/api/apiError';
 import { notifySuccess } from '@/shared/notifications/appToast';
 import type { WhatsAppVerificationChallenge, WhatsAppVerificationState } from '@/shared/types/whatsAppVerification';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { Button } from './Button';
 import { ErrorAlert } from './ErrorAlert';
@@ -106,7 +107,7 @@ export function WhatsAppVerificationPanel({
             <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 <div><span className="font-medium text-slate-700">Recipient:</span> {state?.recipient?.name ?? '-'}</div>
                 <div><span className="font-medium text-slate-700">WhatsApp:</span> {state?.recipient?.phone ?? 'No active mobile number'}</div>
-                {state?.verified_at ? <div><span className="font-medium text-slate-700">Verified at:</span> {new Date(state.verified_at).toLocaleString()}</div> : null}
+                {state?.verified_at ? <div><span className="font-medium text-slate-700">Verified at:</span> {formatBusinessDateTime(state.verified_at)}</div> : null}
                 {state?.verified_by ? <div><span className="font-medium text-slate-700">Verified by:</span> {state.verified_by}</div> : null}
             </div>
             {canManage ? (

@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\BatchPriceData;
 use Modules\Inventory\DTOs\SupersedeBatchPriceData;
@@ -33,6 +34,7 @@ final class BatchPriceService
     public function __construct(
         private readonly ItemValidationService $itemValidator,
         private readonly DecimalMath $math,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     public function create(int $tenantId, BatchPriceData $data): InventoryBatchPriceRevision
@@ -107,7 +109,9 @@ final class BatchPriceService
         ?int $organizationUnitId = null,
         ?string $date = null,
     ): ?InventoryBatchPriceRevision {
-        $effectiveDate = $date ?? CarbonImmutable::now()->toDateString();
+        $effectiveDate = $date ?? ($this->timezoneResolver !== null
+            ? $this->timezoneResolver->todayDateString((int) $batch->tenant_id, $organizationUnitId)
+            : CarbonImmutable::now()->toDateString());
 
         return InventoryBatchPriceRevision::query()
             ->where('tenant_id', $batch->tenant_id)

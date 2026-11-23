@@ -6,6 +6,7 @@
  * Phone: +94713525253
  */
 
+import { formatBusinessDate, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import type {
     TenantOnboardingReadiness,
     TenantPlanLimits,
@@ -65,15 +66,11 @@ export function focusTenantStep(stepId: string | null): void {
 }
 
 export function formatTenantDateTime(value: string | null | undefined, fallback = 'Not set'): string {
-    if (!value) return fallback;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
+    return formatBusinessDateTime(value, fallback);
 }
 
 export function formatTenantDate(value: string | null | undefined, fallback = 'Not set'): string {
-    if (!value) return fallback;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? fallback : date.toLocaleDateString();
+    return formatBusinessDate(value, fallback);
 }
 
 export function formatPlanMoney(revision: Pick<TenantPlanRevision, 'price' | 'currency' | 'billing_interval'>): string {

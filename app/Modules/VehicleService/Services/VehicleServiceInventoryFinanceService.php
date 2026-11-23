@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\Contracts\FinanceSourceReversalInterface;
@@ -36,6 +37,7 @@ final class VehicleServiceInventoryFinanceService
         private readonly DecimalMath $math,
         private readonly FinancePostingInterface $postings,
         private readonly FinanceSourceReversalInterface $reversals,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     public function reverseIssue(VehicleServiceJob $job, InventoryMovement $movement, int $actorId, string $reason): void
@@ -45,13 +47,17 @@ final class VehicleServiceInventoryFinanceService
             return;
         }
 
+        $reversalDate = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->todayDateString((int) $job->tenant_id, $job->organization_unit_id)
+            : now()->toDateString();
+
         $this->reversals->reverseSource(
             (int) $job->tenant_id,
             $job->organization_unit_id,
             VehicleServiceFinanceSource::MODULE,
             VehicleServiceFinanceSource::INVENTORY_ISSUE,
             (int) $movement->getKey(),
-            now()->toDateString(),
+            $reversalDate,
             $actorId,
             $reason,
         );

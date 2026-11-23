@@ -2,7 +2,7 @@
 
 **Document Status:** Single Authoritative System Specification, Enterprise Architecture Reference, and Developer Onboarding Guide for AutoERP.  
 **System Architecture:** Modular Monolith (Laravel 12 Backend + React 19 / TypeScript 6 SPA Frontend)  
-**Standard Civil Timezone:** `Asia/Colombo` (Operational Business Calendar & Civil Timestamps)  
+**Standard Civil Timezone:** Dynamically Configured Workspace Timezone (`localization.timezone` scoped by tenant/organization unit, with fallback to application `APP_TIMEZONE`)  
 **Arithmetic Precision:** Exact Arbitrary-Precision String Arithmetic via `DecimalMath` (PHP BCMath)  
 **Total Canonical Database Tables:** 267 Tables (262 Modular Migrations + 5 Infrastructure Migrations)  
 **Business Modules:** 31 Domain Modules located in `app/Modules/*`  
@@ -543,7 +543,7 @@ flowchart TD
     S2 --> S3["3. PlatformOperatorSeeder (Super Admins)"]
     S3 --> S4["4. AuthSeeder (OAuth Clients & Credentials)"]
     S4 --> S5["5. ReferenceDataSeeder (ISO Currencies, Countries, Timezones)"]
-    S5 --> S6["6. TenantReferenceAssignmentSeeder (Tenant Currency & Asia/Colombo)"]
+    S5 --> S6["6. TenantReferenceAssignmentSeeder (Tenant Currency & Operational Timezone)"]
     S6 --> S7["7. SequenceSeeder (Atomic Monotonic Sequences)"]
     S7 --> S8["8. UomSeeder (Units of Measure)"]
     S8 --> S9["9. WarehouseSeeder (Warehouses, Bays & Bins)"]
@@ -757,7 +757,7 @@ When an assigned vehicle breaks down or requires servicing:
 
 The Running Chart is the **single physical operational log** of vehicle usage:
 - Records daily operational facts:
-  - Duty ON time (e.g. `06:30 AM`) and Duty OFF time (e.g. `08:00 PM`) in civil business timezone (`Asia/Colombo`).
+  - Duty ON time (e.g. `06:30 AM`) and Duty OFF time (e.g. `08:00 PM`) in civil business timezone.
   - Start and finish odometers, comparative daily distance, and cumulative monthly mileage.
   - Overtime minutes categorized as Normal (`N`), Sunday/Double (`D`), or Holiday/Triple (`T`).
   - Out-of-pocket expressway tolls, driver night-out allowances, and AC mode usage.
@@ -1064,7 +1064,7 @@ php artisan view:cache
    - *Remedy:* Generate a fresh UUID v4 key for new operations. If retrying a failed network call, submit the identical payload.
 3. **Date Shift on Daily Running Charts:**
    - *Root Cause:* Client-side code used `new Date().toISOString()`, shifting timestamps across midnight UTC.
-   - *Remedy:* Always parse and format dates using `businessDate.ts` against the operational `Asia/Colombo` civil timezone.
+   - *Remedy:* Always parse and format dates using `businessDate.ts` against the dynamically configured workspace civil timezone.
 4. **Tenant Scope Access Denied:**
    - *Root Cause:* Query executed outside an authenticated tenant session or attempted to access records across tenant boundaries.
    - *Remedy:* Verify the user has an active membership in the target tenant and organization unit.
@@ -1081,7 +1081,7 @@ The following practices are **strictly prohibited** across the entire AutoERP co
 4. **Fictitious Owner Costs:** Never manufacture artificial Owner Agreements or payable vouchers for company-owned vehicles.
 5. **Hardcoded Magic Account Numbers:** Never hardcode legacy account codes in business logic. All GL postings must resolve through `Finance` posting profiles.
 6. **Exposing Raw Database IDs in the UI:** The interface must never display raw integer IDs. Use human-readable labels, registration numbers, codes, and search-driven components (`LookupSelect`).
-7. **Client Timezone Drift:** Never rely on browser UTC string slicing (`.toISOString()`). All business dates and timestamps must be formatted using the tenant's operational business timezone (`Asia/Colombo`).
+7. **Client Timezone Drift & Hardcoded Timezones:** Never rely on browser UTC string slicing (`.toISOString()`) or hardcode a static timezone. All business dates and timestamps must be formatted using `businessDate.ts` against the tenant's dynamically configured business timezone (`localization.timezone` / application configuration).
 8. **Dynamic Migration Code:** Never use dynamic loops, runtime conditionals, or raw SQL statements in migration files.
 
 ---
@@ -1106,7 +1106,7 @@ A task is complete only when:
 - [x] Tenant and organization unit boundaries are strictly enforced.
 - [x] Relational inputs use controlled selection components; zero raw IDs are exposed in the UI.
 - [x] Calculation transparency is maintained with clear formula hints and breakdowns.
-- [x] All dates and times evaluate against the tenant's civil business timezone (`Asia/Colombo`).
+- [x] All dates and times evaluate against the tenant's dynamically configured civil business timezone (zero hardcoded timezones).
 - [x] All relevant backend PHPUnit test suites pass completely (`php artisan test`).
 - [x] All relevant frontend Vitest test suites pass completely (`npm test`).
 - [x] TypeScript compile checks (`npm run typecheck`) report zero errors.

@@ -18,6 +18,7 @@ use InvalidArgumentException;
 use LogicException;
 use Modules\Configuration\Constants\ConfigurationKey;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Expense\Constants\ExpenseIdempotency;
 use Modules\Expense\DTOs\CreateExpenseData;
@@ -46,6 +47,7 @@ final class ExpensePostingService
         private readonly FinancePostingInterface $finance,
         private readonly IdempotencyService $idempotency,
         private readonly ConfigurationResolverInterface $configuration,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     public function createAndPost(CreateExpenseData $data): Expense
@@ -56,12 +58,16 @@ final class ExpensePostingService
                 return $this->replay($record, $data);
             }
 
-            $timezone = (string) ($this->configuration->value(
-                ConfigurationKey::WORKSPACE_TIMEZONE,
-                $data->tenantId,
-                $data->organizationUnitId,
-            ) ?: config('app.timezone'));
-            $today = CarbonImmutable::now($timezone)->startOfDay();
+            $timezone = $this->timezoneResolver !== null
+                ? $this->timezoneResolver->resolve($data->tenantId, $data->organizationUnitId)
+                : (string) ($this->configuration->value(
+                    ConfigurationKey::WORKSPACE_TIMEZONE,
+                    $data->tenantId,
+                    $data->organizationUnitId,
+                ) ?: config('app.timezone', 'UTC'));
+            $today = $this->timezoneResolver !== null
+                ? $this->timezoneResolver->today($data->tenantId, $data->organizationUnitId)
+                : CarbonImmutable::now($timezone)->startOfDay();
             $expenseDate = CarbonImmutable::parse($data->expenseDate, $timezone)->startOfDay();
             if ($expenseDate->greaterThan($today)) {
                 throw new InvalidArgumentException('Expense date cannot be in the future.');

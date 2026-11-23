@@ -20,6 +20,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\AdjustmentEffect;
 use Modules\Invoice\Enums\AdjustmentType;
@@ -63,6 +64,7 @@ final class RentalBillingDocumentService
         private readonly InvoiceBalanceService $balanceService,
         private readonly TwoStageInvoicingService $invoicingService,
         private readonly OwnerSettlementBillingService $ownerSettlementBillingService,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     /**
@@ -167,7 +169,9 @@ final class RentalBillingDocumentService
         }
 
         if (! empty($filters['balance_status'])) {
-            $today = CarbonImmutable::now()->toDateString();
+            $today = $this->timezoneResolver !== null
+                ? $this->timezoneResolver->todayDateString($context->tenantId, $context->organizationUnitId)
+                : CarbonImmutable::now()->toDateString();
             match ($filters['balance_status']) {
                 'paid' => $query->where('balance_due', '<=', 0)
                     ->whereNotIn('status', [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value]),
@@ -215,7 +219,9 @@ final class RentalBillingDocumentService
     {
         $this->assertViewPermission($context, null);
 
-        $today = CarbonImmutable::now()->toDateString();
+        $today = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->todayDateString($context->tenantId, $context->organizationUnitId)
+            : CarbonImmutable::now()->toDateString();
 
         // Customer AR (Outbound)
         $outboundInvoices = $this->baseRentalInvoiceQuery($context)
@@ -955,7 +961,9 @@ final class RentalBillingDocumentService
 
     private function formatDocumentItem(Invoice $invoice, ?array $context): array
     {
-        $today = CarbonImmutable::now()->toDateString();
+        $today = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->todayDateString((int) $invoice->tenant_id, $invoice->organization_unit_id === null ? null : (int) $invoice->organization_unit_id)
+            : CarbonImmutable::now()->toDateString();
         $balanceDue = (string) ($invoice->balance_due ?? $invoice->balance?->remaining_amount ?? '0.000000');
         $paidTotal = (string) ($invoice->paid_total ?? $invoice->balance?->paid_amount ?? '0.000000');
         $grandTotal = (string) $invoice->grand_total;

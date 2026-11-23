@@ -24,10 +24,12 @@ use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\ExceptionParserInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Modules\Core\Services\DecimalMath;
+use Modules\Core\Services\DefaultTimezoneResolver;
 use Modules\Core\Services\SlugGenerator;
 use Modules\Core\Support\ErrorNormalizer;
 use Modules\Core\Support\ExceptionParser;
@@ -46,6 +48,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/core.php', 'core');
 
         $this->app->singleton(ClockInterface::class, SystemClock::class);
+        $this->app->singleton(TimezoneResolverInterface::class, DefaultTimezoneResolver::class);
         $this->app->singleton(DecimalMath::class);
         $this->app->singleton(UuidGeneratorInterface::class, LaravelUuidGenerator::class);
         $this->app->singleton(TransactionManagerInterface::class, LaravelTransactionManager::class);

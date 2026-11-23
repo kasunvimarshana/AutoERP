@@ -18,7 +18,7 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { useApi } from '@/shared/hooks/useApi';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { businessDateInputValue, shiftBusinessDate } from '@/shared/utils/businessDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { getDashboardSummary } from './dashboardApi';
 import type { DashboardDateRange } from './dashboardTypes';
@@ -204,9 +204,7 @@ function datePreset(preset: DatePreset): DashboardDateRange {
 }
 
 function shiftDate(value: string, days: number): string {
-    const [year, month, day] = value.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day + days));
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+    return shiftBusinessDate(value, days);
 }
 
 function presetLabel(preset: DatePreset): string {

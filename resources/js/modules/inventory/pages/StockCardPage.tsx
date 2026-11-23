@@ -21,7 +21,7 @@ import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referen
 import { getDefaultWarehouse, getDefaultWarehouseLocation } from '@/modules/warehouse/warehouseApi';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { businessDateInputValue, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { downloadStockCard, getStockCard, type StockCardFilters, type StockCardResult } from '../inventoryApi';
 
 function currentMonth() {
@@ -168,7 +168,7 @@ export default function StockCardPage() {
                             <tbody className="divide-y divide-slate-100">
                                 <tr className="bg-slate-50 font-semibold"><td colSpan={6} className="px-4 py-3 text-slate-900">Opening balance</td><td className="px-4 py-3 text-right tabular-nums text-slate-900">{result.opening}</td></tr>
                                 {result.rows.map((row) => <tr key={row.movement_number} className="transition-colors hover:bg-blue-50/40">
-                                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{new Date(row.posted_at).toLocaleString()}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatBusinessDateTime(row.posted_at)}</td>
                                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.document_date ?? '—'}</td>
                                     <td className="px-4 py-3">{row.document?.url ? <Link className="font-medium text-blue-600 hover:text-blue-800 hover:underline" to={row.document.url}>{row.document.label}</Link> : row.document?.label ?? row.movement_number}</td>
                                     <td className="px-4 py-3 text-slate-700">{row.description ?? row.type}</td>

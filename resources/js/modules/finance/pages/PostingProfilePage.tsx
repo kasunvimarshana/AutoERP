@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -2042,5 +2043,5 @@ export default function PostingProfilePage() {
 }
 
 function todayDate(): string {
-    return new Date().toISOString().slice(0, 10);
+    return businessDateInputValue();
 }

@@ -13,13 +13,12 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Carbon\CarbonImmutable;
-use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemUnit;
-use Modules\Purchase\Enums\PurchaseOrderStatus;
-use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Validators\PurchaseValidationService;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierItemMapping;
 use Modules\Tax\Contracts\TaxPartyProfileReaderInterface;
@@ -36,6 +35,7 @@ final class PurchaseDocumentContextService
         private readonly PurchaseValidationService $validator,
         private readonly PurchasePricingService $prices,
         private readonly TaxPartyProfileReaderInterface $taxProfiles,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     /**
@@ -52,7 +52,9 @@ final class PurchaseDocumentContextService
 
         return [
             'defaults' => [
-                'purchase_order_date' => CarbonImmutable::now()->toDateString(),
+                'purchase_order_date' => $this->timezoneResolver !== null
+                    ? $this->timezoneResolver->todayDateString($tenantId, $organizationUnitId)
+                    : CarbonImmutable::now()->toDateString(),
                 'expected_delivery_date' => null,
                 'currency_id' => $currency?->getKey(),
                 'currency' => $this->currencySummary($currency),
@@ -154,7 +156,9 @@ final class PurchaseDocumentContextService
             variantId: $variantId,
             currencyId: $currencyId,
             uomId: $uomId,
-            purchaseDate: $purchaseDate ?? CarbonImmutable::now()->toDateString(),
+            purchaseDate: $purchaseDate ?? ($this->timezoneResolver !== null
+                ? $this->timezoneResolver->todayDateString($tenantId, $organizationUnitId)
+                : CarbonImmutable::now()->toDateString()),
             allowedUnits: $allowedUnits,
         );
         $mapping = $price['supplier_mapping'];

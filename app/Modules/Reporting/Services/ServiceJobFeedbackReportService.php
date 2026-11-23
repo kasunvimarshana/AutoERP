@@ -16,6 +16,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
@@ -32,6 +33,7 @@ final class ServiceJobFeedbackReportService
 
     public function __construct(
         private readonly DecimalMath $math,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     /**
@@ -202,7 +204,7 @@ final class ServiceJobFeedbackReportService
             ->select('vehicle_service_job_feedbacks.*');
 
         // Apply date filtering
-        $this->applyDateFilters($query, $params);
+        $this->applyDateFilters($query, $params, $tenantId, $organizationUnitId);
 
         // Feedback type / category filter
         if (! empty($params['feedback_type']) && $params['feedback_type'] !== 'all') {
@@ -284,14 +286,16 @@ final class ServiceJobFeedbackReportService
     /**
      * @param  array<string, mixed>  $params
      */
-    private function applyDateFilters(Builder $query, array $params): void
+    private function applyDateFilters(Builder $query, array $params, int $tenantId = 0, ?int $organizationUnitId = null): void
     {
         $dateBy = ($params['date_by'] ?? 'job_date') === 'feedback_date'
             ? 'vehicle_service_job_feedbacks.created_at'
             : 'vehicle_service_jobs.job_date';
 
         $preset = (string) ($params['date_preset'] ?? '');
-        $today = CarbonImmutable::now();
+        $today = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->today($tenantId, $organizationUnitId)
+            : CarbonImmutable::now();
 
         if ($preset !== '') {
             match ($preset) {

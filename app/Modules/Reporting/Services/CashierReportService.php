@@ -15,6 +15,7 @@ namespace Modules\Reporting\Services;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
@@ -33,6 +34,7 @@ final class CashierReportService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly ReportBrandingResolver $branding,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     /**
@@ -41,8 +43,11 @@ final class CashierReportService
      */
     public function run(int $tenantId, ?int $organizationUnitId, array $params): array
     {
-        $dateFrom = (string) ($params['date_from'] ?? date('Y-m-01'));
-        $dateTo = (string) ($params['date_to'] ?? date('Y-m-d'));
+        $today = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->todayDateString($tenantId, $organizationUnitId)
+            : date('Y-m-d');
+        $dateFrom = (string) ($params['date_from'] ?? substr($today, 0, 7).'-01');
+        $dateTo = (string) ($params['date_to'] ?? $today);
         $cashierUserId = isset($params['cashier_user_id']) && is_numeric($params['cashier_user_id'])
             ? (int) $params['cashier_user_id']
             : null;
@@ -300,7 +305,11 @@ final class CashierReportService
 
             $rows[] = [
                 'payment_date' => (string) $payment->payment_date,
-                'created_at' => $payment->created_at ? Carbon::parse($payment->created_at)->format('H:i:s') : '-',
+                'created_at' => $payment->created_at
+                    ? ($this->timezoneResolver !== null
+                        ? $this->timezoneResolver->toCivilDateTime($payment->created_at, $tenantId, $organizationUnitId)->format('H:i:s')
+                        : Carbon::parse($payment->created_at)->format('H:i:s'))
+                    : '-',
                 'payment_number' => (string) $payment->payment_number,
                 'direction' => $isInbound ? 'Inflow (Collection)' : 'Outflow (Disbursement)',
                 'cashier_name' => $cashierName,
@@ -776,7 +785,11 @@ final class CashierReportService
                 'id' => (int) $p->id,
                 'payment_number' => (string) $p->payment_number,
                 'payment_date' => (string) $p->payment_date,
-                'created_at' => $p->created_at ? Carbon::parse($p->created_at)->toIso8601String() : null,
+                'created_at' => $p->created_at
+                    ? ($this->timezoneResolver !== null
+                        ? $this->timezoneResolver->toCivilDateTime($p->created_at, (int) ($p->tenant_id ?? 0), isset($p->organization_unit_id) && is_numeric($p->organization_unit_id) ? (int) $p->organization_unit_id : null)->toIso8601String()
+                        : Carbon::parse($p->created_at)->toIso8601String())
+                    : null,
                 'direction' => (string) $p->direction,
                 'direction_label' => $isInbound ? 'Collection' : 'Disbursement / Refund',
                 'payment_type' => (string) $p->payment_type,

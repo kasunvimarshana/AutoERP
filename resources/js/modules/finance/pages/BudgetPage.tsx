@@ -20,19 +20,22 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createBudget, getBudgetActuals, getFinanceLookups, listBudgets, type Budget, type BudgetPayload } from '../financeApi';
 
-const currentYear = new Date().getFullYear();
-const initial: BudgetPayload = {
-    name: '',
-    budget_year: currentYear,
-    status: 'draft',
-    description: null,
-    lines: [{ account_id: null, budget_month: 1, amount: '0.000000' }],
-};
+function initialBudgetPayload(): BudgetPayload {
+    const currentYear = Number(businessDateInputValue().slice(0, 4));
+    return {
+        name: '',
+        budget_year: currentYear,
+        status: 'draft',
+        description: null,
+        lines: [{ account_id: null, budget_month: 1, amount: '0.000000' }],
+    };
+}
 
 export default function BudgetPage() {
-    const [form, setForm] = useState(initial);
+    const [form, setForm] = useState(initialBudgetPayload);
     const [actuals, setActuals] = useState<Record<string, unknown> | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -51,7 +54,7 @@ export default function BudgetPage() {
         setError(null);
         try {
             await createBudget({ ...form, lines: form.lines.filter((line) => line.account_id) });
-            setForm(initial);
+            setForm(initialBudgetPayload());
             budgets.reload();
         } catch (requestError) {
             setError(toApiError(requestError));

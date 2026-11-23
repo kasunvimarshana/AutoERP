@@ -18,6 +18,7 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
 use Modules\Configuration\Constants\ConfigurationKey;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -52,13 +53,17 @@ final class DashboardSummaryService
         private readonly SummaryReportService $summaryReports,
         private readonly EmployeeCommissionReportService $commissions,
         private readonly ServiceSalesDashboardService $serviceSales,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
     /** @return array<string, mixed> */
     public function run(int $tenantId, ?int $organizationUnitId, string $dateFrom, string $dateTo): array
     {
-        $timezone = (string) $this->configuration->value(ConfigurationKey::WORKSPACE_TIMEZONE, $tenantId, $organizationUnitId);
-        $today = CarbonImmutable::now($timezone)->startOfDay();
+        $today = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->today($tenantId, $organizationUnitId)
+            : CarbonImmutable::now(
+                (string) ($this->configuration->value(ConfigurationKey::WORKSPACE_TIMEZONE, $tenantId, $organizationUnitId) ?: config('app.timezone', 'UTC'))
+            )->startOfDay();
         $inventory = $this->inventoryHealth($tenantId, $organizationUnitId, $today);
         $receivables = $this->aging($tenantId, $organizationUnitId, InvoiceDirection::Outbound, $today);
         $payables = $this->aging($tenantId, $organizationUnitId, InvoiceDirection::Inbound, $today);

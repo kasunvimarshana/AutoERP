@@ -14,6 +14,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { useApi } from '@/shared/hooks/useApi';
+import { formatBusinessDateTimeWithSeconds } from '@/shared/utils/businessDate';
 import { auditApi } from './auditApi';
 
 export default function AuditLogDetailPage() {
@@ -99,6 +100,5 @@ function JsonPanel({ title, value }: { title: string; value: unknown }) {
 }
 
 function formatDateTime(value: string): string {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(date);
+    return formatBusinessDateTimeWithSeconds(value);
 }

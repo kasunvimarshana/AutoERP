@@ -18,6 +18,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
@@ -25,6 +26,10 @@ use Modules\VehicleService\Models\VehicleServiceJob;
 
 final class UpcomingServicesReportService
 {
+    public function __construct(
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $params
      * @return array<string, mixed>
@@ -36,10 +41,14 @@ final class UpcomingServicesReportService
             ? (int) $params['organization_unit_id']
             : null;
 
-        $scopedQuery = $this->scopedBaseQuery($params, $tenantId, $organizationUnitId);
-        $summary = $this->calculateSummary(clone $scopedQuery);
+        $todayCarbon = $this->timezoneResolver !== null
+            ? $this->timezoneResolver->today($tenantId, $organizationUnitId)
+            : CarbonImmutable::now()->startOfDay();
 
-        $filteredQuery = $this->applyDateAndPresetFilters($scopedQuery, $params);
+        $scopedQuery = $this->scopedBaseQuery($params, $tenantId, $organizationUnitId);
+        $summary = $this->calculateSummary(clone $scopedQuery, $todayCarbon);
+
+        $filteredQuery = $this->applyDateAndPresetFilters($scopedQuery, $params, $todayCarbon);
 
         $filteredQuery->orderBy('vehicle_service_jobs.next_service_date', 'asc')
             ->orderByDesc('vehicle_service_jobs.job_date')
@@ -54,7 +63,7 @@ final class UpcomingServicesReportService
             ->paginate($perPage, ['*'], 'page', $page);
 
         return [
-            'data' => $this->hydrateRows(collect($paginator->items())),
+            'data' => $this->hydrateRows(collect($paginator->items()), $todayCarbon),
             'summary' => $summary,
             'meta' => [
                 'current_page' => $paginator->currentPage(),
@@ -210,11 +219,12 @@ final class UpcomingServicesReportService
     /**
      * @return array<string, int>
      */
-    private function calculateSummary(Builder $query): array
+    private function calculateSummary(Builder $query, ?CarbonImmutable $todayCarbon = null): array
     {
-        $today = CarbonImmutable::now()->toDateString();
-        $weekEnd = CarbonImmutable::now()->addDays(7)->toDateString();
-        $monthEnd = CarbonImmutable::now()->addDays(30)->toDateString();
+        $todayCarbon ??= CarbonImmutable::now()->startOfDay();
+        $today = $todayCarbon->toDateString();
+        $weekEnd = $todayCarbon->addDays(7)->toDateString();
+        $monthEnd = $todayCarbon->addDays(30)->toDateString();
 
         return [
             'total_upcoming' => (clone $query)->count(),
@@ -234,11 +244,12 @@ final class UpcomingServicesReportService
     /**
      * @param  array<string, mixed>  $params
      */
-    private function applyDateAndPresetFilters(Builder $query, array $params): Builder
+    private function applyDateAndPresetFilters(Builder $query, array $params, ?CarbonImmutable $todayCarbon = null): Builder
     {
-        $today = CarbonImmutable::now()->toDateString();
-        $weekEnd = CarbonImmutable::now()->addDays(7)->toDateString();
-        $monthEnd = CarbonImmutable::now()->addDays(30)->toDateString();
+        $todayCarbon ??= CarbonImmutable::now()->startOfDay();
+        $today = $todayCarbon->toDateString();
+        $weekEnd = $todayCarbon->addDays(7)->toDateString();
+        $monthEnd = $todayCarbon->addDays(30)->toDateString();
 
         $preset = (string) ($params['status_preset'] ?? 'all');
         match ($preset) {
@@ -267,9 +278,9 @@ final class UpcomingServicesReportService
      * @param  Collection<int, VehicleServiceJob>  $jobs
      * @return Collection<int, array<string, mixed>>
      */
-    private function hydrateRows(Collection $jobs): Collection
+    private function hydrateRows(Collection $jobs, ?CarbonImmutable $todayCarbon = null): Collection
     {
-        $todayCarbon = CarbonImmutable::now()->startOfDay();
+        $todayCarbon ??= CarbonImmutable::now()->startOfDay();
 
         return $jobs->map(function (VehicleServiceJob $job) use ($todayCarbon): array {
             $nextServiceDate = $job->next_service_date?->toDateString();

@@ -39,10 +39,10 @@ final class CustomerOutstandingReportRequest extends TenantScopedRequest
     public function reportToday(): string
     {
         $timezone = $this->input('timezone');
-        if (! is_string($timezone) || ! in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
-            $timezone = (string) config('app.timezone');
+        if (is_string($timezone) && in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
+            return CarbonImmutable::now($timezone)->toDateString();
         }
 
-        return CarbonImmutable::now($timezone)->toDateString();
+        return $this->workspaceToday();
     }
 }

@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import { formatBusinessDate } from './businessDate';
+import { businessTimeZone, formatBusinessDate } from './businessDate';
 
 export function formatDate(value?: string | null): string {
     if (!value) return '-';
@@ -19,6 +19,9 @@ export function formatDate(value?: string | null): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime())
         ? value
-        : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date);
+        : new Intl.DateTimeFormat(undefined, {
+            timeZone: businessTimeZone(),
+            dateStyle: 'medium',
+        }).format(date);
 }
 

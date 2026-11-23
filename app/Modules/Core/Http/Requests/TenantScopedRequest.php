@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 
 abstract class TenantScopedRequest extends QueryRequest
 {
@@ -49,6 +50,22 @@ abstract class TenantScopedRequest extends QueryRequest
         $value = $this->attributes->get($this->currentUserIdAttribute());
 
         return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    public function workspaceTimezone(): string
+    {
+        return app(TimezoneResolverInterface::class)->resolve(
+            $this->tenantId(),
+            $this->organizationUnitId(),
+        );
+    }
+
+    public function workspaceToday(): string
+    {
+        return app(TimezoneResolverInterface::class)->todayDateString(
+            $this->tenantId(),
+            $this->organizationUnitId(),
+        );
     }
 
     protected function tenantExists(string $table, string $column = 'id'): Exists

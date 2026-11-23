@@ -26,25 +26,23 @@ import type {
     EmployeeCommissionReportParams,
     EmployeeCommissionReportResult,
 } from '../reportingTypes';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 
 const reportKey = 'vehicle-service/employee-commissions';
-const today = new Date();
-const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-const localDate = (date: Date) => [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-].join('-');
-const defaultFilters: EmployeeCommissionReportParams = {
-    page: 1,
-    per_page: 25,
-    group_by: 'employee',
-    sort: 'job_date',
-    direction: 'desc',
-    date_from: localDate(currentMonthStart),
-    date_to: localDate(today),
-    period_view: true,
-};
+
+function createDefaultFilters(): EmployeeCommissionReportParams {
+    const today = businessDateInputValue();
+    return {
+        page: 1,
+        per_page: 25,
+        group_by: 'employee',
+        sort: 'job_date',
+        direction: 'desc',
+        date_from: `${today.slice(0, 7)}-01`,
+        date_to: today,
+        period_view: true,
+    };
+}
 
 export default function EmployeeCommissionReportScreen() {
     const { organizationUnit } = useAuth();
@@ -156,14 +154,15 @@ function cleanParams(params: EmployeeCommissionReportParams): EmployeeCommission
 }
 
 function reportInitialFilters(searchParams: URLSearchParams): EmployeeCommissionReportParams {
+    const defaults = createDefaultFilters();
     const dateFrom = searchParams.get('date_from');
     const dateTo = searchParams.get('date_to');
     const search = searchParams.get('search')?.trim();
 
     return {
-        ...defaultFilters,
-        date_from: isDateInput(dateFrom) ? dateFrom : defaultFilters.date_from,
-        date_to: isDateInput(dateTo) ? dateTo : defaultFilters.date_to,
+        ...defaults,
+        date_from: isDateInput(dateFrom) ? dateFrom : defaults.date_from,
+        date_to: isDateInput(dateTo) ? dateTo : defaults.date_to,
         search: search || undefined,
     };
 }

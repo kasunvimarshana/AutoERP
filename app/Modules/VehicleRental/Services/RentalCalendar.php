@@ -16,6 +16,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use LogicException;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\TimezoneResolverInterface;
 use Modules\VehicleRental\Constants\RentalConfiguration;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
@@ -23,10 +24,17 @@ use Modules\VehicleRental\Models\Agreement;
 
 final class RentalCalendar
 {
-    public function __construct(private readonly ConfigurationResolverInterface $configuration) {}
+    public function __construct(
+        private readonly ConfigurationResolverInterface $configuration,
+        private readonly ?TimezoneResolverInterface $timezoneResolver = null,
+    ) {}
 
     public function timezone(AgreementContext $context): string
     {
+        if ($this->timezoneResolver !== null) {
+            return $this->timezoneResolver->resolve($context->tenantId, $context->organizationUnitId);
+        }
+
         try {
             $tz = (string) $this->configuration->value(
                 RentalConfiguration::WORKSPACE_TIMEZONE,

@@ -21,7 +21,7 @@ final class StoreConsumableUsageRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'usage_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'usage_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.$this->workspaceToday()],
             'item_id' => ['required', 'integer', 'min:1'],
             'warehouse_id' => ['required', 'integer', 'min:1'],
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],

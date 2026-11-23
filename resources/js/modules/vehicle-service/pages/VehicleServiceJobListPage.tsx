@@ -24,7 +24,7 @@ import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
 import { notifySuccess } from '@/shared/notifications/appToast';
 import { useDebounce } from '@/shared/hooks/useDebounce';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { businessDateInputValue, shiftBusinessDate } from '@/shared/utils/businessDate';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import { statusBadgeClassName } from '@/shared/components/StatusBadge';
@@ -297,12 +297,13 @@ function boardDateRange(preset: Exclude<BoardDatePreset, 'custom'>): { from: str
     const today = businessDateInputValue();
     if (preset === 'today') return { from: today, to: today };
 
-    const date = new Date(`${today}T00:00:00Z`);
-    const daysSinceMonday = (date.getUTCDay() + 6) % 7;
-    date.setUTCDate(date.getUTCDate() - daysSinceMonday - (preset === 'last_week' ? 7 : 0));
-    const from = date.toISOString().slice(0, 10);
-    date.setUTCDate(date.getUTCDate() + 6);
-    return { from, to: date.toISOString().slice(0, 10) };
+    const [y, m, d] = today.split('-').map(Number);
+    const utcDate = new Date(Date.UTC(y, m - 1, d));
+    const daysSinceMonday = (utcDate.getUTCDay() + 6) % 7;
+    const offset = -daysSinceMonday - (preset === 'last_week' ? 7 : 0);
+    const from = shiftBusinessDate(today, offset);
+    const to = shiftBusinessDate(from, 6);
+    return { from, to };
 }
 
 function updateStatusSearchParam(

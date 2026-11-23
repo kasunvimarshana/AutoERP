@@ -15,6 +15,7 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
+import { formatBusinessDateTimeWithSeconds } from '@/shared/utils/businessDate';
 import { auditApi } from './auditApi';
 import { AUDIT_EVENT_CATEGORIES, type AuditListFilters, type AuditLogSummary } from './auditTypes';
 
@@ -116,8 +117,7 @@ function cleanFilters(filters: AuditListFilters): AuditListFilters {
 }
 
 function formatDateTime(value: string): string {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(date);
+    return formatBusinessDateTimeWithSeconds(value);
 }
 
 const categoryOptions = AUDIT_EVENT_CATEGORIES.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
