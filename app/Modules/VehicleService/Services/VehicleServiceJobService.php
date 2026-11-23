@@ -12,7 +12,6 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
@@ -224,12 +223,8 @@ final class VehicleServiceJobService
         bool $creating,
         ?VehicleServiceJob $existing,
     ): ?string {
-        if ($data->nextServiceDateProvided || $data->nextServiceDate !== null) {
+        if ($data->nextServiceDateProvided || $creating) {
             return $data->nextServiceDate;
-        }
-
-        if ($creating) {
-            return CarbonImmutable::parse($data->jobDate)->addMonthNoOverflow()->toDateString();
         }
 
         return $existing?->next_service_date?->toDateString();

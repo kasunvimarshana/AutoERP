@@ -681,17 +681,16 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('46.500000', (string) $job->supervisor_commission_amount);
     }
 
-    public function test_next_service_date_defaults_to_one_month_after_job_date_when_omitted(): void
+    public function test_next_service_date_defaults_to_null_when_omitted(): void
     {
         $context = $this->context();
         $job = $this->createJob($context);
 
         $this->assertSame('2026-06-07', $job->job_date->toDateString());
-        $this->assertNotNull($job->next_service_date);
-        $this->assertSame('2026-07-07', $job->next_service_date->toDateString());
+        $this->assertNull($job->next_service_date);
 
         $resource = (new VehicleServiceJobResource($job))->resolve(request());
-        $this->assertSame('2026-07-07', $resource['next_service_date']);
+        $this->assertNull($resource['next_service_date']);
     }
 
     public function test_next_service_date_can_be_customized_or_explicitly_left_empty_and_updated(): void

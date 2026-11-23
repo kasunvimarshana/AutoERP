@@ -12,7 +12,7 @@ import { TestRouter } from '@/test/TestRouter';
 import type { NamedResource } from '@/shared/types/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
-import { defaultNextServiceDate, VehicleServiceJobForm } from './VehicleServiceJobForm';
+import { VehicleServiceJobForm } from './VehicleServiceJobForm';
 import { VehicleServiceSummaryPanel } from './VehicleServiceSummaryPanel';
 
 const apiMocks = vi.hoisted(() => ({
@@ -312,15 +312,7 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByText('9500.000000')).toBeInTheDocument();
     });
 
-    it('calculates default next service date clamping for short months and leap years', () => {
-        expect(defaultNextServiceDate('2026-11-21')).toBe('2026-12-21');
-        expect(defaultNextServiceDate('2026-01-31')).toBe('2026-02-28');
-        expect(defaultNextServiceDate('2024-01-31')).toBe('2024-02-29');
-        expect(defaultNextServiceDate('2026-12-15')).toBe('2027-01-15');
-        expect(defaultNextServiceDate('invalid')).toBe('');
-    });
-
-    it('defaults Next Service Date to one month after job date and tracks job date updates', async () => {
+    it('leaves Next Service Date empty by default and preserves it when job date changes', async () => {
         render(
             <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
                 <VehicleServiceJobForm />
@@ -330,10 +322,10 @@ describe('VehicleServiceJobForm', () => {
         const jobDateInput = screen.getByLabelText('Service job date');
         const nextDateInput = screen.getByLabelText('Next Service Date');
 
-        expect(nextDateInput).toHaveValue(defaultNextServiceDate(jobDateInput.getAttribute('value') ?? ''));
+        expect(nextDateInput).toHaveValue('');
 
         fireEvent.change(jobDateInput, { target: { value: '2026-05-10' } });
-        expect(nextDateInput).toHaveValue('2026-06-10');
+        expect(nextDateInput).toHaveValue('');
     });
 
     it('allows modifying Next Service Date to a custom date and preserves it when job date changes', async () => {
@@ -345,7 +337,7 @@ describe('VehicleServiceJobForm', () => {
         );
 
         fireEvent.change(screen.getByLabelText('Service job date'), { target: { value: '2026-03-01' } });
-        expect(screen.getByLabelText('Next Service Date')).toHaveValue('2026-04-01');
+        expect(screen.getByLabelText('Next Service Date')).toHaveValue('');
 
         fireEvent.change(screen.getByLabelText('Next Service Date'), { target: { value: '2026-09-15' } });
         expect(screen.getByLabelText('Next Service Date')).toHaveValue('2026-09-15');
@@ -367,7 +359,7 @@ describe('VehicleServiceJobForm', () => {
         ));
     });
 
-    it('allows leaving Next Service Date empty and submits null', async () => {
+    it('leaves Next Service Date empty by default and submits null when untouched', async () => {
         const user = userEvent.setup();
         render(
             <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
@@ -376,7 +368,6 @@ describe('VehicleServiceJobForm', () => {
         );
 
         fireEvent.change(screen.getByLabelText('Service job date'), { target: { value: '2026-04-01' } });
-        fireEvent.change(screen.getByLabelText('Next Service Date'), { target: { value: '' } });
         expect(screen.getByLabelText('Next Service Date')).toHaveValue('');
 
         await user.selectOptions(screen.getByLabelText('Type'), 'body_wash');

@@ -67,20 +67,6 @@ const DISABLED_MILEAGE_CLASS = 'disabled:cursor-not-allowed disabled:border-slat
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
 
-export function defaultNextServiceDate(jobDate: string): string {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(jobDate.trim());
-    if (!match) return '';
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-
-    const targetYear = month === 12 ? year + 1 : year;
-    const targetMonth = month === 12 ? 1 : month + 1;
-    const maxDays = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
-    const targetDay = Math.min(day, maxDays);
-
-    return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
-}
 const suggestedNextServiceMileage = (odometerReading: string): string => {
     const value = odometerReading.trim();
 
@@ -123,14 +109,13 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [supervisor, setSupervisor] = useState<NamedResource | null>(job?.supervisor ?? null);
     const [quickVehicleNumber, setQuickVehicleNumber] = useState('');
     const [quickVehicleModalOpen, setQuickVehicleModalOpen] = useState(false);
-    const [nextServiceDateTouched, setNextServiceDateTouched] = useState(false);
     const [jobTypes, setJobTypes] = useState<VehicleServiceJobTypeResource[]>([]);
     const [selectedJobTypeId, setSelectedJobTypeId] = useState<number | null>(job?.job_type_id ?? job?.job_type?.id ?? null);
     const initialJobDate = job?.job_date ?? today();
     const [form, setForm] = useState({
         job_date: initialJobDate,
         expected_delivery_date: job?.expected_delivery_date ?? '',
-        next_service_date: job ? (job.next_service_date ?? '') : defaultNextServiceDate(initialJobDate),
+        next_service_date: job?.next_service_date ?? '',
         type: (job?.type ?? '') as VehicleServiceJobType | '',
         supervisor_commission_type: (job?.supervisor_commission_type ?? null) as CommissionType | null,
         supervisor_commission_value: (job?.supervisor_commission_value ?? null) as string | null,
@@ -368,7 +353,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                                 updateForm((current) => ({
                                     ...current,
                                     job_date: nextDate,
-                                    ...(!nextServiceDateTouched ? { next_service_date: defaultNextServiceDate(nextDate) } : {}),
                                 }));
                             }}
                         />}
@@ -458,9 +442,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             type="date"
                             value={form.next_service_date}
                             error={errorFor('next_service_date')}
-                            hint="Auto-suggested: 1 month from job date (editable or clearable)"
+                            hint="Optional: leave blank or set next scheduled service date"
                             onChange={(event) => {
-                                setNextServiceDateTouched(true);
                                 updateForm({ ...form, next_service_date: event.target.value });
                             }}
                         />
