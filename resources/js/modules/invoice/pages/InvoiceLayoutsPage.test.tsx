@@ -20,6 +20,8 @@ const layoutApi = vi.hoisted(() => ({
     deleteInvoiceLayout: vi.fn(),
     previewInvoiceLayout: vi.fn(),
     setDefaultInvoiceLayout: vi.fn(),
+    uploadInvoiceBladeTemplate: vi.fn(),
+    getInvoiceBladeExportUrl: vi.fn((idOrCode: number | string) => `/api/v1/invoice-layouts/${idOrCode}/export`),
 }));
 
 const authState = vi.hoisted(() => ({
@@ -46,7 +48,9 @@ const mockLayouts: InvoiceLayout[] = [
         paper_size: 'a4',
         paper_size_label: 'A4 (210 × 297 mm)',
         orientation: 'portrait',
+        template_type: 'preset',
         view_template: 'invoice.layouts.standard',
+        blade_content: null,
         is_system: true,
         is_active: true,
         custom_css: null,
@@ -65,7 +69,9 @@ const mockLayouts: InvoiceLayout[] = [
         paper_size: 'a4',
         paper_size_label: 'A4 (210 × 297 mm)',
         orientation: 'portrait',
+        template_type: 'preset',
         view_template: 'invoice.layouts.modern',
+        blade_content: null,
         is_system: true,
         is_active: true,
         custom_css: null,
@@ -84,7 +90,9 @@ const mockLayouts: InvoiceLayout[] = [
         paper_size: 'a4',
         paper_size_label: 'A4 (210 × 297 mm)',
         orientation: 'portrait',
+        template_type: 'preset',
         view_template: 'invoice.layouts.modern',
+        blade_content: null,
         is_system: false,
         is_active: true,
         custom_css: '.title { color: navy; }',
@@ -92,6 +100,27 @@ const mockLayouts: InvoiceLayout[] = [
         footer_content: null,
         settings: { show_logo: true },
         row_version: 3,
+        created_at: '2026-11-22T10:00:00Z',
+        updated_at: '2026-11-22T12:00:00Z',
+    },
+    {
+        id: 11,
+        code: 'custom_blade_v1',
+        name: 'Custom Blade Format',
+        description: 'Bespoke custom blade layout.',
+        paper_size: 'a4',
+        paper_size_label: 'A4 (210 × 297 mm)',
+        orientation: 'portrait',
+        template_type: 'blade',
+        view_template: null,
+        blade_content: '<div>{{ $document["title"] }}</div>',
+        is_system: false,
+        is_active: true,
+        custom_css: null,
+        header_content: null,
+        footer_content: null,
+        settings: {},
+        row_version: 1,
         created_at: '2026-11-22T10:00:00Z',
         updated_at: '2026-11-22T12:00:00Z',
     },
@@ -114,13 +143,16 @@ describe('InvoiceLayoutsPage', () => {
         expect(screen.getByText('Classic Standard A4')).toBeInTheDocument();
         expect(screen.getByText('Modern Clean A4')).toBeInTheDocument();
         expect(screen.getByText('Wholesale Invoice Custom')).toBeInTheDocument();
+        expect(screen.getByText('Custom Blade Format')).toBeInTheDocument();
 
-        // System badges
+        // Badges
         const systemBadges = screen.getAllByText('System');
         expect(systemBadges.length).toBe(2);
+        expect(screen.getByText('Custom Blade')).toBeInTheDocument();
 
         // Custom layout delete button exists
-        expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+        const deleteButtons = screen.getAllByRole('button', { name: 'Delete' });
+        expect(deleteButtons.length).toBeGreaterThan(0);
     });
 
     it('sets layout as tenant and branch default', async () => {
@@ -189,5 +221,25 @@ describe('InvoiceLayoutsPage', () => {
 
         expect(await screen.findByText('Create New Invoice Layout')).toBeInTheDocument();
         expect(screen.getByLabelText(/Layout Name/i)).toBeInTheDocument();
+    });
+
+    it('switches between visual preset and custom blade editor mode', async () => {
+        render(
+            <TestRouter initialEntries={['/settings/invoice-layouts']}>
+                <InvoiceLayoutsPage />
+            </TestRouter>,
+        );
+
+        const newButton = await screen.findByRole('button', { name: '+ New Custom Layout' });
+        fireEvent.click(newButton);
+
+        expect(await screen.findByText('Template Architecture')).toBeInTheDocument();
+        const bladeTabButton = screen.getByText('Custom Blade Template');
+        fireEvent.click(bladeTabButton);
+
+        expect(await screen.findByText(/Blade Template \(\.blade\.php\)/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Upload .blade.php' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Reset Boilerplate' })).toBeInTheDocument();
+        expect(screen.getByText(/Available Blade Template Variables/i)).toBeInTheDocument();
     });
 });

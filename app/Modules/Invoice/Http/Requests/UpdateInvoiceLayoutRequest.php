@@ -15,6 +15,7 @@ namespace Modules\Invoice\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Modules\Invoice\DTOs\InvoiceLayoutData;
 use Modules\Invoice\Enums\InvoiceLayoutTemplate;
+use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
 use Modules\Invoice\Enums\InvoicePaperSize;
 
@@ -35,7 +36,9 @@ final class UpdateInvoiceLayoutRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'paper_size' => ['sometimes', 'required', 'string', 'in:'.implode(',', InvoicePaperSize::values())],
             'orientation' => ['sometimes', 'required', 'string', 'in:'.implode(',', InvoiceOrientation::values())],
-            'view_template' => ['sometimes', 'required', 'string', 'in:'.implode(',', InvoiceLayoutTemplate::values())],
+            'template_type' => ['sometimes', 'nullable', 'string', 'in:'.implode(',', InvoiceLayoutType::values())],
+            'view_template' => ['sometimes', 'nullable', 'string', 'in:'.implode(',', InvoiceLayoutTemplate::values())],
+            'blade_content' => ['sometimes', 'nullable', 'string', 'max:2000000'],
             'is_active' => ['nullable', 'boolean'],
             'custom_css' => ['nullable', 'string', 'max:50000'],
             'header_content' => ['nullable', 'string', 'max:10000'],

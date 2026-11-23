@@ -25,8 +25,10 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceLayoutResolverInterface;
 use Modules\Invoice\DTOs\InvoiceLayoutData;
+use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceLayout;
+use Modules\Invoice\Validators\InvoiceBladeSecurityValidator;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -40,6 +42,8 @@ final readonly class InvoiceLayoutService
         private EloquentConfigurationValueRepository $configurationRepository,
         private ConfigurationResolverInterface $configurationResolver,
         private DecimalMath $math,
+        private ?InvoiceBladeSecurityValidator $bladeValidator = null,
+        private ?InvoiceCustomBladeRenderer $bladeRenderer = null,
     ) {}
 
     /** @return Collection<int, InvoiceLayout> */
@@ -133,6 +137,14 @@ final readonly class InvoiceLayoutService
 
             $this->validateCustomContent($data->customCss, $data->headerContent, $data->footerContent);
 
+            $isBlade = $data->templateType === InvoiceLayoutType::Blade->value;
+            if ($isBlade) {
+                if (empty($data->bladeContent)) {
+                    throw ValidationException::withMessages(['blade_content' => ['Custom Blade template content is required for Blade layouts.']]);
+                }
+                $this->bladeValidator?->validate($data->bladeContent);
+            }
+
             $layout = new InvoiceLayout;
             $layout->tenant_id = $tenantId;
             $layout->code = $code;
@@ -140,7 +152,9 @@ final readonly class InvoiceLayoutService
             $layout->description = $data->description;
             $layout->paper_size = $data->paperSize;
             $layout->orientation = $data->orientation;
-            $layout->view_template = $data->viewTemplate;
+            $layout->template_type = $data->templateType;
+            $layout->view_template = $isBlade ? ($data->viewTemplate ?? 'custom.blade') : ($data->viewTemplate ?? 'invoice.layouts.standard');
+            $layout->blade_content = $isBlade ? $data->bladeContent : null;
             $layout->is_system = false;
             $layout->is_active = $data->isActive;
             $layout->custom_css = $data->customCss;
@@ -180,6 +194,11 @@ final readonly class InvoiceLayoutService
 
             $this->validateCustomContent($data->customCss, $data->headerContent, $data->footerContent);
 
+            $isBlade = $data->templateType === InvoiceLayoutType::Blade->value;
+            if ($isBlade && ! empty($data->bladeContent)) {
+                $this->bladeValidator?->validate($data->bladeContent);
+            }
+
             if (! $layout->is_system) {
                 $newCode = Str::slug($data->code, '_');
                 if ($newCode !== $layout->code) {
@@ -196,7 +215,14 @@ final readonly class InvoiceLayoutService
                 }
                 $layout->paper_size = $data->paperSize;
                 $layout->orientation = $data->orientation;
-                $layout->view_template = $data->viewTemplate;
+                $layout->template_type = $data->templateType;
+                if ($isBlade) {
+                    $layout->view_template = $data->viewTemplate ?? $layout->view_template ?? 'custom.blade';
+                    $layout->blade_content = $data->bladeContent ?? $layout->blade_content;
+                } else {
+                    $layout->view_template = $data->viewTemplate;
+                    $layout->blade_content = null;
+                }
             }
 
             $layout->name = $data->name;
@@ -479,12 +505,26 @@ final readonly class InvoiceLayoutService
                 if ($invoice !== null) {
                     $viewData = $this->prints->viewData($invoice, mode: 'preview', requestedLayout: $layout);
 
+                    if ($layout->isBlade() && ! empty($layout->blade_content) && $this->bladeRenderer !== null) {
+                        if (preg_match('/^\s*<(?:!doctype|html)/i', $layout->blade_content) === 1) {
+                            return $this->bladeRenderer->render($layout->blade_content, $viewData, isSafeMode: true);
+                        }
+                        $viewData['custom_blade_html'] = $this->bladeRenderer->render($layout->blade_content, $viewData, isSafeMode: true);
+                    }
+
                     return view('invoice.print', $viewData)->render();
                 }
             }
 
             // Mock sample invoice data for realistic preview
             $sampleData = $this->sampleInvoiceViewData($layout);
+
+            if ($layout->isBlade() && ! empty($layout->blade_content) && $this->bladeRenderer !== null) {
+                if (preg_match('/^\s*<(?:!doctype|html)/i', $layout->blade_content) === 1) {
+                    return $this->bladeRenderer->render($layout->blade_content, $sampleData, isSafeMode: true);
+                }
+                $sampleData['custom_blade_html'] = $this->bladeRenderer->render($layout->blade_content, $sampleData, isSafeMode: true);
+            }
 
             return view('invoice.print', $sampleData)->render();
         });
@@ -574,7 +614,9 @@ final readonly class InvoiceLayoutService
                 'name' => $layout->name,
                 'paper_size' => $layout->paper_size,
                 'orientation' => $layout->orientation,
+                'template_type' => (string) ($layout->template_type ?? 'preset'),
                 'view_template' => $layout->view_template,
+                'blade_content' => $layout->blade_content,
                 'is_compact' => $layout->isCompact(),
                 'custom_css' => $layout->custom_css,
                 'header_content' => $layout->header_content,

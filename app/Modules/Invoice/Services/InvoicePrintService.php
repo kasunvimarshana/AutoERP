@@ -59,6 +59,7 @@ final class InvoicePrintService
         private readonly InvoicePaymentMethodProviderInterface $paymentMethods,
         private readonly InvoiceLayoutResolverInterface $layoutResolver,
         private readonly ?TimezoneResolverInterface $timezoneResolver = null,
+        private readonly ?InvoiceCustomBladeRenderer $customBladeRenderer = null,
     ) {}
 
     /** @return Builder<Invoice> */
@@ -125,7 +126,11 @@ final class InvoicePrintService
         $isOutboundContinuous = $usesOutboundLayout && $layout === InvoicePrintLayout::Continuous85By55;
         $lines = $this->lines($invoice->lines, $currency);
 
-        return [
+        $templateType = $resolvedLayout->template_type instanceof BackedEnum
+            ? (string) $resolvedLayout->template_type->value
+            : (string) ($resolvedLayout->template_type ?? 'preset');
+
+        $result = [
             'mode' => $mode,
             'pdf_url' => $pdfUrl,
             'layout_model' => $resolvedLayout,
@@ -134,7 +139,9 @@ final class InvoicePrintService
                 'name' => $resolvedLayout->name,
                 'paper_size' => $resolvedLayout->paper_size,
                 'orientation' => $resolvedLayout->orientation,
+                'template_type' => $templateType,
                 'view_template' => $resolvedLayout->view_template,
+                'blade_content' => $resolvedLayout->blade_content,
                 'is_compact' => $resolvedLayout->isCompact(),
                 'custom_css' => $resolvedLayout->custom_css,
                 'header_content' => $resolvedLayout->header_content,
@@ -196,6 +203,16 @@ final class InvoicePrintService
                 'amounts' => $this->amounts($invoice, $currency, $taxLabel, $usesFocusedPrint),
             ],
         ];
+
+        if ($resolvedLayout->isBlade() && ! empty($resolvedLayout->blade_content) && $this->customBladeRenderer !== null) {
+            $result['custom_blade_html'] = $this->customBladeRenderer->render(
+                $resolvedLayout->blade_content,
+                $result,
+                isSafeMode: ($mode === 'preview'),
+            );
+        }
+
+        return $result;
     }
 
     public function layout(Invoice $invoice, ?string $explicitCode = null, ?string $printer = null): InvoicePrintLayout

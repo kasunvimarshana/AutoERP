@@ -24,10 +24,11 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import {
     deleteInvoiceLayout,
+    getInvoiceBladeExportUrl,
     listInvoiceLayouts,
     setDefaultInvoiceLayout,
 } from '../invoiceLayoutApi';
-import type { InvoiceLayout } from '../invoiceLayoutTypes';
+import type { InvoiceLayout, InvoiceLayoutType } from '../invoiceLayoutTypes';
 import { InvoiceLayoutPreviewModal } from '../components/InvoiceLayoutPreviewModal';
 import { InvoiceLayoutEditorDrawer } from '../components/InvoiceLayoutEditorDrawer';
 import { InvoicePrinterAssignmentsModal } from '../components/InvoicePrinterAssignmentsModal';
@@ -39,6 +40,7 @@ export default function InvoiceLayoutsPage() {
     const [search, setSearch] = useState('');
     const [paperSize, setPaperSize] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [typeFilter, setTypeFilter] = useState<string>('all');
     const debouncedSearch = useDebounce(search);
 
     const [previewLayout, setPreviewLayout] = useState<InvoiceLayout | null>(null);
@@ -63,10 +65,11 @@ export default function InvoiceLayoutsPage() {
                     search: debouncedSearch || undefined,
                     paper_size: paperSize !== 'all' ? paperSize : undefined,
                     is_active: statusFilter === 'all' ? undefined : statusFilter === 'active',
+                    template_type: typeFilter !== 'all' ? (typeFilter as InvoiceLayoutType) : undefined,
                 },
                 signal,
             ),
-        [debouncedSearch, paperSize, statusFilter],
+        [debouncedSearch, paperSize, statusFilter, typeFilter],
     );
 
     const handleCreateNew = () => {
@@ -210,6 +213,15 @@ export default function InvoiceLayoutsPage() {
                             { value: 'inactive', label: 'Inactive Only' },
                         ]}
                     />
+                    <Select
+                        value={typeFilter}
+                        onChange={(e) => setTypeFilter(e.target.value)}
+                        options={[
+                            { value: 'all', label: 'All Template Types' },
+                            { value: 'preset', label: 'Visual Presets' },
+                            { value: 'blade', label: 'Custom Blade (.blade.php)' },
+                        ]}
+                    />
                 </div>
             </div>
 
@@ -253,6 +265,11 @@ export default function InvoiceLayoutsPage() {
                                             status={layout.is_active ? 'active' : 'inactive'}
                                             label={layout.is_active ? 'Active' : 'Inactive'}
                                         />
+                                        {layout.template_type === 'blade' && (
+                                            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200">
+                                                Custom Blade
+                                            </span>
+                                        )}
                                         {layout.is_system && (
                                             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                                                 System
@@ -277,13 +294,23 @@ export default function InvoiceLayoutsPage() {
 
                             {/* Actions Footer */}
                             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/50 p-3">
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => setPreviewLayout(layout)}
-                                >
-                                    Preview
-                                </Button>
+                                <div className="flex items-center gap-1.5">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => setPreviewLayout(layout)}
+                                    >
+                                        Preview
+                                    </Button>
+                                    <a
+                                        href={getInvoiceBladeExportUrl(layout.id || layout.code)}
+                                        download={`${layout.code}.blade.php`}
+                                        className="inline-flex items-center rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-xs hover:bg-slate-50"
+                                        title="Download layout template file"
+                                    >
+                                        Export
+                                    </a>
+                                </div>
 
                                 <div className="flex items-center gap-1.5">
                                     {canManage && (

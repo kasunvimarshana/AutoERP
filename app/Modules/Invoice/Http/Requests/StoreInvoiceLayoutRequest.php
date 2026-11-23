@@ -13,8 +13,10 @@ declare(strict_types=1);
 namespace Modules\Invoice\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Modules\Invoice\DTOs\InvoiceLayoutData;
 use Modules\Invoice\Enums\InvoiceLayoutTemplate;
+use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
 use Modules\Invoice\Enums\InvoicePaperSize;
 
@@ -34,7 +36,19 @@ final class StoreInvoiceLayoutRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:1000'],
             'paper_size' => ['required', 'string', 'in:'.implode(',', InvoicePaperSize::values())],
             'orientation' => ['required', 'string', 'in:'.implode(',', InvoiceOrientation::values())],
-            'view_template' => ['required', 'string', 'in:'.implode(',', InvoiceLayoutTemplate::values())],
+            'template_type' => ['nullable', 'string', 'in:'.implode(',', InvoiceLayoutType::values())],
+            'view_template' => [
+                Rule::requiredIf(fn (): bool => ($this->input('template_type') ?? InvoiceLayoutType::Preset->value) === InvoiceLayoutType::Preset->value),
+                'nullable',
+                'string',
+                'in:'.implode(',', InvoiceLayoutTemplate::values()),
+            ],
+            'blade_content' => [
+                Rule::requiredIf(fn (): bool => $this->input('template_type') === InvoiceLayoutType::Blade->value),
+                'nullable',
+                'string',
+                'max:2000000',
+            ],
             'is_active' => ['nullable', 'boolean'],
             'custom_css' => ['nullable', 'string', 'max:50000'],
             'header_content' => ['nullable', 'string', 'max:10000'],

@@ -99,6 +99,15 @@ Route::prefix('api/v1/invoice-layouts')->middleware($middleware)->name('api.v1.i
     Route::delete('printer-assignments/{printer}', [InvoiceLayoutController::class, 'deletePrinterAssignment'])
         ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
         ->name('delete-printer-assignment');
+    Route::post('upload-template', [InvoiceLayoutController::class, 'uploadTemplate'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
+        ->name('upload-template');
+    Route::match(['get', 'post'], '{layout}/preview', [InvoiceLayoutController::class, 'preview'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
+        ->name('preview');
+    Route::get('{layout}/export', [InvoiceLayoutController::class, 'export'])
+        ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
+        ->name('export');
     Route::get('{layout}', [InvoiceLayoutController::class, 'show'])
         ->whereNumber('layout')
         ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
@@ -111,8 +120,4 @@ Route::prefix('api/v1/invoice-layouts')->middleware($middleware)->name('api.v1.i
         ->whereNumber('layout')
         ->middleware($requires(InvoicePermission::LAYOUTS_MANAGE))
         ->name('destroy');
-    Route::post('{layout}/preview', [InvoiceLayoutController::class, 'preview'])
-        ->whereNumber('layout')
-        ->middleware($requires(InvoicePermission::LAYOUTS_VIEW))
-        ->name('preview');
 });

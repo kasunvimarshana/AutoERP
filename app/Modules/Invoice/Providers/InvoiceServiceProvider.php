@@ -22,6 +22,7 @@ use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
 use Modules\Invoice\Contracts\InvoiceTaxDocumentProviderInterface;
 use Modules\Invoice\Services\InvoiceBalanceProvider;
+use Modules\Invoice\Services\InvoiceCustomBladeRenderer;
 use Modules\Invoice\Services\InvoiceLayoutProvisioner;
 use Modules\Invoice\Services\InvoiceLayoutResolver;
 use Modules\Invoice\Services\InvoiceLayoutService;
@@ -29,6 +30,7 @@ use Modules\Invoice\Services\InvoiceSettlementService;
 use Modules\Invoice\Services\InvoiceSourceRestorationRegistry;
 use Modules\Invoice\Services\SupplierBalanceProvider;
 use Modules\Invoice\Services\Tax\InvoiceTaxDocumentProvider;
+use Modules\Invoice\Validators\InvoiceBladeSecurityValidator;
 use Modules\Supplier\Contracts\SupplierBalanceProviderInterface;
 
 final class InvoiceServiceProvider extends ServiceProvider
@@ -39,6 +41,8 @@ final class InvoiceServiceProvider extends ServiceProvider
         $this->app->singleton(InvoiceBalanceProviderInterface::class, InvoiceBalanceProvider::class);
         $this->app->singleton(InvoiceSettlementServiceInterface::class, InvoiceSettlementService::class);
         $this->app->singleton(InvoiceTaxDocumentProviderInterface::class, InvoiceTaxDocumentProvider::class);
+        $this->app->singleton(InvoiceBladeSecurityValidator::class);
+        $this->app->singleton(InvoiceCustomBladeRenderer::class);
         $this->app->bind(InvoiceLayoutResolverInterface::class, InvoiceLayoutResolver::class);
         $this->app->bind(InvoiceLayoutProvisioner::class);
         $this->app->bind(InvoiceLayoutService::class);

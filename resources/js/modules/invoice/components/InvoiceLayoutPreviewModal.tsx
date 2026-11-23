@@ -12,7 +12,7 @@ import { Button } from '@/shared/components/Button';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { previewInvoiceLayout } from '../invoiceLayoutApi';
+import { previewInvoiceLayout, getInvoiceBladeExportUrl } from '../invoiceLayoutApi';
 import type { InvoiceLayout } from '../invoiceLayoutTypes';
 
 interface InvoiceLayoutPreviewModalProps {
@@ -85,9 +85,18 @@ export function InvoiceLayoutPreviewModal({
                         <span className="text-slate-300">|</span>
                         <span className="font-semibold text-slate-700">Orientation:</span> {layout.orientation}
                         <span className="text-slate-300">|</span>
-                        <span className="font-semibold text-slate-700">Type:</span> {layout.is_system ? 'System Preset' : 'Custom Layout'}
+                        <span className="font-semibold text-slate-700">Type:</span> {layout.template_type === 'blade' ? 'Custom Blade (.blade.php)' : layout.is_system ? 'System Preset' : 'Custom Preset'}
                     </div>
                     <div className="flex items-center gap-2">
+                        {layout.template_type === 'blade' && (
+                            <a
+                                href={getInvoiceBladeExportUrl(layout.id || layout.code)}
+                                download={`${layout.code}.blade.php`}
+                                className="inline-flex items-center rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-xs hover:bg-slate-50"
+                            >
+                                Download .blade.php
+                            </a>
+                        )}
                         <Button
                             variant="secondary"
                             size="sm"

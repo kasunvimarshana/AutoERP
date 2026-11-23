@@ -16,6 +16,7 @@ import type {
     SetDefaultInvoiceLayoutPayload,
     PrinterAssignmentsResponse,
     UpdateInvoiceLayoutPayload,
+    UploadTemplateResponse,
 } from './invoiceLayoutTypes';
 
 export async function listInvoiceLayouts(params?: InvoiceLayoutFilterParams, signal?: AbortSignal): Promise<InvoiceLayout[]> {
@@ -51,13 +52,44 @@ export async function previewInvoiceLayout(
     invoiceId?: number,
     signal?: AbortSignal,
 ): Promise<string> {
-    const response = await apiClient.get<string>(`${endpoints.invoiceLayouts}/${idOrCode}/preview`, {
+    const response = await apiClient.get<unknown>(`${endpoints.invoiceLayouts}/${encodeURIComponent(idOrCode)}/preview`, {
         params: invoiceId ? { invoice_id: invoiceId } : undefined,
         signal,
-        headers: { Accept: 'text/html' },
-        responseType: 'text',
+        headers: { Accept: 'application/json, text/html' },
     });
-    return response.data;
+
+    if (typeof response.data === 'string') {
+        return response.data;
+    }
+
+    if (
+        response.data != null &&
+        typeof response.data === 'object' &&
+        'data' in response.data &&
+        (response.data as { data: { html?: unknown } }).data?.html != null
+    ) {
+        return String((response.data as { data: { html: unknown } }).data.html);
+    }
+
+    return String(response.data);
+}
+
+export async function uploadInvoiceBladeTemplate(file: File, signal?: AbortSignal): Promise<UploadTemplateResponse> {
+    const formData = new FormData();
+    formData.append('template_file', file);
+    const response = await apiClient.post<ApiResource<UploadTemplateResponse>>(
+        `${endpoints.invoiceLayouts}/upload-template`,
+        formData,
+        {
+            signal,
+            headers: { 'Content-Type': 'multipart/form-data' },
+        },
+    );
+    return response.data.data;
+}
+
+export function getInvoiceBladeExportUrl(idOrCode: number | string): string {
+    return `${endpoints.invoiceLayouts}/${encodeURIComponent(idOrCode)}/export`;
 }
 
 export async function setDefaultInvoiceLayout(payload: SetDefaultInvoiceLayoutPayload): Promise<{

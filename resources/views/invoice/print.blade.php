@@ -306,7 +306,9 @@ Phone: +94713525253
 @endif
 
 <main class="sheet">
-    @if (($layout['view_template'] ?? '') === 'invoice.layouts.modern')
+    @if (($layout['template_type'] ?? '') === 'blade' && ! empty($custom_blade_html))
+        {!! $custom_blade_html !!}
+    @elseif (($layout['view_template'] ?? '') === 'invoice.layouts.modern')
         @include('invoice.layouts.modern')
     @elseif (($layout['view_template'] ?? '') === 'invoice.layouts.thermal')
         @include('invoice.layouts.thermal')

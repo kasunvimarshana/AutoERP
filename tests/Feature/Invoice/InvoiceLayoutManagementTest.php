@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Invoice;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
@@ -20,6 +21,7 @@ use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Contracts\InvoiceLayoutResolverInterface;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLayoutTemplate;
+use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
 use Modules\Invoice\Enums\InvoicePaperSize;
 use Modules\Invoice\Enums\InvoicePartyType;
@@ -496,6 +498,154 @@ final class InvoiceLayoutManagementTest extends TestCase
         $this->assertNull($invoice->invoice_layout_id);
         $resolvedReset = $resolver->resolve($invoice);
         $this->assertSame('standard_a4', $resolvedReset->code);
+    }
+
+    public function test_create_and_preview_custom_blade_template(): void
+    {
+        $context = $this->createAuthContext([
+            InvoicePermission::LAYOUTS_VIEW,
+            InvoicePermission::LAYOUTS_MANAGE,
+        ]);
+
+        $bladeSource = <<<'BLADE'
+<div class="custom-blade-invoice">
+    <div class="supplier-banner">SUPPLIER: {{ $document['supplier']['name'] }}</div>
+    <div class="inv-number">INVOICE NUMBER: {{ $document['invoice_number'] }}</div>
+    <div class="items-list">
+        @foreach ($document['lines'] as $line)
+            <div class="line-row">{{ $line['line_number'] }} - {{ $line['display_name'] }} ({{ $line['line_total']['display'] }})</div>
+        @endforeach
+    </div>
+    <div class="grand-total">DUE: {{ $document['amounts']['grand_total']['display'] }}</div>
+</div>
+BLADE;
+
+        // 1. Create layout with template_type = blade
+        $response = $this->withAuth($context)->postJson('/api/v1/invoice-layouts', [
+            'code' => 'bespoke_retail_blade',
+            'name' => 'Bespoke Retail Blade Layout',
+            'paper_size' => InvoicePaperSize::A4->value,
+            'orientation' => InvoiceOrientation::Portrait->value,
+            'template_type' => InvoiceLayoutType::Blade->value,
+            'blade_content' => $bladeSource,
+            'is_active' => true,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.code', 'bespoke_retail_blade');
+        $response->assertJsonPath('data.template_type', 'blade');
+        $this->assertSame($bladeSource, $response->json('data.blade_content'));
+
+        $layoutId = (int) $response->json('data.id');
+
+        // 2. Preview via POST with layout ID
+        $previewRes = $this->withAuth($context)->postJson("/api/v1/invoice-layouts/{$layoutId}/preview");
+        $previewRes->assertOk();
+        $html = $previewRes->json('data.html');
+        $this->assertStringContainsString('custom-blade-invoice', $html);
+        $this->assertStringContainsString('SUPPLIER: AutoERP Prime Motors Ltd.', $html);
+        $this->assertStringContainsString('Full Vehicle Diagnostic', $html);
+        $this->assertStringContainsString('DUE: $280.80', $html);
+
+        // 3. Preview via GET with layout code (string slug)
+        $previewGetByCode = $this->withAuth($context)->getJson('/api/v1/invoice-layouts/bespoke_retail_blade/preview');
+        $previewGetByCode->assertOk();
+        $this->assertStringContainsString('custom-blade-invoice', $previewGetByCode->json('data.html'));
+
+        // 4. Preview with Accept: text/html header returns raw HTML
+        $rawHtmlRes = $this->withHeaders([
+            'Authorization' => 'Bearer '.$context['token'],
+            'X-Tenant-Id' => (string) $context['tenant_id'],
+            'X-Organization-Unit-Id' => (string) $context['organization_unit_id'],
+            'Accept' => 'text/html',
+        ])->get('/api/v1/invoice-layouts/bespoke_retail_blade/preview');
+
+        $rawHtmlRes->assertOk();
+        $rawHtmlRes->assertHeader('Content-Type', 'text/html; charset=UTF-8');
+        $this->assertStringContainsString('custom-blade-invoice', $rawHtmlRes->getContent());
+    }
+
+    public function test_security_validator_blocks_malicious_blade_code(): void
+    {
+        $context = $this->createAuthContext([
+            InvoicePermission::LAYOUTS_VIEW,
+            InvoicePermission::LAYOUTS_MANAGE,
+        ]);
+
+        $maliciousSnippets = [
+            'Raw PHP tag' => 'Hello <?php system("whoami"); ?>',
+            'Blade @php directive' => 'Hello @php $x = 1; @endphp',
+            'Arbitrary include' => '<div>@include("passwords")</div>',
+            'Shell exec' => '<div>{{ exec("ls -la") }}</div>',
+            'File read' => '<div>{{ file_get_contents("/etc/passwd") }}</div>',
+            'Eval call' => '<div>{{ eval("phpinfo()") }}</div>',
+            'Database access' => '<div>{{ DB::table("users")->count() }}</div>',
+            'Superglobal access' => '<div>{{ $_GET["cmd"] }}</div>',
+            'Env access' => '<div>{{ env("APP_KEY") }}</div>',
+            'Script tag' => '<script>alert("xss")</script>',
+        ];
+
+        foreach ($maliciousSnippets as $label => $snippet) {
+            $response = $this->withAuth($context)->postJson('/api/v1/invoice-layouts', [
+                'code' => 'bad_'.Str::lower(Str::random(6)),
+                'name' => 'Bad Layout '.$label,
+                'paper_size' => InvoicePaperSize::A4->value,
+                'orientation' => InvoiceOrientation::Portrait->value,
+                'template_type' => InvoiceLayoutType::Blade->value,
+                'blade_content' => $snippet,
+            ]);
+
+            $response->assertStatus(422, "Failed to reject {$label}");
+            $response->assertJsonValidationErrors(['blade_content']);
+        }
+    }
+
+    public function test_upload_and_export_blade_template_file(): void
+    {
+        $context = $this->createAuthContext([
+            InvoicePermission::LAYOUTS_VIEW,
+            InvoicePermission::LAYOUTS_MANAGE,
+        ]);
+
+        $validBlade = <<<'BLADE'
+<div class="uploaded-template">
+    <h2>{{ $document['supplier']['name'] }}</h2>
+    <p>Total: {{ $document['amounts']['grand_total']['display'] }}</p>
+</div>
+BLADE;
+
+        // 1. Upload valid .blade.php file
+        $file = UploadedFile::fake()->createWithContent('invoice_slip.blade.php', $validBlade);
+        $uploadRes = $this->withAuth($context)->post('/api/v1/invoice-layouts/upload-template', [
+            'template_file' => $file,
+        ]);
+        $uploadRes->assertOk();
+        $uploadRes->assertJsonPath('data.filename', 'invoice_slip.blade.php');
+        $this->assertSame($validBlade, $uploadRes->json('data.content'));
+
+        // 2. Reject non .blade.php file
+        $badFile = UploadedFile::fake()->createWithContent('invoice_script.php', 'echo "hello";');
+        $uploadBad = $this->withAuth($context)->post('/api/v1/invoice-layouts/upload-template', [
+            'template_file' => $badFile,
+        ]);
+        $uploadBad->assertStatus(422);
+
+        // 3. Create a layout with this content and export it
+        $createRes = $this->withAuth($context)->postJson('/api/v1/invoice-layouts', [
+            'code' => 'exported_layout_test',
+            'name' => 'Exported Layout Test',
+            'paper_size' => 'a4',
+            'orientation' => 'portrait',
+            'template_type' => 'blade',
+            'blade_content' => $validBlade,
+        ])->assertCreated();
+
+        $layoutId = (int) $createRes->json('data.id');
+
+        $exportRes = $this->withAuth($context)->get("/api/v1/invoice-layouts/{$layoutId}/export");
+        $exportRes->assertOk();
+        $this->assertStringContainsString('exported_layout_test.blade.php', (string) $exportRes->headers->get('Content-Disposition'));
+        $this->assertSame($validBlade, $exportRes->streamedContent());
     }
 
     private function customer(int $tenantId, int $organizationUnitId): int

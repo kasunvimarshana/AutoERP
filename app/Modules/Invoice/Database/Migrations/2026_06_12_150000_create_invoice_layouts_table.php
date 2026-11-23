@@ -27,7 +27,9 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('paper_size', 32)->default('a4');
             $table->string('orientation', 16)->default('portrait');
-            $table->string('view_template', 120)->default('invoice.layouts.standard');
+            $table->string('template_type', 32)->default('preset');
+            $table->string('view_template', 120)->nullable()->default('invoice.layouts.standard');
+            $table->mediumText('blade_content')->nullable();
             $table->boolean('is_system')->default(false);
             $table->boolean('is_active')->default(true);
             $table->mediumText('custom_css')->nullable();

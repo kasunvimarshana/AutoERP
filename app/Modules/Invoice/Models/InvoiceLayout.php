@@ -18,7 +18,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Modules\Core\Models\Concerns\HasTenantScope;
+use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
 use Modules\Invoice\Enums\InvoicePaperSize;
 use Modules\Invoice\Enums\InvoicePrintLayout;
@@ -33,7 +35,9 @@ use Modules\User\Models\UserModel;
  * @property string|null $description
  * @property string $paper_size
  * @property string $orientation
- * @property string $view_template
+ * @property string $template_type
+ * @property string|null $view_template
+ * @property string|null $blade_content
  * @property bool $is_system
  * @property bool $is_active
  * @property string|null $custom_css
@@ -43,9 +47,9 @@ use Modules\User\Models\UserModel;
  * @property int $row_version
  * @property int|null $created_by
  * @property int|null $updated_by
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  */
 final class InvoiceLayout extends Model
 {
@@ -62,7 +66,9 @@ final class InvoiceLayout extends Model
         'description',
         'paper_size',
         'orientation',
+        'template_type',
         'view_template',
+        'blade_content',
         'is_system',
         'is_active',
         'custom_css',
@@ -186,7 +192,16 @@ final class InvoiceLayout extends Model
         ], true);
     }
 
-    /** @return InvoicePrintLayout */
+    public function isBlade(): bool
+    {
+        return ($this->template_type instanceof InvoiceLayoutType ? $this->template_type->value : (string) $this->template_type) === InvoiceLayoutType::Blade->value;
+    }
+
+    public function isPreset(): bool
+    {
+        return ! $this->isBlade();
+    }
+
     public function toLegacyPrintLayout(): InvoicePrintLayout
     {
         return match ($this->paper_size) {

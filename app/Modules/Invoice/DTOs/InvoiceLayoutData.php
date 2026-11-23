@@ -13,13 +13,14 @@ declare(strict_types=1);
 namespace Modules\Invoice\DTOs;
 
 use Modules\Invoice\Enums\InvoiceLayoutTemplate;
+use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
 use Modules\Invoice\Enums\InvoicePaperSize;
 
 final readonly class InvoiceLayoutData
 {
     /**
-     * @param array<string, mixed>|null $settings
+     * @param  array<string, mixed>|null  $settings
      */
     public function __construct(
         public string $code,
@@ -27,7 +28,9 @@ final readonly class InvoiceLayoutData
         public ?string $description = null,
         public string $paperSize = InvoicePaperSize::A4->value,
         public string $orientation = InvoiceOrientation::Portrait->value,
-        public string $viewTemplate = InvoiceLayoutTemplate::Standard->value,
+        public string $templateType = InvoiceLayoutType::Preset->value,
+        public ?string $viewTemplate = InvoiceLayoutTemplate::Standard->value,
+        public ?string $bladeContent = null,
         public bool $isActive = true,
         public ?string $customCss = null,
         public ?string $headerContent = null,
@@ -46,7 +49,13 @@ final readonly class InvoiceLayoutData
                 : null,
             paperSize: (string) ($data['paper_size'] ?? InvoicePaperSize::A4->value),
             orientation: (string) ($data['orientation'] ?? InvoiceOrientation::Portrait->value),
-            viewTemplate: (string) ($data['view_template'] ?? InvoiceLayoutTemplate::Standard->value),
+            templateType: (string) ($data['template_type'] ?? InvoiceLayoutType::Preset->value),
+            viewTemplate: isset($data['view_template']) && trim((string) $data['view_template']) !== ''
+                ? trim((string) $data['view_template'])
+                : null,
+            bladeContent: isset($data['blade_content']) && trim((string) $data['blade_content']) !== ''
+                ? (string) $data['blade_content']
+                : null,
             isActive: (bool) ($data['is_active'] ?? true),
             customCss: isset($data['custom_css']) && trim((string) $data['custom_css']) !== ''
                 ? trim((string) $data['custom_css'])
@@ -72,7 +81,9 @@ final readonly class InvoiceLayoutData
             'description' => $this->description,
             'paper_size' => $this->paperSize,
             'orientation' => $this->orientation,
+            'template_type' => $this->templateType,
             'view_template' => $this->viewTemplate,
+            'blade_content' => $this->bladeContent,
             'is_active' => $this->isActive,
             'custom_css' => $this->customCss,
             'header_content' => $this->headerContent,

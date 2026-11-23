@@ -10,6 +10,8 @@ export type InvoicePaperSize = 'a4' | 'a5' | 'thermal_80mm' | 'continuous_8_5_by
 
 export type InvoiceOrientation = 'portrait' | 'landscape';
 
+export type InvoiceLayoutType = 'preset' | 'blade';
+
 export interface InvoiceLayoutSettings {
     primary_color?: string;
     font_family?: string;
@@ -35,7 +37,9 @@ export interface InvoiceLayout {
     paper_size: InvoicePaperSize;
     paper_size_label: string;
     orientation: InvoiceOrientation;
-    view_template: string;
+    template_type: InvoiceLayoutType;
+    view_template: string | null;
+    blade_content: string | null;
     is_system: boolean;
     is_active: boolean;
     is_tenant_default?: boolean;
@@ -55,7 +59,9 @@ export interface CreateInvoiceLayoutPayload {
     description?: string | null;
     paper_size: InvoicePaperSize;
     orientation?: InvoiceOrientation;
-    view_template: string;
+    template_type?: InvoiceLayoutType;
+    view_template?: string | null;
+    blade_content?: string | null;
     is_active?: boolean;
     custom_css?: string | null;
     header_content?: string | null;
@@ -69,7 +75,9 @@ export interface UpdateInvoiceLayoutPayload {
     description?: string | null;
     paper_size?: InvoicePaperSize;
     orientation?: InvoiceOrientation;
-    view_template?: string;
+    template_type?: InvoiceLayoutType;
+    view_template?: string | null;
+    blade_content?: string | null;
     is_active?: boolean;
     custom_css?: string | null;
     header_content?: string | null;
@@ -98,4 +106,11 @@ export interface InvoiceLayoutFilterParams {
     search?: string;
     paper_size?: string;
     is_active?: boolean;
+    template_type?: InvoiceLayoutType;
+}
+
+export interface UploadTemplateResponse {
+    filename: string;
+    content: string;
+    size_bytes: number;
 }

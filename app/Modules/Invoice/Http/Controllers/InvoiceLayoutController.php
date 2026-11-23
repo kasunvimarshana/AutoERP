@@ -14,12 +14,16 @@ namespace Modules\Invoice\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Modules\Invoice\Http\Requests\SetDefaultInvoiceLayoutRequest;
 use Modules\Invoice\Http\Requests\StoreInvoiceLayoutRequest;
 use Modules\Invoice\Http\Requests\UpdateInvoiceLayoutRequest;
+use Modules\Invoice\Http\Requests\UploadInvoiceBladeTemplateRequest;
 use Modules\Invoice\Http\Resources\InvoiceLayoutResource;
 use Modules\Invoice\Services\InvoiceLayoutService;
+use Modules\Invoice\Validators\InvoiceBladeSecurityValidator;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class InvoiceLayoutController
@@ -114,7 +118,7 @@ final class InvoiceLayoutController
         ]);
     }
 
-    public function preview(Request $request, int $layout): JsonResponse
+    public function preview(Request $request, int|string $layout): Response
     {
         $tenantId = $this->currentTenantId($request);
         $invoiceId = $request->has('invoice_id') && is_numeric($request->input('invoice_id'))
@@ -123,11 +127,75 @@ final class InvoiceLayoutController
 
         $html = $this->layouts->previewHtml($tenantId, $layout, $invoiceId);
 
+        if ($request->header('Accept') === 'text/html' || $request->query('format') === 'html') {
+            return response($html, Response::HTTP_OK, ['Content-Type' => 'text/html; charset=UTF-8']);
+        }
+
         return response()->json([
             'data' => [
                 'html' => $html,
             ],
         ]);
+    }
+
+    public function uploadTemplate(
+        UploadInvoiceBladeTemplateRequest $request,
+        InvoiceBladeSecurityValidator $validator,
+    ): JsonResponse {
+        $file = $request->file('template_file');
+        if ($file === null) {
+            abort(400, 'Template file is required.');
+        }
+
+        $content = (string) file_get_contents($file->getRealPath());
+        $validator->validate($content);
+
+        return response()->json([
+            'data' => [
+                'filename' => $file->getClientOriginalName(),
+                'content' => $content,
+                'size_bytes' => strlen($content),
+            ],
+        ]);
+    }
+
+    public function export(Request $request, int|string $layout): StreamedResponse
+    {
+        $tenantId = $this->currentTenantId($request);
+        $model = is_numeric($layout)
+            ? $this->layouts->find($tenantId, (int) $layout)
+            : $this->layouts->findByCode($tenantId, (string) $layout);
+
+        if ($model === null) {
+            throw new NotFoundHttpException('Invoice layout not found.');
+        }
+
+        $content = '';
+        if ($model->isBlade() && ! empty($model->blade_content)) {
+            $content = $model->blade_content;
+        } else {
+            // Load preset view file
+            $viewName = $model->view_template ?? 'invoice.layouts.standard';
+            $relativeViewPath = str_replace('.', '/', $viewName).'.blade.php';
+            $fullPath = resource_path('views/'.$relativeViewPath);
+            if (file_exists($fullPath)) {
+                $content = (string) file_get_contents($fullPath);
+            } else {
+                $content = "{{-- Custom Blade Template for {$model->name} --}}\n<div class=\"invoice-sheet\">\n    <h1>{{ \$document['title'] }}</h1>\n    <p>Invoice #{{ \$document['invoice_number'] }}</p>\n</div>";
+            }
+        }
+
+        $filename = Str::slug($model->code, '_').'.blade.php';
+
+        return response()->streamDownload(
+            static function () use ($content): void {
+                echo $content;
+            },
+            $filename,
+            [
+                'Content-Type' => 'text/x-php; charset=UTF-8',
+            ],
+        );
     }
 
     public function setDefault(SetDefaultInvoiceLayoutRequest $request): JsonResponse

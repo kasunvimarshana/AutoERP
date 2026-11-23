@@ -14,6 +14,7 @@ namespace Modules\Invoice\Services;
 
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Invoice\Enums\InvoiceLayoutTemplate;
+use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
 use Modules\Invoice\Enums\InvoicePaperSize;
 use Modules\Invoice\Models\InvoiceLayout;
@@ -21,9 +22,13 @@ use Modules\Invoice\Models\InvoiceLayout;
 final readonly class InvoiceLayoutProvisioner
 {
     public const SYSTEM_STANDARD_A4 = 'standard_a4';
+
     public const SYSTEM_MODERN_A4 = 'modern_a4';
+
     public const SYSTEM_COMPACT_A5 = 'compact_a5';
+
     public const SYSTEM_POS_THERMAL = 'pos_thermal_80mm';
+
     public const SYSTEM_CONTINUOUS = 'continuous_8_5_by_5_5';
 
     public function __construct(
@@ -48,7 +53,9 @@ final readonly class InvoiceLayoutProvisioner
                     'description' => $def['description'],
                     'paper_size' => $def['paper_size'],
                     'orientation' => $def['orientation'],
+                    'template_type' => InvoiceLayoutType::Preset->value,
                     'view_template' => $def['view_template'],
+                    'blade_content' => null,
                     'is_system' => true,
                     'is_active' => true,
                     'settings' => $def['settings'],
