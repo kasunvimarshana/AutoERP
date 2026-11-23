@@ -57,12 +57,12 @@ All routes use the existing authenticated tenant/organization/feature middleware
 | GET `vehicle-uses` | Use view; paginated register with search, state and planned-period overlap filters |
 | GET/POST `customer/agreements/{agreement}/vehicles` | Use view/manage; POST requires customer agreement `expected_version` |
 | GET `vehicles/{vehicle}/sources` | Use view; required `starts_at` and present nullable `ends_at`; full-period scoped active owner lookup, no rates |
-| POST `vehicle-uses/{use}/{handover\|return\|cancel}` | Use manage; current use `expected_version`, reason and applicable actual observations |
+| POST `vehicle-uses/{use}/{handover/return/cancel}` | Use manage; current use `expected_version`, reason and applicable actual observations |
 | POST `vehicle-uses/{use}/replace` | Use manage; old use version, actual exchange time, new vehicle/source, reason and optional separate odometers |
 | GET `vehicle-uses/{use}/history` | Use view; paginated readable history |
 | GET/POST `vehicle-uses/{use}/running-charts` | Chart view/manage; POST requires current use version; optional guided correction predecessor |
 | PUT `running-charts/{chart}` | Chart manage; current chart version; draft only |
-| POST `running-charts/{chart}/{finalize\|reverse}` | Separate finalize/reverse permission; current chart version |
+| POST `running-charts/{chart}/{finalize/reverse}` | Separate finalize/reverse permission; current chart version |
 | GET `running-charts/{chart}/history` | Chart view; paginated facts and actor names |
 
 The permission identifiers are centrally defined by `RentalAuthorization`; frontend references use descriptive permission constants. Schema options use enums; decimal precision/scale and timestamp formats use named constants. Financial values are never hardcoded into these workflows.

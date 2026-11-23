@@ -3,7 +3,7 @@
 **Status:** Canonical Master Technical Specification, Architecture Manual & Developer Guide
 **Module Directory (Backend):** [`app/Modules/VehicleRental`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental)  
 **Frontend Directory:** [`resources/js/modules/vehicle-rental`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental)  
-**Timezone Standard:** `Asia/Colombo` (Operational Civil Business Calendar)  
+**Timezone Standard:** Dynamically Configured Workspace Timezone (Operational Civil Business Calendar resolved via `TimezoneResolverInterface` / `businessDate.ts`)  
 **Precision Arithmetic:** Arbitrary-Precision String Math via [`DecimalMath`](file:///d:/project-new/AutoERP/app/Modules/Core/Services/DecimalMath.php) (BCMath, scale 6)  
 **Test Suite Coverage:** 344 Backend PHPUnit Tests (2,948 Assertions) · 38 Frontend Vitest Suites (181 Tests) · TypeScript Strict (0 Errors)
 
@@ -149,8 +149,8 @@ Every service, controller, and database operation in `VehicleRental` enforces th
    - Every read-modify-write operation asserts `expected_version === row_version`. Stale concurrent writes fail immediately with HTTP 409 Conflict.
 5. **Exact Decimal Precision Arithmetic:**
    - Floating-point arithmetic (`float`, `double`) is strictly banned in financial, distance, and quantity calculations. All numbers use arbitrary-precision string math via [`DecimalMath`](file:///d:/project-new/AutoERP/app/Modules/Core/Services/DecimalMath.php) (BCMath with scale 6).
-6. **Civil Timezone Standard (`Asia/Colombo`):**
-   - Rental cutovers, calendar months, duty shifts, and vehicle custody boundaries evaluate strictly against the tenant's civil business timezone (`Asia/Colombo`). Client UTC offsets cannot misalign operational boundaries.
+6. **Dynamic Civil Timezone Standard:**
+   - Rental cutovers, calendar months, duty shifts, and vehicle custody boundaries evaluate strictly against the tenant's dynamically configured civil business timezone (`localization.timezone` / application configuration). Client UTC offsets cannot misalign operational boundaries.
 7. **Strict Immutability & Append-Only History:**
    - Deleting active or historical business records is strictly prohibited (`LogicException`). Modifying an activated agreement, vehicle use, or running chart creates an append-only audit record in dedicated history tables (`*_history`).
 
@@ -1375,8 +1375,8 @@ All routes are prefixed with `/api/v1/vehicle-rental`, require tenant authentica
 | `GET` | `/incidents/{id}/attachments/{att}` | `vehicle-rental.incidents.view` | Download private incident attachment proof |
 | `GET` | `/incidents/vehicle-use-options` | `vehicle-rental.incidents.view` | Query candidate custody uses for incident linking |
 | `GET` | `/incidents/vehicle-uses/{use}/running-chart-options` | `vehicle-rental.incidents.view` | Query candidate running charts for incident linking |
-| `POST` | `/incidents/{id}/{action}` | `vehicle-rental.incidents.review` | Review incident evidence (`action = confirm \| reject`) |
-| **Agreements Group ({kind} = customer \| owner)** | | | |
+| `POST` | `/incidents/{id}/{action}` | `vehicle-rental.incidents.review` | Review incident evidence (`action = confirm / reject`) |
+| **Agreements Group ({kind} = customer / owner)** | | | |
 | `GET` | `/{kind}/agreements` | `vehicle-rental.{kind}-agreements.view` | List commercial customer or owner agreements |
 | `POST` | `/{kind}/agreements` | `vehicle-rental.{kind}-agreements.manage` | Create draft commercial agreement with rate terms JSON |
 | `GET` | `/{kind}/agreements/{id}` | `vehicle-rental.{kind}-agreements.view` | View agreement details, terms, and successor pointers |
@@ -1387,7 +1387,7 @@ All routes are prefixed with `/api/v1/vehicle-rental`, require tenant authentica
 | `GET` | `/{kind}/agreements/{id}/financial-summary`| `vehicle-rental.{kind}-agreements.view` | Invoiced totals, payments received, and balance due metrics |
 | `POST` | `/{kind}/agreements/{id}/financial-adjustments` | `vehicle-rental.{kind}-agreements.manage` | Create contractual debit or credit note adjustment |
 | `POST` | `/{kind}/agreements/{id}/base-rent-preview` | `vehicle-rental.{kind}-agreements.bill` | Preview provisional base rent calculation for period |
-| `POST` | `/{kind}/agreements/{id}/{action}` | `vehicle-rental.{kind}-agreements.manage` | Transition agreement (`action = activate \| close`) |
+| `POST` | `/{kind}/agreements/{id}/{action}` | `vehicle-rental.{kind}-agreements.manage` | Transition agreement (`action = activate / close`) |
 | `GET` | `/{kind}/agreements/{id}/base-charges` | `vehicle-rental.{kind}-agreements.view` | View direct base rent charge schedule |
 | `POST` | `/{kind}/agreements/{id}/base-charges` | `vehicle-rental.{kind}-agreements.bill` | Assess direct base rent charge and issue invoice |
 | `POST` | `/{kind}/agreements/{id}/base-charges/{c}/void` | `vehicle-rental.{kind}-agreements.bill` | Void direct base rent charge |
@@ -1418,7 +1418,7 @@ All routes are prefixed with `/api/v1/vehicle-rental`, require tenant authentica
 | `POST` | `/vehicle-uses/{id}/replace-vehicle` | `vehicle-rental.vehicle-use.manage` | Alternative vehicle replacement swap endpoint |
 | `POST` | `/vehicle-uses/{id}/reassign-driver` | `vehicle-rental.vehicle-use.manage` | Reassign default chauffeur on custody record |
 | `GET` | `/vehicle-uses/{id}/history` | `vehicle-rental.vehicle-use.view` | Custody handover, return, and swap audit history |
-| `POST` | `/vehicle-uses/{id}/{action}` | `vehicle-rental.vehicle-use.manage` | Transition custody (`action = handover \| return \| cancel`) |
+| `POST` | `/vehicle-uses/{id}/{action}` | `vehicle-rental.vehicle-use.manage` | Transition custody (`action = handover / return / cancel`) |
 | `GET` | `/vehicles/available` | `vehicle-rental.vehicle-use.view` | Query unblocked available vehicles for dates and category |
 | **Daily Running Charts Group** | | | |
 | `GET` | `/running-charts` | `vehicle-rental.running-charts.view` | Master register of daily trip sheets with kind & text search |
@@ -1449,7 +1449,7 @@ All routes are prefixed with `/api/v1/vehicle-rental`, require tenant authentica
 | `DELETE`| `/billing-cycles/{id}/items/{itemId}` | `vehicle-rental.{kind}-agreements.bill` | Remove unfinalized ad-hoc addition/deduction line item |
 | `GET` | `/billing-cycles/{id}/preview` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | Preview final stage billing totals and vehicle attributions |
 | `POST` | `/billing-cycles/{id}/finalize` | `vehicle-rental.{kind}-agreements.bill` | Finalize cycle: issues Stage 2 Mode A/B invoice or credit note |
-| `GET` | `/billing-cycles/{id}/export/{format}` | `vehicle-rental.customer-agreements.view` | Export billing cycle summary (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/billing-cycles/{id}/export/{format}` | `vehicle-rental.customer-agreements.view` | Export billing cycle summary (format = `pdf` / `print` / `html`) |
 | **Adjustments & Reassignments Registers** | | | |
 | `GET` | `/adjustments` | `vehicle-rental.customer-agreements.view` / `owner-agreements.view` | List agreement financial adjustments |
 | `POST` | `/adjustments` | `vehicle-rental.customer-agreements.manage` / `owner-agreements.manage` | Create and authorize contractual adjustment |
@@ -1469,21 +1469,21 @@ All routes are prefixed with `/api/v1/vehicle-rental`, require tenant authentica
 | `POST` | `/owner-settlement-bill` | `vehicle-rental.owner-agreements.bill` | Generate itemized owner settlement AP bill (10% WHT & deductions) |
 | **Analytical Reports & Telematics Exports** | | | |
 | `GET` | `/reports/running-chart-sheet` | `vehicle-rental.reports.view` | 31-day running chart matrix sheet (customer, owner, or fleet) |
-| `GET` | `/reports/running-chart-sheet/export/{format}` | `vehicle-rental.reports.view` | Export running chart sheet (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/running-chart-sheet/export/{format}` | `vehicle-rental.reports.view` | Export running chart sheet (format = `pdf` / `print` / `html`) |
 | `GET` | `/reports/fleet-utilization` | `vehicle-rental.reports.view` | Fleet utilization rate % report |
-| `GET` | `/reports/fleet-utilization/export/{format}` | `vehicle-rental.reports.view` | Export fleet utilization report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/fleet-utilization/export/{format}` | `vehicle-rental.reports.view` | Export fleet utilization report (format = `pdf` / `print` / `html`) |
 | `GET` | `/reports/revenue-licenses` | `vehicle-rental.reports.view` | Regulatory compliance and license expiry monitoring report |
-| `GET` | `/reports/revenue-licenses/export/{format}` | `vehicle-rental.reports.view` | Export revenue license report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/revenue-licenses/export/{format}` | `vehicle-rental.reports.view` | Export revenue license report (format = `pdf` / `print` / `html`) |
 | `GET` | `/reports/rental-revenue` | `vehicle-rental.reports.view` | Customer rental revenue report grouped by client account |
-| `GET` | `/reports/rental-revenue/export/{format}` | `vehicle-rental.reports.view` | Export rental revenue report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/rental-revenue/export/{format}` | `vehicle-rental.reports.view` | Export rental revenue report (format = `pdf` / `print` / `html`) |
 | `GET` | `/reports/lessee-outstanding` | `vehicle-rental.reports.view` | Accounts Receivable aging (Current, 30, 60, 90+ days) report |
-| `GET` | `/reports/lessee-outstanding/export/{format}` | `vehicle-rental.reports.view` | Export lessee outstanding report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/lessee-outstanding/export/{format}` | `vehicle-rental.reports.view` | Export lessee outstanding report (format = `pdf` / `print` / `html`) |
 | `GET` | `/reports/owner-disbursements` | `vehicle-rental.reports.view` | Lessor earnings and disbursement report (Detail I & II statements) |
-| `GET` | `/reports/owner-disbursements/export/{format}` | `vehicle-rental.reports.view` | Export owner disbursement report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/owner-disbursements/export/{format}` | `vehicle-rental.reports.view` | Export owner disbursement report (format = `pdf` / `print` / `html`) |
 | `GET` | `/reports/vehicle-profitability` | `vehicle-rental.reports.view` | Dual-sided vehicle profitability (P&L) analysis report |
-| `GET` | `/reports/vehicle-profitability/export/{format}` | `vehicle-rental.reports.view` | Export vehicle profitability report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/vehicle-profitability/export/{format}` | `vehicle-rental.reports.view` | Export vehicle profitability report (format = `pdf` / `print` / `html`) |
 | `GET` | `/reports/incidents-summary` | `vehicle-rental.reports.view` | Damage claims, repair costs, and insurance recovery report |
-| `GET` | `/reports/incidents-summary/export/{format}` | `vehicle-rental.reports.view` | Export incidents summary report (format = `pdf` \| `print` \| `html`) |
+| `GET` | `/reports/incidents-summary/export/{format}` | `vehicle-rental.reports.view` | Export incidents summary report (format = `pdf` / `print` / `html`) |
 
 ---
 
@@ -1526,7 +1526,7 @@ When extending or maintaining `VehicleRental`, developers must follow these engi
 4. **Preserve Bidirectional Restoration:**
    - If introducing a new billing item or charge allocation, ensure [`RentalBillingDocumentService::restoreSourcesOnCancellation()`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental/Services/RentalBillingDocumentService.php) properly restores its source status upon invoice cancellation.
 5. **Enforce Temporal Causality & Boundary Rules:**
-   - Ensure actual physical events (key handover, check-in return) follow temporal order, odometer continuity, and respect the workspace civil calendar (`Asia/Colombo`).
+   - Ensure actual physical events (key handover, check-in return) follow temporal order, odometer continuity, and respect the workspace's dynamically configured civil calendar.
 6. **Always Update Shared Memory:**
    - After completing any modification, record an append-only change document in [`docs/changes/`](file:///d:/project-new/AutoERP/docs/changes) describing what was changed, why, and the verification evidence. Never edit or delete historical change records.
 

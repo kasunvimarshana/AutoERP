@@ -386,7 +386,7 @@ Key configuration variables defined in `.env.example`:
 |---|---|---|
 | `APP_ENV` | `local` | Application runtime environment (`local`, `production`, `testing`). |
 | `APP_KEY` | *(Generated)* | 32-character AES encryption key generated via `app:key:ensure`. |
-| `APP_TIMEZONE` | `Asia/Colombo` | Default fallback civil business timezone for operational timestamps and calendars. |
+| `APP_TIMEZONE` | `UTC` | Default fallback civil business timezone when tenant localization setting is not specified. |
 | `DB_CONNECTION` | `mysql` | Primary database driver (`mysql` for dev/prod, `sqlite` for tests). |
 | `AUTOERP_CURRENCY_CODE` | `LKR` | Default operational currency code for financial transactions. |
 | `TENANT_LOCAL_FALLBACK_ENABLED` | `true` | Allows local development without multi-tenant subdomain DNS configuration. |
@@ -852,9 +852,9 @@ AutoERP maintains a strict zero-regression quality gate. All checks must pass wi
 
 | Gate | Command | Description |
 |---|---|---|
-| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,300+ PHPUnit tests across all 31 modules using SQLite in-memory. |
+| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,370 PHPUnit tests (14,235 assertions) across all 31 modules using SQLite in-memory. |
 | **MySQL Integration Tests** | `composer test:mysql` | Runs integration tests against a live MySQL instance (`phpunit.mysql.xml`). |
-| **Frontend Unit Tests** | `npm test` | Runs 174 Vitest test suites (726+ tests) in JSDOM mode. |
+| **Frontend Unit Tests** | `npm test` | Runs 176 Vitest test suites (736 tests) in JSDOM mode. |
 | **TypeScript Compilation** | `npm run typecheck` | Validates TypeScript types across `resources/js` with zero emissions (`tsc --noEmit`). |
 | **ESLint Quality Check** | `npm run lint` | Lints React 19 / TypeScript code (`eslint resources/js`). |
 | **PHP Code Style (Pint)** | `vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |

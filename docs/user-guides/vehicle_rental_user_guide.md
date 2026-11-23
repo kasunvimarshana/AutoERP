@@ -171,7 +171,7 @@ The **Operations Dashboard** (`/vehicle-rental/dashboard`) provides management a
 1. **Do Not Invent Money**: Physical trip evidence (mileage, overtime hours, night-outs, accident repairs) is recorded as operational truth. **No financial document** (invoice, debit note, credit note, or GL journal) is ever created automatically without explicit, authorized user approval.
 2. **Never Type Raw IDs**: AutoERP uses human-readable autocomplete search boxes (`LookupSelect`). You always select customers by company name, vehicles by registration number (e.g. `CAB-1234`), and drivers by employee name.
 3. **Auditable & Non-Destructive**: Nothing is quietly deleted. If a contract, running chart, or invoice was created in error, it must be formally cancelled or reversed with a mandatory explanation note.
-4. **Civil Time Standard**: All dates and timestamps are evaluated in the official operational business timezone (`Asia/Colombo`).
+4. **Civil Time Standard**: All dates and timestamps are evaluated in the tenant's dynamically configured operational business timezone (`localization.timezone` / application configuration).
 
 ---
 
@@ -473,7 +473,7 @@ When the driver or customer arrives to collect the vehicle:
 3. Complete the handover form:
    - **Actual event time**: Physical departure timestamp. Use the helper buttons **Use planned handover time** or **Use current time**.
      > [!WARNING]
-     > Handover time **cannot be in the future**. Ensure your computer clock matches operational civil time (`Asia/Colombo`).
+     > Handover time **cannot be in the future**. Ensure your computer clock matches operational civil time (the workspace's configured timezone).
    - **Odometer (optional)**: Current physical odometer reading on the dashboard (e.g., `45,200`).
    - **Action reason**: Mandatory operational handover remarks (e.g. *"Handed over with 100% fuel tank, spare wheel OK"*).
 4. Click **Confirm handover**. The status updates to green **In Custody**.
@@ -999,7 +999,7 @@ Navigate to **Vehicle Rental** > **Reports & Matrix Sheet** (`/vehicle-rental/re
 ## 12. End-User Troubleshooting & FAQs
 
 ### Q1: Why do I get the error: *"Handover time cannot be in the future"*?
-**Cause:** AutoERP operates strictly on civil operational time (`Asia/Colombo`). If your computer's local clock is set ahead of the server time, or if you selected a future timestamp, the system blocks the write to maintain chronologically valid odometers.  
+**Cause:** AutoERP operates strictly on the tenant's dynamically configured civil operational time. If your computer's local clock is set ahead of the server time, or if you selected a future timestamp, the system blocks the write to maintain chronologically valid odometers.  
 **Solution:** Ensure your device clock is synchronized with network civil time, or click the **Use current time** button in the form.
 
 ---

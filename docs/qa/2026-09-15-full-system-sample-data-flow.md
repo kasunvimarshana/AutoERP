@@ -50,7 +50,7 @@ Create or verify:
 |---|---|---|
 | Country | `Sri Lanka (LK)` | Active and available in controlled lookups |
 | Currency | `Sri Lankan Rupee (LKR)` | Active; base/test transaction currency |
-| Language/timezone | `English`, `Asia/Colombo` | Available in configuration/profile selectors |
+| Language/timezone | `English`, `Asia/Colombo` (sample workspace IANA timezone) | Available in configuration/profile selectors |
 | UOM | `Each (EA)`, `Litre (L)`, `Hour (HR)`, `Job (JOB)` | Active and selectable for appropriate items |
 | UOM conversion | `1 L = 1000 mL` | Convert `2.5 L` to `2500 mL`; reverse conversion returns `2.5 L` |
 | Tenant configuration | A harmless test setting at tenant scope | Resolved value equals tenant entry |

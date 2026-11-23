@@ -30,6 +30,21 @@ Each module registers only the settings it owns under `configuration.definitions
 
 Reference catalogs are owned by `Modules/ReferenceData`.
 
+## Dynamic Timezone Resolution
+
+The Configuration module provides the authoritative runtime implementation of `Modules\Core\Contracts\TimezoneResolverInterface` via `Modules\Configuration\Services\TimezoneResolver`:
+
+- Resolves `localization.timezone` from the active tenant or organization-unit scope via `ConfigurationResolverInterface`.
+- Falls back gracefully to `config('app.timezone')` and `'UTC'` if not explicitly set on the tenant.
+- Exposes dynamic date and time resolution methods:
+  - `resolve(?int $tenantId, ?int $organizationUnitId): string`
+  - `now(?int $tenantId, ?int $organizationUnitId): CarbonImmutable`
+  - `today(?int $tenantId, ?int $organizationUnitId): CarbonImmutable`
+  - `todayDateString(?int $tenantId, ?int $organizationUnitId): string`
+  - `toCivilDate(DateTimeInterface|string $instant, ?int $tenantId, ?int $organizationUnitId): string`
+  - `toCivilDateTime(DateTimeInterface|string $instant, ?int $tenantId, ?int $organizationUnitId): CarbonImmutable`
+- Registered in `ConfigurationServiceProvider` to cleanly override the Core module's `DefaultTimezoneResolver` during application boot while keeping the module dependency graph 100% acyclic.
+
 ---
 
 ## Author & Maintainer

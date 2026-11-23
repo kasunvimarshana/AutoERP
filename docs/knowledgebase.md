@@ -2,7 +2,7 @@
 
 **Document Status:** Single Authoritative System Specification, Enterprise Architecture Reference, and Developer Onboarding Guide for AutoERP.  
 **System Architecture:** Modular Monolith (Laravel 12 Backend + React 19 / TypeScript 6 SPA Frontend)  
-**Standard Civil Timezone:** `Asia/Colombo` (Operational Business Calendar & Civil Timestamps)  
+**Standard Civil Timezone:** Dynamically Configured Workspace Timezone (`localization.timezone` scoped by tenant/organization unit, with fallback to application `APP_TIMEZONE`)  
 **Arithmetic Precision:** Exact Arbitrary-Precision String Arithmetic via `DecimalMath` (PHP BCMath)  
 **Business Modules:** 31 Domain Modules located in `app/Modules/*`  
 **Shared Project Memory:** Append-Only Change Records in `docs/changes/`  
@@ -172,9 +172,9 @@ Every change to the codebase must pass all verification gates with zero errors:
 
 | Check | Command | Description |
 |---|---|---|
-| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,364 PHPUnit tests (14,218 assertions) across all 31 modules using SQLite in-memory. |
+| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,370 PHPUnit tests (14,235 assertions) across all 31 modules using SQLite in-memory. |
 | **MySQL Integration Tests** | `composer test:mysql` | Runs integration tests against a live MySQL instance (`phpunit.mysql.xml`). |
-| **Frontend Unit Tests** | `npm test` | Runs 176 Vitest test suites (735 tests) in JSDOM mode. |
+| **Frontend Unit Tests** | `npm test` | Runs 176 Vitest test suites (736 tests) in JSDOM mode. |
 | **TypeScript Typecheck** | `npm run typecheck` | Validates TypeScript types across `resources/js` with zero emissions (`tsc --noEmit`). |
 | **ESLint Quality Check** | `npm run lint` | Lints React 19 / TypeScript code (`eslint resources/js`). |
 | **PHP Code Style (Pint)** | `vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |
@@ -291,9 +291,9 @@ The system provides dedicated console commands for maintenance and administratio
    - When fields are computed dynamically (e.g. comparative mileage, total rent, overtime hours, discounts, net amount), display a formula breakdown:
      > *"Calculated: (180 km - 100 free km) × Rs. 65.00/km = Rs. 5,200.00"*
 
-4. **Civil Timezone Standard (`Asia/Colombo`):**
+4. **Dynamic Civil Timezone Standard:**
    - The user's browser may be in any timezone. To prevent date-sliding bugs (e.g., selecting Nov 22 but submitting Nov 21 UTC), **never** use `new Date().toISOString()`.
-   - Use [`businessDate.ts`](file:///d:/project-new/AutoERP/resources/js/shared/utils/businessDate.ts) for civil date formatting, parsing, and day calculations against the business operational timezone.
+   - Use [`businessDate.ts`](file:///d:/project-new/AutoERP/resources/js/shared/utils/businessDate.ts) for civil date formatting, parsing, and day calculations against the dynamically configured workspace civil timezone (`localization.timezone` / application configuration).
 
 5. **Progressive Disclosure:**
    - Keep primary workflow dialogs and creation forms focused on essential fields required to complete the task.
@@ -348,7 +348,7 @@ The root [`DatabaseSeeder`](file:///d:/project-new/AutoERP/database/seeders/Data
 3. `PlatformOperatorSeeder`: Platform super-administrators and system roles.
 4. `AuthSeeder`: OAuth clients, auth providers, and token credentials.
 5. `ReferenceDataSeeder`: ISO countries, currencies (LKR, USD, EUR), languages, and timezones.
-6. `TenantReferenceAssignmentSeeder`: Default currency and operational timezone assignment (`Asia/Colombo`).
+6. `TenantReferenceAssignmentSeeder`: Default currency and operational timezone assignment.
 7. `SequenceSeeder`: Atomic document sequence generators for invoices, vouchers, and jobs.
 8. `UomSeeder`: Units of measure (km, hours, days, units, liters, sets).
 9. `WarehouseSeeder`: Main warehouse, parts racks, and spare parts bins.
@@ -519,7 +519,7 @@ To maintain legal auditability, an `Active` agreement is **immutable**. Commerci
 
 The Running Chart is the **single physical operational log** of vehicle usage:
 - Records daily operational facts:
-  - Duty ON time (e.g. `06:30 AM`) and Duty OFF time (e.g. `08:00 PM`) in civil business timezone (`Asia/Colombo`).
+  - Duty ON time (e.g. `06:30 AM`) and Duty OFF time (e.g. `08:00 PM`) in civil business timezone.
   - Start and finish odometers, comparative daily distance, and cumulative monthly mileage.
   - Overtime minutes categorized as Normal (`N`), Sunday/Double (`D`), or Holiday/Triple (`T`).
   - Out-of-pocket expressway tolls, driver night-out allowances, and AC mode usage.
@@ -746,7 +746,7 @@ php artisan view:cache
    - *Solution:* If the request is a new operation, generate a fresh UUID v4 key. If it is a retry, submit the identical payload.
 3. **Date Shift on Daily Running Charts:**
    - *Cause:* Client-side code used `new Date().toISOString()` which shifted timestamps across midnight UTC.
-   - *Solution:* Always parse and format dates using `businessDate.ts` against the operational `Asia/Colombo` civil timezone.
+   - *Solution:* Always parse and format dates using `businessDate.ts` against the dynamically configured workspace civil timezone.
 4. **Tenant Scope Access Denied:**
    - *Cause:* Query executed outside an authenticated tenant session or attempted to access records across tenant boundaries.
    - *Solution:* Verify the user has an active membership in the target tenant and organization unit.
@@ -763,7 +763,7 @@ The following practices are **strictly prohibited** across the entire AutoERP co
 4. **Fictitious Owner Costs:** Never manufacture artificial Owner Agreements or payable vouchers for company-owned vehicles.
 5. **Hardcoded Magic Account Numbers:** Never hardcode legacy account codes in business logic. All GL postings must resolve through `Finance` posting profiles.
 6. **Exposing Raw Database IDs in the UI:** The interface must never display raw integer IDs. Use human-readable labels, registration numbers, codes, and search-driven components (`LookupSelect`).
-7. **Client Timezone Drift:** Never rely on browser UTC string slicing (`.toISOString()`). All business dates and timestamps must be formatted using the tenant's operational business timezone (`Asia/Colombo`).
+7. **Client Timezone Drift & Hardcoded Timezones:** Never rely on browser UTC string slicing (`.toISOString()`) or hardcode a static timezone. All business dates and timestamps must be formatted using `businessDate.ts` against the tenant's dynamically configured business timezone (`localization.timezone` / application configuration).
 8. **Dynamic Migration Code:** Never use dynamic loops, runtime conditionals, or raw SQL statements in migration files.
 
 ---
@@ -788,7 +788,7 @@ A task is complete only when:
 - [x] Tenant and organization unit boundaries are strictly enforced.
 - [x] Relational inputs use controlled selection components; zero raw IDs are exposed in the UI.
 - [x] Calculation transparency is maintained with clear formula hints and breakdowns.
-- [x] All dates and times evaluate against the tenant's civil business timezone (`Asia/Colombo`).
+- [x] All dates and times evaluate against the tenant's dynamically configured civil business timezone (zero hardcoded timezones).
 - [x] All relevant backend PHPUnit test suites pass completely (`php artisan test`).
 - [x] All relevant frontend Vitest test suites pass completely (`npm test`).
 - [x] TypeScript compile checks (`npm run typecheck`) report zero errors.

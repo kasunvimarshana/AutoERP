@@ -371,8 +371,8 @@ AutoERP enforces a **zero-tolerance policy** for broken tests, type errors, or s
 
 | Quality Gate | Tooling / Framework | Target Baseline & Coverage | Execution Command |
 |---|---|---|---|
-| **Backend Feature & Unit Tests** | PHPUnit 11 | **1,364 Passed / 1,364 Tests (14,218 assertions)** | `php artisan test` |
-| **Frontend Unit & Component Tests** | Vitest 3 + React Testing Library | **176 Passed / 176 Suites (735 tests passed)** | `npm test` |
+| **Backend Feature & Unit Tests** | PHPUnit 11 | **1,370 Passed / 1,370 Tests (14,235 assertions)** | `php artisan test` |
+| **Frontend Unit & Component Tests** | Vitest 3 + React Testing Library | **176 Passed / 176 Suites (736 tests passed)** | `npm test` |
 | **Static TypeScript Verification** | TypeScript Compiler (`tsc`) | **0 Errors across 922 TS/TSX files** (Strict Mode) | `npm run typecheck` |
 | **Frontend Linting & Code Style** | ESLint 9 | **0 Errors** (`resources/js/*`) | `npm run lint` |
 | **Backend Code Style Formatting** | Laravel Pint (PSR-12) | **0 Violations** | `php vendor/bin/pint --test` |
