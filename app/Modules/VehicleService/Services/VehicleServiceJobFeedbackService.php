@@ -34,7 +34,7 @@ final class VehicleServiceJobFeedbackService
         $query = VehicleServiceJobFeedback::query()
             ->where('tenant_id', $job->tenant_id)
             ->where('vehicle_service_job_id', $job->id)
-            ->with(['user:id,name,email', 'creator:id,name', 'updater:id,name']);
+            ->with(['user:id,first_name,last_name,email,username', 'creator:id,first_name,last_name', 'updater:id,first_name,last_name']);
 
         if (! empty($filters['feedback_type'])) {
             $query->where('feedback_type', $filters['feedback_type']);
@@ -152,8 +152,13 @@ final class VehicleServiceJobFeedbackService
     ): VehicleServiceJobFeedback {
         return DB::transaction(function () use ($job, $data, $actorId): VehicleServiceJobFeedback {
             if ($data->expectedJobVersion !== null) {
-                $this->assertExpectedVersion($job, $data->expectedJobVersion);
-                $this->bumpJobVersion($job);
+                /** @var VehicleServiceJob $lockedJob */
+                $lockedJob = VehicleServiceJob::query()
+                    ->where('tenant_id', $job->tenant_id)
+                    ->lockForUpdate()
+                    ->findOrFail($job->getKey());
+                $this->assertExpectedVersion($lockedJob, $data->expectedJobVersion);
+                $this->bumpJobVersion($lockedJob);
             }
 
             $feedbackType = $data->feedbackType ?? VehicleServiceFeedbackType::Review;
@@ -176,7 +181,11 @@ final class VehicleServiceJobFeedbackService
                 'updated_by' => $actorId,
             ]);
 
-            return $feedback->load(['user:id,name,email', 'creator:id,name', 'updater:id,name']);
+            return $feedback->load([
+                'user:id,first_name,last_name,email,username',
+                'creator:id,first_name,last_name',
+                'updater:id,first_name,last_name',
+            ]);
         });
     }
 
@@ -191,31 +200,58 @@ final class VehicleServiceJobFeedbackService
                 abort(404, 'Feedback record not found for this service job.');
             }
 
+            /** @var VehicleServiceJobFeedback $lockedFeedback */
+            $lockedFeedback = VehicleServiceJobFeedback::query()
+                ->where('tenant_id', $job->tenant_id)
+                ->where('vehicle_service_job_id', $job->id)
+                ->lockForUpdate()
+                ->findOrFail($feedback->getKey());
+
             if ($data->expectedVersion !== null) {
-                $this->assertFeedbackExpectedVersion($feedback, $data->expectedVersion);
+                $this->assertFeedbackExpectedVersion($lockedFeedback, $data->expectedVersion);
             }
 
             if ($data->expectedJobVersion !== null) {
-                $this->assertExpectedVersion($job, $data->expectedJobVersion);
-                $this->bumpJobVersion($job);
+                /** @var VehicleServiceJob $lockedJob */
+                $lockedJob = VehicleServiceJob::query()
+                    ->where('tenant_id', $job->tenant_id)
+                    ->lockForUpdate()
+                    ->findOrFail($job->getKey());
+                $this->assertExpectedVersion($lockedJob, $data->expectedJobVersion);
+                $this->bumpJobVersion($lockedJob);
             }
 
-            $feedbackType = $data->feedbackType ?? $feedback->feedback_type;
-            $isCustomerVisible = $data->isCustomerVisible ?? $feedback->is_customer_visible;
-
-            $feedback->fill([
-                'feedback_type' => $feedbackType,
-                'rating' => $data->rating,
-                'title' => $data->title,
-                'comment' => $data->comment,
-                'is_customer_visible' => $isCustomerVisible,
-                'author_name' => $data->authorName,
-                'row_version' => (int) $feedback->row_version + 1,
+            $fillable = [
+                'row_version' => (int) $lockedFeedback->row_version + 1,
                 'updated_by' => $actorId,
-            ]);
-            $feedback->save();
+            ];
 
-            return $feedback->load(['user:id,name,email', 'creator:id,name', 'updater:id,name']);
+            if ($data->hasFeedbackType && $data->feedbackType !== null) {
+                $fillable['feedback_type'] = $data->feedbackType;
+            }
+            if ($data->hasRating) {
+                $fillable['rating'] = $data->rating;
+            }
+            if ($data->hasTitle) {
+                $fillable['title'] = $data->title;
+            }
+            if ($data->hasComment) {
+                $fillable['comment'] = $data->comment;
+            }
+            if ($data->hasIsCustomerVisible && $data->isCustomerVisible !== null) {
+                $fillable['is_customer_visible'] = $data->isCustomerVisible;
+            }
+            if ($data->hasAuthorName) {
+                $fillable['author_name'] = $data->authorName;
+            }
+
+            $lockedFeedback->fill($fillable)->save();
+
+            return $lockedFeedback->load([
+                'user:id,first_name,last_name,email,username',
+                'creator:id,first_name,last_name',
+                'updater:id,first_name,last_name',
+            ]);
         });
     }
 
@@ -224,17 +260,35 @@ final class VehicleServiceJobFeedbackService
         VehicleServiceJobFeedback $feedback,
         int $actorId,
         ?int $expectedVersion = null,
+        ?int $expectedJobVersion = null,
     ): void {
-        DB::transaction(function () use ($job, $feedback, $expectedVersion): void {
+        DB::transaction(function () use ($job, $feedback, $expectedVersion, $expectedJobVersion): void {
             if ($feedback->vehicle_service_job_id !== $job->id || $feedback->tenant_id !== $job->tenant_id) {
                 abort(404, 'Feedback record not found for this service job.');
             }
 
+            /** @var VehicleServiceJobFeedback $lockedFeedback */
+            $lockedFeedback = VehicleServiceJobFeedback::query()
+                ->where('tenant_id', $job->tenant_id)
+                ->where('vehicle_service_job_id', $job->id)
+                ->lockForUpdate()
+                ->findOrFail($feedback->getKey());
+
             if ($expectedVersion !== null) {
-                $this->assertFeedbackExpectedVersion($feedback, $expectedVersion);
+                $this->assertFeedbackExpectedVersion($lockedFeedback, $expectedVersion);
             }
 
-            $feedback->delete();
+            if ($expectedJobVersion !== null) {
+                /** @var VehicleServiceJob $lockedJob */
+                $lockedJob = VehicleServiceJob::query()
+                    ->where('tenant_id', $job->tenant_id)
+                    ->lockForUpdate()
+                    ->findOrFail($job->getKey());
+                $this->assertExpectedVersion($lockedJob, $expectedJobVersion);
+                $this->bumpJobVersion($lockedJob);
+            }
+
+            $lockedFeedback->delete();
         });
     }
 

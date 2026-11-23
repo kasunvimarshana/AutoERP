@@ -52,7 +52,11 @@ final class VehicleServiceJobFeedbackController extends VehicleServiceController
     public function show(ListVehicleServiceJobFeedbacksRequest $request, int $job, int $feedback): VehicleServiceJobFeedbackResource
     {
         $jobModel = $this->job($request, $job);
-        $feedbackModel = $this->feedback($jobModel, $feedback);
+        $feedbackModel = $this->feedback($jobModel, $feedback)->loadMissing([
+            'user:id,first_name,last_name,email,username',
+            'creator:id,first_name,last_name',
+            'updater:id,first_name,last_name',
+        ]);
 
         return new VehicleServiceJobFeedbackResource($feedbackModel);
     }
@@ -88,8 +92,9 @@ final class VehicleServiceJobFeedbackController extends VehicleServiceController
         $jobModel = $this->job($request, $job);
         $feedbackModel = $this->feedback($jobModel, $feedback);
         $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
+        $expectedJobVersion = $request->filled('expected_job_version') ? (int) $request->input('expected_job_version') : null;
 
-        $this->service->delete($jobModel, $feedbackModel, (int) $request->currentUserId(), $expectedVersion);
+        $this->service->delete($jobModel, $feedbackModel, (int) $request->currentUserId(), $expectedVersion, $expectedJobVersion);
 
         return response()->json(status: 204);
     }

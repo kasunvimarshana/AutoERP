@@ -34,6 +34,7 @@ final class VehicleServiceJobFeedbackResource extends JsonResource
             'vehicle_service_job_id' => (int) $this->vehicle_service_job_id,
             'user_id' => $this->user_id === null ? null : (int) $this->user_id,
             'author_name' => (string) $authorDisplay,
+            'raw_author_name' => $this->author_name === null ? null : (string) $this->author_name,
             'user' => $this->user ? [
                 'id' => (int) $this->user->id,
                 'name' => (string) $this->user->name,

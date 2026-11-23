@@ -66,10 +66,13 @@ Migrations represent **immutable database schema specifications**, not dynamic a
 - **Public Invoices Create Drafts Only:** Public endpoints submit business inputs only (direction, dates, customer/supplier, line items). All tax calculations, grand totals, line numbers, document sequences, and lifecycle statuses are authoritative server-owned facts.
 - **Historical Master Snapshots:** Master party and item identities are copied into immutable header and line snapshots at creation time. Historical document rendering reads frozen snapshots, never mutable master entities.
 - **Optimistic Concurrency Control:** Every mutable operational entity carries an unsigned integer `row_version`. API mutations require `expected_version` and atomically assert `WHERE row_version = ?` while incrementing.
+- **Explicit Optional Form Defaulting & Field Presence:** In form requests and DTOs, distinguish between omitted fields and explicitly cleared fields (`null`/`""`) using `$this->has('field')`. Partial updates must preserve existing database entity values for omitted fields.
+- **Blade Template Sandboxing & Tenant Layout Isolation:** Custom Blade templates and layouts (e.g. invoices, vouchers, printouts) must never include unescaped raw PHP execution or direct arbitrary filesystem includes outside registered tenant views.
+- **Token Rotation Grace Window:** Refresh token rotation must provide an idempotent concurrency grace window (30 seconds) to prevent simultaneous API requests from triggering false token revocation.
 
 ---
 
-## 5. The 8 Prohibited Architectural Anti-Patterns
+## 5. The 10 Prohibited Architectural Anti-Patterns
 The following practices are **strictly prohibited** across AutoERP:
 1. **Direct Vehicle-to-Agreement Foreign Keys:** Vehicles must never be bound directly to customer agreements; all assignments must pass through `VehicleUse` to preserve replacement lineage.
 2. **Destructive In-Place Edits on Posted Transactions:** Posted invoices, payments, vouchers, or running charts must never be edited in-place or deleted. Corrections must follow governed reversal/credit/reissue workflows.
@@ -79,6 +82,8 @@ The following practices are **strictly prohibited** across AutoERP:
 6. **Exposing Raw Database IDs in the UI:** The user interface must never display raw integer IDs. Relational inputs must use controlled selection components (`LookupSelect`, `GenericLookupSelect`).
 7. **Client Timezone Drift & Hardcoded Timezones:** Never rely on browser UTC string slicing (`.toISOString()`) or hardcode a static timezone. All business dates and timestamps must be formatted using `businessDate.ts` against the workspace's dynamically configured civil timezone (`localization.timezone` / application configuration).
 8. **Dynamic Migration Code:** Never use dynamic loops, runtime conditionals, or raw SQL statements in migration files.
+9. **Omitted Field Overwrites on Partial Updates:** Never assume omitted request fields imply nullification; always verify presence (`$this->has()`) before updating existing entity attributes.
+10. **Unchecked Token Revocation on Concurrency:** Never invalidate refresh tokens immediately without an idempotent grace window for concurrent requests.
 
 ---
 

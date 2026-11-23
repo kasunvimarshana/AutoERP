@@ -22,6 +22,7 @@ final class DeleteVehicleServiceJobFeedbackRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'expected_version' => ['nullable', 'integer', 'min:1'],
+            'expected_job_version' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

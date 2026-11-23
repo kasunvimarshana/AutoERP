@@ -61,7 +61,11 @@ export const deleteVehicleServiceFeedback = (
     jobId: number,
     feedbackId: number,
     expectedVersion?: number,
+    expectedJobVersion?: number,
 ): Promise<void> =>
     apiClient.delete(`${jobs}/${jobId}/feedbacks/${feedbackId}`, {
-        data: expectedVersion !== undefined ? { expected_version: expectedVersion } : undefined,
+        data: expectedVersion !== undefined || expectedJobVersion !== undefined ? {
+            expected_version: expectedVersion,
+            expected_job_version: expectedJobVersion,
+        } : undefined,
     }).then(() => undefined);

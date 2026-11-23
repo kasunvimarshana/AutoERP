@@ -31,6 +31,7 @@ final class StoreVehicleServiceJobFeedbackRequest extends TenantScopedRequest
             'is_customer_visible' => ['nullable', 'boolean'],
             'author_name' => ['nullable', 'string', 'max:150'],
             'expected_version' => ['nullable', 'integer', 'min:1'],
+            'expected_job_version' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -41,6 +42,10 @@ final class StoreVehicleServiceJobFeedbackRequest extends TenantScopedRequest
             ? VehicleServiceFeedbackType::tryFrom((string) $rawType) ?? VehicleServiceFeedbackType::Review
             : VehicleServiceFeedbackType::Review;
 
+        $expectedJobVersion = $this->filled('expected_job_version')
+            ? (int) $this->input('expected_job_version')
+            : ($this->filled('expected_version') ? (int) $this->input('expected_version') : null);
+
         return new VehicleServiceJobFeedbackData(
             feedbackType: $type,
             comment: $this->filled('comment') ? trim((string) $this->input('comment')) : null,
@@ -49,7 +54,13 @@ final class StoreVehicleServiceJobFeedbackRequest extends TenantScopedRequest
             isCustomerVisible: (bool) $this->boolean('is_customer_visible', $type !== VehicleServiceFeedbackType::InternalNote),
             authorName: $this->filled('author_name') ? trim((string) $this->input('author_name')) : null,
             userId: $currentUserId,
-            expectedJobVersion: $this->filled('expected_version') ? (int) $this->input('expected_version') : null,
+            expectedJobVersion: $expectedJobVersion,
+            hasFeedbackType: true,
+            hasComment: true,
+            hasRating: true,
+            hasTitle: true,
+            hasIsCustomerVisible: true,
+            hasAuthorName: true,
         );
     }
 }

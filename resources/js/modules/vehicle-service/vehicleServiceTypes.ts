@@ -520,6 +520,7 @@ export interface VehicleServiceJobFeedback {
     vehicle_service_job_id: number;
     user_id?: number | null;
     author_name: string;
+    raw_author_name?: string | null;
     user?: {
         id: number;
         name: string;

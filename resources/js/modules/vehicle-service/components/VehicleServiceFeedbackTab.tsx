@@ -61,6 +61,7 @@ export default function VehicleServiceFeedbackTab({
     // Filters
     const [typeFilter, setTypeFilter] = useState<string>('');
     const [ratingFilter, setRatingFilter] = useState<string>('');
+    const [customerVisibleOnly, setCustomerVisibleOnly] = useState<boolean>(false);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [debouncedSearch, setDebouncedSearch] = useState<string>('');
 
@@ -86,11 +87,12 @@ export default function VehicleServiceFeedbackTab({
             const params: VehicleServiceFeedbackFilterParams = {
                 feedback_type: typeFilter ? (typeFilter as VehicleServiceFeedbackType) : undefined,
                 rating: ratingFilter ? Number(ratingFilter) : undefined,
+                customer_visible_only: customerVisibleOnly ? true : undefined,
                 search: debouncedSearch.trim() || undefined,
             };
             return listVehicleServiceFeedbacks(jobId, params, signal);
         },
-        [jobId, typeFilter, ratingFilter, debouncedSearch],
+        [jobId, typeFilter, ratingFilter, customerVisibleOnly, debouncedSearch],
     );
 
     const feedbacks = result.data?.data ?? [];
@@ -120,7 +122,7 @@ export default function VehicleServiceFeedbackTab({
         setDeleting(true);
         setActionError(null);
         try {
-            await deleteVehicleServiceFeedback(jobId, deleteTarget.id, deleteTarget.row_version);
+            await deleteVehicleServiceFeedback(jobId, deleteTarget.id, deleteTarget.row_version, expectedVersion);
             setDeleteTarget(null);
             result.reload();
             if (expectedVersion !== undefined && onChanged) {
@@ -133,11 +135,12 @@ export default function VehicleServiceFeedbackTab({
         }
     };
 
-    const hasActiveFilters = Boolean(typeFilter || ratingFilter || searchQuery);
+    const hasActiveFilters = Boolean(typeFilter || ratingFilter || customerVisibleOnly || searchQuery);
 
     const clearFilters = () => {
         setTypeFilter('');
         setRatingFilter('');
+        setCustomerVisibleOnly(false);
         setSearchQuery('');
     };
 
@@ -209,19 +212,51 @@ export default function VehicleServiceFeedbackTab({
 
                         {/* Breakdown Badges & Quick Action */}
                         <div className="flex flex-col gap-3 lg:col-span-4 lg:items-end">
-                            <div className="flex flex-wrap gap-1.5">
-                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20">
+                            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by category">
+                                <button
+                                    type="button"
+                                    onClick={() => setTypeFilter(typeFilter === 'review' ? '' : 'review')}
+                                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                                        typeFilter === 'review'
+                                            ? 'bg-emerald-600 text-white shadow-xs'
+                                            : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20 hover:bg-emerald-100'
+                                    }`}
+                                >
                                     Reviews: <strong>{summary.reviews_count}</strong>
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-300">
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTypeFilter(typeFilter === 'internal_note' ? '' : 'internal_note')}
+                                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                                        typeFilter === 'internal_note'
+                                            ? 'bg-slate-700 text-white shadow-xs'
+                                            : 'bg-slate-100 text-slate-700 ring-1 ring-slate-300 hover:bg-slate-200'
+                                    }`}
+                                >
                                     Notes: <strong>{summary.notes_count}</strong>
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-600/20">
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTypeFilter(typeFilter === 'customer_feedback' ? '' : 'customer_feedback')}
+                                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                                        typeFilter === 'customer_feedback'
+                                            ? 'bg-blue-600 text-white shadow-xs'
+                                            : 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20 hover:bg-blue-100'
+                                    }`}
+                                >
                                     Feedback: <strong>{summary.customer_feedback_count}</strong>
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-600/20">
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTypeFilter(typeFilter === 'complaint' ? '' : 'complaint')}
+                                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                                        typeFilter === 'complaint'
+                                            ? 'bg-rose-600 text-white shadow-xs'
+                                            : 'bg-rose-50 text-rose-700 ring-1 ring-rose-600/20 hover:bg-rose-100'
+                                    }`}
+                                >
                                     Complaints: <strong>{summary.complaints_count}</strong>
-                                </span>
+                                </button>
                             </div>
 
                             {canManage && (
@@ -258,6 +293,15 @@ export default function VehicleServiceFeedbackTab({
                             placeholder={null}
                         />
                     </div>
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 select-none cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={customerVisibleOnly}
+                            onChange={(e) => setCustomerVisibleOnly(e.target.checked)}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>Customer visible only</span>
+                    </label>
                     {hasActiveFilters && (
                         <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
                             Clear filters
@@ -358,6 +402,11 @@ export default function VehicleServiceFeedbackTab({
                                     </span>
                                     <span>&bull;</span>
                                     <span>{formatDate(item.created_at)}</span>
+                                    {item.updated_at && item.created_at && item.updated_at !== item.created_at && (
+                                        <span className="text-2xs italic text-slate-400" title={`Edited on ${formatDate(item.updated_at)}`}>
+                                            (edited)
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -402,6 +451,7 @@ export default function VehicleServiceFeedbackTab({
             {/* Modal Dialog for Add / Edit */}
             {dialogOpen && (
                 <VehicleServiceFeedbackDialog
+                    key={editingFeedback?.id ?? 'create'}
                     open={dialogOpen}
                     jobId={jobId}
                     expectedJobVersion={expectedVersion}
@@ -416,16 +466,22 @@ export default function VehicleServiceFeedbackTab({
                 open={Boolean(deleteTarget)}
                 title="Delete Feedback"
                 message={
-                    <span>
-                        Are you sure you want to delete this {deleteTarget?.feedback_type_label?.toLowerCase() ?? 'feedback'}?
-                        This action cannot be undone.
-                    </span>
+                    <div className="space-y-3">
+                        <ErrorAlert error={actionError} inline />
+                        <p>
+                            Are you sure you want to delete this {deleteTarget?.feedback_type_label?.toLowerCase() ?? 'feedback'}?
+                            This action cannot be undone.
+                        </p>
+                    </div>
                 }
                 confirmLabel="Delete"
                 cancelLabel="Cancel"
                 danger
                 loading={deleting}
-                onCancel={() => setDeleteTarget(null)}
+                onCancel={() => {
+                    setDeleteTarget(null);
+                    setActionError(null);
+                }}
                 onConfirm={handleDeleteConfirm}
             />
         </div>

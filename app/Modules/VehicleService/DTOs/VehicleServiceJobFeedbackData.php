@@ -26,5 +26,11 @@ final readonly class VehicleServiceJobFeedbackData
         public ?int $userId = null,
         public ?int $expectedVersion = null,
         public ?int $expectedJobVersion = null,
+        public bool $hasFeedbackType = false,
+        public bool $hasComment = false,
+        public bool $hasRating = false,
+        public bool $hasTitle = false,
+        public bool $hasIsCustomerVisible = false,
+        public bool $hasAuthorName = false,
     ) {}
 }

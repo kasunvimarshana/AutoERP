@@ -303,8 +303,163 @@ final class VehicleServiceJobFeedbackTest extends TestCase
 
         $updateResponse->assertOk();
         $updateResponse->assertJsonPath('data.title', 'Updated title only');
+        $updateResponse->assertJsonPath('data.comment', 'Initial comment');
+        $updateResponse->assertJsonPath('data.rating', 4);
         $updateResponse->assertJsonPath('data.feedback_type', 'review');
         $updateResponse->assertJsonPath('data.row_version', 2);
+    }
+
+    public function test_partial_update_can_explicitly_clear_fields_to_null(): void
+    {
+        $context = $this->createContext();
+        $job = $this->createJob($context);
+
+        /** @var VehicleServiceJobFeedback $feedback */
+        $feedback = $this->withTenantExecutionContext($context['tenant_id'], function () use ($context, $job) {
+            return VehicleServiceJobFeedback::query()->create([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'vehicle_service_job_id' => $job->id,
+                'user_id' => $context['user_id'],
+                'feedback_type' => VehicleServiceFeedbackType::Review,
+                'rating' => 4,
+                'title' => 'Initial Title',
+                'comment' => 'Initial comment',
+                'is_customer_visible' => true,
+                'row_version' => 1,
+            ]);
+        });
+
+        // Explicitly clear rating and title to null
+        $updateResponse = $this->tenantPutJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks/{$feedback->id}",
+            [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'rating' => null,
+                'title' => null,
+            ],
+        );
+
+        $updateResponse->assertOk();
+        $updateResponse->assertJsonPath('data.rating', null);
+        $updateResponse->assertJsonPath('data.title', null);
+        $updateResponse->assertJsonPath('data.comment', 'Initial comment');
+        $updateResponse->assertJsonPath('data.row_version', 2);
+    }
+
+    public function test_store_feedback_validates_and_bumps_parent_job_version(): void
+    {
+        $context = $this->createContext();
+        $job = $this->createJob($context);
+        $initialJobVersion = (int) $job->row_version;
+
+        $storeResponse = $this->tenantPostJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks",
+            [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'expected_job_version' => $initialJobVersion,
+                'feedback_type' => 'review',
+                'rating' => 5,
+                'title' => 'Job version checked',
+                'comment' => 'Created with expected_job_version',
+            ],
+        );
+
+        $storeResponse->assertCreated();
+
+        // Verify parent job row_version was bumped
+        $freshJob = $this->withTenantExecutionContext($context['tenant_id'], fn () => VehicleServiceJob::query()->findOrFail($job->id));
+        $this->assertSame($initialJobVersion + 1, (int) $freshJob->row_version);
+
+        // Submitting with stale expected_job_version fails with 422
+        $staleResponse = $this->tenantPostJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks",
+            [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'expected_job_version' => $initialJobVersion,
+                'feedback_type' => 'review',
+                'comment' => 'Should fail due to stale job version',
+            ],
+        );
+
+        $staleResponse->assertUnprocessable();
+        $staleResponse->assertJsonValidationErrors(['expected_version']);
+    }
+
+    public function test_delete_feedback_validates_and_bumps_parent_job_version(): void
+    {
+        $context = $this->createContext();
+        $job = $this->createJob($context);
+        $initialJobVersion = (int) $job->row_version;
+
+        /** @var VehicleServiceJobFeedback $feedback */
+        $feedback = $this->withTenantExecutionContext($context['tenant_id'], function () use ($context, $job) {
+            return VehicleServiceJobFeedback::query()->create([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'vehicle_service_job_id' => $job->id,
+                'user_id' => $context['user_id'],
+                'feedback_type' => VehicleServiceFeedbackType::InternalNote,
+                'comment' => 'Note to delete with job sync',
+                'row_version' => 1,
+            ]);
+        });
+
+        // Delete with both expected_version and expected_job_version
+        $deleteResponse = $this->tenantDeleteJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks/{$feedback->id}",
+            [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'expected_version' => 1,
+                'expected_job_version' => $initialJobVersion,
+            ],
+        );
+
+        $deleteResponse->assertNoContent();
+
+        // Verify parent job was bumped
+        $freshJob = $this->withTenantExecutionContext($context['tenant_id'], fn () => VehicleServiceJob::query()->findOrFail($job->id));
+        $this->assertSame($initialJobVersion + 1, (int) $freshJob->row_version);
+    }
+
+    public function test_show_feedback_eager_loads_user_name_and_returns_raw_author_name(): void
+    {
+        $context = $this->createContext();
+        $job = $this->createJob($context);
+        $user = $this->withTenantExecutionContext($context['tenant_id'], fn () => UserModel::query()->findOrFail($context['user_id']));
+
+        /** @var VehicleServiceJobFeedback $feedback */
+        $feedback = $this->withTenantExecutionContext($context['tenant_id'], function () use ($context, $job) {
+            return VehicleServiceJobFeedback::query()->create([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'vehicle_service_job_id' => $job->id,
+                'user_id' => $context['user_id'],
+                'author_name' => null, // Dynamic user fallback
+                'feedback_type' => VehicleServiceFeedbackType::Review,
+                'rating' => 5,
+                'comment' => 'Dynamic user display test',
+                'row_version' => 1,
+            ]);
+        });
+
+        $showResponse = $this->tenantGetJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->id}/feedbacks/{$feedback->id}?tenant_id={$context['tenant_id']}&organization_unit_id={$context['organization_unit_id']}",
+        );
+
+        $showResponse->assertOk();
+        $showResponse->assertJsonPath('data.raw_author_name', null);
+        $showResponse->assertJsonPath('data.user.name', $user->name);
+        $showResponse->assertJsonPath('data.author_name', $user->name);
     }
 
     public function test_search_matches_submitter_user_name_when_author_name_is_null(): void

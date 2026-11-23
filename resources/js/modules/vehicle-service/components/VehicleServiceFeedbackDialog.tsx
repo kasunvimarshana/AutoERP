@@ -60,7 +60,9 @@ export function VehicleServiceFeedbackDialog({
     const [hoverRating, setHoverRating] = useState<number | null>(null);
     const [title, setTitle] = useState(feedback?.title ?? '');
     const [comment, setComment] = useState(feedback?.comment ?? '');
-    const [authorName, setAuthorName] = useState(feedback?.author_name ?? '');
+    const [authorName, setAuthorName] = useState(
+        feedback ? (feedback.raw_author_name !== undefined ? (feedback.raw_author_name ?? '') : feedback.author_name) : '',
+    );
     const [isCustomerVisible, setIsCustomerVisible] = useState<boolean>(
         feedback ? feedback.is_customer_visible : type !== 'internal_note',
     );
@@ -123,7 +125,7 @@ export function VehicleServiceFeedbackDialog({
             closeDisabled={saving}
         >
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
-                <ErrorAlert error={error} />
+                <ErrorAlert error={error} inline />
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Select
@@ -175,6 +177,15 @@ export function VehicleServiceFeedbackDialog({
                                         onClick={() => setRating(star)}
                                         onMouseEnter={() => setHoverRating(star)}
                                         onMouseLeave={() => setHoverRating(null)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                                                e.preventDefault();
+                                                setRating(Math.min(5, (rating ?? 0) + 1));
+                                            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                                                e.preventDefault();
+                                                setRating(Math.max(1, (rating ?? 2) - 1));
+                                            }
+                                        }}
                                         className="p-1 text-slate-300 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-amber-400 rounded"
                                     >
                                         <svg

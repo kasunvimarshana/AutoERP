@@ -320,8 +320,48 @@ describe('VehicleServiceFeedbackTab', () => {
         await user.click(confirmBtn);
 
         await waitFor(() => {
-            expect(apiMocks.deleteVehicleServiceFeedback).toHaveBeenCalledWith(7, 101, 1);
+            expect(apiMocks.deleteVehicleServiceFeedback).toHaveBeenCalledWith(7, 101, 1, 3);
             expect(onChanged).toHaveBeenCalledWith(4);
+        });
+    });
+
+    it('filters feedback items when toggling customer visible only', async () => {
+        const user = userEvent.setup();
+        render(<VehicleServiceFeedbackTab jobId={7} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Customer visible only')).toBeInTheDocument();
+        });
+
+        const checkbox = screen.getByRole('checkbox', { name: 'Customer visible only' });
+        await user.click(checkbox);
+
+        await waitFor(() => {
+            expect(apiMocks.listVehicleServiceFeedbacks).toHaveBeenCalledWith(
+                7,
+                expect.objectContaining({ customer_visible_only: true }),
+                expect.any(AbortSignal),
+            );
+        });
+    });
+
+    it('filters feedback items when clicking summary category badge button', async () => {
+        const user = userEvent.setup();
+        render(<VehicleServiceFeedbackTab jobId={7} />);
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /Reviews:/ })).toBeInTheDocument();
+        });
+
+        const reviewsBtn = screen.getByRole('button', { name: /Reviews:/ });
+        await user.click(reviewsBtn);
+
+        await waitFor(() => {
+            expect(apiMocks.listVehicleServiceFeedbacks).toHaveBeenCalledWith(
+                7,
+                expect.objectContaining({ feedback_type: 'review' }),
+                expect.any(AbortSignal),
+            );
         });
     });
 

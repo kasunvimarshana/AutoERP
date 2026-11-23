@@ -46,16 +46,38 @@ final class UpdateVehicleServiceJobFeedbackRequest extends TenantScopedRequest
             ? (bool) $this->boolean('is_customer_visible')
             : null;
 
+        $authorName = $this->has('author_name')
+            ? ($this->filled('author_name') ? trim((string) $this->input('author_name')) : null)
+            : null;
+
+        $title = $this->has('title')
+            ? ($this->filled('title') ? trim((string) $this->input('title')) : null)
+            : null;
+
+        $comment = $this->has('comment')
+            ? ($this->filled('comment') ? trim((string) $this->input('comment')) : null)
+            : null;
+
+        $rating = $this->has('rating')
+            ? ($this->filled('rating') ? (int) $this->input('rating') : null)
+            : null;
+
         return new VehicleServiceJobFeedbackData(
             feedbackType: $type,
-            comment: $this->filled('comment') ? trim((string) $this->input('comment')) : null,
-            rating: $this->filled('rating') ? (int) $this->input('rating') : null,
-            title: $this->filled('title') ? trim((string) $this->input('title')) : null,
+            comment: $comment,
+            rating: $rating,
+            title: $title,
             isCustomerVisible: $isCustomerVisible,
-            authorName: $this->filled('author_name') ? trim((string) $this->input('author_name')) : null,
+            authorName: $authorName,
             userId: $currentUserId,
             expectedVersion: $this->filled('expected_version') ? (int) $this->input('expected_version') : null,
             expectedJobVersion: $this->filled('expected_job_version') ? (int) $this->input('expected_job_version') : null,
+            hasFeedbackType: $this->has('feedback_type'),
+            hasComment: $this->has('comment'),
+            hasRating: $this->has('rating'),
+            hasTitle: $this->has('title'),
+            hasIsCustomerVisible: $this->has('is_customer_visible'),
+            hasAuthorName: $this->has('author_name'),
         );
     }
 }
