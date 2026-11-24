@@ -19,6 +19,7 @@ use Modules\Payroll\DTOs\CalculatedPayslipDTO;
 use Modules\Payroll\Enums\AdjustmentStatus;
 use Modules\Payroll\Enums\AdjustmentType;
 use Modules\Payroll\Enums\CalculationType;
+use Modules\Payroll\Enums\LoanType;
 use Modules\Payroll\Enums\PayslipItemType;
 use Modules\Payroll\Enums\SalaryComponentType;
 use Modules\Payroll\Models\PayrollAdjustment;
@@ -33,6 +34,7 @@ final class PayrollCalculationEngine
         private readonly PayrollAttendanceIntegrationService $attendanceService,
         private readonly PayrollStatutoryService $statutoryService,
         private readonly PayrollTaxService $taxService,
+        private readonly PayrollLoanService $loanService,
     ) {}
 
     public function calculateForEmployee(
@@ -258,6 +260,33 @@ final class PayrollCalculationEngine
             }
         }
 
+        // 5b. Active Loans and Salary Advances
+        $activeLoans = $this->loanService->getActiveLoansForEmployee($tenantId, (int) $employee->id, (int) $period->id);
+        $loanDeductions = '0.0000';
+        foreach ($activeLoans as $loan) {
+            $remaining = (string) $loan->balance_remaining;
+            $installment = (string) $loan->monthly_installment;
+            $deduction = bccomp($installment, $remaining, 4) > 0 ? $remaining : $installment;
+
+            if (bccomp($deduction, '0.0000', 4) <= 0) {
+                continue;
+            }
+
+            $loanDeductions = bcadd($loanDeductions, $deduction, 4);
+            $isAdvance = $loan->loan_type === LoanType::Advance;
+            $items[] = new CalculatedLineItemDTO(
+                itemType: PayslipItemType::Deduction,
+                itemCode: $isAdvance ? 'SALARY_ADVANCE_RECOVERY' : 'LOAN_REPAYMENT',
+                itemName: ($isAdvance ? 'Salary Advance Recovery: ' : 'Loan Installment: ').$loan->loan_reference,
+                rate: $deduction,
+                hoursOrQuantity: '1.00',
+                amount: $deduction,
+                isTaxable: false,
+                isStatutory: false,
+                calculationBasis: sprintf('Loan #%d (%s) installment (Balance: %s)', $loan->id, $loan->loan_reference, $remaining),
+            );
+        }
+
         // 6. Gross Pay
         // Gross = Prorated Basic + Allowances + Normal OT + Double OT + Adjustment Additions
         $grossPay = bcadd($proratedBasic, $totalAllowances, 4);
@@ -274,10 +303,11 @@ final class PayrollCalculationEngine
         }
 
         // 8. Total Deductions
-        // Total Deductions = Unpaid Leave + Absent Deduction + Structure Deductions + Adjustment Deductions
+        // Total Deductions = Unpaid Leave + Absent Deduction + Structure Deductions + Adjustment Deductions + Loan Deductions
         $totalDeductions = bcadd($unpaidLeaveDeduction, $absenceDeduction, 4);
         $totalDeductions = bcadd($totalDeductions, $structureDeductions, 4);
         $totalDeductions = bcadd($totalDeductions, $adjustmentDeductions, 4);
+        $totalDeductions = bcadd($totalDeductions, $loanDeductions, 4);
 
         // 9. Tax Calculation (PAYE / Progressive APIT)
         // Taxable Base = max(0, GrossPay - EmployeeStatutory - Deductions)

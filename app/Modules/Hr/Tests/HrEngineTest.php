@@ -693,6 +693,146 @@ final class HrEngineTest extends TestCase
         });
     }
 
+    public function test_shift_rotations_overlap_validation_and_leave_conflicts(): void
+    {
+        [$tenantId, $organizationId] = $this->scope();
+        [$department] = $this->masters($tenantId, $organizationId);
+        $rosterService = app(ShiftRosterService::class);
+        $leaveService = app(LeaveManagementService::class);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $organizationId, $department, $rosterService, $leaveService): void {
+            $user = TenantUserFixture::create([
+                'tenant_id' => $tenantId,
+                'email' => 'roster-tester-'.Str::lower(Str::random(8)).'@example.test',
+            ]);
+
+            $emp = $this->employee($tenantId, $organizationId, 'EMP-ROT-1', (int) $department->getKey());
+            $empId = (int) $emp->getKey();
+
+            // 1. Create Shifts: Morning (08:00 - 16:00) & Evening (16:00 - 00:00)
+            $morningShift = $rosterService->createShift($tenantId, new ShiftData(
+                code: 'MORN-1',
+                name: 'Morning Shift',
+                startTime: '08:00:00',
+                endTime: '16:00:00',
+                organizationUnitId: $organizationId,
+            ));
+
+            $eveningShift = $rosterService->createShift($tenantId, new ShiftData(
+                code: 'EVEN-1',
+                name: 'Evening Shift',
+                startTime: '16:00:00',
+                endTime: '00:00:00',
+                organizationUnitId: $organizationId,
+            ));
+
+            // 2. Create Shift Rotation Pattern (14-day cycle)
+            $rotation = $rosterService->createRotation($tenantId, [
+                'organization_unit_id' => $organizationId,
+                'code' => 'ROT-14D',
+                'name' => '14-Day Continental Shift Pattern',
+                'cycle_days' => 14,
+            ]);
+
+            // Days 1-5: Morning Shift
+            for ($d = 1; $d <= 5; $d++) {
+                $rosterService->addRotationStep($rotation, $d, (int) $morningShift->getKey(), 'Morning shift');
+            }
+            // Days 6-7: Rest Days (null shift)
+            $rosterService->addRotationStep($rotation, 6, null, 'Rest Day 1');
+            $rosterService->addRotationStep($rotation, 7, null, 'Rest Day 2');
+
+            // Days 8-12: Evening Shift
+            for ($d = 8; $d <= 12; $d++) {
+                $rosterService->addRotationStep($rotation, $d, (int) $eveningShift->getKey(), 'Evening shift');
+            }
+            // Days 13-14: Rest Days
+            $rosterService->addRotationStep($rotation, 13, null, 'Rest Day 3');
+            $rosterService->addRotationStep($rotation, 14, null, 'Rest Day 4');
+
+            // Assign rotation starting from anchor date 2026-11-01
+            $rosterService->assignRotation($tenantId, $empId, (int) $rotation->getKey(), '2026-11-01');
+
+            // 3. Resolve Shifts across the rotation
+            // Day 1 (2026-11-01): Should resolve Morning Shift
+            $resolvedDay1 = $rosterService->resolveShift($tenantId, $empId, '2026-11-01');
+            $this->assertSame('rotation', $resolvedDay1->resolutionSource);
+            $this->assertTrue($resolvedDay1->isWorkingDay);
+            $this->assertSame('MORN-1', $resolvedDay1->shift?->code);
+
+            // Day 6 (2026-11-06): Should resolve Rest Day
+            $resolvedDay6 = $rosterService->resolveShift($tenantId, $empId, '2026-11-06');
+            $this->assertSame('rotation_rest', $resolvedDay6->resolutionSource);
+            $this->assertFalse($resolvedDay6->isWorkingDay);
+            $this->assertTrue($resolvedDay6->isRestDay);
+            $this->assertNull($resolvedDay6->shift);
+
+            // Day 8 (2026-11-08): Should resolve Evening Shift
+            $resolvedDay8 = $rosterService->resolveShift($tenantId, $empId, '2026-11-08');
+            $this->assertSame('rotation', $resolvedDay8->resolutionSource);
+            $this->assertTrue($resolvedDay8->isWorkingDay);
+            $this->assertSame('EVEN-1', $resolvedDay8->shift?->code);
+
+            // 4. Overlapping Shift Assignment Validation
+            $rosterService->assignShift($tenantId, new ShiftAssignmentData(
+                employeeId: $empId,
+                shiftId: (int) $morningShift->getKey(),
+                assignmentType: ShiftAssignmentType::SpecificDate,
+                startDate: '2026-11-20',
+                assignedBy: $user,
+            ));
+
+            // Assigning another specific-date shift on the same date throws InvalidArgumentException
+            try {
+                $rosterService->assignShift($tenantId, new ShiftAssignmentData(
+                    employeeId: $empId,
+                    shiftId: (int) $eveningShift->getKey(),
+                    assignmentType: ShiftAssignmentType::SpecificDate,
+                    startDate: '2026-11-20',
+                    assignedBy: $user,
+                ));
+                $this->fail('Expected InvalidArgumentException on overlapping specific date shift assignment.');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('already has an active specific-date shift assignment', $e->getMessage());
+            }
+
+            // 5. Leave Conflict Validation
+            $leaveType = $leaveService->createLeaveType($tenantId, new LeaveTypeData(
+                code: 'ANNUAL-CONFLICT',
+                name: 'Annual Leave',
+                isPaid: true,
+                organizationUnitId: $organizationId,
+            ));
+
+            $balance = $leaveService->getOrCreateBalance($tenantId, $empId, (int) $leaveType->getKey(), 2026);
+            $balance->update(['accrued_days' => '5.00', 'current_balance' => '5.00']);
+
+            $leaveReq = $leaveService->applyLeave($tenantId, new LeaveRequestData(
+                employeeId: $empId,
+                leaveTypeId: (int) $leaveType->getKey(),
+                startDate: '2026-12-05',
+                endDate: '2026-12-05',
+                totalDays: '1.00',
+                reason: 'Holiday',
+            ));
+            $leaveService->actionLeaveRequest($leaveReq, $user, true);
+
+            // Attempting to assign shift on date of approved leave throws InvalidArgumentException
+            try {
+                $rosterService->assignShift($tenantId, new ShiftAssignmentData(
+                    employeeId: $empId,
+                    shiftId: (int) $morningShift->getKey(),
+                    assignmentType: ShiftAssignmentType::SpecificDate,
+                    startDate: '2026-12-05',
+                    assignedBy: $user,
+                ));
+                $this->fail('Expected InvalidArgumentException when assigning shift on approved leave date.');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('Employee has approved leave', $e->getMessage());
+            }
+        });
+    }
+
     private function employee(int $tenantId, int $organizationId, string $number, int $departmentId): HrEmployee
     {
         return $this->withTenantExecutionContext($tenantId, fn (): HrEmployee => app(EmployeeCreationService::class)->create(new CreateEmployeeData(tenantId: $tenantId, organizationUnitId: $organizationId, employeeNumber: $number, firstName: $number, displayName: $number, departmentId: $departmentId, status: EmployeeStatus::Active)));

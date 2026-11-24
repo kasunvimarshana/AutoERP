@@ -242,3 +242,65 @@ export interface PayrollAdjustment {
     approved_at: string | null;
     created_at?: string;
 }
+
+export type LoanType = 'loan' | 'advance';
+export type LoanStatus = 'draft' | 'approved' | 'active' | 'completed' | 'cancelled';
+export type LoanRepaymentStatus = 'scheduled' | 'deducted' | 'manual_payment' | 'reversed';
+
+export interface PayrollLoanRepayment {
+    id: number;
+    tenant_id: number;
+    payroll_employee_loan_id: number;
+    pay_run_id: number | null;
+    payslip_id: number | null;
+    repayment_date: string;
+    principal_amount: string | number;
+    interest_amount: string | number;
+    total_repaid: string | number;
+    balance_after: string | number;
+    status: LoanRepaymentStatus;
+    notes: string | null;
+    created_at?: string;
+}
+
+export interface PayrollLoan {
+    id: number;
+    tenant_id: number;
+    organization_unit_id: number | null;
+    employee_id: number;
+    employee?: {
+        id: number;
+        employee_number: string;
+        display_name: string;
+        department?: { name: string };
+        designation?: { name: string };
+    };
+    loan_reference: string;
+    loan_type: LoanType;
+    principal_amount: string | number;
+    annual_interest_rate: string | number;
+    term_months: number;
+    monthly_installment: string | number;
+    total_payable: string | number;
+    total_paid: string | number;
+    balance_remaining: string | number;
+    disbursed_date: string | null;
+    deduction_start_period_id: number | null;
+    deduction_start_period?: PayPeriod;
+    status: LoanStatus;
+    approved_by: number | null;
+    approved_at: string | null;
+    notes: string | null;
+    repayments?: PayrollLoanRepayment[];
+    created_at?: string;
+}
+
+export interface PayrollLoanFormState {
+    employee_id: number | '';
+    loan_type: LoanType;
+    principal_amount: string;
+    annual_interest_rate: string;
+    term_months: number;
+    deduction_start_period_id: number | '';
+    notes: string;
+}

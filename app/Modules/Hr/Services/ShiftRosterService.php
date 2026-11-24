@@ -19,12 +19,17 @@ use Modules\Hr\DTOs\ShiftAssignmentData;
 use Modules\Hr\DTOs\ShiftData;
 use Modules\Hr\DTOs\ShiftReallocationData;
 use Modules\Hr\DTOs\ShiftSwapData;
+use Modules\Hr\Enums\LeaveRequestStatus;
 use Modules\Hr\Enums\ShiftAssignmentType;
 use Modules\Hr\Enums\ShiftSwapStatus;
 use Modules\Hr\Models\HrHoliday;
+use Modules\Hr\Models\HrLeaveRequest;
 use Modules\Hr\Models\HrShift;
 use Modules\Hr\Models\HrShiftAssignment;
 use Modules\Hr\Models\HrShiftReallocation;
+use Modules\Hr\Models\HrShiftRotation;
+use Modules\Hr\Models\HrShiftRotationAssignment;
+use Modules\Hr\Models\HrShiftRotationStep;
 use Modules\Hr\Models\HrShiftSwap;
 
 final class ShiftRosterService
@@ -83,6 +88,59 @@ final class ShiftRosterService
 
     public function assignShift(int $tenantId, ShiftAssignmentData $data): HrShiftAssignment
     {
+        // 1. Validate Overlapping Active Shift Assignments
+        if ($data->assignmentType === ShiftAssignmentType::SpecificDate && $data->startDate !== null) {
+            $hasOverlap = HrShiftAssignment::query()
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $data->employeeId)
+                ->where('assignment_type', ShiftAssignmentType::SpecificDate)
+                ->whereDate('start_date', $data->startDate)
+                ->where('is_cancelled', false)
+                ->exists();
+
+            if ($hasOverlap) {
+                throw new InvalidArgumentException(sprintf('Employee already has an active specific-date shift assignment on %s.', $data->startDate));
+            }
+
+            // Check Leave Conflict
+            $hasLeave = HrLeaveRequest::query()
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $data->employeeId)
+                ->whereDate('start_date', '<=', $data->startDate)
+                ->whereDate('end_date', '>=', $data->startDate)
+                ->where('status', LeaveRequestStatus::Approved)
+                ->exists();
+
+            if ($hasLeave) {
+                throw new InvalidArgumentException(sprintf('Cannot assign shift: Employee has approved leave on %s.', $data->startDate));
+            }
+        } elseif ($data->assignmentType === ShiftAssignmentType::DateRange && $data->startDate !== null && $data->endDate !== null) {
+            $hasOverlap = HrShiftAssignment::query()
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $data->employeeId)
+                ->where('assignment_type', ShiftAssignmentType::DateRange)
+                ->whereDate('start_date', '<=', $data->endDate)
+                ->whereDate('end_date', '>=', $data->startDate)
+                ->where('is_cancelled', false)
+                ->exists();
+
+            if ($hasOverlap) {
+                throw new InvalidArgumentException('Employee already has an active overlapping date-range shift assignment.');
+            }
+        } elseif ($data->assignmentType === ShiftAssignmentType::Recurring && $data->dayOfWeek !== null) {
+            $hasOverlap = HrShiftAssignment::query()
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $data->employeeId)
+                ->where('assignment_type', ShiftAssignmentType::Recurring)
+                ->where('day_of_week', $data->dayOfWeek)
+                ->where('is_cancelled', false)
+                ->exists();
+
+            if ($hasOverlap) {
+                throw new InvalidArgumentException(sprintf('Employee already has an active recurring shift assignment for day %d.', $data->dayOfWeek));
+            }
+        }
+
         return HrShiftAssignment::create([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $data->organizationUnitId,
@@ -189,6 +247,44 @@ final class ShiftRosterService
         ]);
     }
 
+    public function createRotation(int $tenantId, array $data): HrShiftRotation
+    {
+        return HrShiftRotation::create([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $data['organization_unit_id'] ?? null,
+            'code' => $data['code'],
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'cycle_days' => (int) ($data['cycle_days'] ?? 7),
+            'status' => $data['status'] ?? 'active',
+        ]);
+    }
+
+    public function addRotationStep(HrShiftRotation $rotation, int $daySequence, ?int $shiftId, ?string $notes = null): HrShiftRotationStep
+    {
+        return HrShiftRotationStep::create([
+            'tenant_id' => $rotation->tenant_id,
+            'organization_unit_id' => $rotation->organization_unit_id,
+            'shift_rotation_id' => $rotation->id,
+            'day_sequence' => $daySequence,
+            'shift_id' => $shiftId,
+            'notes' => $notes,
+        ]);
+    }
+
+    public function assignRotation(int $tenantId, int $employeeId, int $rotationId, string $anchorDate, ?string $endDate = null): HrShiftRotationAssignment
+    {
+        return HrShiftRotationAssignment::create([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'employee_id' => $employeeId,
+            'shift_rotation_id' => $rotationId,
+            'anchor_date' => $anchorDate,
+            'end_date' => $endDate,
+            'is_active' => true,
+        ]);
+    }
+
     public function resolveShift(int $tenantId, int $employeeId, string $civilDate): ResolvedShiftData
     {
         $date = CarbonImmutable::parse($civilDate);
@@ -257,6 +353,50 @@ final class ShiftRosterService
 
         if ($dateRange !== null && $dateRange->shift !== null) {
             return $this->buildResolvedShift($dateRange->shift, $civilDate, 'date_range', $dateRange);
+        }
+
+        // 4b. Check Shift Rotation Assignment
+        $rotationAssignment = HrShiftRotationAssignment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $employeeId)
+            ->where('is_active', true)
+            ->whereDate('anchor_date', '<=', $civilDate)
+            ->where(function ($q) use ($civilDate): void {
+                $q->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $civilDate);
+            })
+            ->with(['rotation.steps.shift'])
+            ->first();
+
+        if ($rotationAssignment !== null && $rotationAssignment->rotation !== null) {
+            $anchor = CarbonImmutable::parse($rotationAssignment->anchor_date);
+            $dayDiff = $anchor->diffInDays($date);
+            $cycleDays = max(1, (int) $rotationAssignment->rotation->cycle_days);
+            $stepSequence = ($dayDiff % $cycleDays) + 1;
+
+            $step = $rotationAssignment->rotation->steps->firstWhere('day_sequence', $stepSequence);
+            if ($step !== null) {
+                if ($step->shift !== null) {
+                    return $this->buildResolvedShift($step->shift, $civilDate, 'rotation');
+                }
+
+                // Scheduled rest day in rotation
+                return new ResolvedShiftData(
+                    shift: null,
+                    shiftDate: $civilDate,
+                    isWorkingDay: false,
+                    isRestDay: true,
+                    isHoliday: false,
+                    holidayName: null,
+                    startTime: null,
+                    endTime: null,
+                    isOvernight: false,
+                    scheduledMinutes: 0,
+                    graceInMinutes: 0,
+                    graceOutMinutes: 0,
+                    resolutionSource: 'rotation_rest',
+                );
+            }
         }
 
         // 5. Check Recurring Weekly Assignment (1=Mon ... 7=Sun)

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Payroll\Http\Controllers\PayrollAdjustmentController;
 use Modules\Payroll\Http\Controllers\PayrollAssignmentController;
 use Modules\Payroll\Http\Controllers\PayrollComponentController;
+use Modules\Payroll\Http\Controllers\PayrollLoanController;
 use Modules\Payroll\Http\Controllers\PayrollPayRunController;
 use Modules\Payroll\Http\Controllers\PayrollPayslipController;
 use Modules\Payroll\Http\Controllers\PayrollPeriodController;
@@ -81,5 +82,14 @@ Route::prefix('api/v1/payroll')->middleware($middleware)->group(function (): voi
     // Adjustments
     Route::get('adjustments', [PayrollAdjustmentController::class, 'index']);
     Route::post('adjustments', [PayrollAdjustmentController::class, 'store']);
+    Route::post('adjustments/calculate-retro-arrears', [PayrollAdjustmentController::class, 'calculateRetroArrears']);
     Route::patch('adjustments/{id}/cancel', [PayrollAdjustmentController::class, 'cancel']);
+
+    // Loans and Advances
+    Route::get('loans', [PayrollLoanController::class, 'index']);
+    Route::post('loans', [PayrollLoanController::class, 'store']);
+    Route::get('loans/{id}', [PayrollLoanController::class, 'show']);
+    Route::post('loans/{id}/approve', [PayrollLoanController::class, 'approve']);
+    Route::post('loans/{id}/disburse', [PayrollLoanController::class, 'disburse']);
+    Route::post('loans/{id}/cancel', [PayrollLoanController::class, 'cancel']);
 });

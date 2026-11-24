@@ -157,3 +157,23 @@ export interface HrCompOffClaim {
     claimed_days: string; reason: string; status: 'pending' | 'approved' | 'rejected' | 'expired' | 'used';
     expiry_date?: string | null; employee?: EmployeeSummary;
 }
+
+// --- Shift Rotations ---
+export interface HrShiftRotationStep {
+    id: number;
+    shift_rotation_id: number;
+    day_sequence: number;
+    shift_id: number | null;
+    shift?: HrShift | null;
+    notes?: string | null;
+}
+
+export interface HrShiftRotation {
+    id: number;
+    code: string;
+    name: string;
+    description?: string | null;
+    cycle_days: number;
+    status: 'active' | 'inactive';
+    steps?: HrShiftRotationStep[];
+}

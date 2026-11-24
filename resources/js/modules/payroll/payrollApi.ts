@@ -13,6 +13,7 @@ import type {
     EmployeeSalaryAssignment,
     PayPeriod,
     PayrollAdjustment,
+    PayrollLoan,
     PayRun,
     Payslip,
     SalaryComponent,
@@ -118,3 +119,29 @@ export const createAdjustment = (payload: Partial<PayrollAdjustment>) =>
 
 export const cancelAdjustment = (id: number) =>
     apiClient.patch<ApiResource<PayrollAdjustment>>(`${endpoints.payrollAdjustments}/${id}/cancel`).then((r) => r.data.data);
+
+// --- Loans & Advances ---
+export const listLoans = (params?: { employee_id?: number; loan_type?: string; status?: string }) =>
+    apiClient.get<ApiResource<{ data: PayrollLoan[] } | PayrollLoan[]>>(endpoints.payrollLoans, { params }).then((r) => {
+        const raw = r.data.data;
+        return Array.isArray(raw) ? raw : (raw as unknown as { data: PayrollLoan[] }).data || [];
+    });
+
+export const getLoan = (id: number) =>
+    apiClient.get<ApiResource<PayrollLoan>>(`${endpoints.payrollLoans}/${id}`).then((r) => r.data.data);
+
+export const createLoan = (payload: Partial<PayrollLoan>) =>
+    apiClient.post<ApiResource<PayrollLoan>>(endpoints.payrollLoans, payload).then((r) => r.data.data);
+
+export const approveLoan = (id: number) =>
+    apiClient.post<ApiResource<PayrollLoan>>(`${endpoints.payrollLoans}/${id}/approve`).then((r) => r.data.data);
+
+export const disburseLoan = (id: number, payload: { disbursed_date: string; deduction_start_period_id?: number }) =>
+    apiClient.post<ApiResource<PayrollLoan>>(`${endpoints.payrollLoans}/${id}/disburse`, payload).then((r) => r.data.data);
+
+export const cancelLoan = (id: number, reason: string) =>
+    apiClient.post<ApiResource<PayrollLoan>>(`${endpoints.payrollLoans}/${id}/cancel`, { reason }).then((r) => r.data.data);
+
+// --- Retroactive Pay ---
+export const calculateRetroArrears = (payload: { employee_id: number; effective_from_date: string; target_pay_period_id: number }) =>
+    apiClient.post<ApiResource<PayrollAdjustment>>(`${endpoints.payrollAdjustments}/calculate-retro-arrears`, payload).then((r) => r.data.data);

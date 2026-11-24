@@ -79,4 +79,6 @@ export const endpoints = {
     payrollPayRuns: '/api/v1/payroll/pay-runs',
     payrollPayslips: '/api/v1/payroll/payslips',
     payrollAdjustments: '/api/v1/payroll/adjustments',
+    payrollLoans: '/api/v1/payroll/loans',
+    hrShiftRotations: '/api/v1/hr/shift-rotations',
 } as const;

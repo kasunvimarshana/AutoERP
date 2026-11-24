@@ -255,6 +255,48 @@ final class PayrollApiTest extends TestCase
         $revResp->assertStatus(200);
         $this->assertSame(PayRunStatus::Reversed->value, $revResp->json('data.status'));
         $this->assertTrue($fakeFinance->reversed);
+
+        // 13. Loan Application, Approval, and Disbursement API
+        $loanResp = $this->withHeaders($headers)->postJson('/api/v1/payroll/loans', [
+            'tenant_id' => $tenantId,
+            'employee_id' => $employee->id,
+            'loan_type' => 'loan',
+            'principal_amount' => 50000,
+            'term_months' => 10,
+            'annual_interest_rate' => 0,
+            'notes' => 'API test loan',
+        ]);
+        $loanResp->assertStatus(201);
+        $loanId = $loanResp->json('data.id');
+        $this->assertSame('draft', $loanResp->json('data.status'));
+
+        // List Loans
+        $listLoansResp = $this->withHeaders($headers)->getJson("/api/v1/payroll/loans?tenant_id={$tenantId}");
+        $listLoansResp->assertStatus(200);
+
+        // Approve Loan
+        $apprLoanResp = $this->withHeaders($headers)->postJson("/api/v1/payroll/loans/{$loanId}/approve", [
+            'tenant_id' => $tenantId,
+        ]);
+        $apprLoanResp->assertStatus(200);
+        $this->assertSame('approved', $apprLoanResp->json('data.status'));
+
+        // Disburse Loan
+        $disbLoanResp = $this->withHeaders($headers)->postJson("/api/v1/payroll/loans/{$loanId}/disburse", [
+            'tenant_id' => $tenantId,
+            'disbursed_date' => '2026-06-01',
+        ]);
+        $disbLoanResp->assertStatus(200);
+        $this->assertSame('active', $disbLoanResp->json('data.status'));
+
+        // 14. Retroactive Arrears API
+        $retroResp = $this->withHeaders($headers)->postJson('/api/v1/payroll/adjustments/calculate-retro-arrears', [
+            'tenant_id' => $tenantId,
+            'employee_id' => $employee->id,
+            'effective_from_date' => '2026-05-01',
+            'target_pay_period_id' => $periodId,
+        ]);
+        $retroResp->assertStatus(200);
     }
 
     private function scope(): array

@@ -17,9 +17,39 @@ use Modules\Payroll\Enums\AdjustmentStatus;
 use Modules\Payroll\Enums\AdjustmentType;
 use Modules\Payroll\Http\Requests\PayrollRequest;
 use Modules\Payroll\Models\PayrollAdjustment;
+use Modules\Payroll\Services\PayrollRetroactivePayService;
 
 final class PayrollAdjustmentController
 {
+    public function calculateRetroArrears(PayrollRequest $request, PayrollRetroactivePayService $retroService): JsonResponse
+    {
+        $validated = $request->validate([
+            'employee_id' => ['required', 'integer'],
+            'effective_from_date' => ['required', 'date'],
+            'target_pay_period_id' => ['required', 'integer'],
+        ]);
+
+        $adjustment = $retroService->calculateSalaryArrears(
+            tenantId: $request->tenantId(),
+            employeeId: (int) $validated['employee_id'],
+            effectiveFromDate: $validated['effective_from_date'],
+            targetPayPeriodId: (int) $validated['target_pay_period_id'],
+            userId: $request->currentUserId() ?? 1,
+        );
+
+        if ($adjustment === null) {
+            return response()->json([
+                'message' => 'No historical salary delta found for the specified effective date.',
+                'data' => null,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Retroactive salary arrears calculated and queued successfully.',
+            'data' => $adjustment->fresh(['employee', 'payPeriod']),
+        ], 201);
+    }
+
     public function index(PayrollRequest $request): JsonResponse
     {
         $tenantId = $request->tenantId();

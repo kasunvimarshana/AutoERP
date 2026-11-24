@@ -46,6 +46,6 @@ final class HrDepartmentService extends HrMasterService
             throw new InvalidArgumentException('Department cannot be its own parent.');
         }
 
-return parent::update($model, $data);
+        return parent::update($model, $data);
     }
 }

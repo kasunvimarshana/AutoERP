@@ -10,6 +10,7 @@ import { rentalNavigationItem } from './rentalNavigation';
 import { inventoryRoutePermissions } from '@/modules/inventory/inventoryPermissions';
 import { voucherViewPermissions } from '@/app/access/voucherRouteEntitlements';
 import { hrNavigationItem } from './hrNavigation';
+import { payrollNavigationItem } from './payrollNavigation';
 import { tenantNavigationSections as baseTenantNavigationSections } from './navigationConfig';
 import type { NavigationItem, NavigationSection } from './navigationTypes';
 import { uomNavigationItem } from './uomNavigation';
@@ -59,6 +60,7 @@ export const tenantWorkspaceNavigationSections: NavigationSection[] = baseTenant
             items: [
                 ...section.items.map(inventoryNavigation),
                 hrNavigationItem,
+                payrollNavigationItem,
                 rentalNavigationItem,
             ],
         };

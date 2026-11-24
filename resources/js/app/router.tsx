@@ -442,6 +442,9 @@ const AttendanceManagementPage = lazy(() => import("@/modules/hr/AttendanceManag
 const LeaveManagementPage = lazy(() => import("@/modules/hr/LeaveManagementPage"));
 const SalaryStructurePage = lazy(() => import("@/modules/payroll/SalaryStructurePage"));
 const PayRunManagementPage = lazy(() => import("@/modules/payroll/PayRunManagementPage"));
+const PayrollLoanManagementPage = lazy(() =>
+    import("@/modules/payroll/PayrollLoanManagementPage").then((m) => ({ default: m.PayrollLoanManagementPage })),
+);
 const EmployeePayslipPage = lazy(() => import("@/modules/payroll/EmployeePayslipPage"));
 const VehicleServiceJobListPage = lazy(
     () => import("@/modules/vehicle-service/pages/VehicleServiceJobListPage"),
@@ -1149,6 +1152,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/payroll/pay-runs"
                             element={<PayRunManagementPage />}
+                        />
+                        <Route
+                            path="/payroll/loans"
+                            element={<PayrollLoanManagementPage />}
                         />
                         <Route
                             path="/payroll/payslips"

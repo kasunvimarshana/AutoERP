@@ -16,11 +16,15 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Modules\Payroll\Enums\AdjustmentStatus;
+use Modules\Payroll\Enums\LoanRepaymentStatus;
 use Modules\Payroll\Enums\PayRunStatus;
 use Modules\Payroll\Enums\PayRunType;
+use Modules\Payroll\Enums\PayslipItemType;
 use Modules\Payroll\Enums\PayslipStatus;
 use Modules\Payroll\Models\PayrollAdjustment;
+use Modules\Payroll\Models\PayrollEmployeeLoan;
 use Modules\Payroll\Models\PayrollEmployeeSalaryAssignment;
+use Modules\Payroll\Models\PayrollLoanRepayment;
 use Modules\Payroll\Models\PayrollPayPeriod;
 use Modules\Payroll\Models\PayrollPayRun;
 use Modules\Payroll\Models\PayrollPayslip;
@@ -31,6 +35,7 @@ final class PayRunExecutionService
     public function __construct(
         private readonly PayrollCalculationEngine $calculationEngine,
         private readonly PayrollJournalPostingService $journalPostingService,
+        private readonly PayrollLoanService $loanService,
     ) {}
 
     public function createPayRun(
@@ -239,7 +244,9 @@ final class PayRunExecutionService
                 ->update(['status' => PayslipStatus::Paid->value]);
 
             // Mark pending adjustments for these employees as applied
-            $payslips = PayrollPayslip::query()->where('pay_run_id', $payRun->id)->get();
+            $payslips = PayrollPayslip::query()->with('items')->where('pay_run_id', $payRun->id)->get();
+            $payoutDate = $payRun->period?->payout_date?->toDateString() ?? now()->toDateString();
+
             foreach ($payslips as $slip) {
                 PayrollAdjustment::query()
                     ->where('tenant_id', $payRun->tenant_id)
@@ -253,6 +260,23 @@ final class PayRunExecutionService
                         'status' => AdjustmentStatus::Applied->value,
                         'applied_payslip_id' => $slip->id,
                     ]);
+
+                // Record Loan and Salary Advance Deductions
+                foreach ($slip->items as $item) {
+                    if (
+                        $item->item_type === PayslipItemType::Deduction
+                        && in_array($item->item_code, ['LOAN_REPAYMENT', 'SALARY_ADVANCE_RECOVERY'], true)
+                    ) {
+                        // Extract loan id from calculation_basis (Format: "Loan #<id> (<ref>) installment...")
+                        if (preg_match('/Loan #(\d+)/', (string) $item->calculation_basis, $matches)) {
+                            $loanId = (int) $matches[1];
+                            $loan = PayrollEmployeeLoan::query()->where('tenant_id', $payRun->tenant_id)->find($loanId);
+                            if ($loan !== null) {
+                                $this->loanService->recordDeduction($loan, (string) $item->amount, (int) $payRun->id, (int) $slip->id, $payoutDate);
+                            }
+                        }
+                    }
+                }
             }
 
             $payRun->update([
@@ -280,6 +304,16 @@ final class PayRunExecutionService
             if ($payRun->finance_journal_id !== null) {
                 $reversalDate = now()->toDateString();
                 $this->journalPostingService->reversePayRun($payRun, $reversalDate, $userId, $reason);
+            }
+
+            // Reverse loan repayments deducted in this pay run
+            $repayments = PayrollLoanRepayment::query()
+                ->where('pay_run_id', $payRun->id)
+                ->where('status', LoanRepaymentStatus::Deducted)
+                ->get();
+
+            foreach ($repayments as $repayment) {
+                $this->loanService->reverseRepayment($repayment, 'Pay run '.$payRun->pay_run_number.' reversed: '.$reason);
             }
 
             // Reset applied adjustments back to pending

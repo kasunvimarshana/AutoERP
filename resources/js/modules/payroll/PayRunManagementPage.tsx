@@ -7,9 +7,12 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { EmployeeLookupSelect } from '@/modules/hr/components/EmployeeLookupSelect';
+import type { EmployeeSummary } from '@/modules/hr/hrTypes';
 import {
     approvePayRun,
     calculatePayRun,
+    calculateRetroArrears,
     createPayPeriod,
     createPayRun,
     listPayPeriods,
@@ -42,6 +45,13 @@ export default function PayRunManagementPage() {
     // Reversal Modal
     const [reversalTarget, setReversalTarget] = useState<PayRun | null>(null);
     const [reversalReason, setReversalReason] = useState('');
+
+    // Retro Arrears Modal
+    const [showRetroModal, setShowRetroModal] = useState(false);
+    const [retroEmployee, setRetroEmployee] = useState<EmployeeSummary | null>(null);
+    const [retroEffectiveDate, setRetroEffectiveDate] = useState('');
+    const [retroTargetPeriodId, setRetroTargetPeriodId] = useState<number | ''>('');
+    const [retroSuccessMsg, setRetroSuccessMsg] = useState<string | null>(null);
 
     const loadData = useCallback(() => {
         Promise.all([listPayPeriods(), listPayRuns()])
@@ -168,6 +178,33 @@ export default function PayRunManagementPage() {
         }
     };
 
+    const handleCalculateRetro = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!retroEmployee || !retroEffectiveDate || !retroTargetPeriodId) return;
+        setActionLoading(true);
+        setErrorMsg(null);
+        setRetroSuccessMsg(null);
+        try {
+            await calculateRetroArrears({
+                employee_id: retroEmployee.id,
+                effective_from_date: retroEffectiveDate,
+                target_pay_period_id: Number(retroTargetPeriodId),
+            });
+            setRetroSuccessMsg('Retroactive arrears calculated and queued as adjustment successfully.');
+            setTimeout(() => {
+                setShowRetroModal(false);
+                setRetroSuccessMsg(null);
+                setRetroEmployee(null);
+                setRetroEffectiveDate('');
+            }, 1800);
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { message?: string } }; message?: string };
+            setErrorMsg(error.response?.data?.message || error.message || 'Retro calculation failed.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const filteredRuns = selectedPeriodId
         ? payRuns.filter((r) => r.pay_period_id === Number(selectedPeriodId))
         : payRuns;
@@ -205,6 +242,13 @@ export default function PayRunManagementPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowRetroModal(true)}
+                        className="rounded-md border border-purple-300 bg-purple-50 px-3.5 py-2 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
+                    >
+                        + Retro Arrears
+                    </button>
                     <button
                         type="button"
                         onClick={() => setShowPeriodModal(true)}
@@ -540,6 +584,80 @@ export default function PayRunManagementPage() {
                                     className="rounded bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-50"
                                 >
                                     Confirm Reversal
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Retroactive Arrears Calculation Modal */}
+            {showRetroModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-800">
+                        <div className="flex items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-700">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Calculate Retroactive Arrears</h2>
+                            <button onClick={() => setShowRetroModal(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+                        </div>
+
+                        {retroSuccessMsg && (
+                            <div className="mt-3 rounded-md bg-green-50 p-3 text-sm text-green-700 dark:bg-green-950/40 dark:text-green-300">
+                                {retroSuccessMsg}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleCalculateRetro} className="mt-4 space-y-4">
+                            <div>
+                                <EmployeeLookupSelect
+                                    label="Employee"
+                                    value={retroEmployee}
+                                    onChange={setRetroEmployee}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Backdated Effective Date</label>
+                                <input
+                                    type="date"
+                                    required
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    value={retroEffectiveDate}
+                                    onChange={(e) => setRetroEffectiveDate(e.target.value)}
+                                />
+                                <p className="mt-1 text-xs text-gray-500">Historical date from which the new salary level is effective.</p>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Target Pay Period (For Payout)</label>
+                                <select
+                                    required
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    value={retroTargetPeriodId}
+                                    onChange={(e) => setRetroTargetPeriodId(e.target.value ? Number(e.target.value) : '')}
+                                >
+                                    <option value="">-- Select Target Period --</option>
+                                    {periods.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name} ({p.period_start} to {p.period_end})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-end gap-3 border-t border-gray-200 pt-3 dark:border-gray-700">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRetroModal(false)}
+                                    className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={actionLoading || !retroEmployee || !retroEffectiveDate || !retroTargetPeriodId}
+                                    className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-700 disabled:opacity-50"
+                                >
+                                    {actionLoading ? 'Calculating...' : 'Compute Arrears'}
                                 </button>
                             </div>
                         </form>
