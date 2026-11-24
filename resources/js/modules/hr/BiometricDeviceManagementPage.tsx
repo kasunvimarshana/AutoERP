@@ -121,9 +121,10 @@ export default function BiometricDeviceManagementPage() {
     }, [protocolFilter, statusFilter, searchFilter]);
 
     useEffect(() => {
-        if (canView) {
-            loadDevices();
-        }
+        if (!canView) return;
+        queueMicrotask(() => {
+            void loadDevices();
+        });
     }, [canView, loadDevices]);
 
     if (!canView) {
