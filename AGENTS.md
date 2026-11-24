@@ -35,6 +35,10 @@
 - Every write mutation must be atomic, conflict-aware, and version-checked (`expected_version` / `row_version`).
 - Store every transaction with its original values and never modify historical financial or operational ledger records in place.
 - All adjustments, corrections, or reversals must be recorded as separate, linked audit records to preserve complete audit trails and accurate historical reporting.
+- **Dual-Timestamp Architecture & Safe Backdated CRUD**:
+  - Maintain a strict architectural separation between physical recording timestamps (`created_at`, `posted_at`, `reversed_at`, `updated_at`, `deleted_at`) and civil operational business dates (`invoice_date`, `movement_date`, `received_date`, `layer_date`, `payment_date`, `journal_date`).
+  - Physical ingestion timestamps (`created_at`) are authoritative server-owned audit facts and must never be overridden or modified by client inputs.
+  - Backdated transactions must preserve chronological downstream consistency: project running balances across subsequent movements, verify that backdated issues do not create intermediate negative stock across subsequent dates, validate reversal dates against business posting dates rather than physical wall-clock timestamps, and map tax transactions to operational business dates.
 
 ## 7. Database Architecture & Explicit Migrations
 - Use portable Laravel migration APIs.

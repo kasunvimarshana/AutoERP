@@ -1829,7 +1829,7 @@ final class TwoStageInvoicingService
         foreach ($initialAllocations as $alloc) {
             $payment = Payment::query()->where('tenant_id', $context->tenantId)->lockForUpdate()->find($alloc->payment_id);
             if ($payment) {
-                $reversalDate = now()->toDateString();
+                $reversalDate = $finalInvoice->invoice_date?->toDateString() ?? now()->toDateString();
                 if ($alloc->allocation_date && $reversalDate < $alloc->allocation_date->toDateString()) {
                     $reversalDate = $alloc->allocation_date->toDateString();
                 }

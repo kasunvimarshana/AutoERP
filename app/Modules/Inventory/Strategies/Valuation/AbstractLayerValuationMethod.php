@@ -36,6 +36,7 @@ abstract class AbstractLayerValuationMethod implements ValuationMethodInterface
 
         InventoryValuationLayer::query()->create([
             ...$this->layerScope($movement),
+            'layer_date' => $movement->movement_date,
             'base_uom_id' => $movement->base_uom_id,
             'source_type' => $movement->source_type,
             'source_id' => $movement->source_id,
@@ -100,7 +101,7 @@ abstract class AbstractLayerValuationMethod implements ValuationMethodInterface
             $query->where($column, $movement->{$column});
         }
 
-        return $query->orderBy('created_at')->orderBy('id');
+        return $query->orderBy('layer_date')->orderBy('created_at')->orderBy('id');
     }
 
     /**

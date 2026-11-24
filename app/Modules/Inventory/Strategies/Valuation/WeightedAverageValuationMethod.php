@@ -38,6 +38,7 @@ final class WeightedAverageValuationMethod implements ValuationMethodInterface
         if (! $layer instanceof InventoryValuationLayer) {
             $layer = InventoryValuationLayer::query()->create([
                 ...$this->scope($movement),
+                'layer_date' => $movement->movement_date,
                 'base_uom_id' => $movement->base_uom_id,
                 'source_type' => $movement->source_type,
                 'source_id' => $movement->source_id,

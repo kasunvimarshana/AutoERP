@@ -46,14 +46,15 @@ abstract class InventoryTestCase extends TestCase
         int $warehouseId,
         Item $item,
         string $quantity,
-        string $unitCost,
+        string $unitCost = '0.000000',
         ?int $batchId = null,
         ?int $serialId = null,
         ?int $warehouseLocationId = null,
+        ?string $movementDate = null,
     ): InventoryMovement {
         return $this->withTenantExecutionContext($tenantId, fn (): InventoryMovement => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
-            movementDate: '2026-06-06',
+            movementDate: $movementDate ?? (\Illuminate\Support\Carbon::hasTestNow() ? now()->toDateString() : '2026-06-06'),
             movementType: InventoryMovementType::Receipt,
             direction: InventoryDirection::In,
             itemId: (int) $item->getKey(),

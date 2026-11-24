@@ -127,17 +127,25 @@ final class PurchaseInventoryIntegrationService
     public function reverseReceiptBatchAllocation(
         GoodsReceiptNoteLineBatchAllocation $allocation,
         ?int $reversedBy = null,
+        ?string $reversalDate = null,
     ): void {
-        $allocation->loadMissing('inventoryMovement');
+        $allocation->loadMissing(['inventoryMovement', 'goodsReceiptNoteLine.goodsReceiptNote']);
         if (! $allocation->inventoryMovement instanceof InventoryMovement) {
             throw new \InvalidArgumentException('Posted batch allocation inventory movement was not found.');
         }
 
-        $this->inventory->reverse($allocation->inventoryMovement, $reversedBy);
+        $effectiveDate = $reversalDate
+            ?? $allocation->goodsReceiptNoteLine?->goodsReceiptNote?->received_date?->toDateString();
+
+        $this->inventory->reverse($allocation->inventoryMovement, $reversedBy, reversalDate: $effectiveDate);
     }
 
-    public function reverseReceipt(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line, ?int $postedBy = null): ?InventoryMovement
-    {
+    public function reverseReceipt(
+        GoodsReceiptNote $grn,
+        GoodsReceiptNoteLine $line,
+        ?int $postedBy = null,
+        ?string $reversalDate = null,
+    ): ?InventoryMovement {
         if ($this->math->isZero((string) $line->accepted_quantity)) {
             return null;
         }
@@ -146,14 +154,16 @@ final class PurchaseInventoryIntegrationService
             return null;
         }
 
+        $effectiveDate = $reversalDate ?? $grn->received_date->toDateString();
+
         $line->loadMissing('inventoryMovement');
         if ($line->inventoryMovement instanceof InventoryMovement) {
-            return $this->inventory->reverse($line->inventoryMovement, $postedBy);
+            return $this->inventory->reverse($line->inventoryMovement, $postedBy, reversalDate: $effectiveDate);
         }
 
         return $this->inventory->issue(new StockMovementData(
             tenantId: (int) $grn->tenant_id,
-            movementDate: now()->toDateString(),
+            movementDate: $effectiveDate,
             movementType: InventoryMovementType::ReturnOut,
             direction: InventoryDirection::Out,
             itemId: (int) $line->item_id,

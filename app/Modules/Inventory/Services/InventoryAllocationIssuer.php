@@ -33,9 +33,13 @@ final class InventoryAllocationIssuer
         private readonly StockMovementService $movements,
     ) {}
 
-    public function issue(InventoryAllocation $allocation, ?string $quantity = null, ?int $issuedBy = null): InventoryAllocation
-    {
-        return DB::transaction(function () use ($allocation, $quantity, $issuedBy): InventoryAllocation {
+    public function issue(
+        InventoryAllocation $allocation,
+        ?string $quantity = null,
+        ?int $issuedBy = null,
+        ?string $movementDate = null,
+    ): InventoryAllocation {
+        return DB::transaction(function () use ($allocation, $quantity, $issuedBy, $movementDate): InventoryAllocation {
             $allocation = InventoryAllocation::query()
                 ->with('lines.stockBalance')
                 ->lockForUpdate()
@@ -44,6 +48,7 @@ final class InventoryAllocationIssuer
                 throw new InvalidArgumentException('Only active inventory allocations can be issued.');
             }
 
+            $effectiveDate = $movementDate ?? $allocation->allocation_date?->toDateString() ?? now()->toDateString();
             $issueQuantity = $this->operationQuantity($quantity, (string) $allocation->quantity_remaining);
             $remaining = $issueQuantity;
             foreach ($allocation->lines as $line) {
@@ -61,7 +66,7 @@ final class InventoryAllocationIssuer
                 $this->balances->releaseAllocated($balance, $take);
                 $movement = $this->movements->record(new StockMovementData(
                     tenantId: (int) $allocation->tenant_id,
-                    movementDate: now()->toDateString(),
+                    movementDate: $effectiveDate,
                     movementType: InventoryMovementType::Issue,
                     direction: InventoryDirection::Out,
                     itemId: (int) $allocation->item_id,

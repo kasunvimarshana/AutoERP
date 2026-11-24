@@ -44,7 +44,7 @@ final class GoodsReceiptNoteTaxDocumentMapper
             sourceId: (int) $goodsReceipt->getKey(),
             sourceNumber: (string) $goodsReceipt->grn_number,
             sourceDate: $goodsReceipt->received_date->toDateString(),
-            transactionDate: $goodsReceipt->posted_at?->toDateString() ?? $goodsReceipt->received_date->toDateString(),
+            transactionDate: $goodsReceipt->received_date->toDateString(),
             partyType: $goodsReceipt->supplier_id === null ? null : 'supplier',
             partyId: $goodsReceipt->supplier_id === null ? null : (int) $goodsReceipt->supplier_id,
             lines: $lines,

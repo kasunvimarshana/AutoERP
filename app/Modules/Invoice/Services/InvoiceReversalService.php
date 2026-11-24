@@ -54,7 +54,7 @@ final class InvoiceReversalService
         $this->assertDate($reversalDate);
 
         return DB::transaction(function () use ($invoice, $expectedVersion, $reversalDate, $reason, $actorId): Invoice {
-            $invoice = Invoice::query()->lockForUpdate()->findOrFail($invoice->getKey());
+            $invoice = Invoice::query()->with('postingPlan')->lockForUpdate()->findOrFail($invoice->getKey());
             if ((int) $invoice->row_version !== $expectedVersion) {
                 throw new InvalidArgumentException(
                     'Invoice was changed by another request. Reload it before performing this action.',
@@ -80,7 +80,7 @@ final class InvoiceReversalService
             if ($reversalDate < $invoiceDate) {
                 throw new InvalidArgumentException('Invoice reversal date cannot be before the invoice date.');
             }
-            $postingDate = $invoice->posted_at?->toDateString() ?? $invoiceDate;
+            $postingDate = $invoice->postingPlan?->posting_date?->toDateString() ?? $invoiceDate;
             if ($reversalDate < $postingDate) {
                 throw new InvalidArgumentException('Invoice reversal date cannot be before the posting date.');
             }

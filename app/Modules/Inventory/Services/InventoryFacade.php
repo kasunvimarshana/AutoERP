@@ -112,13 +112,16 @@ final class InventoryFacade
         InventoryMovement $movement,
         ?int $reversedBy = null,
         ?string $reason = null,
+        ?string $reversalDate = null,
     ): InventoryMovement {
-        return $this->movements->reverse($movement, $reversedBy, $reason);
+        return $this->movements->reverse($movement, $reversedBy, $reason, $reversalDate);
     }
 
     public function reverse(
         InventoryMovement|InventoryAdjustment|InventoryTransfer $record,
         ?int $reversedBy = null,
+        ?string $reason = null,
+        ?string $reversalDate = null,
     ): InventoryMovement|InventoryAdjustment|InventoryTransfer {
         if ($record instanceof InventoryAdjustment) {
             return $this->adjustments->reverse($record, $reversedBy);
@@ -127,6 +130,6 @@ final class InventoryFacade
             return $this->transfers->reverse($record, $reversedBy);
         }
 
-        return $this->movements->reverse($record, $reversedBy);
+        return $this->movements->reverse($record, $reversedBy, $reason, $reversalDate);
     }
 }

@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Services\ItemAuthorizationService;
+use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class ItemBaseUomTest extends TestCase
@@ -75,6 +79,7 @@ final class ItemBaseUomTest extends TestCase
             'item_id' => $itemId,
             'base_uom_id' => $oldUomId,
             'warehouse_id' => $warehouseId,
+            'layer_date' => now()->toDateString(),
             'valuation_method' => 'fifo',
             'original_quantity' => '12.345678',
             'remaining_quantity' => '12.345678',
@@ -614,8 +619,8 @@ final class ItemBaseUomTest extends TestCase
             'activated_at' => $now,
             'created_at' => $now,
             'updated_at' => $now]);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        ActiveTenantSubscriptionFixture::create($tenantId);
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main',
             'code' => 'MAIN',
@@ -626,7 +631,7 @@ final class ItemBaseUomTest extends TestCase
             'updated_at' => $now,
         ]);
         $email ??= strtolower($code).'@example.test';
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'UOM',
             'last_name' => 'Tester',
@@ -675,7 +680,7 @@ final class ItemBaseUomTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,

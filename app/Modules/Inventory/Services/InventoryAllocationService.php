@@ -30,9 +30,13 @@ final class InventoryAllocationService
         return $this->creator->allocate($data);
     }
 
-    public function issue(InventoryAllocation $allocation, ?string $quantity = null, ?int $issuedBy = null): InventoryAllocation
-    {
-        return $this->issuer->issue($allocation, $quantity, $issuedBy);
+    public function issue(
+        InventoryAllocation $allocation,
+        ?string $quantity = null,
+        ?int $issuedBy = null,
+        ?string $movementDate = null,
+    ): InventoryAllocation {
+        return $this->issuer->issue($allocation, $quantity, $issuedBy, $movementDate);
     }
 
     public function release(InventoryAllocation $allocation, ?string $quantity = null, ?int $releasedBy = null): InventoryAllocation

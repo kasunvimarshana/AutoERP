@@ -43,6 +43,7 @@ final class InventoryValuationLayer extends TenantOwnedModel
             'source_id' => 'integer',
             'source_line_id' => 'integer',
             'movement_id' => 'integer',
+            'layer_date' => 'date',
             'valuation_method' => ValuationMethod::class,
             'original_quantity' => 'decimal:6',
             'remaining_quantity' => 'decimal:6',

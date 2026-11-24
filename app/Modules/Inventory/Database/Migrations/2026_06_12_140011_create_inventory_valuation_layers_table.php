@@ -33,6 +33,7 @@ return new class extends Migration
             $table->string('source_line_type')->nullable();
             $table->unsignedBigInteger('source_line_id')->nullable();
             $table->foreignId('movement_id')->nullable();
+            $table->date('layer_date');
             $table->string('valuation_method', 40);
             $table->decimal('original_quantity', 20, 6);
             $table->decimal('remaining_quantity', 20, 6);
@@ -48,6 +49,7 @@ return new class extends Migration
             $table->index(['source_type', 'source_id'], 'inventory_valuation_layers_source_ix');
             $table->index(['source_line_type', 'source_line_id'], 'inventory_valuation_layers_source_line_ix');
             $table->index('movement_id', 'inventory_valuation_layers_movement_ix');
+            $table->index('layer_date', 'inventory_valuation_layers_layer_date_ix');
             $table->index('status', 'inventory_valuation_layers_status_ix');
 
             $table->unique(['id', 'tenant_id'], 'inventory_valuation_layers_id_tenant_uk');

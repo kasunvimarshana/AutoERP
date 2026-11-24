@@ -42,9 +42,13 @@ final class StockMovementService
         return $this->poster->post($movement, $postedBy);
     }
 
-    public function reverse(InventoryMovement $movement, ?int $reversedBy = null, ?string $reason = null): InventoryMovement
-    {
-        return $this->reversals->reverse($movement, $reversedBy, $reason);
+    public function reverse(
+        InventoryMovement $movement,
+        ?int $reversedBy = null,
+        ?string $reason = null,
+        ?string $reversalDate = null,
+    ): InventoryMovement {
+        return $this->reversals->reverse($movement, $reversedBy, $reason, $reversalDate);
     }
 
     public function result(InventoryMovement $movement): StockPostingResult

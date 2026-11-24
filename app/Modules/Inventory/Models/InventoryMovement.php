@@ -57,7 +57,38 @@ final class InventoryMovement extends TenantOwnedModel
                 && $newStatus === InventoryStatus::Reversed
                 && ! $model->isDirty(['tenant_id', 'item_id', 'warehouse_id', 'quantity', 'direction', 'movement_type', 'total_cost', 'unit_cost', 'balance_quantity_after', 'balance_value_after']);
 
-            if (! $isPosting && ! $isLinkingReversal && ! $isReversing) {
+            $isUpdatingRunningBalance = in_array($originalStatus, [InventoryStatus::Posted, InventoryStatus::Reversed], true)
+                && in_array($newStatus, [InventoryStatus::Posted, InventoryStatus::Reversed], true)
+                && $originalStatus === $newStatus
+                && ! $model->isDirty([
+                    'tenant_id',
+                    'organization_unit_id',
+                    'item_id',
+                    'warehouse_id',
+                    'warehouse_location_id',
+                    'item_variant_id',
+                    'batch_id',
+                    'serial_number_id',
+                    'base_uom_id',
+                    'entered_uom_id',
+                    'entered_quantity',
+                    'entered_unit_cost',
+                    'conversion_factor',
+                    'quantity',
+                    'direction',
+                    'movement_type',
+                    'unit_cost',
+                    'total_cost',
+                    'movement_date',
+                    'status',
+                    'from_state',
+                    'to_state',
+                    'posted_at',
+                    'reversed_at',
+                    'reversal_of_id',
+                ]);
+
+            if (! $isPosting && ! $isLinkingReversal && ! $isReversing && ! $isUpdatingRunningBalance) {
                 throw new LogicException('InventoryMovement is an immutable ledger and cannot be updated.');
             }
         });

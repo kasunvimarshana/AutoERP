@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Services;
 
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
@@ -52,6 +53,7 @@ final class AgingReportService
         ?string $asOfDate = null,
     ): array {
         $asOf = Carbon::parse($asOfDate ?: now()->toDateString())->startOfDay();
+        $asOfDateStr = $asOf->toDateString();
         $buckets = [
             'current' => '0.000000',
             '1_30' => '0.000000',
@@ -61,13 +63,73 @@ final class AgingReportService
         ];
         $rows = [];
 
+        $paymentReversals = DB::table('finance_journal_entries as original')
+            ->join('finance_journal_entries as reversal', function (JoinClause $join): void {
+                $join->on('reversal.reversal_of_id', '=', 'original.id')
+                    ->on('reversal.tenant_id', '=', 'original.tenant_id');
+            })
+            ->where('original.tenant_id', $tenantId)
+            ->where('original.source_module', 'payment')
+            ->where('original.source_type', 'payment_allocation')
+            ->whereNull('original.reversal_of_id')
+            ->select('original.source_id as allocation_id')
+            ->selectRaw('MIN(reversal.journal_date) as reversal_date')
+            ->groupBy('original.source_id');
+
+        $allocationsByInvoice = DB::table('payment_allocations as allocations')
+            ->leftJoinSub($paymentReversals, 'payment_reversals', 'payment_reversals.allocation_id', '=', 'allocations.id')
+            ->where('allocations.tenant_id', $tenantId)
+            ->whereDate('allocations.allocation_date', '<=', $asOfDateStr)
+            ->where(function ($q) use ($asOfDateStr): void {
+                $q->where('allocations.status', 'active')
+                    ->orWhere(function ($q2) use ($asOfDateStr): void {
+                        $q2->where('allocations.status', 'reversed')
+                            ->where(function ($q3) use ($asOfDateStr): void {
+                                $q3->where('payment_reversals.reversal_date', '>', $asOfDateStr)
+                                    ->orWhere(function ($q4) use ($asOfDateStr): void {
+                                        $q4->whereNull('payment_reversals.reversal_date')
+                                            ->whereDate('allocations.updated_at', '>', $asOfDateStr);
+                                    });
+                            });
+                    });
+            })
+            ->groupBy('allocations.invoice_id')
+            ->select('allocations.invoice_id', DB::raw('SUM(allocations.allocated_amount) as total_paid'))
+            ->pluck('total_paid', 'allocations.invoice_id');
+
+        $creditsByInvoice = DB::table('invoice_credit_allocations')
+            ->where('tenant_id', $tenantId)
+            ->whereDate('created_at', '<=', $asOfDateStr)
+            ->groupBy('invoice_id')
+            ->select('invoice_id', DB::raw('SUM(allocated_amount) as total_credit'))
+            ->pluck('total_credit', 'invoice_id');
+
+        $adjustmentsByInvoice = DB::table('invoice_adjustment_allocations')
+            ->where('tenant_id', $tenantId)
+            ->whereDate('created_at', '<=', $asOfDateStr)
+            ->groupBy('invoice_id')
+            ->select('invoice_id', DB::raw('SUM(allocated_amount) as total_adj'))
+            ->pluck('total_adj', 'invoice_id');
+
+        $invoiceReversals = DB::table('finance_journal_entries as original')
+            ->join('finance_journal_entries as reversal', function (JoinClause $join): void {
+                $join->on('reversal.reversal_of_id', '=', 'original.id')
+                    ->on('reversal.tenant_id', '=', 'original.tenant_id');
+            })
+            ->where('original.tenant_id', $tenantId)
+            ->where('original.source_module', 'invoice')
+            ->where('original.source_type', 'invoice')
+            ->whereNull('original.reversal_of_id')
+            ->select('original.source_id as invoice_id', DB::raw('MIN(reversal.journal_date) as reversal_date'))
+            ->groupBy('original.source_id')
+            ->pluck('reversal_date', 'invoice_id');
+
         $query = DB::table('invoice_balances')
             ->join('invoices', 'invoices.id', '=', 'invoice_balances.invoice_id')
             ->where('invoice_balances.tenant_id', $tenantId)
             ->where('invoices.direction', $direction)
             ->whereNotIn('invoices.status', ['cancelled', 'void'])
-            ->where('invoice_balances.remaining_amount', '>', '0')
-            ->whereDate('invoices.invoice_date', '<=', $asOf->toDateString())
+            ->whereDate('invoices.invoice_date', '<=', $asOfDateStr)
             ->select([
                 'invoice_balances.invoice_id',
                 'invoice_balances.invoice_total',
@@ -80,6 +142,8 @@ final class AgingReportService
                 'invoices.due_date',
                 'invoices.party_type',
                 'invoices.party_id',
+                'invoices.status as invoice_status',
+                'invoices.updated_at as invoice_updated_at',
             ])
             ->orderBy('invoices.due_date')
             ->orderBy('invoices.invoice_number');
@@ -89,7 +153,27 @@ final class AgingReportService
             : $query->where('invoice_balances.organization_unit_id', $organizationUnitId);
 
         foreach ($query->get() as $row) {
-            $remaining = $this->math->normalize((string) $row->remaining_amount);
+            if ($row->invoice_status === 'reversed') {
+                $reversalDate = $invoiceReversals[$row->invoice_id]
+                    ?? Carbon::parse($row->invoice_updated_at)->toDateString();
+                if ($reversalDate <= $asOfDateStr) {
+                    continue;
+                }
+            }
+
+            $paidAmount = $this->math->normalize((string) ($allocationsByInvoice[$row->invoice_id] ?? '0.000000'));
+            $creditAmount = $this->math->normalize($this->math->add(
+                (string) ($creditsByInvoice[$row->invoice_id] ?? '0.000000'),
+                (string) ($adjustmentsByInvoice[$row->invoice_id] ?? '0.000000'),
+            ));
+            $settled = $this->math->add($paidAmount, $creditAmount);
+            $invoiceTotal = $this->math->normalize((string) $row->invoice_total);
+            $remaining = $this->math->sub($invoiceTotal, $settled);
+
+            if ($this->math->compare($remaining, '0.000000') <= 0) {
+                continue;
+            }
+
             $dueDate = Carbon::parse($row->due_date ?: $row->invoice_date)->startOfDay();
             $daysOverdue = $dueDate->greaterThanOrEqualTo($asOf)
                 ? 0
@@ -104,9 +188,9 @@ final class AgingReportService
                 'due_date' => $dueDate->toDateString(),
                 'party_type' => $row->party_type,
                 'party_id' => $row->party_id,
-                'invoice_total' => (string) $row->invoice_total,
-                'paid_amount' => (string) $row->paid_amount,
-                'credit_allocated_amount' => (string) $row->credit_allocated_amount,
+                'invoice_total' => $invoiceTotal,
+                'paid_amount' => $paidAmount,
+                'credit_allocated_amount' => $creditAmount,
                 'remaining_amount' => $remaining,
                 'status' => (string) $row->status,
                 'days_overdue' => $daysOverdue,

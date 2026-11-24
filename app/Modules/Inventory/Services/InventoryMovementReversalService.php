@@ -38,9 +38,9 @@ final class InventoryMovementReversalService
         private readonly InventoryMovementPoster $poster,
     ) {}
 
-    public function reverse(InventoryMovement $movement, ?int $reversedBy = null, ?string $reason = null): InventoryMovement
+    public function reverse(InventoryMovement $movement, ?int $reversedBy = null, ?string $reason = null, ?string $reversalDate = null): InventoryMovement
     {
-        return DB::transaction(function () use ($movement, $reversedBy, $reason): InventoryMovement {
+        return DB::transaction(function () use ($movement, $reversedBy, $reason, $reversalDate): InventoryMovement {
             $movement = InventoryMovement::query()->lockForUpdate()->findOrFail($movement->getKey());
             if ($movement->status !== InventoryStatus::Posted) {
                 throw new InvalidArgumentException('Only posted inventory movements can be reversed.');
@@ -52,12 +52,17 @@ final class InventoryMovementReversalService
                 throw new InvalidArgumentException('Inventory movement already has a reversal.');
             }
 
+            $effectiveDate = $reversalDate ?? now()->toDateString();
+            if ($reversalDate !== null && $reversalDate < $movement->movement_date?->toDateString()) {
+                throw new InvalidArgumentException('Inventory reversal date cannot be before original movement date.');
+            }
+
             $direction = $movement->direction === InventoryDirection::In ? InventoryDirection::Out : InventoryDirection::In;
             $type = $direction === InventoryDirection::In ? InventoryMovementType::AdjustmentIn : InventoryMovementType::AdjustmentOut;
             [$reversalQuantity, $reversalUnitCost] = $this->reversalBasis($movement);
             $reversal = $this->recorder->create(new StockMovementData(
                 tenantId: (int) $movement->tenant_id,
-                movementDate: now()->toDateString(),
+                movementDate: $effectiveDate,
                 movementType: $type,
                 direction: $direction,
                 itemId: (int) $movement->item_id,

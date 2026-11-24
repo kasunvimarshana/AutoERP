@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Services;
 
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\InventoryStockState;
 use Modules\Inventory\Models\InventoryMovement;
@@ -33,8 +35,12 @@ final class InventoryStockStateService
         ?int $sourceLineId = null,
         ?string $description = null,
         ?int $userId = null,
+        ?DateTimeInterface $occurredAt = null,
     ): InventoryStockStateChange {
         $quantity = $this->math->normalize($quantity);
+        $occurredAt ??= $record instanceof InventoryMovement && $record->movement_date !== null
+            ? CarbonImmutable::parse($record->movement_date)->startOfDay()
+            : now();
 
         return InventoryStockStateChange::query()->create([
             'tenant_id' => $record->tenant_id,
@@ -55,7 +61,7 @@ final class InventoryStockStateService
             'source_line_id' => $sourceLineId,
             'description' => $description,
             'created_by' => $userId,
-            'occurred_at' => now(),
+            'occurred_at' => $occurredAt,
         ]);
     }
 }

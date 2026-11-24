@@ -37,15 +37,6 @@ final class PaymentCashReceiptDatePolicy
 
     public function assertCanPost(Payment $payment, ?int $postedBy): void
     {
-        if ($postedBy === null || $payment->direction !== PaymentDirection::Inbound) {
-            return;
-        }
-
-        $hasCash = $payment->lines->contains(fn (PaymentLine $line): bool => (string) $line->payment_method_type_snapshot === PaymentMethodType::Cash->value);
-        if (! $hasCash) {
-            return;
-        }
-
         $today = $this->timezoneResolver !== null
             ? $this->timezoneResolver->todayDateString((int) $payment->tenant_id, $payment->organization_unit_id)
             : CarbonImmutable::now(
@@ -56,9 +47,21 @@ final class PaymentCashReceiptDatePolicy
                 ) ?: config('app.timezone', 'UTC'))
             )->toDateString();
         $paymentDate = $payment->payment_date->toDateString();
+
+        $direction = $payment->direction instanceof PaymentDirection
+            ? $payment->direction
+            : PaymentDirection::tryFrom((string) $payment->direction);
+        $hasCash = $payment->lines->contains(fn (PaymentLine $line): bool => (string) $line->payment_method_type_snapshot === PaymentMethodType::Cash->value);
+        $isCashReceipt = $direction === PaymentDirection::Inbound && $hasCash;
+
         if ($paymentDate > $today) {
-            throw new InvalidArgumentException('Cash receipt date cannot be in the future.');
+            throw new InvalidArgumentException($isCashReceipt ? 'Cash receipt date cannot be in the future.' : 'Payment date cannot be in the future.');
         }
+
+        if ($postedBy === null || ! $isCashReceipt) {
+            return;
+        }
+
         if ($paymentDate < $today && ! $this->permissions->allows($postedBy, (int) $payment->tenant_id, PaymentPermission::PAYMENTS_BACKDATE_CASH)) {
             throw new AuthorizationException('Backdated cash receipts require the backdate-cash permission.');
         }

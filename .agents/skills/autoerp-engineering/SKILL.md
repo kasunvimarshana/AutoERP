@@ -69,10 +69,14 @@ Migrations represent **immutable database schema specifications**, not dynamic a
 - **Explicit Optional Form Defaulting & Field Presence:** In form requests and DTOs, distinguish between omitted fields and explicitly cleared fields (`null`/`""`) using `$this->has('field')`. Partial updates must preserve existing database entity values for omitted fields.
 - **Blade Template Sandboxing & Tenant Layout Isolation:** Custom Blade templates and layouts (e.g. invoices, vouchers, printouts) must never include unescaped raw PHP execution or direct arbitrary filesystem includes outside registered tenant views.
 - **Token Rotation Grace Window:** Refresh token rotation must provide an idempotent concurrency grace window (30 seconds) to prevent simultaneous API requests from triggering false token revocation.
+- **Dual-Timestamp Architecture & Backdated CRUD Safety:**
+  - Authoritative physical timestamps (`created_at`, `posted_at`, `reversed_at`, `updated_at`, `deleted_at`) represent the server-owned moment of recording and must never be altered or accepted from user input.
+  - Operational business dates (`invoice_date`, `movement_date`, `received_date`, `layer_date`, `payment_date`, `journal_date`) represent civil legal facts and govern all accounting periods, tax filing intervals, chronological valuation queues, and ledger aging.
+  - Backdated entries must update chronological running projections, prevent multi-period intermediate negative stock, validate reversals against business posting dates, and record FIFO layers with explicit `layer_date`.
 
 ---
 
-## 5. The 10 Prohibited Architectural Anti-Patterns
+## 5. The 11 Prohibited Architectural Anti-Patterns
 The following practices are **strictly prohibited** across AutoERP:
 1. **Direct Vehicle-to-Agreement Foreign Keys:** Vehicles must never be bound directly to customer agreements; all assignments must pass through `VehicleUse` to preserve replacement lineage.
 2. **Destructive In-Place Edits on Posted Transactions:** Posted invoices, payments, vouchers, or running charts must never be edited in-place or deleted. Corrections must follow governed reversal/credit/reissue workflows.
@@ -84,6 +88,7 @@ The following practices are **strictly prohibited** across AutoERP:
 8. **Dynamic Migration Code:** Never use dynamic loops, runtime conditionals, or raw SQL statements in migration files.
 9. **Omitted Field Overwrites on Partial Updates:** Never assume omitted request fields imply nullification; always verify presence (`$this->has()`) before updating existing entity attributes.
 10. **Unchecked Token Revocation on Concurrency:** Never invalidate refresh tokens immediately without an idempotent grace window for concurrent requests.
+11. **Conflating Physical Timestamps with Business Dates:** Never query, filter, or order operational, tax, or valuation ledgers (such as stock cards, valuation layers, aging reports, or tax documents) by physical ingestion timestamps (`created_at`, `posted_at`, `updated_at`). Always use dedicated, indexed business operational dates (`movement_date`, `invoice_date`, `received_date`, `layer_date`).
 
 ---
 

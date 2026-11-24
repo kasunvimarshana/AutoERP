@@ -54,9 +54,7 @@ final class InvoiceTaxDocumentMapper
             sourceId: (int) $invoice->getKey(),
             sourceNumber: (string) $invoice->invoice_number,
             sourceDate: $invoice->invoice_date->toDateString(),
-            transactionDate: $transactionDate
-                ?? $invoice->posted_at?->toDateString()
-                ?? $invoice->invoice_date->toDateString(),
+            transactionDate: $transactionDate ?? $invoice->invoice_date->toDateString(),
             partyType: $partyType,
             partyId: $invoice->party_id === null ? null : (int) $invoice->party_id,
             lines: $lines,

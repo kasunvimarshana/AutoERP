@@ -135,8 +135,18 @@ final class StockAdjustmentService
                     warehouseLocationId: $adjustment->warehouse_location_id,
                     batchId: $line->batch_id,
                 ));
+                $expectedQuantity = $this->historicalStockOnHand(
+                    tenantId: (int) $adjustment->tenant_id,
+                    organizationUnitId: $adjustment->organization_unit_id,
+                    itemId: (int) $line->item_id,
+                    warehouseId: (int) $adjustment->warehouse_id,
+                    warehouseLocationId: $adjustment->warehouse_location_id,
+                    itemVariantId: $line->item_variant_id,
+                    batchId: $line->batch_id,
+                    asOfDate: $adjustment->adjustment_date->toDateString(),
+                );
                 if ($this->math->compare(
-                    (string) $balance->quantity_on_hand,
+                    $expectedQuantity,
                     (string) $line->system_quantity,
                 ) !== 0) {
                     throw new InvalidArgumentException(
@@ -294,5 +304,59 @@ final class StockAdjustmentService
             }
             $seen[$key] = true;
         }
+    }
+
+    private function historicalStockOnHand(
+        int $tenantId,
+        ?int $organizationUnitId,
+        int $itemId,
+        int $warehouseId,
+        ?int $warehouseLocationId,
+        ?int $itemVariantId,
+        ?int $batchId,
+        string $asOfDate,
+    ): string {
+        $query = InventoryMovement::query()
+            ->where('tenant_id', $tenantId)
+            ->where('item_id', $itemId)
+            ->where('warehouse_id', $warehouseId)
+            ->whereIn('status', [InventoryStatus::Posted->value, InventoryStatus::Reversed->value])
+            ->whereDate('movement_date', '<=', $asOfDate);
+
+        if ($organizationUnitId === null) {
+            $query->whereNull('organization_unit_id');
+        } else {
+            $query->where('organization_unit_id', $organizationUnitId);
+        }
+
+        if ($warehouseLocationId === null) {
+            $query->whereNull('warehouse_location_id');
+        } else {
+            $query->where('warehouse_location_id', $warehouseLocationId);
+        }
+
+        if ($itemVariantId === null) {
+            $query->whereNull('item_variant_id');
+        } else {
+            $query->where('item_variant_id', $itemVariantId);
+        }
+
+        if ($batchId === null) {
+            $query->whereNull('batch_id');
+        } else {
+            $query->where('batch_id', $batchId);
+        }
+
+        $balance = '0.000000';
+        foreach ($query->cursor() as $movement) {
+            $qty = (string) $movement->quantity;
+            if ($movement->direction === InventoryDirection::In) {
+                $balance = $this->math->add($balance, $qty);
+            } else {
+                $balance = $this->math->sub($balance, $qty);
+            }
+        }
+
+        return $this->math->normalize($balance);
     }
 }

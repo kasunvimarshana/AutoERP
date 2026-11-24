@@ -40,16 +40,22 @@ final class VehicleServiceInventoryFinanceService
         private readonly ?TimezoneResolverInterface $timezoneResolver = null,
     ) {}
 
-    public function reverseIssue(VehicleServiceJob $job, InventoryMovement $movement, int $actorId, string $reason): void
-    {
+    public function reverseIssue(
+        VehicleServiceJob $job,
+        InventoryMovement $movement,
+        int $actorId,
+        string $reason,
+        ?string $reversalDate = null,
+    ): void {
         // Zero-cost issues deliberately have no finance posting (see postIssue).
         if ($this->math->isZero((string) $movement->total_cost)) {
             return;
         }
 
-        $reversalDate = $this->timezoneResolver !== null
-            ? $this->timezoneResolver->todayDateString((int) $job->tenant_id, $job->organization_unit_id)
-            : now()->toDateString();
+        $reversalDate ??= $movement->movement_date?->toDateString()
+            ?? ($this->timezoneResolver !== null
+                ? $this->timezoneResolver->todayDateString((int) $job->tenant_id, $job->organization_unit_id)
+                : now()->toDateString());
 
         $this->reversals->reverseSource(
             (int) $job->tenant_id,

@@ -67,8 +67,8 @@ class StockCardService
         if (! in_array($timezone, \DateTimeZone::listIdentifiers(), true)) {
             $timezone = (string) config('app.timezone', 'UTC');
         }
-        $from = CarbonImmutable::parse($filters['date_from'], $timezone)->startOfDay()->utc();
-        $to = CarbonImmutable::parse($filters['date_to'], $timezone)->addDay()->startOfDay()->utc();
+        $dateFrom = CarbonImmutable::parse($filters['date_from'], $timezone)->toDateString();
+        $dateTo = CarbonImmutable::parse($filters['date_to'], $timezone)->toDateString();
         $snapshot = CarbonImmutable::now('UTC');
         $revisions = ItemBaseUomRevision::query()
             ->where('tenant_id', $tenantId)
@@ -84,8 +84,7 @@ class StockCardService
             ->where('item_id', $item->id)
             ->where('warehouse_id', $warehouse->id)
             ->whereIn('status', [InventoryStatus::Posted->value, InventoryStatus::Reversed->value])
-            ->whereNotNull('posted_at')
-            ->where('posted_at', '<=', $snapshot);
+            ->whereNotNull('posted_at');
 
         if ($organizationUnitId !== null) {
             $query->where('organization_unit_id', $organizationUnitId);
@@ -94,12 +93,13 @@ class StockCardService
             $query->where('warehouse_location_id', $location->id);
         }
 
-        return DB::transaction(function () use ($query, $from, $to, $snapshot, $tenantId, $organizationUnitId, $item, $warehouse, $location, $filters, $timezone, $revisions): array {
-            $opening = $this->sumSigned(clone $query, $from, $revisions->all(), (int) $item->base_uom_id);
+        return DB::transaction(function () use ($query, $dateFrom, $dateTo, $snapshot, $tenantId, $organizationUnitId, $item, $warehouse, $location, $filters, $timezone, $revisions): array {
+            $opening = $this->sumSigned(clone $query, $dateFrom, $revisions->all(), (int) $item->base_uom_id);
             $movements = (clone $query)
-                ->where('posted_at', '>=', $from)
-                ->where('posted_at', '<', $to)
-                ->orderBy('posted_at')
+                ->where('movement_date', '>=', $dateFrom)
+                ->where('movement_date', '<=', $dateTo)
+                ->orderBy('movement_date')
+                ->orderBy('created_at')
                 ->orderBy('id')
                 ->get();
             $documents = $this->documents->resolve($movements->all(), $tenantId, $organizationUnitId);
@@ -148,10 +148,10 @@ class StockCardService
         });
     }
 
-    private function sumSigned(Builder $query, CarbonImmutable $before, array $revisions, int $currentUomId): string
+    private function sumSigned(Builder $query, string $beforeDate, array $revisions, int $currentUomId): string
     {
         $balance = $this->math->normalize(0);
-        foreach ($query->where('posted_at', '<', $before)->cursor() as $movement) {
+        foreach ($query->where('movement_date', '<', $beforeDate)->cursor() as $movement) {
             $quantity = $this->currentQuantity($movement, $revisions, $currentUomId);
             if ($movement->direction === InventoryDirection::In) {
                 $balance = $this->math->add($balance, $quantity);

@@ -62,7 +62,7 @@ class StockCardTest extends InventoryTestCase
         $this->assertSame('10.000000', $card['closing']);
         $this->assertCount(2, $card['rows']);
         $this->assertSame('2026-06-06', $card['rows'][0]['document_date']);
-        $this->assertSame('15.000000', $card['rows'][0]['balance']);
+        $this->assertSame('6.000000', $card['rows'][0]['balance']);
 
         $firstLocationCard = $this->withTenantExecutionContext($tenantId, fn () => app(StockCardService::class)->build([
             ...$filters,
