@@ -53,5 +53,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('hr_employee_rates');
     }
-
 };

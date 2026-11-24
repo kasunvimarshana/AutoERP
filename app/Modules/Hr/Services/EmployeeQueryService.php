@@ -111,8 +111,12 @@ final class EmployeeQueryService
     public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage, string $kind = 'all'): LengthAwarePaginator
     {
         $query = $this->criteria($this->base($tenantId, $organizationUnitId), $criteria);
-        if ($kind === 'active') { $query->active(); }
-        if (in_array($kind, ['available', 'service-available'], true)) { $query->available(); }
+        if ($kind === 'active') {
+            $query->active();
+        }
+        if (in_array($kind, ['available', 'service-available'], true)) {
+            $query->available();
+        }
         if ($kind === 'service-available') {
             $query->when(isset($criteria['at']), fn (Builder $q) => $q->whereDoesntHave('availabilities', function (Builder $availability) use ($criteria): void {
                 $availability->whereIn('availability_status', ['assigned', 'on_leave', 'unavailable', 'suspended', 'inactive'])
@@ -120,6 +124,7 @@ final class EmployeeQueryService
                     ->where(fn (Builder $range) => $range->whereNull('ends_at')->orWhere('ends_at', '>=', $criteria['at']));
             }));
         }
+
         return $query->with(['department', 'designation'])->orderBy('display_name')->paginate(min($perPage, 50));
     }
 
@@ -135,7 +140,9 @@ final class EmployeeQueryService
             $query->where(fn (Builder $q) => $q->where('employee_number', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%")->orWhere('display_name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")->orWhere('mobile', 'like', "%{$search}%"));
         }
         foreach (['department_id', 'designation_id', 'employment_type_id', 'status', 'availability_status'] as $key) {
-            if (isset($criteria[$key]) && $criteria[$key] !== '') { $query->where($key, $criteria[$key]); }
+            if (isset($criteria[$key]) && $criteria[$key] !== '') {
+                $query->where($key, $criteria[$key]);
+            }
         }
         if (isset($criteria['designation_code']) && $criteria['designation_code'] !== '') {
             $query->whereHas('designation', fn (Builder $q) => $q->where('code', $criteria['designation_code']));
@@ -143,9 +150,16 @@ final class EmployeeQueryService
         if (isset($criteria['exclude_designation_code']) && $criteria['exclude_designation_code'] !== '') {
             $query->whereHas('designation', fn (Builder $q) => $q->where('code', '!=', $criteria['exclude_designation_code']));
         }
-        if (isset($criteria['skill_id'])) { $query->whereHas('skillAssignments', fn (Builder $q) => $q->where('skill_id', $criteria['skill_id'])); }
-        if (isset($criteria['certification_id'])) { $query->whereHas('certificationAssignments', fn (Builder $q) => $q->where('certification_id', $criteria['certification_id'])); }
-        if (isset($criteria['license_id'])) { $query->whereHas('licenseAssignments', fn (Builder $q) => $q->where('license_id', $criteria['license_id'])); }
+        if (isset($criteria['skill_id'])) {
+            $query->whereHas('skillAssignments', fn (Builder $q) => $q->where('skill_id', $criteria['skill_id']));
+        }
+        if (isset($criteria['certification_id'])) {
+            $query->whereHas('certificationAssignments', fn (Builder $q) => $q->where('certification_id', $criteria['certification_id']));
+        }
+        if (isset($criteria['license_id'])) {
+            $query->whereHas('licenseAssignments', fn (Builder $q) => $q->where('license_id', $criteria['license_id']));
+        }
+
         return $query;
     }
 }

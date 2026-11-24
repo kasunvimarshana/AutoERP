@@ -26,6 +26,7 @@ use Modules\Hr\Http\Requests\Concerns\MapsEmployeeData;
 final class StoreEmployeeWithRelationsRequest extends TenantScopedRequest
 {
     use MapsEmployeeData;
+
     public function rules(): array
     {
         return [
@@ -41,5 +42,11 @@ final class StoreEmployeeWithRelationsRequest extends TenantScopedRequest
             'availability' => ['nullable', 'array'], 'availability.availability_status' => ['required_with:availability', Rule::enum(EmployeeAvailabilityStatus::class)], 'availability.availability_date' => ['nullable', 'date'], 'availability.source_type' => ['nullable', 'string', 'max:150'], 'availability.source_id' => ['nullable', 'integer', 'min:1'], 'availability.reason' => ['nullable', 'string'], 'availability.starts_at' => ['nullable', 'date'], 'availability.ends_at' => ['nullable', 'date'],
         ];
     }
-    public function toData(): CreateEmployeeData { $data = $this->validated(); return $this->mapEmployeeData((array) $data['employee'], $data); }
+
+    public function toData(): CreateEmployeeData
+    {
+        $data = $this->validated();
+
+        return $this->mapEmployeeData((array) $data['employee'], $data);
+    }
 }

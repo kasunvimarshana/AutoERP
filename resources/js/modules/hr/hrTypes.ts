@@ -56,3 +56,104 @@ export type EmployeeAvailabilityPayload = Omit<EmployeeAvailability, 'id'>;
 export interface EmployeeStatusHistory { id: number; old_status?: EmployeeStatus | null; new_status: EmployeeStatus; reason?: string | null; changed_by?: number | null; changed_at: string; }
 export interface EmployeeRelationsPayload { contacts: EmployeeContactPayload[]; addresses: EmployeeAddressPayload[]; documents: EmployeeDocumentPayload[]; skills: EmployeeSkillPayload[]; certifications: EmployeeCertificationPayload[]; licenses: EmployeeLicensePayload[]; rates: EmployeeRatePayload[]; availability?: EmployeeAvailabilityPayload; }
 export interface EmployeeWithRelationsPayload extends EmployeeRelationsPayload { employee: EmployeePayload; }
+
+// --- Shifts & Rostering Types ---
+export type ShiftStatus = 'active' | 'inactive';
+export interface HrShift {
+    id: number; row_version: number; tenant_id: number; organization_unit_id?: number | null;
+    code: string; name: string; color: string; start_time: string; end_time: string;
+    is_overnight: boolean; grace_in_minutes: number; grace_out_minutes: number;
+    half_day_threshold_minutes: number; full_day_threshold_minutes: number;
+    is_break_paid: boolean; auto_deduct_break: boolean; auto_deduct_break_minutes: number;
+    auto_deduct_threshold_minutes: number; is_flexible: boolean; status: ShiftStatus; notes?: string | null;
+}
+export type HrShiftPayload = Omit<HrShift, 'id' | 'row_version' | 'tenant_id'>;
+
+export interface HrShiftAssignment {
+    id: number; row_version: number; employee_id: number; shift_id: number;
+    assignment_type: 'recurring' | 'date_range' | 'specific_date';
+    day_of_week?: number | null; start_date?: string | null; end_date?: string | null;
+    is_custom_timing: boolean; custom_start_time?: string | null; custom_end_time?: string | null;
+    is_cancelled: boolean; cancellation_reason?: string | null;
+    shift?: HrShift; employee?: EmployeeSummary;
+}
+
+export interface HrShiftSwap {
+    id: number; row_version: number; requester_employee_id: number; target_employee_id: number;
+    requester_shift_id?: number | null; target_shift_id?: number | null;
+    swap_date: string; target_swap_date: string; reason: string;
+    status: 'pending_peer' | 'peer_accepted' | 'peer_rejected' | 'manager_approved' | 'manager_rejected' | 'cancelled';
+    requester_employee?: EmployeeSummary; target_employee?: EmployeeSummary;
+    requester_shift?: HrShift; target_shift?: HrShift;
+}
+
+// --- Attendance Types ---
+export type PunchType = 'in' | 'out' | 'break_out' | 'break_in' | 'meal_out' | 'meal_in';
+export type PunchSource = 'web' | 'mobile' | 'biometric_device' | 'manual_entry' | 'system_resolved';
+export type AttendanceStatus = 'present' | 'late' | 'half_day' | 'absent' | 'on_leave' | 'rest_day' | 'holiday' | 'unresolved';
+
+export interface HrAttendancePunch {
+    id: number; attendance_record_id?: number | null; employee_id: number;
+    attendance_date: string; punch_time: string; punch_type: PunchType;
+    punch_source: PunchSource; device_id?: string | null; ip_address?: string | null;
+    latitude?: string | null; longitude?: string | null; is_verified: boolean; is_ignored: boolean;
+}
+
+export interface HrAttendanceRecord {
+    id: number; row_version: number; employee_id: number; attendance_date: string;
+    shift_id?: number | null; first_punch_in?: string | null; last_punch_out?: string | null;
+    scheduled_minutes: number; total_worked_minutes: number; total_break_minutes: number;
+    unpaid_break_minutes: number; regular_minutes: number; overtime_minutes: number;
+    double_time_minutes: number; late_arrival_minutes: number; early_departure_minutes: number;
+    status: AttendanceStatus; lock_status: 'open' | 'locked' | 'finalized';
+    is_regularized: boolean; notes?: string | null;
+    shift?: HrShift; employee?: EmployeeSummary; punches?: HrAttendancePunch[];
+}
+
+export interface HrAttendanceRegularization {
+    id: number; row_version: number; attendance_record_id?: number | null; employee_id: number;
+    attendance_date: string; regularization_type: 'missing_in' | 'missing_out' | 'both_missing' | 'incorrect_time' | 'forgot_to_punch' | 'on_duty';
+    proposed_clock_in?: string | null; proposed_clock_out?: string | null; reason_code: string;
+    employee_notes: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+    actioned_at?: string | null; action_notes?: string | null;
+    employee?: EmployeeSummary; attendance_record?: HrAttendanceRecord;
+}
+
+// --- Leave Types ---
+export interface HrLeaveType {
+    id: number; row_version: number; code: string; name: string; color: string;
+    is_paid: boolean; requires_attachment: boolean; attachment_mandatory_after_days: number;
+    allow_half_day: boolean; allow_hourly: boolean; is_compensatory: boolean;
+    sandwich_rule_applied: boolean; status: 'active' | 'inactive';
+}
+
+export interface HrLeavePolicy {
+    id: number; row_version: number; leave_type_id: number; department_id?: number | null;
+    employment_type_id?: number | null; name: string; annual_allocation_days: string;
+    accrual_frequency: 'annual_upfront' | 'monthly_prorated' | 'quarterly' | 'no_accrual';
+    max_carry_forward_days: string; carry_forward_expiry_months: number;
+    max_consecutive_days: number; probation_restricted: boolean;
+    effective_from: string; effective_to?: string | null;
+    leave_type?: HrLeaveType; department?: HrDepartment;
+}
+
+export interface HrLeaveBalance {
+    id: number; row_version: number; employee_id: number; leave_type_id: number; calendar_year: number;
+    opening_balance: string; accrued_days: string; carried_forward_days: string; used_days: string;
+    pending_approval_days: string; expired_days: string; current_balance: string;
+    leave_type?: HrLeaveType; employee?: EmployeeSummary;
+}
+
+export interface HrLeaveRequest {
+    id: number; row_version: number; employee_id: number; leave_type_id: number;
+    start_date: string; end_date: string; duration_type: 'full_day' | 'half_day_morning' | 'half_day_afternoon' | 'custom_hours';
+    total_days: string; reason: string; attachment_document_id?: number | null;
+    status: 'pending' | 'approved' | 'rejected' | 'cancelled'; approved_at?: string | null; action_notes?: string | null;
+    leave_type?: HrLeaveType; employee?: EmployeeSummary;
+}
+
+export interface HrCompOffClaim {
+    id: number; row_version: number; employee_id: number; worked_date: string;
+    claimed_days: string; reason: string; status: 'pending' | 'approved' | 'rejected' | 'expired' | 'used';
+    expiry_date?: string | null; employee?: EmployeeSummary;
+}

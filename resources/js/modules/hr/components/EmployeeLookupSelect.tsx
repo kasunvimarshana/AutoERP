@@ -12,17 +12,18 @@ import { searchEmployees } from '../hrApi';
 import type { EmployeeSummary } from '../hrTypes';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 
-export function EmployeeLookupSelect({ value, onChange, excludeId, error }: {
+export function EmployeeLookupSelect({ value, onChange, excludeId, error, label = 'Employee' }: {
     value: EmployeeSummary | null;
     onChange: (value: EmployeeSummary | null) => void;
     excludeId?: number | null;
     error?: string;
+    label?: string;
 }) {
     const search = useCallback((params: LookupLoadParams) => searchEmployees(params), []);
 
     return (
         <GenericLookupSelect
-            label="Reporting Manager"
+            label={label}
             value={value}
             onChange={onChange}
             search={search}

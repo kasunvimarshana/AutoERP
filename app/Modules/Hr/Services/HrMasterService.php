@@ -22,7 +22,9 @@ abstract class HrMasterService
 {
     /** @var class-string<Model> */
     protected string $modelClass;
+
     protected string $label;
+
     protected bool $hasSortOrder = false;
 
     public function create(object $data): Model
@@ -72,6 +74,7 @@ abstract class HrMasterService
     public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
         $criteria['is_active'] = true;
+
         return $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
     }
 
@@ -101,6 +104,7 @@ abstract class HrMasterService
         if ($this->hasSortOrder) {
             $attributes['sort_order'] = $data->sortOrder;
         }
+
         return $attributes;
     }
 
@@ -118,6 +122,7 @@ abstract class HrMasterService
         if (array_key_exists('is_active', $criteria) && $criteria['is_active'] !== null && $criteria['is_active'] !== '') {
             $query->where('is_active', $criteria['is_active']);
         }
+
         return $query;
     }
 

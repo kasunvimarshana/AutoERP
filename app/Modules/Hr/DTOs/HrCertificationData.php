@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -10,4 +11,8 @@ declare(strict_types=1);
  */
 
 namespace Modules\Hr\DTOs;
-final readonly class HrCertificationData { public function __construct(public int $tenantId, public string $code, public string $name, public ?int $organizationUnitId = null, public ?string $description = null, public bool $isActive = true) {} }
+
+final readonly class HrCertificationData
+{
+    public function __construct(public int $tenantId, public string $code, public string $name, public ?int $organizationUnitId = null, public ?string $description = null, public bool $isActive = true) {}
+}

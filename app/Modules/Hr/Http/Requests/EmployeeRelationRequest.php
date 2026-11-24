@@ -25,9 +25,11 @@ use Modules\Hr\Http\Requests\Concerns\MapsEmployeeData;
 final class EmployeeRelationRequest extends TenantScopedRequest
 {
     use MapsEmployeeData;
+
     public function rules(): array
     {
         $base = ['tenant_id' => ['required', 'integer', 'min:1'], 'organization_unit_id' => ['nullable', 'integer', 'min:1']];
+
         return $base + match ((string) $this->route()->getName()) {
             'api.v1.hr.employees.contacts.store', 'api.v1.hr.employees.contacts.update' => ['contact_name' => ['required', 'string', 'max:255'], 'relationship' => ['nullable', 'string', 'max:100'], 'email' => ['nullable', 'email'], 'phone' => ['nullable', 'string', 'max:50'], 'mobile' => ['nullable', 'string', 'max:50'], 'is_emergency_contact' => ['nullable', 'boolean'], 'is_primary' => ['nullable', 'boolean'], 'is_active' => ['nullable', 'boolean'], 'notes' => ['nullable', 'string']],
             'api.v1.hr.employees.addresses.store', 'api.v1.hr.employees.addresses.update' => ['address_type' => ['required', Rule::enum(EmployeeAddressType::class)], 'address_line_1' => ['required', 'string', 'max:255'], 'address_line_2' => ['nullable', 'string', 'max:255'], 'city' => ['nullable', 'string'], 'state' => ['nullable', 'string'], 'postal_code' => ['nullable', 'string'], 'country' => ['nullable', 'string'], 'is_primary' => ['nullable', 'boolean'], 'is_active' => ['nullable', 'boolean']],

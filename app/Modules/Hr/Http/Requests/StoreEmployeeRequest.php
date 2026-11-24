@@ -23,11 +23,21 @@ use Modules\Hr\Http\Requests\Concerns\MapsEmployeeData;
 class StoreEmployeeRequest extends TenantScopedRequest
 {
     use MapsEmployeeData;
-    public function rules(): array { return self::employeeRules(); }
-    public function toData(): CreateEmployeeData { return $this->mapEmployeeData($this->validated()); }
+
+    public function rules(): array
+    {
+        return self::employeeRules();
+    }
+
+    public function toData(): CreateEmployeeData
+    {
+        return $this->mapEmployeeData($this->validated());
+    }
+
     public static function employeeRules(string $prefix = ''): array
     {
         $key = fn (string $name) => $prefix.$name;
+
         return [
             $key('tenant_id') => $prefix === '' ? ['required', 'integer', 'min:1'] : ['prohibited'],
             $key('organization_unit_id') => $prefix === '' ? ['nullable', 'integer', 'min:1'] : ['prohibited'],

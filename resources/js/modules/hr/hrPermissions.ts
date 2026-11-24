@@ -13,4 +13,13 @@ export const hrPermissions = {
     employeesDelete: 'hr.employees.delete',
     masterDataView: 'hr.master-data.view',
     masterDataManage: 'hr.master-data.manage',
+    shiftsView: 'hr.shifts.view',
+    shiftsManage: 'hr.shifts.manage',
+    attendanceView: 'hr.attendance.view',
+    attendanceManage: 'hr.attendance.manage',
+    attendancePunch: 'hr.attendance.punch',
+    attendanceRegularize: 'hr.attendance.regularize',
+    leavesView: 'hr.leaves.view',
+    leavesApply: 'hr.leaves.apply',
+    leavesManage: 'hr.leaves.manage',
 } as const;

@@ -23,6 +23,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'hr_employees_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
+            $table->foreignId('user_id')->nullable();
             $table->string('employee_number');
             $table->string('code')->nullable();
             $table->string('first_name');
@@ -56,6 +57,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'hr_employees_tenant_org_ix');
             $table->index(['department_id', 'designation_id', 'employment_type_id'], 'hr_employees_workforce_ix');
             $table->index('reporting_manager_id', 'hr_employees_reporting_manager_ix');
+            $table->index('user_id', 'hr_employees_user_id_ix');
             $table->index('status', 'hr_employees_status_ix');
             $table->index('availability_status', 'hr_employees_availability_status_ix');
 
@@ -80,6 +82,11 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('hr_employees')
                 ->restrictOnDelete();
+
+            $table->foreign(['user_id', 'tenant_id'], 'hr_employees_user_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->nullOnDelete();
 
             $table->foreign(['approved_by', 'tenant_id'], 'hr_employees_approved_by_tenant_fk')
                 ->references(['id', 'tenant_id'])

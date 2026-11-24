@@ -12,10 +12,10 @@ declare(strict_types=1);
 
 namespace Modules\Hr\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Hr\Models\HrDepartment;
 use Modules\Hr\Models\HrDesignation;
 use Modules\Hr\Models\HrEmployee;

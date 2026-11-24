@@ -57,7 +57,9 @@ final class EmployeeUpdateService
                 'gender' => $data->gender, 'notes' => $data->notes, 'metadata' => $data->metadata,
             ];
             foreach (['default_hourly_rate', 'default_daily_rate', 'default_service_rate'] as $key) {
-                $property = match ($key) { 'default_hourly_rate' => 'defaultHourlyRate', 'default_daily_rate' => 'defaultDailyRate', default => 'defaultServiceRate' };
+                $property = match ($key) {
+                    'default_hourly_rate' => 'defaultHourlyRate', 'default_daily_rate' => 'defaultDailyRate', default => 'defaultServiceRate'
+                };
                 $map[$key] = $data->{$property} === null ? null : $this->math->normalize($data->{$property});
             }
             $attributes = [];

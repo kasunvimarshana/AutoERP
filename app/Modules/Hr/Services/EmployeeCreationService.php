@@ -71,14 +71,30 @@ final class EmployeeCreationService
                 'approved_at' => $data->status === EmployeeStatus::Active ? now() : null,
             ]);
 
-            foreach ($data->contacts as $row) { $this->contacts->create($employee, $row); }
-            foreach ($data->addresses as $row) { $this->addresses->create($employee, $row); }
-            foreach ($data->documents as $row) { $this->documents->create($employee, $row); }
-            foreach ($data->skills as $row) { $this->skills->create($employee, $row); }
-            foreach ($data->certifications as $row) { $this->certifications->create($employee, $row); }
-            foreach ($data->licenses as $row) { $this->licenses->create($employee, $row); }
-            foreach ($data->rates as $row) { $this->rates->create($employee, $row); }
-            if ($data->availability !== null) { $this->availability->create($employee, $data->availability); }
+            foreach ($data->contacts as $row) {
+                $this->contacts->create($employee, $row);
+            }
+            foreach ($data->addresses as $row) {
+                $this->addresses->create($employee, $row);
+            }
+            foreach ($data->documents as $row) {
+                $this->documents->create($employee, $row);
+            }
+            foreach ($data->skills as $row) {
+                $this->skills->create($employee, $row);
+            }
+            foreach ($data->certifications as $row) {
+                $this->certifications->create($employee, $row);
+            }
+            foreach ($data->licenses as $row) {
+                $this->licenses->create($employee, $row);
+            }
+            foreach ($data->rates as $row) {
+                $this->rates->create($employee, $row);
+            }
+            if ($data->availability !== null) {
+                $this->availability->create($employee, $data->availability);
+            }
             $this->statuses->recordInitial($employee, $data->createdBy);
 
             return $employee->refresh()->load($this->relations());

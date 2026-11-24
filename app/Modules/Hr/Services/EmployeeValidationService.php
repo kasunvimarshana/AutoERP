@@ -145,7 +145,7 @@ final class EmployeeValidationService
     }
 
     /**
-     * @param class-string<Model> $class
+     * @param  class-string<Model>  $class
      */
     private function findReference(string $class, int $id, int $tenantId): Model
     {

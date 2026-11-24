@@ -26,6 +26,24 @@ final class HrAuthorizationService
 
     public const MANAGE_MASTER_DATA = 'hr.master-data.manage';
 
+    public const VIEW_SHIFTS = 'hr.shifts.view';
+
+    public const MANAGE_SHIFTS = 'hr.shifts.manage';
+
+    public const VIEW_ATTENDANCE = 'hr.attendance.view';
+
+    public const MANAGE_ATTENDANCE = 'hr.attendance.manage';
+
+    public const PUNCH_ATTENDANCE = 'hr.attendance.punch';
+
+    public const REGULARIZE_ATTENDANCE = 'hr.attendance.regularize';
+
+    public const VIEW_LEAVES = 'hr.leaves.view';
+
+    public const APPLY_LEAVES = 'hr.leaves.apply';
+
+    public const MANAGE_LEAVES = 'hr.leaves.manage';
+
     /** @return array<string,string> */
     public static function descriptions(): array
     {
@@ -36,6 +54,15 @@ final class HrAuthorizationService
             self::DELETE_EMPLOYEES => 'Archive unreferenced HR employees.',
             self::VIEW_MASTER_DATA => 'View HR master data and lookups.',
             self::MANAGE_MASTER_DATA => 'Create, update, and archive HR master data.',
+            self::VIEW_SHIFTS => 'View HR shifts, assignments, and roster schedules.',
+            self::MANAGE_SHIFTS => 'Create, modify, assign, swap, and reallocate HR shifts.',
+            self::VIEW_ATTENDANCE => 'View employee attendance records, punches, and summaries.',
+            self::MANAGE_ATTENDANCE => 'Directly adjust and finalize HR attendance records.',
+            self::PUNCH_ATTENDANCE => 'Submit web or mobile clock-in/out and break punches.',
+            self::REGULARIZE_ATTENDANCE => 'Submit or review attendance regularization requests.',
+            self::VIEW_LEAVES => 'View leave balances, policies, and leave requests.',
+            self::APPLY_LEAVES => 'Apply for leave and submit comp-off claims.',
+            self::MANAGE_LEAVES => 'Configure leave policies, approve/reject leaves and comp-off claims.',
         ];
     }
 }

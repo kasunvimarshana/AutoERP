@@ -24,7 +24,18 @@ final class HrDepartment extends HrMasterModel
         return array_merge(parent::casts(), ['sort_order' => 'integer']);
     }
 
-    public function parent(): BelongsTo { return $this->belongsTo(self::class, 'parent_id'); }
-    public function children(): HasMany { return $this->hasMany(self::class, 'parent_id'); }
-    public function employees(): HasMany { return $this->hasMany(HrEmployee::class, 'department_id'); }
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function employees(): HasMany
+    {
+        return $this->hasMany(HrEmployee::class, 'department_id');
+    }
 }

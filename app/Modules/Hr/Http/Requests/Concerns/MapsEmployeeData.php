@@ -73,14 +73,53 @@ trait MapsEmployeeData
         );
     }
 
-    public function contactData(array $row): EmployeeContactData { return new EmployeeContactData((string) $row['contact_name'], $row['relationship'] ?? null, $row['email'] ?? null, $row['phone'] ?? null, $row['mobile'] ?? null, (bool) ($row['is_emergency_contact'] ?? false), (bool) ($row['is_primary'] ?? false), (bool) ($row['is_active'] ?? true), $row['notes'] ?? null); }
-    public function addressData(array $row): EmployeeAddressData { return new EmployeeAddressData(EmployeeAddressType::from((string) $row['address_type']), (string) $row['address_line_1'], $row['address_line_2'] ?? null, $row['city'] ?? null, $row['state'] ?? null, $row['postal_code'] ?? null, $row['country'] ?? null, (bool) ($row['is_primary'] ?? false), (bool) ($row['is_active'] ?? true)); }
-    public function documentData(array $row): EmployeeDocumentData { return new EmployeeDocumentData(EmployeeDocumentType::from((string) $row['document_type']), $row['document_number'] ?? null, $row['issued_date'] ?? null, $row['expiry_date'] ?? null, $row['file_path'] ?? null, EmployeeDocumentStatus::from((string) ($row['status'] ?? 'pending')), $row['notes'] ?? null); }
-    public function skillData(array $row): EmployeeSkillAssignmentData { return new EmployeeSkillAssignmentData((int) $row['skill_id'], SkillProficiencyLevel::from((string) ($row['proficiency_level'] ?? 'beginner')), (string) ($row['years_of_experience'] ?? '0.000000'), (bool) ($row['is_primary'] ?? false)); }
-    public function certificationData(array $row): EmployeeCertificationAssignmentData { return new EmployeeCertificationAssignmentData((int) $row['certification_id'], $row['certificate_number'] ?? null, $row['issued_date'] ?? null, $row['expiry_date'] ?? null, EmployeeDocumentStatus::from((string) ($row['status'] ?? 'pending'))); }
-    public function licenseData(array $row): EmployeeLicenseAssignmentData { return new EmployeeLicenseAssignmentData((int) $row['license_id'], $row['license_number'] ?? null, $row['issued_date'] ?? null, $row['expiry_date'] ?? null, EmployeeDocumentStatus::from((string) ($row['status'] ?? 'pending'))); }
-    public function rateData(array $row): EmployeeRateData { return new EmployeeRateData(EmployeeRateType::from((string) $row['rate_type']), (string) $row['amount'], isset($row['currency_id']) ? (int) $row['currency_id'] : null, $row['effective_from'] ?? null, $row['effective_to'] ?? null, (bool) ($row['is_active'] ?? true)); }
-    public function availabilityData(array $row): EmployeeAvailabilityData { return new EmployeeAvailabilityData(EmployeeAvailabilityStatus::from((string) $row['availability_status']), $row['availability_date'] ?? null, $row['source_type'] ?? null, isset($row['source_id']) ? (int) $row['source_id'] : null, $row['reason'] ?? null, $row['starts_at'] ?? null, $row['ends_at'] ?? null); }
-    private function nullableString(array $data, string $key): ?string { return isset($data[$key]) && trim((string) $data[$key]) !== '' ? (string) $data[$key] : null; }
-    private function nullableInteger(array $data, string $key): ?int { return isset($data[$key]) && $data[$key] !== '' ? (int) $data[$key] : null; }
+    public function contactData(array $row): EmployeeContactData
+    {
+        return new EmployeeContactData((string) $row['contact_name'], $row['relationship'] ?? null, $row['email'] ?? null, $row['phone'] ?? null, $row['mobile'] ?? null, (bool) ($row['is_emergency_contact'] ?? false), (bool) ($row['is_primary'] ?? false), (bool) ($row['is_active'] ?? true), $row['notes'] ?? null);
+    }
+
+    public function addressData(array $row): EmployeeAddressData
+    {
+        return new EmployeeAddressData(EmployeeAddressType::from((string) $row['address_type']), (string) $row['address_line_1'], $row['address_line_2'] ?? null, $row['city'] ?? null, $row['state'] ?? null, $row['postal_code'] ?? null, $row['country'] ?? null, (bool) ($row['is_primary'] ?? false), (bool) ($row['is_active'] ?? true));
+    }
+
+    public function documentData(array $row): EmployeeDocumentData
+    {
+        return new EmployeeDocumentData(EmployeeDocumentType::from((string) $row['document_type']), $row['document_number'] ?? null, $row['issued_date'] ?? null, $row['expiry_date'] ?? null, $row['file_path'] ?? null, EmployeeDocumentStatus::from((string) ($row['status'] ?? 'pending')), $row['notes'] ?? null);
+    }
+
+    public function skillData(array $row): EmployeeSkillAssignmentData
+    {
+        return new EmployeeSkillAssignmentData((int) $row['skill_id'], SkillProficiencyLevel::from((string) ($row['proficiency_level'] ?? 'beginner')), (string) ($row['years_of_experience'] ?? '0.000000'), (bool) ($row['is_primary'] ?? false));
+    }
+
+    public function certificationData(array $row): EmployeeCertificationAssignmentData
+    {
+        return new EmployeeCertificationAssignmentData((int) $row['certification_id'], $row['certificate_number'] ?? null, $row['issued_date'] ?? null, $row['expiry_date'] ?? null, EmployeeDocumentStatus::from((string) ($row['status'] ?? 'pending')));
+    }
+
+    public function licenseData(array $row): EmployeeLicenseAssignmentData
+    {
+        return new EmployeeLicenseAssignmentData((int) $row['license_id'], $row['license_number'] ?? null, $row['issued_date'] ?? null, $row['expiry_date'] ?? null, EmployeeDocumentStatus::from((string) ($row['status'] ?? 'pending')));
+    }
+
+    public function rateData(array $row): EmployeeRateData
+    {
+        return new EmployeeRateData(EmployeeRateType::from((string) $row['rate_type']), (string) $row['amount'], isset($row['currency_id']) ? (int) $row['currency_id'] : null, $row['effective_from'] ?? null, $row['effective_to'] ?? null, (bool) ($row['is_active'] ?? true));
+    }
+
+    public function availabilityData(array $row): EmployeeAvailabilityData
+    {
+        return new EmployeeAvailabilityData(EmployeeAvailabilityStatus::from((string) $row['availability_status']), $row['availability_date'] ?? null, $row['source_type'] ?? null, isset($row['source_id']) ? (int) $row['source_id'] : null, $row['reason'] ?? null, $row['starts_at'] ?? null, $row['ends_at'] ?? null);
+    }
+
+    private function nullableString(array $data, string $key): ?string
+    {
+        return isset($data[$key]) && trim((string) $data[$key]) !== '' ? (string) $data[$key] : null;
+    }
+
+    private function nullableInteger(array $data, string $key): ?int
+    {
+        return isset($data[$key]) && $data[$key] !== '' ? (int) $data[$key] : null;
+    }
 }

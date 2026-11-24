@@ -71,3 +71,86 @@ export const availabilityApi = {
     create: (employeeId: number, payload: EmployeeAvailabilityPayload) => apiClient.post<ApiResource<EmployeeAvailability>>(path(employeeId, 'availability'), payload).then((r) => r.data.data),
 };
 export const listEmployeeStatusHistory = (employeeId: number, page: number, signal: AbortSignal) => apiClient.get<ApiCollection<EmployeeStatusHistory>>(path(employeeId, 'status-history'), { params: { page, per_page: 20 }, signal }).then((r) => r.data);
+
+// --- Shifts & Rostering API ---
+export const listShifts = () => apiClient.get<ApiResource<import('./hrTypes').HrShift[]>>(endpoints.hrShifts).then((r) => r.data.data);
+export const createShift = (payload: import('./hrTypes').HrShiftPayload) => apiClient.post<ApiResource<import('./hrTypes').HrShift>>(endpoints.hrShifts, payload).then((r) => r.data.data);
+export const updateShift = (id: number, payload: Partial<import('./hrTypes').HrShiftPayload>) => apiClient.put<ApiResource<import('./hrTypes').HrShift>>(`${endpoints.hrShifts}/${id}`, payload).then((r) => r.data.data);
+export const deleteShift = (id: number) => apiClient.delete(`${endpoints.hrShifts}/${id}`);
+
+export const getRoster = (params: { start_date: string; end_date: string; employee_ids?: number[]; department_id?: number }) =>
+    apiClient.get<ApiResource<Array<{ employee: { id: number; employee_number: string; display_name: string }; days: Record<string, { shift: import('./hrTypes').HrShift | null; is_working: boolean; is_rest_day: boolean; is_holiday: boolean; holiday_name?: string | null; source: string }> }>>>(endpoints.hrRoster, { params }).then((r) => r.data.data);
+
+export const assignShift = (payload: { employee_id: number; shift_id: number; assignment_type: string; day_of_week?: number; start_date?: string; end_date?: string; is_custom_timing?: boolean; custom_start_time?: string; custom_end_time?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShiftAssignment>>(endpoints.hrShiftAssignments, payload).then((r) => r.data.data);
+
+export const cancelShiftAssignment = (id: number, reason: string) =>
+    apiClient.delete<ApiResource<import('./hrTypes').HrShiftAssignment>>(`${endpoints.hrShiftAssignments}/${id}`, { data: { reason } }).then((r) => r.data.data);
+
+export const requestShiftSwap = (payload: { requester_employee_id: number; target_employee_id: number; swap_date: string; target_swap_date: string; reason: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShiftSwap>>(endpoints.hrShiftSwaps, payload).then((r) => r.data.data);
+
+export const peerActionShiftSwap = (swapId: number, peerEmployeeId: number, accept: boolean) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${swapId}/peer-action`, { peer_employee_id: peerEmployeeId, accept }).then((r) => r.data.data);
+
+export const managerActionShiftSwap = (swapId: number, approve: boolean, notes?: string) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${swapId}/manager-action`, { approve, notes }).then((r) => r.data.data);
+
+export const reallocateShiftCover = (payload: { absent_employee_id: number; cover_employee_id: number; shift_id: number; reallocation_date: string; reason_code?: string; notes?: string }) =>
+    apiClient.post(endpoints.hrShiftReallocations, payload).then((r) => r.data.data);
+
+// --- Attendance API ---
+export const punchAttendance = (payload: { employee_id: number; punch_type: string; punch_time?: string; punch_source?: string; notes?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendancePunch>>(endpoints.hrAttendancePunch, payload).then((r) => r.data.data);
+
+export const getTodayAttendance = (employeeId: number) =>
+    apiClient.get<ApiResource<{ date: string; record: import('./hrTypes').HrAttendanceRecord | null; punches: import('./hrTypes').HrAttendancePunch[] }>>(`${endpoints.hrAttendanceToday}/${employeeId}`).then((r) => r.data.data);
+
+export const listAttendanceRecords = (params: { start_date?: string; end_date?: string; employee_id?: number; department_id?: number; status?: string; page?: number; per_page?: number }) =>
+    apiClient.get<ApiCollection<import('./hrTypes').HrAttendanceRecord>>(endpoints.hrAttendanceRecords, { params }).then((r) => r.data);
+
+export const requestAttendanceRegularization = (payload: { employee_id: number; attendance_date: string; regularization_type: string; reason_code: string; employee_notes: string; proposed_clock_in?: string; proposed_clock_out?: string; attendance_record_id?: number }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendanceRegularization>>(endpoints.hrAttendanceRegularize, payload).then((r) => r.data.data);
+
+export const listAttendanceRegularizations = (params?: { status?: string; employee_id?: number }) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrAttendanceRegularization[]>>(endpoints.hrAttendanceRegularizations, { params }).then((r) => r.data.data);
+
+export const actionAttendanceRegularization = (id: number, approve: boolean, notes?: string) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrAttendanceRegularization>>(`${endpoints.hrAttendanceRegularizations}/${id}/action`, { approve, notes }).then((r) => r.data.data);
+
+export const directAdjustAttendanceRecord = (recordId: number, payload: { new_status: string; new_worked_minutes: number; new_overtime_minutes: number; adjustment_reason: string }) =>
+    apiClient.post<ApiResource<unknown>>(`${endpoints.hrAttendanceRecords}/${recordId}/direct-adjust`, payload).then((r) => r.data.data);
+
+// --- Leaves API ---
+export const listLeaveTypes = () =>
+    apiClient.get<ApiResource<import('./hrTypes').HrLeaveType[]>>(endpoints.hrLeaveTypes).then((r) => r.data.data);
+
+export const createLeaveType = (payload: Partial<import('./hrTypes').HrLeaveType>) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrLeaveType>>(endpoints.hrLeaveTypes, payload).then((r) => r.data.data);
+
+export const listLeavePolicies = () =>
+    apiClient.get<ApiResource<import('./hrTypes').HrLeavePolicy[]>>(endpoints.hrLeavePolicies).then((r) => r.data.data);
+
+export const createLeavePolicy = (payload: Partial<import('./hrTypes').HrLeavePolicy>) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrLeavePolicy>>(endpoints.hrLeavePolicies, payload).then((r) => r.data.data);
+
+export const listLeaveBalances = (params?: { employee_id?: number; calendar_year?: number }) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrLeaveBalance[]>>(endpoints.hrLeaveBalances, { params }).then((r) => r.data.data);
+
+export const listLeaveRequests = (params?: { employee_id?: number; status?: string; leave_type_id?: number; page?: number; per_page?: number }) =>
+    apiClient.get<ApiCollection<import('./hrTypes').HrLeaveRequest>>(endpoints.hrLeaveRequests, { params }).then((r) => r.data);
+
+export const applyLeave = (payload: { employee_id: number; leave_type_id: number; start_date: string; end_date: string; total_days: string; reason: string; duration_type?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrLeaveRequest>>(endpoints.hrLeaveRequests, payload).then((r) => r.data.data);
+
+export const actionLeaveRequest = (requestId: number, approve: boolean, notes?: string) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrLeaveRequest>>(`${endpoints.hrLeaveRequests}/${requestId}/action`, { approve, notes }).then((r) => r.data.data);
+
+export const cancelLeaveRequest = (requestId: number, reason: string) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrLeaveRequest>>(`${endpoints.hrLeaveRequests}/${requestId}/cancel`, { reason }).then((r) => r.data.data);
+
+export const claimCompOff = (payload: { employee_id: number; worked_date: string; reason: string; claimed_days?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrCompOffClaim>>(endpoints.hrCompOffClaim, payload).then((r) => r.data.data);
+
+export const actionCompOffClaim = (claimId: number, approve: boolean) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrCompOffClaim>>(`${endpoints.hrCompOffClaims}/${claimId}/action`, { approve }).then((r) => r.data.data);
