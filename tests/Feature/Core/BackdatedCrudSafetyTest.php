@@ -16,6 +16,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use LogicException;
+use Modules\Expense\Enums\ExpenseStatus;
+use Modules\Expense\Models\Expense;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Finance\Services\AgingReportService;
@@ -55,13 +58,20 @@ use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentType as PaymentDocType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Services\PaymentCashReceiptDatePolicy;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentPostingService;
+use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
+use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
+use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
+use Modules\Purchase\Services\GoodsReceiptNoteService;
+use Modules\Purchase\Services\PurchaseGoodsReceiptPostingCoordinator;
 use Modules\Purchase\Services\Tax\GoodsReceiptNoteTaxDocumentMapper;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class BackdatedCrudSafetyTest extends TestCase
@@ -775,6 +785,470 @@ final class BackdatedCrudSafetyTest extends TestCase
             $this->assertSame('100.000000', $reportMay15['total']);
             $this->assertCount(1, $reportMay15['rows']);
             $this->assertSame('INV-AGING-001', $reportMay15['rows'][0]['invoice_number']);
+        });
+    }
+
+    public function test_model_lifecycle_guardrails_prevent_in_place_mutations_and_deletions_on_posted_documents(): void
+    {
+        $tenantId = $this->createTenant();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $orgUnitId = OrganizationUnitFixture::create([
+                'tenant_id' => $tenantId,
+                'name' => 'Main Org',
+                'code' => 'ORG-MAIN',
+            ]);
+
+            // 1. Invoice Guardrail
+            $invoice = new Invoice;
+            $invoice->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'invoice_number' => 'INV-LIFECYCLE-001',
+                'invoice_date' => '2026-05-01',
+                'due_date' => '2026-05-30',
+                'party_type' => 'customer',
+                'party_id' => 1,
+                'subtotal' => '100.000000',
+                'discount_total' => '0.000000',
+                'tax_total' => '0.000000',
+                'charge_total' => '0.000000',
+                'adjustment_total' => '0.000000',
+                'grand_total' => '100.000000',
+                'exchange_rate' => '1.000000',
+                'invoice_type' => InvoiceType::Manual,
+                'direction' => InvoiceDocDirection::Outbound,
+                'status' => InvoiceStatus::Posted,
+                'posted_at' => now(),
+            ]);
+            $invoice->save();
+
+            // Deleting posted invoice must throw LogicException
+            try {
+                $invoice->delete();
+                $this->fail('Expected deleting posted invoice to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Only draft invoices can be deleted', $e->getMessage());
+            }
+
+            // In-place mutation of financial attributes on posted invoice must throw LogicException
+            try {
+                $invoice->subtotal = '200.000000';
+                $invoice->save();
+                $this->fail('Expected mutating posted invoice subtotal to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Historical posted invoice financial attributes are immutable in place', $e->getMessage());
+            }
+
+            // 2. Payment Guardrail
+            $payment = new Payment;
+            $payment->forceFill([
+                'tenant_id' => $tenantId,
+                'payment_number' => 'PAY-LIFECYCLE-001',
+                'payment_type' => PaymentDocType::CustomerReceipt,
+                'direction' => PaymentDirection::Inbound,
+                'payment_date' => '2026-05-01',
+                'total_amount' => '100.000000',
+                'allocated_amount' => '0.000000',
+                'unapplied_amount' => '100.000000',
+                'refunded_amount' => '0.000000',
+                'document_status' => PaymentDocumentStatus::Approved,
+            ]);
+            $payment->save();
+
+            try {
+                $payment->delete();
+                $this->fail('Expected deleting posted payment to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Only draft payments can be archived', $e->getMessage());
+            }
+
+            try {
+                $payment->total_amount = '200.000000';
+                $payment->save();
+                $this->fail('Expected mutating posted payment total to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Historical posted payment financial attributes are immutable in place', $e->getMessage());
+            }
+
+            // 3. Payment Allocation Guardrail
+            $allocation = new PaymentAllocation;
+            $allocation->forceFill([
+                'tenant_id' => $tenantId,
+                'payment_id' => $payment->getKey(),
+                'invoice_id' => $invoice->getKey(),
+                'invoice_number_snapshot' => 'INV-LIFECYCLE-001',
+                'invoice_total' => '100.000000',
+                'invoice_balance_before' => '100.000000',
+                'previously_allocated_amount' => '0.000000',
+                'allocated_amount' => '50.000000',
+                'invoice_balance_after' => '50.000000',
+                'allocation_date' => '2026-05-02',
+                'invoice_exchange_rate_snapshot' => '1.000000',
+            ]);
+            $allocation->save();
+
+            try {
+                $allocation->delete();
+                $this->fail('Expected deleting payment allocation to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Payment allocations cannot be deleted', $e->getMessage());
+            }
+
+            try {
+                $allocation->allocated_amount = '75.000000';
+                $allocation->save();
+                $this->fail('Expected mutating payment allocation amount to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Payment allocation amounts and targets are immutable', $e->getMessage());
+            }
+
+            // 4. Expense Guardrail
+            $expenseTypeId = (int) DB::table('expense_types')->insertGetId([
+                'tenant_id' => $tenantId,
+                'name' => 'Office',
+                'code' => 'OFFICE',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $expense = new Expense;
+            $expense->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'expense_type_id' => $expenseTypeId,
+                'expense_type_code_snapshot' => 'OFFICE',
+                'expense_type_name_snapshot' => 'Office',
+                'payment_method_id_snapshot' => 1,
+                'payment_method_code_snapshot' => 'CASH',
+                'payment_method_name_snapshot' => 'Cash',
+                'payment_method_type_snapshot' => 'cash',
+                'expense_number' => 'EXP-LIFECYCLE-001',
+                'expense_date' => '2026-05-01',
+                'amount' => '50.000000',
+                'exchange_rate' => '1.000000',
+                'status' => ExpenseStatus::Posted,
+                'posted_at' => now(),
+            ]);
+            $expense->save();
+
+            try {
+                $expense->delete();
+                $this->fail('Expected deleting posted expense to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Expenses cannot be deleted', $e->getMessage());
+            }
+
+            try {
+                $expense->amount = '100.000000';
+                $expense->save();
+                $this->fail('Expected mutating posted expense amount to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Posted expenses are immutable in place', $e->getMessage());
+            }
+
+            // 5. Goods Receipt Note Guardrail
+            $warehouseId = $this->createWarehouse($tenantId);
+            $grn = new GoodsReceiptNote;
+            $grn->forceFill([
+                'tenant_id' => $tenantId,
+                'warehouse_id' => $warehouseId,
+                'grn_number' => 'GRN-LIFECYCLE-001',
+                'received_date' => '2026-05-01',
+                'status' => GoodsReceiptNoteStatus::Posted,
+                'subtotal' => '100.000000',
+                'grand_total' => '100.000000',
+                'posted_at' => now(),
+            ]);
+            $grn->save();
+
+            try {
+                $grn->delete();
+                $this->fail('Expected deleting posted GRN to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Only draft goods receipt notes can be deleted', $e->getMessage());
+            }
+
+            try {
+                $grn->grand_total = '150.000000';
+                $grn->save();
+                $this->fail('Expected mutating posted GRN grand total to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Posted goods receipt note attributes are immutable in place', $e->getMessage());
+            }
+        });
+    }
+
+    public function test_grn_reversal_propagates_reversal_date_to_inventory_and_finance(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId);
+        $item = $this->createItem($tenantId, 'ITEM-GRN-REV');
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId, $item): void {
+            FinancePostingFixture::seedSupplierInvoiceProfiles($tenantId);
+
+            $userId = (int) DB::table('users')->insertGetId([
+                'tenant_id' => $tenantId,
+                'first_name' => 'Purchasing',
+                'last_name' => 'Agent',
+                'email' => 'purchasing@example.com',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $supplierId = (int) DB::table('suppliers')->insertGetId([
+                'tenant_id' => $tenantId,
+                'supplier_number' => 'SUP-001',
+                'code' => 'SUP-001',
+                'name' => 'Test Supplier',
+                'supplier_type' => 'company',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $grnService = app(GoodsReceiptNoteService::class);
+            $coordinator = app(PurchaseGoodsReceiptPostingCoordinator::class);
+
+            // Create and post GRN on 2026-05-01
+            $grn = $grnService->create(new CreateGoodsReceiptNoteData(
+                tenantId: $tenantId,
+                receivedDate: '2026-05-01',
+                warehouseId: $warehouseId,
+                supplierId: $supplierId,
+                lines: [
+                    new GoodsReceiptNoteLineData(
+                        itemId: (int) $item->getKey(),
+                        uomId: (int) $item->base_uom_id,
+                        receivedQuantity: '10.000000',
+                        acceptedQuantity: '10.000000',
+                        unitPrice: '15.000000',
+                    ),
+                ],
+            ));
+            $postedGrn = $coordinator->post($grn, $userId);
+            $this->assertSame(GoodsReceiptNoteStatus::Posted, $postedGrn->status);
+
+            // Verify original inventory receipt movement has movement_date = '2026-05-01'
+            $receiptMovement = DB::table('inventory_movements')
+                ->where('tenant_id', $tenantId)
+                ->where('item_id', $item->getKey())
+                ->where('direction', 'in')
+                ->first();
+            $this->assertNotNull($receiptMovement);
+            $this->assertSame('2026-05-01', substr((string) $receiptMovement->movement_date, 0, 10));
+
+            // Reverse GRN on civil business date 2026-05-15
+            $reversedGrn = $coordinator->reverse(
+                $postedGrn,
+                '2026-05-15',
+                'Goods defective on inspection',
+                $userId,
+                $postedGrn->row_version,
+            );
+            $this->assertSame(GoodsReceiptNoteStatus::Reversed, $reversedGrn->status);
+
+            // Verify that the inventory reversal movement received the EXACT reversal business date (2026-05-15)
+            // and did NOT fall back to received_date (2026-05-01)!
+            $reversalMovement = DB::table('inventory_movements')
+                ->where('tenant_id', $tenantId)
+                ->where('item_id', $item->getKey())
+                ->where('direction', 'out')
+                ->first();
+            $this->assertNotNull($reversalMovement);
+            $this->assertSame('2026-05-15', substr((string) $reversalMovement->movement_date, 0, 10));
+
+            // Verify that the finance journal reversal entry also has journal_date = '2026-05-15'
+            $journalReversal = DB::table('finance_journal_entries')
+                ->where('tenant_id', $tenantId)
+                ->whereNotNull('reversal_of_id')
+                ->first();
+            $this->assertNotNull($journalReversal);
+            $this->assertSame('2026-05-15', substr((string) $journalReversal->journal_date, 0, 10));
+        });
+    }
+
+    public function test_aging_report_accounts_for_backdated_credit_allocations_via_operational_date(): void
+    {
+        $tenantId = $this->createTenant();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+            $agingService = app(AgingReportService::class);
+
+            $customerId = (int) DB::table('customers')->insertGetId([
+                'tenant_id' => $tenantId,
+                'customer_number' => 'CUS-CREDIT-01',
+                'code' => 'CUS-CREDIT-01',
+                'name' => 'Credit Customer',
+                'customer_type' => 'company',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // Create invoice on 2026-05-01 for $100
+            $invoiceId = (int) DB::table('invoices')->insertGetId([
+                'tenant_id' => $tenantId,
+                'invoice_number' => 'INV-CREDIT-001',
+                'invoice_date' => '2026-05-01',
+                'due_date' => '2026-05-30',
+                'party_type' => 'customer',
+                'party_id' => $customerId,
+                'subtotal' => '100.000000',
+                'discount_total' => '0.000000',
+                'tax_total' => '0.000000',
+                'charge_total' => '0.000000',
+                'adjustment_total' => '0.000000',
+                'grand_total' => '100.000000',
+                'exchange_rate' => '1.000000',
+                'invoice_type' => 'manual',
+                'direction' => 'outbound',
+                'status' => 'posted',
+                'created_at' => '2026-05-01 10:00:00',
+                'updated_at' => '2026-05-01 10:00:00',
+            ]);
+
+            DB::table('invoice_balances')->insert([
+                'tenant_id' => $tenantId,
+                'invoice_id' => $invoiceId,
+                'invoice_total' => '100.000000',
+                'paid_amount' => '0.000000',
+                'credit_allocated_amount' => '40.000000',
+                'remaining_amount' => '60.000000',
+                'status' => 'partially_paid',
+                'created_at' => '2026-05-01 10:00:00',
+                'updated_at' => '2026-05-01 10:00:00',
+            ]);
+
+            // Create a credit note invoice with operational invoice_date = '2026-05-20'
+            $creditInvoiceId = (int) DB::table('invoices')->insertGetId([
+                'tenant_id' => $tenantId,
+                'invoice_number' => 'INV-CN-001',
+                'invoice_date' => '2026-05-20',
+                'due_date' => '2026-05-20',
+                'party_type' => 'customer',
+                'party_id' => $customerId,
+                'subtotal' => '40.000000',
+                'discount_total' => '0.000000',
+                'tax_total' => '0.000000',
+                'charge_total' => '0.000000',
+                'adjustment_total' => '0.000000',
+                'grand_total' => '40.000000',
+                'exchange_rate' => '1.000000',
+                'invoice_type' => 'credit_note',
+                'direction' => 'outbound',
+                'status' => 'posted',
+                'created_at' => '2026-05-02 10:00:00', // physical timestamp was early!
+                'updated_at' => '2026-05-02 10:00:00',
+            ]);
+
+            // Create invoice credit allocation
+            DB::table('invoice_credit_allocations')->insert([
+                'tenant_id' => $tenantId,
+                'credit_source_type' => 'invoice',
+                'credit_source_id' => $creditInvoiceId,
+                'invoice_id' => $invoiceId,
+                'invoice_total' => '100.000000',
+                'previously_allocated_amount' => '0.000000',
+                'allocated_amount' => '40.000000',
+                'remaining_invoice_balance' => '60.000000',
+                'created_at' => '2026-05-02 10:00:00', // physical timestamp
+                'updated_at' => '2026-05-02 10:00:00',
+            ]);
+
+            // 1. As of 2026-05-10:
+            // Even though created_at was 2026-05-02, the return operational date is 2026-05-20.
+            // So on May 10, the credit is NOT effective yet! Remaining amount must be $100!
+            $reportMay10 = $agingService->receivables($tenantId, null, '2026-05-10');
+            $this->assertSame('100.000000', $reportMay10['total']);
+            $this->assertCount(1, $reportMay10['rows']);
+            $this->assertSame('100.000000', $reportMay10['rows'][0]['remaining_amount']);
+
+            // 2. As of 2026-05-25:
+            // The return date 2026-05-20 has passed. The credit is now effective! Remaining amount must be $60!
+            $reportMay25 = $agingService->receivables($tenantId, null, '2026-05-25');
+            $this->assertSame('60.000000', $reportMay25['total']);
+            $this->assertCount(1, $reportMay25['rows']);
+            $this->assertSame('60.000000', $reportMay25['rows'][0]['remaining_amount']);
+        });
+    }
+
+    public function test_uom_revision_reversal_uses_operational_movement_date_rather_than_created_at(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId);
+        $item = $this->createItem($tenantId, 'ITEM-UOM-REV');
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId, $item): void {
+            $uomBoxId = (int) DB::table('unit_of_measures')->insertGetId([
+                'tenant_id' => $tenantId,
+                'code' => 'BOX-'.Str::upper(Str::random(3)),
+                'name' => 'Box',
+                'symbol' => 'box',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $movements = app(StockMovementService::class);
+
+            // 1. Initial stock receipt of 50
+            $movements->record(new StockMovementData(
+                tenantId: $tenantId,
+                movementDate: '2026-04-01',
+                movementType: InventoryMovementType::Receipt,
+                direction: InventoryDirection::In,
+                itemId: (int) $item->getKey(),
+                warehouseId: $warehouseId,
+                quantity: '50.000000',
+                unitCost: '5.000000',
+            ));
+
+            // Record issue movement with operational movement_date = '2026-05-01'
+            $movement = $movements->record(new StockMovementData(
+                tenantId: $tenantId,
+                movementDate: '2026-05-01',
+                movementType: InventoryMovementType::Issue,
+                direction: InventoryDirection::Out,
+                itemId: (int) $item->getKey(),
+                warehouseId: $warehouseId,
+                quantity: '10.000000',
+                unitCost: '5.000000',
+            ));
+
+            // Force created_at to a future physical date (2026-05-25) to simulate late ingestion
+            DB::table('inventory_movements')->where('id', $movement->getKey())->update([
+                'created_at' => '2026-05-25 12:00:00',
+            ]);
+            $movement->refresh();
+
+            // 2. Create an applied ItemBaseUomRevision on 2026-05-10 (between movement_date May 1 and created_at May 25!)
+            // Old UOM: $item->base_uom_id, New UOM: $uomBoxId, factor = 2.000000 (1 box = 2 pcs)
+            DB::table('item_base_uom_revisions')->insert([
+                'tenant_id' => $tenantId,
+                'item_id' => (int) $item->getKey(),
+                'old_base_uom_id' => (int) $item->base_uom_id,
+                'new_base_uom_id' => $uomBoxId,
+                'conversion_factor' => '2.000000',
+                'status' => 'applied',
+                'effective_at' => '2026-05-10 09:00:00',
+                'applied_at' => '2026-05-10 09:00:00',
+                'reason' => 'Package size change',
+                'created_at' => '2026-05-10 09:00:00',
+                'updated_at' => '2026-05-10 09:00:00',
+            ]);
+
+            // Update item to use new base UOM
+            $item->base_uom_id = $uomBoxId;
+            $item->save();
+
+            // 3. Reversing the issue movement must succeed using the revision applied on May 10
+            // Because movement_date was May 1 (before revision May 10), even though created_at was May 25!
+            $reversed = $movements->reverse($movement);
+            $this->assertSame('reversed', $movement->refresh()->status->value);
+            // In new base UOM: quantity is 10 * 2 = 20
+            $this->assertSame('20.000000', (string) $reversed->quantity);
         });
     }
 

@@ -14,6 +14,7 @@ namespace Modules\Selling\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\Models\Invoice;
@@ -28,6 +29,24 @@ final class Sale extends TenantOwnedModel
     protected $table = 'sales';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (Sale $sale): void {
+            if ($sale->getOriginal('posted_at') !== null) {
+                $immutable = ['sale_date', 'customer_id', 'warehouse_id', 'warehouse_location_id', 'invoice_id', 'tenant_id'];
+                if ($sale->isDirty($immutable)) {
+                    throw new LogicException('Posted sales are immutable in place.');
+                }
+            }
+        });
+
+        self::deleting(static function (Sale $sale): void {
+            if ($sale->posted_at !== null) {
+                throw new LogicException('Posted sales cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

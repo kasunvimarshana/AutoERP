@@ -116,11 +116,12 @@ final class InventoryMovementReversalService
 
         $factor = '1.000000';
         $currentUomId = $fromUomId;
+        $movementDate = $movement->movement_date?->toDateString() ?? $movement->created_at?->toDateString();
         $revisions = ItemBaseUomRevision::query()
             ->where('tenant_id', $movement->tenant_id)
             ->where('item_id', $movement->item_id)
             ->where('status', ItemBaseUomRevisionStatus::Applied->value)
-            ->where('applied_at', '>=', $movement->created_at)
+            ->whereDate('applied_at', '>=', $movementDate)
             ->orderBy('applied_at')
             ->orderBy('id')
             ->get();

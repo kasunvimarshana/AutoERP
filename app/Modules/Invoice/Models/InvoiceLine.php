@@ -14,8 +14,10 @@ namespace Modules\Invoice\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Invoice\Enums\InvoiceLineType;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Item\Models\Item;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
@@ -24,6 +26,21 @@ use Modules\UOM\Models\UnitOfMeasureModel;
 final class InvoiceLine extends TenantOwnedModel
 {
     protected $table = 'invoice_lines';
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InvoiceLine $line): void {
+            if ($line->invoice && $line->invoice->status !== InvoiceStatus::Draft) {
+                throw new LogicException('Invoice lines of non-draft invoices cannot be modified.');
+            }
+        });
+
+        self::deleting(static function (InvoiceLine $line): void {
+            if ($line->invoice && $line->invoice->status !== InvoiceStatus::Draft) {
+                throw new LogicException('Invoice lines of non-draft invoices cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

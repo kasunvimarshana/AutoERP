@@ -143,15 +143,23 @@ final class StockTransferService
         });
     }
 
-    public function receive(InventoryTransfer $transfer, ?int $receivedBy = null): InventoryTransfer
-    {
-        return DB::transaction(function () use ($transfer, $receivedBy): InventoryTransfer {
+    public function receive(
+        InventoryTransfer $transfer,
+        ?int $receivedBy = null,
+        ?string $receivedDate = null,
+    ): InventoryTransfer {
+        return DB::transaction(function () use ($transfer, $receivedBy, $receivedDate): InventoryTransfer {
             $transfer = InventoryTransfer::query()
                 ->with('lines')
                 ->lockForUpdate()
                 ->findOrFail($transfer->getKey());
             if (! in_array($transfer->status, [TransferStatus::Dispatched, TransferStatus::InTransit], true)) {
                 throw new InvalidArgumentException('Only dispatched inventory transfers can be received.');
+            }
+
+            $effectiveDate = $receivedDate ?? $transfer->transfer_date->toDateString();
+            if ($effectiveDate < $transfer->transfer_date->toDateString()) {
+                throw new InvalidArgumentException('Transfer receive date cannot be before the transfer date.');
             }
 
             foreach ($transfer->lines as $line) {
@@ -164,7 +172,7 @@ final class StockTransferService
                 }
                 $inbound = $this->movements->record(new StockMovementData(
                     tenantId: (int) $transfer->tenant_id,
-                    movementDate: $transfer->transfer_date->toDateString(),
+                    movementDate: $effectiveDate,
                     movementType: InventoryMovementType::TransferIn,
                     direction: InventoryDirection::In,
                     itemId: (int) $line->item_id,

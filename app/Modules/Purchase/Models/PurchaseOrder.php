@@ -15,6 +15,7 @@ namespace Modules\Purchase\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
@@ -33,6 +34,19 @@ final class PurchaseOrder extends TenantOwnedModel
     protected $table = 'purchase_orders';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (PurchaseOrder $order): void {
+            $status = $order->status instanceof PurchaseOrderStatus
+                ? $order->status
+                : PurchaseOrderStatus::from((string) $order->status);
+
+            if ($status !== PurchaseOrderStatus::Draft) {
+                throw new LogicException('Only draft purchase orders can be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

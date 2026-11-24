@@ -17,8 +17,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Purchase\Models\Concerns\HasPurchaseRowVersion;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 
 final class PurchaseDebitNote extends TenantOwnedModel
@@ -30,9 +30,19 @@ final class PurchaseDebitNote extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::updating(static function (self $document): void {
+        self::updating(static function (self $document): void {
             if ($document->isDirty('currency_id')) {
                 throw new LogicException('Purchase financial document currency cannot change after creation.');
+            }
+        });
+
+        self::deleting(static function (self $document): void {
+            $status = $document->status instanceof PurchaseDebitNoteStatus
+                ? $document->status
+                : PurchaseDebitNoteStatus::from((string) $document->status);
+
+            if ($status !== PurchaseDebitNoteStatus::Draft) {
+                throw new LogicException('Only draft purchase debit notes can be deleted.');
             }
         });
     }

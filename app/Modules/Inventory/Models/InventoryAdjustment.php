@@ -15,6 +15,7 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\AdjustmentStatus;
 use Modules\Inventory\Enums\AdjustmentType;
@@ -28,6 +29,19 @@ final class InventoryAdjustment extends TenantOwnedModel
     protected $table = 'inventory_adjustments';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (InventoryAdjustment $adjustment): void {
+            $status = $adjustment->status instanceof AdjustmentStatus
+                ? $adjustment->status
+                : AdjustmentStatus::from((string) $adjustment->status);
+
+            if ($status !== AdjustmentStatus::Draft) {
+                throw new LogicException('Only draft inventory adjustments can be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

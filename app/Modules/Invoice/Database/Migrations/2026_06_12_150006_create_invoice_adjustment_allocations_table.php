@@ -50,7 +50,7 @@ return new class extends Migration
             $table->foreign(['invoice_id', 'tenant_id'], 'invoice_adjustment_allocations_invoice_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('invoices')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['invoice_adjustment_id', 'tenant_id'], 'invoice_adjustment_allocations_inv_adjustment_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('invoice_adjustments')

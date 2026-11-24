@@ -14,6 +14,7 @@ namespace Modules\Selling\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\InventoryMovement;
@@ -29,6 +30,15 @@ final class SaleLine extends TenantOwnedModel
     protected $table = 'sale_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (SaleLine $line): void {
+            if ($line->sale && $line->sale->posted_at !== null) {
+                throw new LogicException('Lines of posted sales cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

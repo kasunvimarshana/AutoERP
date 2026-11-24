@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use InvalidArgumentException;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\PaymentAllocationState;
@@ -73,13 +73,39 @@ final class Payment extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        self::deleting(function (Payment $payment): void {
+        self::updating(static function (Payment $payment): void {
+            $originalStatus = $payment->getOriginal('document_status');
+            $originalStatusEnum = $originalStatus instanceof PaymentDocumentStatus
+                ? $originalStatus
+                : ($originalStatus !== null ? PaymentDocumentStatus::tryFrom((string) $originalStatus) : null);
+
+            if ($originalStatusEnum !== null && $originalStatusEnum !== PaymentDocumentStatus::Draft) {
+                $immutableAttributes = [
+                    'payment_number',
+                    'payment_date',
+                    'payment_type',
+                    'direction',
+                    'party_id',
+                    'party_type',
+                    'currency_id',
+                    'exchange_rate',
+                    'total_amount',
+                    'tenant_id',
+                    'organization_unit_id',
+                ];
+                if ($payment->isDirty($immutableAttributes)) {
+                    throw new LogicException('Historical posted payment financial attributes are immutable in place. Use governed reversal or adjustment.');
+                }
+            }
+        });
+
+        self::deleting(static function (Payment $payment): void {
             $status = $payment->document_status instanceof PaymentDocumentStatus
                 ? $payment->document_status
                 : PaymentDocumentStatus::from((string) $payment->document_status);
 
             if ($status !== PaymentDocumentStatus::Draft) {
-                throw new InvalidArgumentException('Only draft payments can be archived.');
+                throw new LogicException('Only draft payments can be archived.');
             }
         });
     }

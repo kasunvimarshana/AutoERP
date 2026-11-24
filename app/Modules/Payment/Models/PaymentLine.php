@@ -13,13 +13,24 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Tenant\Models\TenantModel;
 
 final class PaymentLine extends TenantOwnedModel
 {
     protected $table = 'payment_lines';
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (PaymentLine $line): void {
+            if ($line->payment && $line->payment->document_status !== PaymentDocumentStatus::Draft) {
+                throw new LogicException('Lines of non-draft payments cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

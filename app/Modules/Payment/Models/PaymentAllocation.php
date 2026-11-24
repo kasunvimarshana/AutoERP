@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\AllocationStatus;
@@ -23,6 +24,26 @@ final class PaymentAllocation extends TenantOwnedModel
     public const ACTIVE_IDENTITY_SLOT = 1;
 
     protected $table = 'payment_allocations';
+
+    protected static function booted(): void
+    {
+        self::updating(static function (PaymentAllocation $allocation): void {
+            $immutableAttributes = [
+                'invoice_id',
+                'payment_id',
+                'allocation_date',
+                'allocated_amount',
+                'tenant_id',
+            ];
+            if ($allocation->isDirty($immutableAttributes)) {
+                throw new LogicException('Payment allocation amounts and targets are immutable. Reverse the allocation instead.');
+            }
+        });
+
+        self::deleting(static function (): never {
+            throw new LogicException('Payment allocations cannot be deleted. Use governed reversal to undo an allocation.');
+        });
+    }
 
     protected function casts(): array
     {

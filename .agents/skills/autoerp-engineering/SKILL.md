@@ -71,8 +71,10 @@ Migrations represent **immutable database schema specifications**, not dynamic a
 - **Token Rotation Grace Window:** Refresh token rotation must provide an idempotent concurrency grace window (30 seconds) to prevent simultaneous API requests from triggering false token revocation.
 - **Dual-Timestamp Architecture & Backdated CRUD Safety:**
   - Authoritative physical timestamps (`created_at`, `posted_at`, `reversed_at`, `updated_at`, `deleted_at`) represent the server-owned moment of recording and must never be altered or accepted from user input.
-  - Operational business dates (`invoice_date`, `movement_date`, `received_date`, `layer_date`, `payment_date`, `journal_date`) represent civil legal facts and govern all accounting periods, tax filing intervals, chronological valuation queues, and ledger aging.
-  - Backdated entries must update chronological running projections, prevent multi-period intermediate negative stock, validate reversals against business posting dates, and record FIFO layers with explicit `layer_date`.
+  - Operational business dates (`invoice_date`, `movement_date`, `received_date`, `layer_date`, `payment_date`, `journal_date`) represent civil legal facts and govern all accounting periods, tax filing intervals, chronological valuation queues, point-in-time aging, and ledger sequencing.
+  - Backdated CREATE: Operational documents may be created backdated if within open accounting periods, valid non-future dates, and downstream projections prevent intermediate negative running balances.
+  - In-Place Immutability (UPDATE/DELETE): Posted, approved, or finalized transaction documents are strictly immutable in place. Core models enforce lifecycle `booted()` hooks throwing `LogicException` on illegal mutations or deletions. All adjustments must be separate linked audit records.
+  - Operational Date Priority: Point-in-time reporting and UOM revision lookups must always filter and sequence by civil operational dates, never falling back to physical server timestamps (`created_at`, `updated_at`).
 
 ---
 

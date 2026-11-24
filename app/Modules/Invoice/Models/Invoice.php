@@ -39,6 +39,34 @@ final class Invoice extends TenantOwnedModel
             if (! $invoice->isDirty('row_version')) {
                 $invoice->row_version = ((int) $invoice->getOriginal('row_version')) + 1;
             }
+
+            $originalStatus = $invoice->getOriginal('status');
+            $originalStatusEnum = $originalStatus instanceof InvoiceStatus
+                ? $originalStatus
+                : ($originalStatus !== null ? InvoiceStatus::tryFrom((string) $originalStatus) : null);
+
+            if ($originalStatusEnum !== null && $originalStatusEnum !== InvoiceStatus::Draft) {
+                $immutableAttributes = [
+                    'invoice_number',
+                    'invoice_date',
+                    'currency_id',
+                    'party_id',
+                    'party_type',
+                    'direction',
+                    'invoice_type',
+                    'tenant_id',
+                    'organization_unit_id',
+                    'subtotal',
+                    'tax_total',
+                    'discount_total',
+                    'charge_total',
+                    'adjustment_total',
+                    'grand_total',
+                ];
+                if ($invoice->isDirty($immutableAttributes)) {
+                    throw new LogicException('Historical posted invoice financial attributes are immutable in place. Use credit/debit notes or governed adjustments.');
+                }
+            }
         });
 
         self::deleting(static function (Invoice $invoice): void {

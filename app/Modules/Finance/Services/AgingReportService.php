@@ -97,19 +97,48 @@ final class AgingReportService
             ->select('allocations.invoice_id', DB::raw('SUM(allocations.allocated_amount) as total_paid'))
             ->pluck('total_paid', 'allocations.invoice_id');
 
-        $creditsByInvoice = DB::table('invoice_credit_allocations')
-            ->where('tenant_id', $tenantId)
-            ->whereDate('created_at', '<=', $asOfDateStr)
-            ->groupBy('invoice_id')
-            ->select('invoice_id', DB::raw('SUM(allocated_amount) as total_credit'))
-            ->pluck('total_credit', 'invoice_id');
+        $creditsByInvoice = DB::table('invoice_credit_allocations as credits')
+            ->leftJoin('sale_returns as returns', function (JoinClause $join): void {
+                $join->on('returns.id', '=', 'credits.credit_source_id')
+                    ->on('returns.tenant_id', '=', 'credits.tenant_id');
+            })
+            ->leftJoin('invoices as credit_invoices', function (JoinClause $join): void {
+                $join->on('credit_invoices.id', '=', 'credits.credit_source_id')
+                    ->on('credit_invoices.tenant_id', '=', 'credits.tenant_id');
+            })
+            ->where('credits.tenant_id', $tenantId)
+            ->where(function ($query) use ($asOfDateStr): void {
+                $query->whereDate('returns.return_date', '<=', $asOfDateStr)
+                    ->orWhere(function ($q) use ($asOfDateStr): void {
+                        $q->whereNull('returns.return_date')
+                            ->whereDate('credit_invoices.invoice_date', '<=', $asOfDateStr);
+                    })
+                    ->orWhere(function ($q) use ($asOfDateStr): void {
+                        $q->whereNull('returns.return_date')
+                            ->whereNull('credit_invoices.invoice_date')
+                            ->whereDate('credits.created_at', '<=', $asOfDateStr);
+                    });
+            })
+            ->groupBy('credits.invoice_id')
+            ->select('credits.invoice_id', DB::raw('SUM(credits.allocated_amount) as total_credit'))
+            ->pluck('total_credit', 'credits.invoice_id');
 
-        $adjustmentsByInvoice = DB::table('invoice_adjustment_allocations')
-            ->where('tenant_id', $tenantId)
-            ->whereDate('created_at', '<=', $asOfDateStr)
-            ->groupBy('invoice_id')
-            ->select('invoice_id', DB::raw('SUM(allocated_amount) as total_adj'))
-            ->pluck('total_adj', 'invoice_id');
+        $adjustmentsByInvoice = DB::table('invoice_adjustment_allocations as adjustments')
+            ->leftJoin('invoices', function (JoinClause $join): void {
+                $join->on('invoices.id', '=', 'adjustments.invoice_id')
+                    ->on('invoices.tenant_id', '=', 'adjustments.tenant_id');
+            })
+            ->where('adjustments.tenant_id', $tenantId)
+            ->where(function ($query) use ($asOfDateStr): void {
+                $query->whereDate('invoices.invoice_date', '<=', $asOfDateStr)
+                    ->orWhere(function ($q) use ($asOfDateStr): void {
+                        $q->whereNull('invoices.invoice_date')
+                            ->whereDate('adjustments.created_at', '<=', $asOfDateStr);
+                    });
+            })
+            ->groupBy('adjustments.invoice_id')
+            ->select('adjustments.invoice_id', DB::raw('SUM(adjustments.allocated_amount) as total_adj'))
+            ->pluck('total_adj', 'adjustments.invoice_id');
 
         $invoiceReversals = DB::table('finance_journal_entries as original')
             ->join('finance_journal_entries as reversal', function (JoinClause $join): void {

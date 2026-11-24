@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Expense\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Expense\Enums\ExpenseStatus;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -23,6 +24,35 @@ final class Expense extends TenantOwnedModel
     protected $table = 'expenses';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (Expense $expense): void {
+            $originalStatus = $expense->getOriginal('status');
+            $originalStatusEnum = $originalStatus instanceof ExpenseStatus
+                ? $originalStatus
+                : ($originalStatus !== null ? ExpenseStatus::tryFrom((string) $originalStatus) : null);
+
+            if ($originalStatusEnum === ExpenseStatus::Posted || $originalStatusEnum === ExpenseStatus::Reversed) {
+                $immutableAttributes = [
+                    'expense_date',
+                    'amount',
+                    'currency_id',
+                    'exchange_rate',
+                    'expense_type_id',
+                    'tenant_id',
+                    'organization_unit_id',
+                ];
+                if ($expense->isDirty($immutableAttributes)) {
+                    throw new LogicException('Posted expenses are immutable in place. Use governed reversal instead.');
+                }
+            }
+        });
+
+        self::deleting(static function (): never {
+            throw new LogicException('Expenses cannot be deleted. Use governed reversal instead.');
+        });
+    }
 
     protected function casts(): array
     {

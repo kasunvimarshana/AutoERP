@@ -340,9 +340,13 @@ final class GoodsReceiptNoteService
         });
     }
 
-    public function reverse(GoodsReceiptNote $grn, ?int $reversedBy = null, ?int $expectedVersion = null): GoodsReceiptNote
-    {
-        return DB::transaction(function () use ($grn, $reversedBy, $expectedVersion): GoodsReceiptNote {
+    public function reverse(
+        GoodsReceiptNote $grn,
+        ?int $reversedBy = null,
+        ?int $expectedVersion = null,
+        ?string $reversalDate = null,
+    ): GoodsReceiptNote {
+        return DB::transaction(function () use ($grn, $reversedBy, $expectedVersion, $reversalDate): GoodsReceiptNote {
             $locked = $this->lockGoodsReceiptForMutation($grn);
             $this->assertExpectedVersion($locked, $expectedVersion);
 
@@ -369,10 +373,10 @@ final class GoodsReceiptNoteService
 
                 if ($line->batchAllocations->isNotEmpty()) {
                     foreach ($line->batchAllocations as $allocation) {
-                        $this->inventory->reverseReceiptBatchAllocation($allocation, $reversedBy);
+                        $this->inventory->reverseReceiptBatchAllocation($allocation, $reversedBy, reversalDate: $reversalDate);
                     }
                 } else {
-                    $this->inventory->reverseReceipt($locked, $line, $reversedBy);
+                    $this->inventory->reverseReceipt($locked, $line, $reversedBy, reversalDate: $reversalDate);
                 }
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
                     $this->orderQuantities->reverseReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);

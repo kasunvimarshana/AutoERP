@@ -14,11 +14,13 @@ namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
+use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class GoodsReceiptNoteLine extends TenantOwnedModel
@@ -26,6 +28,15 @@ final class GoodsReceiptNoteLine extends TenantOwnedModel
     protected $table = 'goods_receipt_note_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (GoodsReceiptNoteLine $line): void {
+            if ($line->goodsReceiptNote && $line->goodsReceiptNote->status !== GoodsReceiptNoteStatus::Draft) {
+                throw new LogicException('Lines of non-draft goods receipt notes cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

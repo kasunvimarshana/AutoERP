@@ -15,6 +15,7 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\TransferStatus;
 use Modules\Warehouse\Models\WarehouseLocationModel;
@@ -27,6 +28,19 @@ final class InventoryTransfer extends TenantOwnedModel
     protected $table = 'inventory_transfers';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (InventoryTransfer $transfer): void {
+            $status = $transfer->status instanceof TransferStatus
+                ? $transfer->status
+                : TransferStatus::from((string) $transfer->status);
+
+            if ($status !== TransferStatus::Draft) {
+                throw new LogicException('Only draft inventory transfers can be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

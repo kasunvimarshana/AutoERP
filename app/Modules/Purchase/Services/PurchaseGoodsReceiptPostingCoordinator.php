@@ -67,7 +67,7 @@ final class PurchaseGoodsReceiptPostingCoordinator
                 return $current->load(['lines.inventoryMovement', 'adjustments']);
             }
 
-            $reversed = $this->goodsReceipts->reverse($current, $actorId, $expectedVersion);
+            $reversed = $this->goodsReceipts->reverse($current, $actorId, $expectedVersion, $reversalDate);
             $this->finance->reverse($reversed, $reversalDate, $reason, $actorId);
 
             return $reversed->refresh()->load(['lines.inventoryMovement', 'adjustments']);

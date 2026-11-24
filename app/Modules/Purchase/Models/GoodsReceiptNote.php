@@ -15,6 +15,7 @@ namespace Modules\Purchase\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Models\Concerns\HasPurchaseRowVersion;
@@ -31,6 +32,47 @@ final class GoodsReceiptNote extends TenantOwnedModel
     protected $table = 'goods_receipt_notes';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (GoodsReceiptNote $grn): void {
+            $originalStatus = $grn->getOriginal('status');
+            $originalStatusEnum = $originalStatus instanceof GoodsReceiptNoteStatus
+                ? $originalStatus
+                : ($originalStatus !== null ? GoodsReceiptNoteStatus::tryFrom((string) $originalStatus) : null);
+
+            if ($originalStatusEnum !== null && $originalStatusEnum !== GoodsReceiptNoteStatus::Draft) {
+                $immutableAttributes = [
+                    'grn_number',
+                    'received_date',
+                    'supplier_id',
+                    'warehouse_id',
+                    'warehouse_location_id',
+                    'purchase_order_id',
+                    'subtotal',
+                    'discount_total',
+                    'tax_total',
+                    'charge_total',
+                    'grand_total',
+                    'tenant_id',
+                    'organization_unit_id',
+                ];
+                if ($grn->isDirty($immutableAttributes)) {
+                    throw new LogicException('Posted goods receipt note attributes are immutable in place. Use governed reversal instead.');
+                }
+            }
+        });
+
+        self::deleting(static function (GoodsReceiptNote $grn): void {
+            $status = $grn->status instanceof GoodsReceiptNoteStatus
+                ? $grn->status
+                : GoodsReceiptNoteStatus::from((string) $grn->status);
+
+            if ($status !== GoodsReceiptNoteStatus::Draft) {
+                throw new LogicException('Only draft goods receipt notes can be deleted. Use governed reversal to reverse posted receipts.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

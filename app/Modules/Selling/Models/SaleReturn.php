@@ -14,6 +14,7 @@ namespace Modules\Selling\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Invoice\Models\Invoice;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -30,6 +31,15 @@ final class SaleReturn extends TenantOwnedModel
     protected $table = 'sale_returns';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (SaleReturn $saleReturn): void {
+            if ($saleReturn->posted_at !== null) {
+                throw new LogicException('Posted sale returns cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

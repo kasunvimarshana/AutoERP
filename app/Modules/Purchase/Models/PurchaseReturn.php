@@ -34,9 +34,19 @@ final class PurchaseReturn extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::updating(static function (self $document): void {
+        self::updating(static function (self $document): void {
             if ($document->isDirty('currency_id')) {
                 throw new LogicException('Purchase financial document currency cannot change after creation.');
+            }
+        });
+
+        self::deleting(static function (self $document): void {
+            $status = $document->status instanceof PurchaseReturnStatus
+                ? $document->status
+                : PurchaseReturnStatus::from((string) $document->status);
+
+            if ($status !== PurchaseReturnStatus::Draft) {
+                throw new LogicException('Only draft purchase returns can be deleted.');
             }
         });
     }
