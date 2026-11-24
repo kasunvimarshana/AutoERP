@@ -70,6 +70,10 @@ use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseGoodsReceiptPostingCoordinator;
 use Modules\Purchase\Services\Tax\GoodsReceiptNoteTaxDocumentMapper;
+use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Tests\Support\FinancePostingFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
@@ -975,6 +979,68 @@ final class BackdatedCrudSafetyTest extends TestCase
                 $this->fail('Expected mutating posted GRN grand total to throw LogicException.');
             } catch (LogicException $e) {
                 $this->assertStringContainsString('Posted goods receipt note attributes are immutable in place', $e->getMessage());
+            }
+
+            // 6. Vehicle Service Job & Line Guardrail
+            $serviceCustomerId = (int) DB::table('customers')->insertGetId([
+                'tenant_id' => $tenantId,
+                'customer_number' => 'CUS-VSJ-001',
+                'code' => 'CUS-VSJ-001',
+                'name' => 'Service Customer',
+                'customer_type' => 'individual',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $serviceVehicleId = (int) DB::table('vehicles')->insertGetId([
+                'tenant_id' => $tenantId,
+                'vehicle_number' => 'VEH-001',
+                'registration_number' => 'CAB-1234',
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $job = new VehicleServiceJob;
+            $job->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'job_number' => 'JOB-LIFECYCLE-001',
+                'customer_id' => $serviceCustomerId,
+                'vehicle_id' => $serviceVehicleId,
+                'type' => 'inspection',
+                'status' => VehicleServiceJobStatus::Invoiced,
+                'job_date' => '2026-05-01',
+                'grand_total' => '250.000000',
+            ]);
+            $job->save();
+
+            try {
+                $job->delete();
+                $this->fail('Expected deleting invoiced vehicle service job to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Completed or invoiced service jobs cannot be deleted', $e->getMessage());
+            }
+
+            $jobLine = new VehicleServiceJobLine;
+            $jobLine->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'vehicle_service_job_id' => $job->getKey(),
+                'line_number' => 1,
+                'line_source_type' => VehicleServiceLineSourceType::ServiceItem,
+                'description' => 'Inspection Line',
+                'quantity' => '1.000000',
+                'line_total' => '250.000000',
+            ]);
+            $jobLine->save();
+
+            try {
+                $jobLine->delete();
+                $this->fail('Expected deleting line of invoiced service job to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of invoiced or paid service jobs cannot be deleted', $e->getMessage());
             }
         });
     }

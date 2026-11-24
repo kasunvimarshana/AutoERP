@@ -14,6 +14,7 @@ namespace Modules\VehicleService\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\InventoryBatchPriceRevision;
@@ -21,6 +22,7 @@ use Modules\Inventory\Models\InventoryMovement;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
+use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 
@@ -114,5 +116,26 @@ final class VehicleServiceJobLine extends TenantOwnedModel
     public function employeeAssignments(): HasMany
     {
         return $this->hasMany(VehicleServiceLineEmployee::class, 'vehicle_service_job_line_id');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (self $line): void {
+            $job = $line->job()->first();
+            if ($job === null) {
+                return;
+            }
+            $status = $job->status instanceof VehicleServiceJobStatus
+                ? $job->status
+                : VehicleServiceJobStatus::tryFrom((string) $job->status);
+
+            if (in_array($status, [
+                VehicleServiceJobStatus::Invoiced,
+                VehicleServiceJobStatus::PartiallyPaid,
+                VehicleServiceJobStatus::Paid,
+            ], true)) {
+                throw new LogicException('Lines of invoiced or paid service jobs cannot be deleted.');
+            }
+        });
     }
 }

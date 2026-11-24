@@ -60,6 +60,7 @@ Added status-aware `updating()` and `deleting()` lifecycle hooks across core tra
 - **`Sale` & `SaleLine`**: Blocks deletion or in-place modification once `posted_at` is set.
 - **`SaleReturn`**: Blocks deletion once `posted_at` is set.
 - **`InventoryTransfer` & `InventoryAdjustment`**: Blocks deletion of non-draft transfers and stock adjustments.
+- **`VehicleServiceJob` & `VehicleServiceJobLine`**: Blocks deletion of completed or invoiced jobs and protects service job lines from deletion once billed/invoiced.
 
 ---
 
@@ -90,7 +91,9 @@ Added status-aware `updating()` and `deleting()` lifecycle hooks across core tra
 | `app/Modules/Selling/Models/SaleReturn.php` | Added `deleting()` hook protecting posted sale returns. |
 | `app/Modules/Inventory/Models/InventoryTransfer.php` | Added `deleting()` hook protecting non-draft inventory transfers. |
 | `app/Modules/Inventory/Models/InventoryAdjustment.php` | Added `deleting()` hook protecting non-draft stock adjustments. |
-| `tests/Feature/Core/BackdatedCrudSafetyTest.php` | Expanded test suite with 4 new comprehensive test methods covering lifecycle guardrails, GRN reversal date propagation, credit allocation operational dates, and UOM revision reversal dates. |
+| `app/Modules/VehicleService/Models/VehicleServiceJob.php` | Added `deleting()` hook protecting completed, invoiced, and paid vehicle service jobs. |
+| `app/Modules/VehicleService/Models/VehicleServiceJobLine.php` | Added `deleting()` hook protecting lines of invoiced and paid service jobs. |
+| `tests/Feature/Core/BackdatedCrudSafetyTest.php` | Expanded test suite with comprehensive test methods covering lifecycle guardrails, GRN reversal date propagation, credit allocation operational dates, and UOM revision reversal dates. |
 | `AGENTS.md` | Codified permanent rules for Dual-Timestamp Architecture and Backdated CRUD Safety. |
 | `.agents/skills/autoerp-engineering/SKILL.md` | Updated engineering procedures with permanent Backdated CRUD rules. |
 
@@ -100,7 +103,7 @@ Added status-aware `updating()` and `deleting()` lifecycle hooks across core tra
 
 | Quality Gate | Tooling / Command | Result |
 |---|---|---|
-| **Backdated CRUD Safety Suite** | `php artisan test tests/Feature/Core/BackdatedCrudSafetyTest.php` | **PASS (13 passed, 65 assertions)** |
+| **Backdated CRUD Safety Suite** | `php artisan test tests/Feature/Core/BackdatedCrudSafetyTest.php` | **PASS (13 passed, 67 assertions)** |
 | **Purchase Engine Suite** | `php artisan test app/Modules/Purchase/Tests/PurchaseEngineTest.php` | **PASS (38 passed, 174 assertions)** |
 | **Payment Crud & Settlement Suite** | `php artisan test app/Modules/Payment/Tests/PaymentCrudTest.php app/Modules/Payment/Tests/PaymentSettlementServiceTest.php` | **PASS (12 passed, 39 assertions)** |
 | **Expense & Invoice Settlement Suite** | `php artisan test app/Modules/Invoice/Tests/InvoiceSettlementServiceTest.php app/Modules/Expense/Tests/ExpensePostingTest.php` | **PASS (5 passed, 42 assertions)** |

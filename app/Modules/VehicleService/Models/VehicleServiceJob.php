@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Hr\Models\HrEmployee;
@@ -159,5 +160,23 @@ final class VehicleServiceJob extends TenantOwnedModel
     public function feedbacks(): HasMany
     {
         return $this->hasMany(VehicleServiceJobFeedback::class, 'vehicle_service_job_id')->latest('created_at');
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (self $job): void {
+            $status = $job->status instanceof VehicleServiceJobStatus
+                ? $job->status
+                : VehicleServiceJobStatus::tryFrom((string) $job->status);
+
+            if (in_array($status, [
+                VehicleServiceJobStatus::Completed,
+                VehicleServiceJobStatus::Invoiced,
+                VehicleServiceJobStatus::PartiallyPaid,
+                VehicleServiceJobStatus::Paid,
+            ], true)) {
+                throw new LogicException('Completed or invoiced service jobs cannot be deleted; use governed cancellation.');
+            }
+        });
     }
 }
