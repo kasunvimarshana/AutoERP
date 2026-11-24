@@ -17,6 +17,7 @@ use Modules\Customer\Providers\CustomerServiceProvider;
 use Modules\Expense\Providers\ExpenseServiceProvider;
 use Modules\Finance\Providers\FinanceServiceProvider;
 use Modules\Hr\Providers\HrServiceProvider;
+use Modules\Payroll\Providers\PayrollServiceProvider;
 use Modules\Idempotency\Providers\IdempotencyServiceProvider;
 use Modules\Inventory\Providers\InventoryServiceProvider;
 use Modules\Invoice\Providers\InvoiceServiceProvider;
@@ -60,6 +61,7 @@ return [
     VoucherServiceProvider::class,
     ReportingServiceProvider::class,
     HrServiceProvider::class,
+    PayrollServiceProvider::class,
     ItemServiceProvider::class,
     InventoryServiceProvider::class,
     PurchaseServiceProvider::class,

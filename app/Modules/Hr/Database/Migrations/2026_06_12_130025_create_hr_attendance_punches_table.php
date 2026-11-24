@@ -41,8 +41,8 @@ return new class extends Migration
             $table->index(['employee_id', 'attendance_date', 'punch_time'], 'hr_att_punches_emp_date_time_ix');
             $table->index(['attendance_record_id', 'is_ignored'], 'hr_att_punches_rec_ignore_ix');
 
-            $table->foreign(['attendance_record_id', 'tenant_id'], 'hr_att_punches_record_tenant_fk')
-                ->references(['id', 'tenant_id'])
+            $table->foreign('attendance_record_id', 'hr_att_punches_record_fk')
+                ->references('id')
                 ->on('hr_attendance_records')
                 ->nullOnDelete();
             $table->foreign(['employee_id', 'tenant_id'], 'hr_att_punches_employee_tenant_fk')

@@ -44,5 +44,7 @@ final class TenantFeature
 
     public const REPORTING = 'reporting';
 
+    public const PAYROLL = 'payroll';
+
     private function __construct() {}
 }

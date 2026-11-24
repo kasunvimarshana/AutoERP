@@ -440,6 +440,9 @@ const EmployeeDetailPage = lazy(
 const RosterSchedulerPage = lazy(() => import("@/modules/hr/RosterSchedulerPage"));
 const AttendanceManagementPage = lazy(() => import("@/modules/hr/AttendanceManagementPage"));
 const LeaveManagementPage = lazy(() => import("@/modules/hr/LeaveManagementPage"));
+const SalaryStructurePage = lazy(() => import("@/modules/payroll/SalaryStructurePage"));
+const PayRunManagementPage = lazy(() => import("@/modules/payroll/PayRunManagementPage"));
+const EmployeePayslipPage = lazy(() => import("@/modules/payroll/EmployeePayslipPage"));
 const VehicleServiceJobListPage = lazy(
     () => import("@/modules/vehicle-service/pages/VehicleServiceJobListPage"),
 );
@@ -1138,6 +1141,18 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/hr/leaves"
                             element={<LeaveManagementPage />}
+                        />
+                        <Route
+                            path="/payroll/structures"
+                            element={<SalaryStructurePage />}
+                        />
+                        <Route
+                            path="/payroll/pay-runs"
+                            element={<PayRunManagementPage />}
+                        />
+                        <Route
+                            path="/payroll/payslips"
+                            element={<EmployeePayslipPage />}
                         />
                         <Route path={RENTAL_DASHBOARD_PATH} element={<PermissionRoute permission={RENTAL_DASHBOARD_PERMISSION}><RentalDashboardPage /></PermissionRoute>} />
                         <Route path={RESERVATION_REGISTER_PATH} element={<PermissionRoute permission={RESERVATION_PERMISSION.view}><ReservationsPage /></PermissionRoute>} />

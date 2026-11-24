@@ -70,4 +70,13 @@ export const endpoints = {
     hrCompOffClaims: '/api/v1/hr/comp-off/claims',
     uoms: '/api/v1/uoms',
     uomConversions: '/api/v1/uom-conversions',
+    payrollComponents: '/api/v1/payroll/components',
+    payrollStructures: '/api/v1/payroll/structures',
+    payrollAssignments: '/api/v1/payroll/assignments',
+    payrollTaxTables: '/api/v1/payroll/tax-tables',
+    payrollStatutoryRules: '/api/v1/payroll/statutory-rules',
+    payrollPeriods: '/api/v1/payroll/periods',
+    payrollPayRuns: '/api/v1/payroll/pay-runs',
+    payrollPayslips: '/api/v1/payroll/payslips',
+    payrollAdjustments: '/api/v1/payroll/adjustments',
 } as const;

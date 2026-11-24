@@ -50,8 +50,8 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('hr_leave_types')
                 ->restrictOnDelete();
-            $table->foreign(['attachment_document_id', 'tenant_id'], 'hr_leave_req_doc_tenant_fk')
-                ->references(['id', 'tenant_id'])
+            $table->foreign('attachment_document_id', 'hr_leave_req_doc_fk')
+                ->references('id')
                 ->on('hr_employee_documents')
                 ->nullOnDelete();
             $table->foreign(['approver_id', 'tenant_id'], 'hr_leave_req_appr_tenant_fk')
