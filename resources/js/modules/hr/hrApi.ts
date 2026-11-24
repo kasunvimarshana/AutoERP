@@ -154,3 +154,52 @@ export const claimCompOff = (payload: { employee_id: number; worked_date: string
 
 export const actionCompOffClaim = (claimId: number, approve: boolean) =>
     apiClient.patch<ApiResource<import('./hrTypes').HrCompOffClaim>>(`${endpoints.hrCompOffClaims}/${claimId}/action`, { approve }).then((r) => r.data.data);
+
+// --- Biometric Hardware API ---
+export const listBiometricDevices = (params?: { status?: string; protocol?: string; search?: string; page?: number; per_page?: number }) =>
+    apiClient.get<ApiCollection<import('./hrTypes').HrBiometricDevice>>(endpoints.hrBiometricDevices, { params }).then((r) => r.data);
+
+export const getBiometricDevice = (id: number) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrBiometricDevice>>(`${endpoints.hrBiometricDevices}/${id}`).then((r) => r.data.data);
+
+export const createBiometricDevice = (payload: import('./hrTypes').HrBiometricDevicePayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrBiometricDevice>>(endpoints.hrBiometricDevices, payload).then((r) => r.data.data);
+
+export const updateBiometricDevice = (id: number, payload: Partial<import('./hrTypes').HrBiometricDevicePayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrBiometricDevice>>(`${endpoints.hrBiometricDevices}/${id}`, payload).then((r) => r.data.data);
+
+export const deleteBiometricDevice = (id: number) =>
+    apiClient.delete(`${endpoints.hrBiometricDevices}/${id}`).then((r) => r.data);
+
+export const pingBiometricDevice = (id: number) =>
+    apiClient.post<ApiResource<import('./hrTypes').DeviceHealthResult>>(`${endpoints.hrBiometricDevices}/${id}/ping`).then((r) => r.data.data);
+
+export const syncBiometricDevice = (id: number, async = false) =>
+    apiClient.post(`${endpoints.hrBiometricDevices}/${id}/sync`, { async }).then((r) => r.data);
+
+export const listBiometricDeviceUsers = (deviceId: number) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrBiometricDeviceUser[]>>(`${endpoints.hrBiometricDevices}/${deviceId}/users`).then((r) => r.data.data);
+
+export const mapBiometricDeviceUser = (deviceId: number, payload: { biometric_user_id: string; employee_id: number; card_number?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrBiometricDeviceUser>>(`${endpoints.hrBiometricDevices}/${deviceId}/users`, payload).then((r) => r.data.data);
+
+export const unmapBiometricDeviceUser = (deviceId: number, mappingId: number) =>
+    apiClient.delete(`${endpoints.hrBiometricDevices}/${deviceId}/users/${mappingId}`).then((r) => r.data);
+
+export const listBiometricRawLogs = (deviceId: number, params?: { sync_status?: string; date?: string; page?: number; per_page?: number }) =>
+    apiClient.get<ApiCollection<import('./hrTypes').HrBiometricRawPunch>>(`${endpoints.hrBiometricDevices}/${deviceId}/raw-logs`, { params }).then((r) => r.data);
+
+export const reprocessBiometricDeviceLogs = (deviceId: number) =>
+    apiClient.post<{ message: string; count: number }>(`${endpoints.hrBiometricDevices}/${deviceId}/reprocess`).then((r) => r.data);
+
+export const uploadBiometricFileLog = (deviceId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<{ message: string; stats: Record<string, number> }>(`${endpoints.hrBiometricDevices}/${deviceId}/upload-log`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+};
+
+export function searchBiometricDevices(params: LookupLoadParams): Promise<LookupResult<import('./hrTypes').HrBiometricDevice>> {
+    return requestLookup<import('./hrTypes').HrBiometricDevice>(`${endpoints.hrBiometricDevices}/lookup`, params);
+}

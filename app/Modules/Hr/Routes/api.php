@@ -15,6 +15,8 @@ use Modules\Core\Tenancy\TenantFeature;
 use Modules\Hr\Http\Controllers\EmployeeController;
 use Modules\Hr\Http\Controllers\EmployeeRelationController;
 use Modules\Hr\Http\Controllers\HrAttendanceController;
+use Modules\Hr\Http\Controllers\HrBiometricDeviceController;
+use Modules\Hr\Http\Controllers\HrBiometricPushReceiverController;
 use Modules\Hr\Http\Controllers\HrCertificationController;
 use Modules\Hr\Http\Controllers\HrDepartmentController;
 use Modules\Hr\Http\Controllers\HrDesignationController;
@@ -275,4 +277,73 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->whereNumber('claim')
         ->middleware($requires(HrAuthorizationService::MANAGE_LEAVES))
         ->name('comp-off.action');
+
+    // Biometric Device Management & Logs
+    Route::get('biometric/devices/lookup', [HrBiometricDeviceController::class, 'lookup'])
+        ->middleware($requires(HrAuthorizationService::VIEW_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.lookup');
+    Route::get('biometric/devices', [HrBiometricDeviceController::class, 'index'])
+        ->middleware($requires(HrAuthorizationService::VIEW_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.index');
+    Route::post('biometric/devices', [HrBiometricDeviceController::class, 'store'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.store');
+    Route::get('biometric/devices/{device}', [HrBiometricDeviceController::class, 'show'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::VIEW_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.show');
+    Route::match(['put', 'patch'], 'biometric/devices/{device}', [HrBiometricDeviceController::class, 'update'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::MANAGE_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.update');
+    Route::delete('biometric/devices/{device}', [HrBiometricDeviceController::class, 'destroy'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::MANAGE_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.destroy');
+    Route::post('biometric/devices/{device}/ping', [HrBiometricDeviceController::class, 'ping'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::VIEW_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.ping');
+    Route::post('biometric/devices/{device}/sync', [HrBiometricDeviceController::class, 'sync'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::SYNC_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.sync');
+    Route::get('biometric/devices/{device}/users', [HrBiometricDeviceController::class, 'users'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::VIEW_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.users.index');
+    Route::post('biometric/devices/{device}/users', [HrBiometricDeviceController::class, 'storeUser'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::MANAGE_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.users.store');
+    Route::delete('biometric/devices/{device}/users/{mapping}', [HrBiometricDeviceController::class, 'destroyUser'])
+        ->whereNumber(['device', 'mapping'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.users.destroy');
+    Route::get('biometric/devices/{device}/raw-logs', [HrBiometricDeviceController::class, 'rawLogs'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::VIEW_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.raw-logs');
+    Route::post('biometric/devices/{device}/reprocess', [HrBiometricDeviceController::class, 'reprocess'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::MANAGE_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.reprocess');
+    Route::post('biometric/devices/{device}/upload-log', [HrBiometricPushReceiverController::class, 'uploadLog'])
+        ->whereNumber('device')
+        ->middleware($requires(HrAuthorizationService::SYNC_BIOMETRIC_DEVICES))
+        ->name('biometric.devices.upload-log');
 });
+
+// Public Biometric Hardware Push Receivers (Outside Session Guard)
+Route::prefix('api/v1/hr/biometric/push')->group(function (): void {
+    Route::match(['get', 'post'], 'zkteco/cdata', [HrBiometricPushReceiverController::class, 'zkTecoCdata'])->name('api.v1.hr.biometric.push.zkteco.cdata');
+    Route::get('zkteco/getrequest', [HrBiometricPushReceiverController::class, 'zkTecoGetRequest'])->name('api.v1.hr.biometric.push.zkteco.getrequest');
+    Route::post('zkteco/devicecmd', [HrBiometricPushReceiverController::class, 'zkTecoDeviceCmd'])->name('api.v1.hr.biometric.push.zkteco.devicecmd');
+    Route::post('hikvision', [HrBiometricPushReceiverController::class, 'hikvisionPush'])->name('api.v1.hr.biometric.push.hikvision');
+    Route::post('webhook/{deviceCode}', [HrBiometricPushReceiverController::class, 'genericWebhook'])->name('api.v1.hr.biometric.push.webhook');
+});
+
+// ZKTeco direct root path aliases (for legacy firmware with hardcoded /iclock paths)
+Route::match(['get', 'post'], 'iclock/cdata', [HrBiometricPushReceiverController::class, 'zkTecoCdata'])->name('iclock.cdata');
+Route::get('iclock/getrequest', [HrBiometricPushReceiverController::class, 'zkTecoGetRequest'])->name('iclock.getrequest');
+Route::post('iclock/devicecmd', [HrBiometricPushReceiverController::class, 'zkTecoDeviceCmd'])->name('iclock.devicecmd');

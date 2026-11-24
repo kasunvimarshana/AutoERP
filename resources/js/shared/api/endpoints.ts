@@ -81,4 +81,5 @@ export const endpoints = {
     payrollAdjustments: '/api/v1/payroll/adjustments',
     payrollLoans: '/api/v1/payroll/loans',
     hrShiftRotations: '/api/v1/hr/shift-rotations',
+    hrBiometricDevices: '/api/v1/hr/biometric/devices',
 } as const;

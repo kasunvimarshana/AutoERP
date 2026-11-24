@@ -23,4 +23,12 @@ export const hrRouteEntitlements: readonly EntitlementRule[] = [
     operational('/hr/employees/:id/edit', HR_MODULES, [hrPermissions.employeesUpdate]),
     operational('/hr/employees/:id', HR_MODULES, [hrPermissions.employeesView]),
     operational('/hr/employees', HR_MODULES, hrWorkspaceViewPermissions),
+    operational('/hr/roster', HR_MODULES, [hrPermissions.shiftsView]),
+    operational('/hr/attendance', HR_MODULES, [hrPermissions.attendanceView]),
+    operational('/hr/leaves', HR_MODULES, [hrPermissions.leavesView]),
+    operational('/hr/biometric-devices', HR_MODULES, [hrPermissions.biometricView]),
+    operational('/payroll/structures', HR_MODULES, ['payroll.structures.manage', 'payroll.view']),
+    operational('/payroll/pay-runs', HR_MODULES, ['payroll.view', 'payroll.pay-runs.calculate']),
+    operational('/payroll/loans', HR_MODULES, ['payroll.view']),
+    operational('/payroll/payslips', HR_MODULES, ['payroll.payslips.view', 'payroll.view']),
 ];

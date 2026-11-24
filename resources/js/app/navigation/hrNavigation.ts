@@ -71,6 +71,14 @@ export const hrNavigationItem = {
             match: ['/hr/leaves'],
             access: hrAccess([hrPermissions.leavesView]),
         },
+        {
+            id: 'hr-biometric-devices',
+            type: 'link',
+            label: 'Biometric Devices',
+            to: '/hr/biometric-devices',
+            match: ['/hr/biometric-devices'],
+            access: hrAccess([hrPermissions.biometricView]),
+        },
         ...masterDataLinks(),
     ],
 } satisfies NavigationModuleItem;

@@ -177,3 +177,76 @@ export interface HrShiftRotation {
     status: 'active' | 'inactive';
     steps?: HrShiftRotationStep[];
 }
+
+// --- Biometric Hardware Integration Types ---
+export type BiometricProtocol = 'zkteco_push' | 'zkteco_socket' | 'hikvision_isapi' | 'dahua_cgi' | 'generic_webhook' | 'usb_import';
+export type BiometricDeviceStatus = 'active' | 'inactive' | 'offline' | 'error';
+export type BiometricPunchState = 'check_in' | 'check_out' | 'break_out' | 'break_in' | 'overtime_in' | 'overtime_out' | 'auto';
+export type BiometricVerifyMethod = 'fingerprint' | 'face' | 'card' | 'password' | 'iris' | 'unknown';
+export type RawPunchSyncStatus = 'pending' | 'processed' | 'duplicate' | 'unmapped_user' | 'failed';
+
+export interface HrBiometricDevice {
+    id: number;
+    row_version: number;
+    tenant_id: number;
+    organization_unit_id?: number | null;
+    device_code: string;
+    name: string;
+    protocol: BiometricProtocol;
+    ip_address?: string | null;
+    port?: number | null;
+    serial_number?: string | null;
+    comm_key?: string | null;
+    auth_token?: string | null;
+    status: BiometricDeviceStatus;
+    is_enabled: boolean;
+    auto_map_users: boolean;
+    last_ping_at?: string | null;
+    last_sync_at?: string | null;
+    total_punches_synced: number;
+    settings?: Record<string, unknown> | null;
+    device_users_count?: number;
+    raw_punches_count?: number;
+}
+
+export type HrBiometricDevicePayload = Omit<HrBiometricDevice, 'id' | 'tenant_id' | 'total_punches_synced' | 'device_users_count' | 'raw_punches_count'>;
+
+export interface HrBiometricDeviceUser {
+    id: number;
+    tenant_id: number;
+    device_id: number;
+    biometric_user_id: string;
+    card_number?: string | null;
+    employee_id: number;
+    is_active: boolean;
+    sync_status: string;
+    employee?: EmployeeSummary | null;
+}
+
+export interface HrBiometricRawPunch {
+    id: number;
+    tenant_id: number;
+    device_id: number;
+    biometric_user_id: string;
+    employee_id?: number | null;
+    attendance_punch_id?: number | null;
+    punch_time: string;
+    received_at: string;
+    punch_state: BiometricPunchState;
+    verify_method: BiometricVerifyMethod;
+    idempotency_hash: string;
+    sync_status: RawPunchSyncStatus;
+    error_message?: string | null;
+    employee?: EmployeeSummary | null;
+    attendance_punch?: HrAttendancePunch | null;
+}
+
+export interface DeviceHealthResult {
+    isReachable: boolean;
+    responseTimeMs?: number | null;
+    firmwareVersion?: string | null;
+    deviceTime?: string | null;
+    clockDriftSeconds?: number | null;
+    errorMessage?: string | null;
+    metadata?: Record<string, unknown>;
+}

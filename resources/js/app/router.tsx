@@ -440,6 +440,7 @@ const EmployeeDetailPage = lazy(
 const RosterSchedulerPage = lazy(() => import("@/modules/hr/RosterSchedulerPage"));
 const AttendanceManagementPage = lazy(() => import("@/modules/hr/AttendanceManagementPage"));
 const LeaveManagementPage = lazy(() => import("@/modules/hr/LeaveManagementPage"));
+const BiometricDeviceManagementPage = lazy(() => import("@/modules/hr/BiometricDeviceManagementPage"));
 const SalaryStructurePage = lazy(() => import("@/modules/payroll/SalaryStructurePage"));
 const PayRunManagementPage = lazy(() => import("@/modules/payroll/PayRunManagementPage"));
 const PayrollLoanManagementPage = lazy(() =>
@@ -1144,6 +1145,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/hr/leaves"
                             element={<LeaveManagementPage />}
+                        />
+                        <Route
+                            path="/hr/biometric-devices"
+                            element={<BiometricDeviceManagementPage />}
                         />
                         <Route
                             path="/payroll/structures"

@@ -22,4 +22,7 @@ export const hrPermissions = {
     leavesView: 'hr.leaves.view',
     leavesApply: 'hr.leaves.apply',
     leavesManage: 'hr.leaves.manage',
+    biometricView: 'hr.biometric.view',
+    biometricManage: 'hr.biometric.manage',
+    biometricSync: 'hr.biometric.sync',
 } as const;

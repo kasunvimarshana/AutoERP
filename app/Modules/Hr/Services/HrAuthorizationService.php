@@ -44,6 +44,12 @@ final class HrAuthorizationService
 
     public const MANAGE_LEAVES = 'hr.leaves.manage';
 
+    public const VIEW_BIOMETRIC_DEVICES = 'hr.biometric.view';
+
+    public const MANAGE_BIOMETRIC_DEVICES = 'hr.biometric.manage';
+
+    public const SYNC_BIOMETRIC_DEVICES = 'hr.biometric.sync';
+
     /** @return array<string,string> */
     public static function descriptions(): array
     {
@@ -63,6 +69,9 @@ final class HrAuthorizationService
             self::VIEW_LEAVES => 'View leave balances, policies, and leave requests.',
             self::APPLY_LEAVES => 'Apply for leave and submit comp-off claims.',
             self::MANAGE_LEAVES => 'Configure leave policies, approve/reject leaves and comp-off claims.',
+            self::VIEW_BIOMETRIC_DEVICES => 'View biometric attendance devices, connectivity status, and audit logs.',
+            self::MANAGE_BIOMETRIC_DEVICES => 'Configure biometric devices, hardware protocols, and employee PIN mappings.',
+            self::SYNC_BIOMETRIC_DEVICES => 'Trigger manual or batch log synchronization from biometric hardware.',
         ];
     }
 }
