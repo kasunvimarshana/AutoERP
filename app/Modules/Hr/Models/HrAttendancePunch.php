@@ -14,6 +14,7 @@ namespace Modules\Hr\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Hr\Enums\CaptureMethod;
 use Modules\Hr\Enums\PunchSource;
 use Modules\Hr\Enums\PunchType;
 use Modules\Hr\Models\Concerns\ScopesHrTenant;
@@ -37,6 +38,10 @@ final class HrAttendancePunch extends TenantOwnedModel
             'punch_time' => 'datetime',
             'punch_type' => PunchType::class,
             'punch_source' => PunchSource::class,
+            'capture_method' => CaptureMethod::class,
+            'credential_id' => 'integer',
+            'accuracy_meters' => 'integer',
+            'geofence_id' => 'integer',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'is_verified' => 'boolean',
@@ -52,5 +57,15 @@ final class HrAttendancePunch extends TenantOwnedModel
     public function employee(): BelongsTo
     {
         return $this->belongsTo(HrEmployee::class, 'employee_id');
+    }
+
+    public function credential(): BelongsTo
+    {
+        return $this->belongsTo(HrEmployeeAttendanceCredential::class, 'credential_id');
+    }
+
+    public function geofence(): BelongsTo
+    {
+        return $this->belongsTo(HrAttendanceGeofence::class, 'geofence_id');
     }
 }

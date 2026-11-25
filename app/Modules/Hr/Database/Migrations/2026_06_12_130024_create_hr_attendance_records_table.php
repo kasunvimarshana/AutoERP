@@ -40,6 +40,8 @@ return new class extends Migration
             $table->string('status', 32)->default('unresolved');
             $table->string('lock_status', 32)->default('open');
             $table->boolean('is_regularized')->default(false);
+            $table->string('anomaly_type', 32)->nullable();
+            $table->boolean('requires_regularization')->default(false);
             $table->text('notes')->nullable();
             $table->timestamps();
 
@@ -47,6 +49,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'employee_id', 'attendance_date'], 'hr_att_records_emp_date_uk');
             $table->index(['tenant_id', 'attendance_date', 'status'], 'hr_att_records_date_status_ix');
             $table->index(['tenant_id', 'lock_status'], 'hr_att_records_lock_ix');
+            $table->index(['tenant_id', 'requires_regularization'], 'hr_att_records_req_reg_ix');
 
             $table->foreign(['employee_id', 'tenant_id'], 'hr_att_records_employee_tenant_fk')
                 ->references(['id', 'tenant_id'])

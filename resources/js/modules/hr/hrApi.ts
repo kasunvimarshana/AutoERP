@@ -203,3 +203,63 @@ export const uploadBiometricFileLog = (deviceId: number, file: File) => {
 export function searchBiometricDevices(params: LookupLoadParams): Promise<LookupResult<import('./hrTypes').HrBiometricDevice>> {
     return requestLookup<import('./hrTypes').HrBiometricDevice>(`${endpoints.hrBiometricDevices}/lookup`, params);
 }
+
+// --- Attendance Capture & Anomaly API ---
+export const recordWebPunch = (payload: { employee_id: number; punch_type: string; notes?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendancePunch>>(endpoints.hrAttendanceCaptureWeb, payload).then((r) => r.data.data);
+
+export const recordMobilePunch = (payload: { employee_id: number; punch_type: string; latitude: number; longitude: number; accuracy_meters?: number; notes?: string; geofence_id?: number }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendancePunch>>(endpoints.hrAttendanceCaptureMobile, payload).then((r) => r.data.data);
+
+export const recordRfidPunch = (payload: { card_uid: string; punch_type: string; device_id?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendancePunch>>(endpoints.hrAttendanceCaptureRfid, payload).then((r) => r.data.data);
+
+export const recordBarcodePunch = (payload: { barcode: string; punch_type: string; device_id?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendancePunch>>(endpoints.hrAttendanceCaptureBarcode, payload).then((r) => r.data.data);
+
+export const getKioskQrToken = (kioskId: number) =>
+    apiClient.get<ApiResource<{ token: string; expires_in_seconds: number; kiosk_code: string }>>(`${endpoints.hrAttendanceCaptureKiosks}/${kioskId}/qr-token`).then((r) => r.data.data);
+
+export const scanKioskQr = (payload: { employee_id: number; qr_token: string; punch_type: string; latitude?: number; longitude?: number }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendancePunch>>(endpoints.hrAttendanceCaptureQrScan, payload).then((r) => r.data.data);
+
+export const previewAttendanceImport = (payload: { file?: File; csv_content?: string }) => {
+    if (payload.file) {
+        const formData = new FormData();
+        formData.append('file', payload.file);
+        return apiClient.post<ApiResource<import('./hrTypes').BatchImportPreview>>(endpoints.hrAttendanceCaptureImportPreview, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }).then((r) => r.data.data);
+    }
+    return apiClient.post<ApiResource<import('./hrTypes').BatchImportPreview>>(endpoints.hrAttendanceCaptureImportPreview, { csv_content: payload.csv_content }).then((r) => r.data.data);
+};
+
+export const commitAttendanceImport = (payload: { file_name: string; csv_content: string }) =>
+    apiClient.post<ApiResource<unknown>>(endpoints.hrAttendanceCaptureImportCommit, payload).then((r) => r.data.data);
+
+export const listAttendanceAnomalies = (params?: { date?: string; employee_id?: number; anomaly_type?: string; page?: number }) =>
+    apiClient.get<ApiCollection<import('./hrTypes').HrAttendanceRecord>>(endpoints.hrAttendanceAnomalies, { params }).then((r) => r.data);
+
+export const scanAttendanceAnomalies = (params?: { date?: string; employee_id?: number }) =>
+    apiClient.post<ApiResource<{ total_scanned: number; anomalies_detected: number }>>(`${endpoints.hrAttendanceAnomalies}/scan`, params).then((r) => r.data.data);
+
+export const quickResolveAttendanceAnomaly = (recordId: number, payload: { in_time?: string; out_time?: string; resolution_reason: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendanceRecord>>(`${endpoints.hrAttendanceAnomalies}/${recordId}/quick-resolve`, payload).then((r) => r.data.data);
+
+export const listEmployeeCredentials = (employeeId: number) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrEmployeeAttendanceCredential[]>>(`${endpoints.hrEmployees}/${employeeId}/credentials`).then((r) => r.data.data);
+
+export const storeEmployeeCredential = (employeeId: number, payload: { credential_type: string; credential_value: string; label?: string; expires_at?: string }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrEmployeeAttendanceCredential>>(`${endpoints.hrEmployees}/${employeeId}/credentials`, payload).then((r) => r.data.data);
+
+export const updateEmployeeCredentialStatus = (employeeId: number, credentialId: number, payload: { status: string; revocation_reason?: string }) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrEmployeeAttendanceCredential>>(`${endpoints.hrEmployees}/${employeeId}/credentials/${credentialId}/status`, payload).then((r) => r.data.data);
+
+export const deleteEmployeeCredential = (employeeId: number, credentialId: number) =>
+    apiClient.delete(`${endpoints.hrEmployees}/${employeeId}/credentials/${credentialId}`).then((r) => r.data);
+
+export const listAttendanceGeofences = () =>
+    apiClient.get<ApiResource<import('./hrTypes').HrAttendanceGeofence[]>>(endpoints.hrAttendanceGeofences).then((r) => r.data.data);
+
+export const listAttendanceKiosks = () =>
+    apiClient.get<ApiResource<import('./hrTypes').HrAttendanceKiosk[]>>(endpoints.hrAttendanceKiosks).then((r) => r.data.data);

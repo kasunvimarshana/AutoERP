@@ -15,6 +15,7 @@ namespace Modules\Hr\Services;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 use Modules\Hr\DTOs\PunchData;
+use Modules\Hr\Enums\AnomalyType;
 use Modules\Hr\Enums\AttendanceLockStatus;
 use Modules\Hr\Enums\AttendanceStatus;
 use Modules\Hr\Enums\LeaveRequestStatus;
@@ -53,6 +54,16 @@ final class AttendanceCalculationEngine
             $civilDate = $yesterday;
         }
 
+        if ($data->idempotencyHash !== null) {
+            $hashDuplicate = HrAttendancePunch::query()
+                ->where('tenant_id', $tenantId)
+                ->where('idempotency_hash', $data->idempotencyHash)
+                ->first();
+            if ($hashDuplicate !== null) {
+                return $hashDuplicate;
+            }
+        }
+
         // Multi-punch deduplication within 120 seconds for same type
         $recentDuplicate = HrAttendancePunch::query()
             ->where('tenant_id', $tenantId)
@@ -70,6 +81,13 @@ final class AttendanceCalculationEngine
             'punch_time' => $punchTimestamp,
             'punch_type' => $data->punchType,
             'punch_source' => $data->punchSource,
+            'capture_method' => $data->captureMethod,
+            'credential_id' => $data->credentialId,
+            'accuracy_meters' => $data->accuracyMeters,
+            'device_fingerprint' => $data->deviceFingerprint,
+            'photo_path' => $data->photoPath,
+            'geofence_id' => $data->geofenceId,
+            'idempotency_hash' => $data->idempotencyHash,
             'device_id' => $data->deviceId,
             'ip_address' => $data->ipAddress,
             'latitude' => $data->latitude,
@@ -229,6 +247,9 @@ final class AttendanceCalculationEngine
             $regularMinutes = 0;
         }
 
+        $anomalyType = null;
+        $requiresRegularization = false;
+
         // Attendance Status Determination
         if ($hasApprovedLeave) {
             $status = AttendanceStatus::OnLeave;
@@ -246,7 +267,17 @@ final class AttendanceCalculationEngine
             // Punches exist
             if ($firstIn === null || $lastOut === null) {
                 $status = AttendanceStatus::Unresolved;
+                $anomalyType = $firstIn === null ? AnomalyType::MissingIn : AnomalyType::MissingOut;
+                $requiresRegularization = true;
             } else {
+                if ($activeBreakStart !== null) {
+                    $anomalyType = AnomalyType::UnpairedBreak;
+                    $requiresRegularization = true;
+                } elseif ($totalWorkedMinutes > 16 * 60) {
+                    $anomalyType = AnomalyType::ExcessiveHours;
+                    $requiresRegularization = true;
+                }
+
                 $halfDayThreshold = $shift?->half_day_threshold_minutes ?? 240;
                 $fullDayThreshold = $shift?->full_day_threshold_minutes ?? 480;
 
@@ -277,6 +308,8 @@ final class AttendanceCalculationEngine
             'late_arrival_minutes' => $lateArrivalMinutes,
             'early_departure_minutes' => $earlyDepartureMinutes,
             'status' => $status,
+            'anomaly_type' => $anomalyType,
+            'requires_regularization' => $requiresRegularization,
         ]);
 
         return $record->refresh();

@@ -179,6 +179,11 @@ final class HrEmployee extends TenantOwnedModel
         return $this->hasMany(HrCompOffClaim::class, 'employee_id');
     }
 
+    public function attendanceCredentials(): HasMany
+    {
+        return $this->hasMany(HrEmployeeAttendanceCredential::class, 'employee_id');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', EmployeeStatus::Active);

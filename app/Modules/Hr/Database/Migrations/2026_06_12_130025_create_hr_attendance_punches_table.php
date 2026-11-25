@@ -28,6 +28,13 @@ return new class extends Migration
             $table->dateTime('punch_time');
             $table->string('punch_type', 32);
             $table->string('punch_source', 32)->default('web');
+            $table->string('capture_method', 32)->default('web');
+            $table->unsignedBigInteger('credential_id')->nullable();
+            $table->unsignedInteger('accuracy_meters')->nullable();
+            $table->string('device_fingerprint', 128)->nullable();
+            $table->string('photo_path', 255)->nullable();
+            $table->unsignedBigInteger('geofence_id')->nullable();
+            $table->string('idempotency_hash', 64)->nullable();
             $table->string('device_id', 64)->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->decimal('latitude', 10, 7)->nullable();
@@ -40,6 +47,7 @@ return new class extends Migration
             $table->unique(['id', 'tenant_id'], 'hr_att_punches_id_tenant_uk');
             $table->index(['employee_id', 'attendance_date', 'punch_time'], 'hr_att_punches_emp_date_time_ix');
             $table->index(['attendance_record_id', 'is_ignored'], 'hr_att_punches_rec_ignore_ix');
+            $table->index(['tenant_id', 'idempotency_hash'], 'hr_att_punches_tenant_hash_ix');
 
             $table->foreign('attendance_record_id', 'hr_att_punches_record_fk')
                 ->references('id')

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Hr\DTOs\PunchData;
 use Modules\Hr\DTOs\RawBiometricPunchData;
 use Modules\Hr\Enums\BiometricDeviceStatus;
+use Modules\Hr\Enums\CaptureMethod;
 use Modules\Hr\Enums\PunchSource;
 use Modules\Hr\Enums\PunchType;
 use Modules\Hr\Enums\RawPunchSyncStatus;
@@ -107,9 +108,11 @@ final class BiometricLogIngestionService
                     punchType: $resolvedPunchType,
                     punchTime: $punchData->punchTime,
                     punchSource: PunchSource::BiometricDevice,
+                    captureMethod: CaptureMethod::Biometric,
                     deviceId: $device->device_code,
                     notes: "Biometric stamp from [{$device->name}] via [{$device->protocol->value}]",
                     organizationUnitId: $device->organization_unit_id ?? $employee->organization_unit_id,
+                    idempotencyHash: $fingerprint,
                 );
 
                 $createdPunch = $this->attendanceEngine->recordPunch($tenantId, $enginePunchData);

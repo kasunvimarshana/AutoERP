@@ -14,6 +14,7 @@ namespace Modules\Hr\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Hr\Commands\DetectMissingPunchesCommand;
 use Modules\Hr\Services\HrAuthorizationService;
 
 final class HrServiceProvider extends ServiceProvider
@@ -25,5 +26,11 @@ final class HrServiceProvider extends ServiceProvider
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                DetectMissingPunchesCommand::class,
+            ]);
+        }
     }
 }

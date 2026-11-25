@@ -18,11 +18,24 @@ use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Contracts\TimezoneResolverInterface;
 
-abstract class TenantScopedRequest extends QueryRequest
+class TenantScopedRequest extends QueryRequest
 {
     public function authorize(): bool
     {
         return $this->currentUserId() !== null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return [];
+    }
+
+    public function userId(): ?int
+    {
+        return $this->currentUserId();
     }
 
     public function tenantId(): int

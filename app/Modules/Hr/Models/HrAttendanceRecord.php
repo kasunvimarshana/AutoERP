@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Hr\Enums\AnomalyType;
 use Modules\Hr\Enums\AttendanceLockStatus;
 use Modules\Hr\Enums\AttendanceStatus;
 use Modules\Hr\Models\Concerns\ScopesHrTenant;
@@ -77,6 +78,8 @@ final class HrAttendanceRecord extends TenantOwnedModel
             'status' => AttendanceStatus::class,
             'lock_status' => AttendanceLockStatus::class,
             'is_regularized' => 'boolean',
+            'anomaly_type' => AnomalyType::class,
+            'requires_regularization' => 'boolean',
         ]);
     }
 

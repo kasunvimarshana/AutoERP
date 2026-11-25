@@ -17,14 +17,29 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { EmployeeLookupSelect } from './components/EmployeeLookupSelect';
 import {
     actionAttendanceRegularization,
+    commitAttendanceImport,
     directAdjustAttendanceRecord,
+    getKioskQrToken,
+    listAttendanceAnomalies,
+    listAttendanceKiosks,
     listAttendanceRecords,
     listAttendanceRegularizations,
+    previewAttendanceImport,
     punchAttendance,
+    quickResolveAttendanceAnomaly,
     requestAttendanceRegularization,
+    scanAttendanceAnomalies,
 } from './hrApi';
 import { hrPermissions } from './hrPermissions';
-import type { EmployeeSummary, HrAttendanceRecord, HrAttendanceRegularization } from './hrTypes';
+import type {
+    BatchImportPreview,
+    EmployeeSummary,
+    HrAttendanceKiosk,
+    HrAttendanceRecord,
+    HrAttendanceRegularization,
+} from './hrTypes';
+
+type ActiveTab = 'records' | 'regularizations' | 'anomalies' | 'kiosk' | 'import';
 
 export default function AttendanceManagementPage() {
     const auth = useAuth();
@@ -32,7 +47,7 @@ export default function AttendanceManagementPage() {
     const canManage = hasPermission(auth, hrPermissions.attendanceManage);
     const canPunch = hasPermission(auth, hrPermissions.attendancePunch);
 
-    const [activeTab, setActiveTab] = useState<'records' | 'regularizations'>('records');
+    const [activeTab, setActiveTab] = useState<ActiveTab>('records');
 
     // Filter states
     const [startDate, setStartDate] = useState(() => {
@@ -46,13 +61,17 @@ export default function AttendanceManagementPage() {
     // Records data
     const [records, setRecords] = useState<HrAttendanceRecord[]>([]);
     const [regularizations, setRegularizations] = useState<HrAttendanceRegularization[]>([]);
+    const [anomalies, setAnomalies] = useState<HrAttendanceRecord[]>([]);
+    const [kiosks, setKiosks] = useState<HrAttendanceKiosk[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Modals
     const [showRegularizeModal, setShowRegularizeModal] = useState(false);
     const [showAdjustModal, setShowAdjustModal] = useState(false);
+    const [showQuickResolveModal, setShowQuickResolveModal] = useState(false);
     const [selectedRecordForAdjust, setSelectedRecordForAdjust] = useState<HrAttendanceRecord | null>(null);
+    const [selectedRecordForQuickResolve, setSelectedRecordForQuickResolve] = useState<HrAttendanceRecord | null>(null);
 
     // Regularize form
     const [regDate, setRegDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -62,11 +81,28 @@ export default function AttendanceManagementPage() {
     const [regReason, setRegReason] = useState('forgot_to_punch');
     const [regNotes, setRegNotes] = useState('');
 
+    // Quick resolve form
+    const [quickInTime, setQuickInTime] = useState('');
+    const [quickOutTime, setQuickOutTime] = useState('');
+    const [quickReason, setQuickReason] = useState('');
+
     // Direct adjust form
     const [adjustStatus, setAdjustStatus] = useState<string>('present');
     const [adjustWorkedMinutes, setAdjustWorkedMinutes] = useState<number>(480);
     const [adjustOtMinutes, setAdjustOtMinutes] = useState<number>(0);
     const [adjustReason, setAdjustReason] = useState<string>('');
+
+    // Dynamic QR Kiosk Terminal state
+    const [selectedKioskId, setSelectedKioskId] = useState<number | null>(null);
+    const [kioskToken, setKioskToken] = useState<string | null>(null);
+    const [kioskExpiresIn, setKioskExpiresIn] = useState<number>(0);
+
+    // Batch File Import state
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [importCsvContent, setImportCsvContent] = useState<string>('');
+    const [importPreview, setImportPreview] = useState<BatchImportPreview | null>(null);
+    const [importLoading, setImportLoading] = useState(false);
+    const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
 
     const fetchRecords = () => {
         setLoading(true);
@@ -87,12 +123,52 @@ export default function AttendanceManagementPage() {
             .catch(() => {});
     };
 
+    const fetchAnomalies = () => {
+        listAttendanceAnomalies()
+            .then((res) => setAnomalies(res.data))
+            .catch(() => {});
+    };
+
+    const fetchKiosks = () => {
+        listAttendanceKiosks()
+            .then((data) => {
+                setKiosks(data);
+                if (data.length > 0 && selectedKioskId === null) {
+                    setSelectedKioskId(data[0].id);
+                }
+            })
+            .catch(() => {});
+    };
+
     useEffect(() => {
         if (canView) {
-            fetchRecords();
-            fetchRegularizations();
+            queueMicrotask(() => {
+                fetchRecords();
+                fetchRegularizations();
+                fetchAnomalies();
+                fetchKiosks();
+            });
         }
     }, [startDate, endDate, selectedEmployee]);
+
+    // Dynamic Kiosk Timer
+    useEffect(() => {
+        if (activeTab !== 'kiosk' || !selectedKioskId) return;
+
+        const refreshQr = () => {
+            getKioskQrToken(selectedKioskId)
+                .then((data) => {
+                    setKioskToken(data.token);
+                    setKioskExpiresIn(data.expires_in_seconds);
+                })
+                .catch(() => {});
+        };
+
+        refreshQr();
+        const interval = setInterval(refreshQr, 10000);
+
+        return () => clearInterval(interval);
+    }, [activeTab, selectedKioskId]);
 
     if (!canView) return <AccessDeniedPage />;
 
@@ -107,6 +183,7 @@ export default function AttendanceManagementPage() {
                 punch_type: type,
             });
             fetchRecords();
+            fetchAnomalies();
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Punch failed');
         }
@@ -128,6 +205,7 @@ export default function AttendanceManagementPage() {
             setShowRegularizeModal(false);
             fetchRecords();
             fetchRegularizations();
+            fetchAnomalies();
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Regularization request failed');
         }
@@ -138,6 +216,7 @@ export default function AttendanceManagementPage() {
             await actionAttendanceRegularization(id, approve);
             fetchRegularizations();
             fetchRecords();
+            fetchAnomalies();
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to action regularization');
         }
@@ -155,8 +234,79 @@ export default function AttendanceManagementPage() {
             });
             setShowAdjustModal(false);
             fetchRecords();
+            fetchAnomalies();
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Direct adjustment failed');
+        }
+    };
+
+    const handleQuickResolveSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedRecordForQuickResolve) return;
+        try {
+            await quickResolveAttendanceAnomaly(selectedRecordForQuickResolve.id, {
+                in_time: quickInTime || undefined,
+                out_time: quickOutTime || undefined,
+                resolution_reason: quickReason,
+            });
+            setShowQuickResolveModal(false);
+            setSelectedRecordForQuickResolve(null);
+            fetchRecords();
+            fetchAnomalies();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Quick resolution failed');
+        }
+    };
+
+    const handleScanAnomalies = async () => {
+        try {
+            setLoading(true);
+            await scanAttendanceAnomalies({ date: startDate });
+            fetchAnomalies();
+            fetchRecords();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Anomaly scan failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePreviewImport = async () => {
+        setImportLoading(true);
+        setError(null);
+        setImportSuccessMessage(null);
+        try {
+            const preview = await previewAttendanceImport({
+                file: importFile ?? undefined,
+                csv_content: importCsvContent || undefined,
+            });
+            setImportPreview(preview);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to parse import preview');
+        } finally {
+            setImportLoading(false);
+        }
+    };
+
+    const handleCommitImport = async () => {
+        if (!importPreview || importPreview.valid_rows === 0) return;
+        setImportLoading(true);
+        setError(null);
+        try {
+            await commitAttendanceImport({
+                file_name: importFile?.name ?? 'manual_paste.csv',
+                csv_content: importCsvContent || (importFile ? await importFile.text() : ''),
+            });
+            setImportSuccessMessage(`Successfully imported ${importPreview.valid_rows} attendance punches.`);
+            setImportPreview(null);
+            setImportFile(null);
+            setImportCsvContent('');
+            fetchRecords();
+            fetchAnomalies();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Commit failed');
+        } finally {
+            setImportLoading(false);
         }
     };
 
@@ -164,10 +314,15 @@ export default function AttendanceManagementPage() {
         <div className="space-y-6 p-6">
             <ContentHeader
                 title="Attendance & Time Tracking"
-                description="Monitor clock-ins, daily work hours, multi-breaks, overtime, and punch regularizations."
+                description="Monitor clock-ins, daily work hours, biometric hardware, NFC/RFID cards, rotating QR kiosks, and anomalies."
                 actions={
                     <div className="flex gap-2">
-                        <Button variant="secondary" onClick={() => setShowRegularizeModal(true)}>
+                        {canManage && (
+                            <Button variant="secondary" onClick={handleScanAnomalies}>
+                                Scan Missing Punches
+                            </Button>
+                        )}
+                        <Button variant="primary" onClick={() => setShowRegularizeModal(true)}>
                             Request Regularization
                         </Button>
                     </div>
@@ -194,7 +349,9 @@ export default function AttendanceManagementPage() {
                             </div>
                             <div>
                                 <span className="text-xs uppercase tracking-wider text-gray-500">Today's Date</span>
-                                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+                                </div>
                             </div>
                         </div>
 
@@ -222,7 +379,13 @@ export default function AttendanceManagementPage() {
                     className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === 'records' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
                     onClick={() => setActiveTab('records')}
                 >
-                    Daily Attendance Records
+                    Daily Records
+                </button>
+                <button
+                    className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === 'anomalies' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                    onClick={() => setActiveTab('anomalies')}
+                >
+                    Missing Punches & Anomalies ({anomalies.length})
                 </button>
                 <button
                     className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === 'regularizations' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
@@ -230,11 +393,23 @@ export default function AttendanceManagementPage() {
                 >
                     Regularization Requests ({regularizations.length})
                 </button>
+                <button
+                    className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === 'kiosk' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                    onClick={() => setActiveTab('kiosk')}
+                >
+                    Dynamic QR Kiosk
+                </button>
+                <button
+                    className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === 'import' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                    onClick={() => setActiveTab('import')}
+                >
+                    Batch File Import
+                </button>
             </div>
 
+            {/* TAB 1: Daily Attendance Records */}
             {activeTab === 'records' && (
                 <div className="space-y-4">
-                    {/* Filters */}
                     <div className="flex flex-wrap items-center gap-4 rounded-lg bg-white p-4 shadow-sm dark:bg-gray-800">
                         <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">From:</label>
@@ -262,90 +437,91 @@ export default function AttendanceManagementPage() {
                     {loading ? (
                         <LoadingState label="Loading attendance records..." />
                     ) : (
-                        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead className="bg-gray-50 dark:bg-gray-900">
+                        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                            <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-800">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Date</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Employee</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Shift</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">First In / Last Out</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Worked</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Overtime</th>
-                                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Status</th>
-                                        {canManage && <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Actions</th>}
+                                        <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Date</th>
+                                        <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Employee</th>
+                                        <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Shift</th>
+                                        <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">In / Out</th>
+                                        <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Worked</th>
+                                        <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Overtime</th>
+                                        <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                                        <th className="px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
                                     {records.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="py-8 text-center text-sm text-gray-500">
-                                                No attendance records found.
+                                            <td colSpan={8} className="py-6 text-center text-gray-500">
+                                                No attendance records found for this period.
                                             </td>
                                         </tr>
                                     ) : (
-                                        records.map((r) => {
-                                            const workedHours = (r.total_worked_minutes / 60).toFixed(1);
-                                            const otHours = (r.overtime_minutes / 60).toFixed(1);
-                                            return (
-                                                <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                                                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                        {r.attendance_date}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                                        <div className="font-medium text-gray-900 dark:text-gray-100">{r.employee?.display_name}</div>
-                                                        <div className="text-xs text-gray-400">{r.employee?.employee_number}</div>
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                                        {r.shift ? (
-                                                            <span className="inline-block rounded px-2 py-0.5 text-xs font-medium text-white" style={{ backgroundColor: r.shift.color || '#3B82F6' }}>
-                                                                {r.shift.code}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-400">-</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                                        <div>In: {r.first_punch_in ? r.first_punch_in.slice(11, 16) : '-'}</div>
-                                                        <div className="text-xs text-gray-400">Out: {r.last_punch_out ? r.last_punch_out.slice(11, 16) : '-'}</div>
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-800 dark:text-gray-200">
-                                                        {workedHours} hrs
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
-                                                        {r.overtime_minutes > 0 ? (
-                                                            <span className="font-semibold text-green-600 dark:text-green-400">+{otHours} hrs</span>
-                                                        ) : (
-                                                            '-'
-                                                        )}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-4 py-3 text-center">
+                                        records.map((r) => (
+                                            <tr key={r.id}>
+                                                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                                                    {r.attendance_date}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-800 dark:text-gray-200">
+                                                    {r.employee?.display_name ?? `EMP #${r.employee_id}`}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                                                    {r.shift?.name ?? 'Unassigned'}
+                                                </td>
+                                                <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
+                                                    {r.first_punch_in ? r.first_punch_in.slice(11, 16) : '—'} /{' '}
+                                                    {r.last_punch_out ? r.last_punch_out.slice(11, 16) : '—'}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                                    {(r.total_worked_minutes / 60).toFixed(1)} hrs
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                                    {r.overtime_minutes > 0 ? `${(r.overtime_minutes / 60).toFixed(1)} hrs` : '0'}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex flex-col gap-1 items-start">
                                                         <StatusBadge status={r.status} />
-                                                        {r.is_regularized && (
-                                                            <span className="ml-1 text-[10px] text-amber-500 font-semibold" title="Regularized">
-                                                                [REG]
+                                                        {r.requires_regularization && (
+                                                            <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                                                {r.anomaly_type?.replace('_', ' ').toUpperCase() ?? 'NEEDS REG'}
                                                             </span>
                                                         )}
-                                                    </td>
-                                                    {canManage && (
-                                                        <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
-                                                            <button
-                                                                className="text-xs text-indigo-600 hover:underline dark:text-indigo-400"
-                                                                onClick={() => {
-                                                                    setSelectedRecordForAdjust(r);
-                                                                    setAdjustStatus(r.status);
-                                                                    setAdjustWorkedMinutes(r.total_worked_minutes);
-                                                                    setAdjustOtMinutes(r.overtime_minutes);
-                                                                    setShowAdjustModal(true);
-                                                                }}
-                                                            >
-                                                                Adjust
-                                                            </button>
-                                                        </td>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right space-x-2">
+                                                    {canManage && r.requires_regularization && (
+                                                        <Button
+                                                            variant="primary"
+                                                            onClick={() => {
+                                                                setSelectedRecordForQuickResolve(r);
+                                                                setQuickInTime(r.first_punch_in ? r.first_punch_in.slice(0, 19) : `${r.attendance_date} 08:00:00`);
+                                                                setQuickOutTime(r.last_punch_out ? r.last_punch_out.slice(0, 19) : `${r.attendance_date} 17:00:00`);
+                                                                setQuickReason('Admin quick resolution of missing punch');
+                                                                setShowQuickResolveModal(true);
+                                                            }}
+                                                        >
+                                                            Quick Fix
+                                                        </Button>
                                                     )}
-                                                </tr>
-                                            );
-                                        })
+                                                    {canManage && (
+                                                        <Button
+                                                            variant="secondary"
+                                                            onClick={() => {
+                                                                setSelectedRecordForAdjust(r);
+                                                                setAdjustStatus(r.status);
+                                                                setAdjustWorkedMinutes(r.total_worked_minutes);
+                                                                setAdjustOtMinutes(r.overtime_minutes);
+                                                                setShowAdjustModal(true);
+                                                            }}
+                                                        >
+                                                            Adjust
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
                                     )}
                                 </tbody>
                             </table>
@@ -354,63 +530,376 @@ export default function AttendanceManagementPage() {
                 </div>
             )}
 
-            {activeTab === 'regularizations' && (
-                <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-900">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Date</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Employee</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Type & Reason</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Proposed Times</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Employee Notes</th>
-                                {canManage && <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-700 dark:text-gray-300">Action</th>}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {regularizations.length === 0 ? (
+            {/* TAB 2: Missing Punches & Anomaly Desk */}
+            {activeTab === 'anomalies' && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-lg bg-amber-50 p-4 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800">
+                        <div>
+                            <h4 className="font-semibold text-amber-900 dark:text-amber-200">Anomaly Resolution Desk</h4>
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                                Records flagged with missing IN/OUT punches, unpaired breaks, or excessive hours requiring administrative or employee regularization.
+                            </p>
+                        </div>
+                        {canManage && (
+                            <Button variant="secondary" onClick={handleScanAnomalies}>
+                                Run Anomaly Scan
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                        <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
                                 <tr>
-                                    <td colSpan={6} className="py-8 text-center text-sm text-gray-500">
-                                        No pending regularizations.
-                                    </td>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Date</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Employee</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Shift</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Anomaly Type</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">First In / Last Out</th>
+                                    <th className="px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Actions</th>
                                 </tr>
-                            ) : (
-                                regularizations.map((reg) => (
-                                    <tr key={reg.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                                        <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {reg.attendance_date}
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+                                {anomalies.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="py-8 text-center text-gray-500">
+                                            No unresolved attendance anomalies found. All shifts are cleanly closed!
                                         </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                            {reg.employee?.display_name}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                            <div className="font-semibold text-gray-800 dark:text-gray-200">{reg.regularization_type}</div>
-                                            <div className="text-xs text-gray-400">{reg.reason_code}</div>
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                            <div>In: {reg.proposed_clock_in ? reg.proposed_clock_in.slice(11, 16) : '-'}</div>
-                                            <div>Out: {reg.proposed_clock_out ? reg.proposed_clock_out.slice(11, 16) : '-'}</div>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                                            {reg.employee_notes}
-                                        </td>
-                                        {canManage && (
-                                            <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
-                                                <div className="flex justify-center gap-2">
-                                                    <Button size="sm" variant="primary" onClick={() => handleActionRegularization(reg.id, true)}>
-                                                        Approve
-                                                    </Button>
-                                                    <Button size="sm" variant="danger" onClick={() => handleActionRegularization(reg.id, false)}>
-                                                        Reject
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        )}
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    anomalies.map((a) => (
+                                        <tr key={a.id}>
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                                                {a.attendance_date}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-800 dark:text-gray-200">
+                                                {a.employee?.display_name ?? `EMP #${a.employee_id}`}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                                                {a.shift?.name ?? 'Standard Shift'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-950/50 dark:text-rose-300">
+                                                    {a.anomaly_type ? a.anomaly_type.replace('_', ' ').toUpperCase() : 'MISSING PUNCH'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
+                                                {a.first_punch_in ? a.first_punch_in.slice(11, 16) : '(MISSING)'} /{' '}
+                                                {a.last_punch_out ? a.last_punch_out.slice(11, 16) : '(MISSING)'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Button
+                                                    variant="primary"
+                                                    onClick={() => {
+                                                        setSelectedRecordForQuickResolve(a);
+                                                        setQuickInTime(a.first_punch_in ? a.first_punch_in.slice(0, 19) : `${a.attendance_date} 08:00:00`);
+                                                        setQuickOutTime(a.last_punch_out ? a.last_punch_out.slice(0, 19) : `${a.attendance_date} 17:00:00`);
+                                                        setQuickReason('Quick-resolved via Anomaly Desk');
+                                                        setShowQuickResolveModal(true);
+                                                    }}
+                                                >
+                                                    Resolve Anomaly
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 3: Regularization Requests */}
+            {activeTab === 'regularizations' && (
+                <div className="space-y-4">
+                    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                        <table className="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-gray-700">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Date</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Employee</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Reason</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Proposed Times</th>
+                                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                                    <th className="px-4 py-3 text-right font-medium text-gray-700 dark:text-gray-300">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+                                {regularizations.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="py-6 text-center text-gray-500">
+                                            No pending regularization requests.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    regularizations.map((reg) => (
+                                        <tr key={reg.id}>
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                                                {reg.attendance_date}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-800 dark:text-gray-200">
+                                                {reg.employee?.display_name ?? `EMP #${reg.employee_id}`}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                                <div className="font-medium">{reg.reason_code}</div>
+                                                <div className="text-xs text-gray-500">{reg.employee_notes}</div>
+                                            </td>
+                                            <td className="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
+                                                {reg.proposed_clock_in ? reg.proposed_clock_in.slice(11, 16) : '—'} /{' '}
+                                                {reg.proposed_clock_out ? reg.proposed_clock_out.slice(11, 16) : '—'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <StatusBadge status={reg.status} />
+                                            </td>
+                                            <td className="px-4 py-3 text-right space-x-2">
+                                                {canManage && reg.status === 'pending' && (
+                                                    <>
+                                                        <Button variant="primary" onClick={() => handleActionRegularization(reg.id, true)}>
+                                                            Approve
+                                                        </Button>
+                                                        <Button variant="danger" onClick={() => handleActionRegularization(reg.id, false)}>
+                                                            Reject
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 4: Dynamic QR Kiosk Terminal */}
+            {activeTab === 'kiosk' && (
+                <div className="mx-auto max-w-2xl space-y-6 text-center">
+                    <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-700 dark:bg-gray-850">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                            Stationary Kiosk Rotating QR Terminal
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Displays dynamic, cryptographic HMAC-SHA256 rotating tokens that change every 20 seconds. Prevents photo copying and buddy punching.
+                        </p>
+
+                        <div className="mt-6 flex justify-center gap-4">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Select Active Kiosk Terminal:
+                            </label>
+                            <select
+                                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={selectedKioskId ?? ''}
+                                onChange={(e) => setSelectedKioskId(Number(e.target.value))}
+                            >
+                                {kiosks.map((k) => (
+                                    <option key={k.id} value={k.id}>
+                                        {k.name} ({k.kiosk_code})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mt-8 flex flex-col items-center justify-center">
+                            <div className="flex h-64 w-64 items-center justify-center rounded-2xl border-4 border-indigo-600 bg-gray-50 p-4 shadow-inner dark:border-indigo-500 dark:bg-gray-900">
+                                <div className="space-y-3 text-center">
+                                    <div className="mx-auto h-24 w-24 rounded-lg bg-indigo-100 p-2 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                                        <svg className="h-full w-full" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm-5 5h2v3h-2v-3zm2-3h3v2h-3v-2zm3 3h3v3h-3v-3z" />
+                                        </svg>
+                                    </div>
+                                    <span className="block font-mono text-[10px] break-all text-gray-600 dark:text-gray-400">
+                                        {kioskToken ?? 'Generating cryptographic token...'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 flex items-center gap-2">
+                                <span className="h-2.5 w-2.5 animate-ping rounded-full bg-emerald-500" />
+                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                    Rotates in: {kioskExpiresIn}s
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 5: Batch File Import */}
+            {activeTab === 'import' && (
+                <div className="space-y-6">
+                    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                            Two-Phase Attendance Batch Ingestion (CSV / Excel)
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Upload or paste attendance CSV records. The dry-run engine validates employee numbers, date/time formatting, and duplicate checks before executing an atomic batch commit.
+                        </p>
+
+                        <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Upload CSV File
+                                </label>
+                                <input
+                                    type="file"
+                                    accept=".csv,.txt"
+                                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/50 dark:file:text-indigo-300"
+                                    onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            setImportFile(e.target.files[0]);
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Or Paste CSV Content
+                                </label>
+                                <textarea
+                                    rows={4}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 font-mono text-xs p-2 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                    placeholder="employee_code,date,time,punch_type,notes&#10;EMP-01,2026-11-25,08:00:00,in,Morning shift"
+                                    value={importCsvContent}
+                                    onChange={(e) => setImportCsvContent(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-4 flex gap-2">
+                            <Button
+                                variant="primary"
+                                onClick={handlePreviewImport}
+                                disabled={importLoading || (!importFile && !importCsvContent)}
+                            >
+                                {importLoading ? 'Validating...' : 'Run Dry Run Validation'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {importSuccessMessage && (
+                        <div className="rounded-md bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 border border-emerald-200">
+                            {importSuccessMessage}
+                        </div>
+                    )}
+
+                    {importPreview && (
+                        <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h4 className="font-semibold text-gray-900 dark:text-gray-100">Dry Run Validation Summary</h4>
+                                    <p className="text-sm text-gray-500">
+                                        Total: {importPreview.total_rows} | Valid:{' '}
+                                        <span className="font-bold text-emerald-600">{importPreview.valid_rows}</span> | Invalid:{' '}
+                                        <span className="font-bold text-rose-600">{importPreview.invalid_rows}</span>
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="primary"
+                                    onClick={handleCommitImport}
+                                    disabled={importPreview.invalid_rows > 0 || importLoading}
+                                >
+                                    {importLoading ? 'Committing...' : 'Commit Valid Batch'}
+                                </Button>
+                            </div>
+
+                            <div className="max-h-80 overflow-y-auto rounded border border-gray-200 dark:border-gray-700">
+                                <table className="min-w-full divide-y divide-gray-200 text-left text-xs dark:divide-gray-700">
+                                    <thead className="bg-gray-50 dark:bg-gray-850">
+                                        <tr>
+                                            <th className="px-3 py-2 font-medium">Row</th>
+                                            <th className="px-3 py-2 font-medium">Emp Code</th>
+                                            <th className="px-3 py-2 font-medium">Name</th>
+                                            <th className="px-3 py-2 font-medium">Date & Time</th>
+                                            <th className="px-3 py-2 font-medium">Type</th>
+                                            <th className="px-3 py-2 font-medium">Status / Errors</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+                                        {importPreview.rows.map((row) => (
+                                            <tr key={row.row_number} className={row.is_valid ? '' : 'bg-rose-50/50 dark:bg-rose-950/20'}>
+                                                <td className="px-3 py-2 font-mono">{row.row_number}</td>
+                                                <td className="px-3 py-2 font-medium">{row.employee_code}</td>
+                                                <td className="px-3 py-2">{row.employee_name ?? '—'}</td>
+                                                <td className="px-3 py-2 font-mono">{row.date} {row.time}</td>
+                                                <td className="px-3 py-2 uppercase">{row.punch_type}</td>
+                                                <td className="px-3 py-2">
+                                                    {row.is_valid ? (
+                                                        <span className="text-emerald-600 font-semibold">VALID</span>
+                                                    ) : (
+                                                        <span className="text-rose-600 font-medium">{row.errors.join('; ')}</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Modal: Quick Resolve Missing Punch */}
+            {showQuickResolveModal && selectedRecordForQuickResolve && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+                        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            Quick Resolve Missing Punch
+                        </h3>
+                        <p className="mb-4 text-xs text-gray-500">
+                            Employee: {selectedRecordForQuickResolve.employee?.display_name ?? `ID #${selectedRecordForQuickResolve.employee_id}`} | Date: {selectedRecordForQuickResolve.attendance_date}
+                        </p>
+                        <form onSubmit={handleQuickResolveSubmit} className="space-y-4">
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    First Clock In Timestamp
+                                </label>
+                                <input
+                                    type="text"
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                    value={quickInTime}
+                                    onChange={(e) => setQuickInTime(e.target.value)}
+                                    placeholder="YYYY-MM-DD HH:MM:SS"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Last Clock Out Timestamp
+                                </label>
+                                <input
+                                    type="text"
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                    value={quickOutTime}
+                                    onChange={(e) => setQuickOutTime(e.target.value)}
+                                    placeholder="YYYY-MM-DD HH:MM:SS"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Resolution Reason (Audit Trail)
+                                </label>
+                                <input
+                                    type="text"
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                    value={quickReason}
+                                    onChange={(e) => setQuickReason(e.target.value)}
+                                    placeholder="e.g. Card tap failure confirmed by shift lead"
+                                    required
+                                />
+                            </div>
+                            <div className="mt-6 flex justify-end gap-2">
+                                <Button variant="secondary" onClick={() => setShowQuickResolveModal(false)}>
+                                    Cancel
+                                </Button>
+                                <Button variant="primary" type="submit" disabled={!quickReason}>
+                                    Apply Quick Fix
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
 
@@ -420,13 +909,8 @@ export default function AttendanceManagementPage() {
                     <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
                         <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Submit Attendance Regularization</h3>
                         <form onSubmit={handleRegularizeSubmit} className="space-y-4">
-                            <EmployeeLookupSelect
-                                label="Employee"
-                                value={selectedEmployee}
-                                onChange={setSelectedEmployee}
-                            />
                             <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date</label>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Attendance Date</label>
                                 <input
                                     type="date"
                                     className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
@@ -440,14 +924,14 @@ export default function AttendanceManagementPage() {
                                 <select
                                     className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                                     value={regType}
-                                    onChange={(e) => setRegType(e.target.value as typeof regType)}
+                                    onChange={(e) => setRegType(e.target.value as HrAttendanceRegularization['regularization_type'])}
                                 >
-                                    <option value="missing_in">Missing Clock In</option>
-                                    <option value="missing_out">Missing Clock Out</option>
+                                    <option value="missing_in">Missing In Punch</option>
+                                    <option value="missing_out">Missing Out Punch</option>
                                     <option value="both_missing">Both Punches Missing</option>
-                                    <option value="incorrect_time">Incorrect Punch Time</option>
+                                    <option value="incorrect_time">Incorrect Time Clocked</option>
                                     <option value="forgot_to_punch">Forgot to Punch</option>
-                                    <option value="on_duty">On Duty / Client Visit</option>
+                                    <option value="on_duty">Official On-Duty / Client Visit</option>
                                 </select>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
@@ -472,31 +956,25 @@ export default function AttendanceManagementPage() {
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reason</label>
-                                <select
-                                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                <input
+                                    type="text"
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                                     value={regReason}
                                     onChange={(e) => setRegReason(e.target.value)}
-                                >
-                                    <option value="forgot_badge">Forgot ID Badge</option>
-                                    <option value="system_outage">System / Internet Outage</option>
-                                    <option value="client_visit">Field Work / Client Visit</option>
-                                    <option value="biometric_error">Biometric Reader Error</option>
-                                    <option value="emergency">Personal Emergency</option>
-                                    <option value="forgot_to_punch">Forgot to Punch</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employee Notes</label>
-                                <textarea
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    rows={2}
-                                    value={regNotes}
-                                    onChange={(e) => setRegNotes(e.target.value)}
                                     required
                                 />
                             </div>
-
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Detailed Notes</label>
+                                <textarea
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                    rows={3}
+                                    value={regNotes}
+                                    onChange={(e) => setRegNotes(e.target.value)}
+                                    placeholder="Explain why punch regularization is needed..."
+                                    required
+                                />
+                            </div>
                             <div className="mt-6 flex justify-end gap-2">
                                 <Button variant="secondary" onClick={() => setShowRegularizeModal(false)}>
                                     Cancel

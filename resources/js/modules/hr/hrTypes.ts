@@ -90,12 +90,18 @@ export interface HrShiftSwap {
 // --- Attendance Types ---
 export type PunchType = 'in' | 'out' | 'break_out' | 'break_in' | 'meal_out' | 'meal_in';
 export type PunchSource = 'web' | 'mobile' | 'biometric_device' | 'manual_entry' | 'system_resolved';
-export type AttendanceStatus = 'present' | 'late' | 'half_day' | 'absent' | 'on_leave' | 'rest_day' | 'holiday' | 'unresolved';
+export type CaptureMethod = 'biometric' | 'rfid_card' | 'nfc_tag' | 'barcode' | 'totp_qr' | 'mobile_gps' | 'web_portal' | 'manual_admin' | 'file_upload';
+export type AnomalyType = 'missing_out' | 'missing_in' | 'unpaired_break' | 'excessive_hours' | 'short_shift' | 'geofence_violation';
+export type CredentialType = 'rfid_card' | 'nfc_tag' | 'barcode' | 'mobile_device_uuid';
+export type CredentialStatus = 'active' | 'suspended' | 'lost' | 'revoked';
+export type AttendanceStatus = 'present' | 'late' | 'half_day' | 'absent' | 'on_leave' | 'rest_day' | 'holiday' | 'unresolved' | 'missing_punch' | 'anomalous';
 
 export interface HrAttendancePunch {
     id: number; attendance_record_id?: number | null; employee_id: number;
     attendance_date: string; punch_time: string; punch_type: PunchType;
-    punch_source: PunchSource; device_id?: string | null; ip_address?: string | null;
+    punch_source: PunchSource; capture_method?: CaptureMethod;
+    credential_id?: number | null; accuracy_meters?: number | null;
+    geofence_id?: number | null; device_id?: string | null; ip_address?: string | null;
     latitude?: string | null; longitude?: string | null; is_verified: boolean; is_ignored: boolean;
 }
 
@@ -106,8 +112,47 @@ export interface HrAttendanceRecord {
     unpaid_break_minutes: number; regular_minutes: number; overtime_minutes: number;
     double_time_minutes: number; late_arrival_minutes: number; early_departure_minutes: number;
     status: AttendanceStatus; lock_status: 'open' | 'locked' | 'finalized';
-    is_regularized: boolean; notes?: string | null;
+    is_regularized: boolean; anomaly_type?: AnomalyType | null; requires_regularization?: boolean; notes?: string | null;
     shift?: HrShift; employee?: EmployeeSummary; punches?: HrAttendancePunch[];
+}
+
+export interface HrEmployeeAttendanceCredential {
+    id: number; row_version: number; employee_id: number;
+    credential_type: CredentialType; credential_value: string; label?: string | null;
+    status: CredentialStatus; issued_at?: string | null; expires_at?: string | null;
+    revoked_at?: string | null; revocation_reason?: string | null;
+}
+
+export interface HrAttendanceGeofence {
+    id: number; row_version: number; name: string; code: string;
+    latitude: string | number; longitude: string | number; radius_meters: number;
+    ip_whitelist?: string | null; is_active: boolean; notes?: string | null;
+}
+
+export interface HrAttendanceKiosk {
+    id: number; row_version: number; kiosk_code: string; name: string;
+    secret_key?: string; rotation_seconds: number; geofence_id?: number | null;
+    is_active: boolean; last_heartbeat_at?: string | null;
+    geofence?: HrAttendanceGeofence | null;
+}
+
+export interface BatchImportPreview {
+    total_rows: number;
+    valid_rows: number;
+    invalid_rows: number;
+    rows: Array<{
+        row_number: number;
+        employee_code: string;
+        employee_name?: string | null;
+        employee_id?: number | null;
+        date: string;
+        time: string;
+        punch_type: string;
+        notes?: string;
+        is_valid: boolean;
+        errors: string[];
+    }>;
+    error_summary: string[];
 }
 
 export interface HrAttendanceRegularization {

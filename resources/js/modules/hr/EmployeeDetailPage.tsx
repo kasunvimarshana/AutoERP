@@ -34,8 +34,9 @@ const EmployeeLicenseTab = lazy(() => import('./components/EmployeeLicenseTab').
 const EmployeeRateTab = lazy(() => import('./components/EmployeeRateTab').then((module) => ({ default: module.EmployeeRateTab })));
 const EmployeeAvailabilityTab = lazy(() => import('./components/EmployeeAvailabilityTab').then((module) => ({ default: module.EmployeeAvailabilityTab })));
 const EmployeeStatusHistoryTab = lazy(() => import('./components/EmployeeStatusHistoryTab').then((module) => ({ default: module.EmployeeStatusHistoryTab })));
+const EmployeeCredentialTab = lazy(() => import('./components/EmployeeCredentialTab').then((module) => ({ default: module.EmployeeCredentialTab })));
 
-type Tab = 'summary' | 'contacts' | 'addresses' | 'documents' | 'skills' | 'certifications' | 'licenses' | 'rates' | 'availability' | 'history';
+type Tab = 'summary' | 'contacts' | 'addresses' | 'documents' | 'skills' | 'certifications' | 'licenses' | 'rates' | 'availability' | 'credentials' | 'history';
 
 const tabs = [
     { id: 'summary', label: 'Summary' },
@@ -47,6 +48,7 @@ const tabs = [
     { id: 'licenses', label: 'Licenses' },
     { id: 'rates', label: 'Rates' },
     { id: 'availability', label: 'Availability' },
+    { id: 'credentials', label: 'Badges & Credentials' },
     { id: 'history', label: 'Status History' },
 ] satisfies Array<{ id: Tab; label: string }>;
 
@@ -110,6 +112,7 @@ export default function EmployeeDetailPage() {
                             {tab.openedTabs.has('licenses') && <div hidden={tab.activeTab !== 'licenses'}><EmployeeLicenseTab employeeId={id} canManage={canUpdate} /></div>}
                             {tab.openedTabs.has('rates') && <div hidden={tab.activeTab !== 'rates'}><EmployeeRateTab employeeId={id} /></div>}
                             {tab.openedTabs.has('availability') && <div hidden={tab.activeTab !== 'availability'}><EmployeeAvailabilityTab employeeId={id} /></div>}
+                            {tab.openedTabs.has('credentials') && <div hidden={tab.activeTab !== 'credentials'}><EmployeeCredentialTab employeeId={id} /></div>}
                             {tab.openedTabs.has('history') && <div hidden={tab.activeTab !== 'history'}><EmployeeStatusHistoryTab employeeId={id} /></div>}
                         </Suspense>
                     </div>

@@ -14,7 +14,11 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Hr\Http\Controllers\EmployeeController;
 use Modules\Hr\Http\Controllers\EmployeeRelationController;
+use Modules\Hr\Http\Controllers\HrAttendanceAnomalyController;
+use Modules\Hr\Http\Controllers\HrAttendanceCaptureController;
 use Modules\Hr\Http\Controllers\HrAttendanceController;
+use Modules\Hr\Http\Controllers\HrAttendanceCredentialController;
+use Modules\Hr\Http\Controllers\HrAttendanceGeofenceController;
 use Modules\Hr\Http\Controllers\HrBiometricDeviceController;
 use Modules\Hr\Http\Controllers\HrBiometricPushReceiverController;
 use Modules\Hr\Http\Controllers\HrCertificationController;
@@ -215,6 +219,92 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
     Route::post('attendance/punch', [HrAttendanceController::class, 'punch'])
         ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
         ->name('attendance.punch');
+    Route::post('attendance/capture/web', [HrAttendanceCaptureController::class, 'webPunch'])
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.web');
+    Route::post('attendance/capture/mobile', [HrAttendanceCaptureController::class, 'mobilePunch'])
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.mobile');
+    Route::post('attendance/capture/rfid', [HrAttendanceCaptureController::class, 'rfidPunch'])
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.rfid');
+    Route::post('attendance/capture/barcode', [HrAttendanceCaptureController::class, 'barcodePunch'])
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.barcode');
+    Route::get('attendance/capture/kiosks/{kiosk}/qr-token', [HrAttendanceCaptureController::class, 'kioskQrToken'])
+        ->whereNumber('kiosk')
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.kiosk-token');
+    Route::post('attendance/capture/qr-scan', [HrAttendanceCaptureController::class, 'scanKioskQr'])
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.qr-scan');
+    Route::post('attendance/capture/import/preview', [HrAttendanceCaptureController::class, 'previewImport'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.capture.import.preview');
+    Route::post('attendance/capture/import/commit', [HrAttendanceCaptureController::class, 'commitImport'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.capture.import.commit');
+
+    // Attendance Anomalies & Missing Punches
+    Route::get('attendance/anomalies', [HrAttendanceAnomalyController::class, 'index'])
+        ->middleware($requires(HrAuthorizationService::VIEW_ATTENDANCE))
+        ->name('attendance.anomalies.index');
+    Route::post('attendance/anomalies/scan', [HrAttendanceAnomalyController::class, 'scan'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.anomalies.scan');
+    Route::post('attendance/anomalies/{record}/quick-resolve', [HrAttendanceAnomalyController::class, 'quickResolve'])
+        ->whereNumber('record')
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.anomalies.quick-resolve');
+
+    // Attendance Geofences & Kiosks
+    Route::get('attendance/geofences', [HrAttendanceGeofenceController::class, 'indexGeofences'])
+        ->middleware($requires(HrAuthorizationService::VIEW_ATTENDANCE))
+        ->name('attendance.geofences.index');
+    Route::post('attendance/geofences', [HrAttendanceGeofenceController::class, 'storeGeofence'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.geofences.store');
+    Route::put('attendance/geofences/{geofence}', [HrAttendanceGeofenceController::class, 'updateGeofence'])
+        ->whereNumber('geofence')
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.geofences.update');
+    Route::delete('attendance/geofences/{geofence}', [HrAttendanceGeofenceController::class, 'destroyGeofence'])
+        ->whereNumber('geofence')
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.geofences.destroy');
+
+    Route::get('attendance/kiosks', [HrAttendanceGeofenceController::class, 'indexKiosks'])
+        ->middleware($requires(HrAuthorizationService::VIEW_ATTENDANCE))
+        ->name('attendance.kiosks.index');
+    Route::post('attendance/kiosks', [HrAttendanceGeofenceController::class, 'storeKiosk'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.kiosks.store');
+    Route::put('attendance/kiosks/{kiosk}', [HrAttendanceGeofenceController::class, 'updateKiosk'])
+        ->whereNumber('kiosk')
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.kiosks.update');
+    Route::delete('attendance/kiosks/{kiosk}', [HrAttendanceGeofenceController::class, 'destroyKiosk'])
+        ->whereNumber('kiosk')
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
+        ->name('attendance.kiosks.destroy');
+
+    // Employee Attendance Credentials
+    Route::get('employees/{employee}/credentials', [HrAttendanceCredentialController::class, 'index'])
+        ->whereNumber('employee')
+        ->middleware($requires(HrAuthorizationService::VIEW_EMPLOYEES))
+        ->name('employees.credentials.index');
+    Route::post('employees/{employee}/credentials', [HrAttendanceCredentialController::class, 'store'])
+        ->whereNumber('employee')
+        ->middleware($requires(HrAuthorizationService::UPDATE_EMPLOYEES))
+        ->name('employees.credentials.store');
+    Route::patch('employees/{employee}/credentials/{credential}/status', [HrAttendanceCredentialController::class, 'updateStatus'])
+        ->whereNumber(['employee', 'credential'])
+        ->middleware($requires(HrAuthorizationService::UPDATE_EMPLOYEES))
+        ->name('employees.credentials.status');
+    Route::delete('employees/{employee}/credentials/{credential}', [HrAttendanceCredentialController::class, 'destroy'])
+        ->whereNumber(['employee', 'credential'])
+        ->middleware($requires(HrAuthorizationService::UPDATE_EMPLOYEES))
+        ->name('employees.credentials.destroy');
     Route::get('attendance/today/{employee}', [HrAttendanceController::class, 'today'])
         ->whereNumber('employee')
         ->middleware($requires(HrAuthorizationService::VIEW_ATTENDANCE))

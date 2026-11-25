@@ -22,4 +22,6 @@ enum AttendanceStatus: string
     case RestDay = 'rest_day';
     case Holiday = 'holiday';
     case Unresolved = 'unresolved';
+    case MissingPunch = 'missing_punch';
+    case Anomalous = 'anomalous';
 }
