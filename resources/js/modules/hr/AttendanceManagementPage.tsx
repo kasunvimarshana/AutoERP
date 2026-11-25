@@ -290,10 +290,14 @@ export default function AttendanceManagementPage() {
         setImportLoading(true);
         setError(null);
         try {
-            await commitAttendanceImport({
-                file_name: importFile?.name ?? 'manual_paste.csv',
-                csv_content: importCsvContent || (importFile ? await importFile.text() : ''),
-            });
+            await commitAttendanceImport(
+                importFile
+                    ? { file: importFile }
+                    : {
+                        file_name: 'manual_paste.csv',
+                        csv_content: importCsvContent,
+                    },
+            );
             setImportSuccessMessage(`Successfully imported ${importPreview.valid_rows} attendance punches.`);
             setImportPreview(null);
             setImportFile(null);
@@ -737,11 +741,11 @@ export default function AttendanceManagementPage() {
                         <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Upload CSV File
+                                    Upload CSV or Excel (.xlsx) File
                                 </label>
                                 <input
                                     type="file"
-                                    accept=".csv,.txt"
+                                    accept=".csv,.txt,.xlsx"
                                     className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/50 dark:file:text-indigo-300"
                                     onChange={(e) => {
                                         if (e.target.files && e.target.files[0]) {

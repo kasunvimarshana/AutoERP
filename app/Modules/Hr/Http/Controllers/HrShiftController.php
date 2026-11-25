@@ -16,6 +16,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Hr\DTOs\ShiftAssignmentData;
 use Modules\Hr\DTOs\ShiftData;
@@ -29,6 +30,9 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Models\HrShift;
 use Modules\Hr\Models\HrShiftAssignment;
 use Modules\Hr\Models\HrShiftReallocation;
+use Modules\Hr\Models\HrShiftRotation;
+use Modules\Hr\Models\HrShiftRotationAssignment;
+use Modules\Hr\Models\HrShiftRotationStep;
 use Modules\Hr\Models\HrShiftSwap;
 use Modules\Hr\Services\ShiftRosterService;
 
@@ -561,5 +565,278 @@ final class HrShiftController
         $reallocation = $this->rosterService->reallocateCover($request->tenantId(), $data);
 
         return response()->json(['data' => $reallocation], 201);
+    }
+
+    public function indexRotations(TenantScopedRequest $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => ['nullable', 'string', Rule::in(['active', 'inactive'])],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
+        ]);
+
+        $query = HrShiftRotation::query()
+            ->where('tenant_id', $request->tenantId())
+            ->with(['steps.shift'])
+            ->orderBy('name');
+
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        return response()->json($query->paginate((int) ($validated['per_page'] ?? 25)));
+    }
+
+    public function storeRotation(TenantScopedRequest $request): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:64', Rule::unique('hr_shift_rotations', 'code')->where('tenant_id', $tenantId)],
+            'name' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
+            'cycle_days' => ['required', 'integer', 'between:1,365'],
+            'status' => ['nullable', 'string', Rule::in(['active', 'inactive'])],
+        ]);
+
+        $rotation = $this->rosterService->createRotation($tenantId, [
+            'organization_unit_id' => $request->organizationUnitId(),
+            'code' => $validated['code'],
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'cycle_days' => (int) $validated['cycle_days'],
+            'status' => $validated['status'] ?? 'active',
+        ]);
+
+        return response()->json(['data' => $rotation->load('steps.shift')], 201);
+    }
+
+    public function showRotation(TenantScopedRequest $request, int $rotation): JsonResponse
+    {
+        $rotationModel = HrShiftRotation::query()
+            ->where('tenant_id', $request->tenantId())
+            ->where('id', $rotation)
+            ->with(['steps.shift'])
+            ->firstOrFail();
+
+        return response()->json(['data' => $rotationModel]);
+    }
+
+    public function updateRotation(TenantScopedRequest $request, int $rotation): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+            'code' => ['sometimes', 'required', 'string', 'max:64', Rule::unique('hr_shift_rotations', 'code')->where('tenant_id', $tenantId)->ignore($rotation)],
+            'name' => ['sometimes', 'required', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
+            'cycle_days' => ['sometimes', 'required', 'integer', 'between:1,365'],
+            'status' => ['sometimes', 'required', 'string', Rule::in(['active', 'inactive'])],
+        ]);
+
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+
+        $updated = DB::transaction(function () use ($request, $tenantId, $rotation, $validated, $expectedVersion): ?HrShiftRotation {
+            $rotationModel = HrShiftRotation::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $rotation)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $rotationModel->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            $rotationModel->update([
+                'code' => $request->has('code') ? $validated['code'] : $rotationModel->code,
+                'name' => $request->has('name') ? $validated['name'] : $rotationModel->name,
+                'description' => $request->has('description') ? ($validated['description'] ?? null) : $rotationModel->description,
+                'cycle_days' => $request->has('cycle_days') ? (int) $validated['cycle_days'] : $rotationModel->cycle_days,
+                'status' => $request->has('status') ? $validated['status'] : $rotationModel->status,
+                'row_version' => ((int) $rotationModel->row_version) + 1,
+            ]);
+
+            return $rotationModel->fresh('steps.shift');
+        });
+
+        if ($updated === null) {
+            return response()->json(['message' => 'Shift rotation was changed by someone else. Reload before saving.'], 409);
+        }
+
+        return response()->json(['data' => $updated]);
+    }
+
+    public function destroyRotation(TenantScopedRequest $request, int $rotation): JsonResponse
+    {
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+
+        $result = DB::transaction(function () use ($request, $rotation, $expectedVersion): string {
+            $tenantId = $request->tenantId();
+            $rotationModel = HrShiftRotation::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $rotation)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $rotationModel->row_version !== $expectedVersion) {
+                return 'conflict';
+            }
+
+            $inUse = HrShiftRotationAssignment::query()
+                ->where('tenant_id', $tenantId)
+                ->where('shift_rotation_id', $rotation)
+                ->exists();
+
+            if ($inUse) {
+                return 'in_use';
+            }
+
+            $rotationModel->delete();
+
+            return 'deleted';
+        });
+
+        if ($result === 'conflict') {
+            return response()->json(['message' => 'Shift rotation was changed by someone else. Reload before deleting.'], 409);
+        }
+
+        if ($result === 'in_use') {
+            return response()->json(['message' => 'Cannot delete shift rotation because it is referenced by rotation assignments.'], 422);
+        }
+
+        return response()->json(null, 204);
+    }
+
+    public function storeRotationStep(TenantScopedRequest $request, int $rotation): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $rotationModel = HrShiftRotation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $rotation)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'day_sequence' => [
+                'required',
+                'integer',
+                'between:1,'.$rotationModel->cycle_days,
+                Rule::unique('hr_shift_rotation_steps', 'day_sequence')
+                    ->where('tenant_id', $tenantId)
+                    ->where('shift_rotation_id', $rotationModel->id),
+            ],
+            'shift_id' => ['nullable', 'integer', Rule::exists('hr_shifts', 'id')->where('tenant_id', $tenantId)],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $step = $this->rosterService->addRotationStep(
+            $rotationModel,
+            (int) $validated['day_sequence'],
+            isset($validated['shift_id']) ? (int) $validated['shift_id'] : null,
+            $validated['notes'] ?? null,
+        );
+
+        return response()->json(['data' => $step->load('shift')], 201);
+    }
+
+    public function destroyRotationStep(TenantScopedRequest $request, int $rotation, int $step): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $stepModel = HrShiftRotationStep::query()
+            ->where('tenant_id', $tenantId)
+            ->where('shift_rotation_id', $rotation)
+            ->where('id', $step)
+            ->firstOrFail();
+
+        $stepModel->delete();
+
+        return response()->json(null, 204);
+    }
+
+    public function rotationAssignments(TenantScopedRequest $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'employee_id' => ['nullable', 'integer'],
+            'shift_rotation_id' => ['nullable', 'integer'],
+            'is_active' => ['nullable', 'boolean'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
+        ]);
+
+        $query = HrShiftRotationAssignment::query()
+            ->where('tenant_id', $request->tenantId())
+            ->with(['employee', 'rotation'])
+            ->orderByDesc('anchor_date');
+
+        if (! empty($validated['employee_id'])) {
+            $query->where('employee_id', (int) $validated['employee_id']);
+        }
+        if (! empty($validated['shift_rotation_id'])) {
+            $query->where('shift_rotation_id', (int) $validated['shift_rotation_id']);
+        }
+        if ($request->has('is_active')) {
+            $query->where('is_active', (bool) $validated['is_active']);
+        }
+
+        return response()->json($query->paginate((int) ($validated['per_page'] ?? 25)));
+    }
+
+    public function assignRotation(TenantScopedRequest $request): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $validated = $request->validate([
+            'employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')->where('tenant_id', $tenantId)],
+            'shift_rotation_id' => ['required', 'integer', Rule::exists('hr_shift_rotations', 'id')->where('tenant_id', $tenantId)],
+            'anchor_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:anchor_date'],
+        ]);
+
+        try {
+            $assignment = $this->rosterService->assignRotation(
+                $tenantId,
+                (int) $validated['employee_id'],
+                (int) $validated['shift_rotation_id'],
+                $validated['anchor_date'],
+                $validated['end_date'] ?? null,
+            );
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $assignment->load(['employee', 'rotation'])], 201);
+    }
+
+    public function cancelRotationAssignment(TenantScopedRequest $request, int $assignment): JsonResponse
+    {
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+
+        $cancelled = DB::transaction(function () use ($request, $assignment, $expectedVersion): ?HrShiftRotationAssignment {
+            $assignmentModel = HrShiftRotationAssignment::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('id', $assignment)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $assignmentModel->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            $assignmentModel->update([
+                'is_active' => false,
+                'row_version' => ((int) $assignmentModel->row_version) + 1,
+            ]);
+
+            return $assignmentModel->fresh();
+        });
+
+        if ($cancelled === null) {
+            return response()->json(['message' => 'Rotation assignment was changed by someone else. Reload before cancelling.'], 409);
+        }
+
+        return response()->json(['data' => $cancelled]);
     }
 }

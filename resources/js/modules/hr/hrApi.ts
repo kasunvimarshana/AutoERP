@@ -234,8 +234,19 @@ export const previewAttendanceImport = (payload: { file?: File; csv_content?: st
     return apiClient.post<ApiResource<import('./hrTypes').BatchImportPreview>>(endpoints.hrAttendanceCaptureImportPreview, { csv_content: payload.csv_content }).then((r) => r.data.data);
 };
 
-export const commitAttendanceImport = (payload: { file_name: string; csv_content: string }) =>
-    apiClient.post<ApiResource<unknown>>(endpoints.hrAttendanceCaptureImportCommit, payload).then((r) => r.data.data);
+export const commitAttendanceImport = (payload: { file?: File; file_name?: string; csv_content?: string }) => {
+    if (payload.file) {
+        const formData = new FormData();
+        formData.append('file', payload.file);
+        return apiClient.post<ApiResource<unknown>>(endpoints.hrAttendanceCaptureImportCommit, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }).then((r) => r.data.data);
+    }
+    return apiClient.post<ApiResource<unknown>>(endpoints.hrAttendanceCaptureImportCommit, {
+        file_name: payload.file_name,
+        csv_content: payload.csv_content,
+    }).then((r) => r.data.data);
+};
 
 export const listAttendanceAnomalies = (params?: { date?: string; employee_id?: number; anomaly_type?: string; page?: number }) =>
     apiClient.get<ApiCollection<import('./hrTypes').HrAttendanceRecord>>(endpoints.hrAttendanceAnomalies, { params }).then((r) => r.data);

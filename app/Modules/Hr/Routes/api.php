@@ -225,6 +225,44 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-reallocations.store');
 
+    // Shift Rotations & Rotation Assignments
+    Route::get('shift-rotations', [HrShiftController::class, 'indexRotations'])
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-rotations.index');
+    Route::post('shift-rotations', [HrShiftController::class, 'storeRotation'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotations.store');
+    Route::get('shift-rotations/{rotation}', [HrShiftController::class, 'showRotation'])
+        ->whereNumber('rotation')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-rotations.show');
+    Route::match(['put', 'patch'], 'shift-rotations/{rotation}', [HrShiftController::class, 'updateRotation'])
+        ->whereNumber('rotation')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotations.update');
+    Route::delete('shift-rotations/{rotation}', [HrShiftController::class, 'destroyRotation'])
+        ->whereNumber('rotation')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotations.destroy');
+    Route::post('shift-rotations/{rotation}/steps', [HrShiftController::class, 'storeRotationStep'])
+        ->whereNumber('rotation')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotations.steps.store');
+    Route::delete('shift-rotations/{rotation}/steps/{step}', [HrShiftController::class, 'destroyRotationStep'])
+        ->whereNumber(['rotation', 'step'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotations.steps.destroy');
+    Route::get('shift-rotation-assignments', [HrShiftController::class, 'rotationAssignments'])
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-rotation-assignments.index');
+    Route::post('shift-rotation-assignments', [HrShiftController::class, 'assignRotation'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotation-assignments.store');
+    Route::delete('shift-rotation-assignments/{assignment}', [HrShiftController::class, 'cancelRotationAssignment'])
+        ->whereNumber('assignment')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotation-assignments.destroy');
+
     // Holiday Calendars & Holidays
     Route::get('holiday-calendars', [HrHolidayController::class, 'indexCalendars'])
         ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))

@@ -522,6 +522,119 @@ final class HrEndToEndAuditTest extends TestCase
         });
     }
 
+    public function test_shift_rotations_crud_steps_occ_and_assignments(): void
+    {
+        $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
+        $tenantId = $this->tenant();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $userId = $this->createUser($tenantId);
+            $this->actingAs(UserModel::query()->findOrFail($userId));
+            $orgId = OrganizationUnitFixture::create(['tenant_id' => $tenantId, 'name' => 'HQ', 'code' => 'HQ-ROT']);
+            $employee = $this->createEmployee($tenantId, $orgId, 'Rot Tester', 'EMP-ROT1');
+
+            $shiftRes = $this->postJson('/api/v1/hr/shifts', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'code' => 'ROT-S1',
+                'name' => 'Rotation Day Shift',
+                'start_time' => '08:00:00',
+                'end_time' => '17:00:00',
+            ])->assertStatus(201);
+            $shiftId = (int) $shiftRes->json('data.id');
+
+            // Create rotation
+            $rotRes = $this->postJson('/api/v1/hr/shift-rotations', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'code' => 'CONT-7',
+                'name' => '7-Day Rotation',
+                'cycle_days' => 7,
+            ])->assertStatus(201);
+            $rotId = (int) $rotRes->json('data.id');
+
+            // List & Show
+            $this->getJson("/api/v1/hr/shift-rotations?tenant_id={$tenantId}&organization_unit_id={$orgId}")
+                ->assertStatus(200)
+                ->assertJsonPath('data.0.code', 'CONT-7');
+            $this->getJson("/api/v1/hr/shift-rotations/{$rotId}?tenant_id={$tenantId}&organization_unit_id={$orgId}")
+                ->assertStatus(200)
+                ->assertJsonPath('data.name', '7-Day Rotation');
+
+            // Add step
+            $stepRes = $this->postJson("/api/v1/hr/shift-rotations/{$rotId}/steps", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'day_sequence' => 1,
+                'shift_id' => $shiftId,
+            ])->assertStatus(201);
+            $stepId = (int) $stepRes->json('data.id');
+
+            // Update with stale OCC -> 409, valid OCC -> 200
+            $this->putJson("/api/v1/hr/shift-rotations/{$rotId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 999,
+                'name' => 'Stale Name',
+            ])->assertStatus(409);
+
+            $this->putJson("/api/v1/hr/shift-rotations/{$rotId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 1,
+                'name' => 'Updated 7-Day Rotation',
+            ])->assertStatus(200)
+                ->assertJsonPath('data.name', 'Updated 7-Day Rotation')
+                ->assertJsonPath('data.row_version', 2);
+
+            // Assign rotation & reject overlapping assignment
+            $assignRes = $this->postJson('/api/v1/hr/shift-rotation-assignments', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'employee_id' => $employee->id,
+                'shift_rotation_id' => $rotId,
+                'anchor_date' => '2026-11-01',
+                'end_date' => '2026-11-30',
+            ])->assertStatus(201);
+            $assignId = (int) $assignRes->json('data.id');
+
+            $this->postJson('/api/v1/hr/shift-rotation-assignments', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'employee_id' => $employee->id,
+                'shift_rotation_id' => $rotId,
+                'anchor_date' => '2026-11-15',
+            ])->assertStatus(422);
+
+            // In-use rotation delete blocked -> 422
+            $this->deleteJson("/api/v1/hr/shift-rotations/{$rotId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+            ])->assertStatus(422);
+
+            // Cancel rotation assignment with OCC
+            $this->deleteJson("/api/v1/hr/shift-rotation-assignments/{$assignId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 999,
+            ])->assertStatus(409);
+
+            $this->deleteJson("/api/v1/hr/shift-rotation-assignments/{$assignId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 1,
+            ])->assertStatus(200)
+                ->assertJsonPath('data.is_active', false);
+
+            // Delete step
+            $this->deleteJson("/api/v1/hr/shift-rotations/{$rotId}/steps/{$stepId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+            ])->assertStatus(204);
+        });
+    }
+
     private function createSerialAndSharedStringsXlsx(): string
     {
         $path = tempnam(sys_get_temp_dir(), 'hr_xlsx_serial_').'.xlsx';
