@@ -38,7 +38,11 @@
 - **Dual-Timestamp Architecture & Safe Backdated CRUD**:
   - Maintain a strict architectural separation between physical recording timestamps (`created_at`, `posted_at`, `reversed_at`, `updated_at`, `deleted_at`) and civil operational business dates (`invoice_date`, `movement_date`, `received_date`, `layer_date`, `payment_date`, `journal_date`).
   - Physical ingestion timestamps (`created_at`) are authoritative server-owned audit facts and must never be overridden or modified by client inputs.
-  - Backdated transactions must preserve chronological downstream consistency: project running balances across subsequent movements, verify that backdated issues do not create intermediate negative stock across subsequent dates, validate reversal dates against business posting dates rather than physical wall-clock timestamps, and map tax transactions to operational business dates.
+  - Operational business dates govern accounting periods, chronological valuation queues, tax mapping, point-in-time aging, and ledger sequencing.
+  - **Backdated CREATE**: Permitted for operational documents and ledger entries provided the civil date falls within an open accounting period, is not in the future (where prohibited, e.g. payments/expenses), and preserves chronological downstream consistency (e.g. projecting running balances and verifying that backdated stock issues do not cause intermediate negative stock across subsequent dates).
+  - **UPDATE**: Draft records may be modified with optimistic concurrency control (`row_version`). Posted, approved, or finalized financial and operational records are strictly immutable in place; all adjustments must be separate linked audit records. Core transaction models must enforce this via lifecycle `booted()` hooks throwing `LogicException` on illegal mutations.
+  - **DELETE**: Only draft records may be deleted. Posted or finalized documents must never be deleted in place; use governed cancellations or reversals. Core transaction models must enforce this via lifecycle `booted()` hooks throwing `LogicException`.
+  - Point-in-time queries, aging calculations, and revision factor lookups must always filter and sequence by civil operational dates, never by physical server timestamps (`created_at`, `updated_at`).
 
 ## 7. Database Architecture & Explicit Migrations
 - Use portable Laravel migration APIs.
