@@ -15,23 +15,22 @@ namespace Modules\Hr\Services\Capture;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\Hr\DTOs\PunchData;
 use Modules\Hr\Enums\BatchImportStatus;
 use Modules\Hr\Enums\CaptureMethod;
-use Modules\Hr\Enums\PunchSource;
 use Modules\Hr\Enums\PunchType;
 use Modules\Hr\Models\HrAttendanceBatchImport;
 use Modules\Hr\Models\HrEmployee;
-use Modules\Hr\Services\AttendanceCalculationEngine;
+use SimpleXMLElement;
+use ZipArchive;
 
 final class BatchAttendanceImportService
 {
     public function __construct(
-        private readonly AttendanceCalculationEngine $calculationEngine,
+        private readonly AttendanceCaptureAdapterManager $adapterManager,
     ) {}
 
     /**
-     * Phase 1: Dry run preview validation.
+     * Phase 1: Dry run preview validation (supports CSV/TSV content or Excel .xlsx file path).
      *
      * @return array{
      *     total_rows: int,
@@ -41,9 +40,11 @@ final class BatchAttendanceImportService
      *     error_summary: list<string>
      * }
      */
-    public function preview(int $tenantId, string $csvContent): array
+    public function preview(int $tenantId, string $csvContent, ?string $filePath = null): array
     {
-        $parsed = $this->parseCsv($csvContent);
+        $parsed = ($filePath !== null && $this->isXlsxFile($filePath))
+            ? $this->parseXlsx($filePath)
+            : $this->parseCsv($csvContent);
         $total = count($parsed);
         $validCount = 0;
         $invalidCount = 0;
@@ -61,8 +62,8 @@ final class BatchAttendanceImportService
             $errors = [];
 
             $empCode = strtoupper(trim((string) ($row['employee_code'] ?? $row['employee_number'] ?? '')));
-            $date = trim((string) ($row['date'] ?? ''));
-            $time = trim((string) ($row['time'] ?? $row['punch_time'] ?? ''));
+            $date = $this->normalizeImportDate(trim((string) ($row['date'] ?? '')));
+            $time = $this->normalizeImportTime(trim((string) ($row['time'] ?? $row['punch_time'] ?? '')));
             $typeStr = strtolower(trim((string) ($row['punch_type'] ?? 'in')));
             $notes = trim((string) ($row['notes'] ?? ''));
 
@@ -72,11 +73,13 @@ final class BatchAttendanceImportService
                 $errors[] = "Row {$rowNum}: Employee code [{$empCode}] not found.";
             }
 
+            $dateValid = false;
             if ($date === '') {
                 $errors[] = "Row {$rowNum}: Missing punch date.";
             } else {
                 try {
                     CarbonImmutable::parse($date);
+                    $dateValid = true;
                 } catch (\Throwable) {
                     $errors[] = "Row {$rowNum}: Invalid date format [{$date}].";
                 }
@@ -86,7 +89,8 @@ final class BatchAttendanceImportService
                 $errors[] = "Row {$rowNum}: Missing punch time.";
             } else {
                 try {
-                    CarbonImmutable::parse("{$date} {$time}");
+                    $probeDate = $dateValid ? $date : '2000-01-01';
+                    CarbonImmutable::parse("{$probeDate} {$time}");
                 } catch (\Throwable) {
                     $errors[] = "Row {$rowNum}: Invalid time format [{$time}].";
                 }
@@ -133,9 +137,9 @@ final class BatchAttendanceImportService
     /**
      * Phase 2: Atomic commit of validated batch.
      */
-    public function commit(int $tenantId, ?int $userId, string $fileName, string $csvContent): HrAttendanceBatchImport
+    public function commit(int $tenantId, ?int $userId, string $fileName, string $csvContent, ?string $filePath = null): HrAttendanceBatchImport
     {
-        $preview = $this->preview($tenantId, $csvContent);
+        $preview = $this->preview($tenantId, $csvContent, $filePath);
         if ($preview['invalid_rows'] > 0) {
             throw new InvalidArgumentException(
                 'Batch import contains '.count($preview['error_summary']).' validation errors. Review errors and correct the file.',
@@ -175,15 +179,13 @@ final class BatchAttendanceImportService
                 $punchType = PunchType::from($row['punch_type']);
                 $idempotency = hash('sha256', "import:{$tenantId}:{$row['employee_id']}:{$punchType->value}:{$punchTime->toDateTimeString()}");
 
-                $this->calculationEngine->recordPunch($tenantId, new PunchData(
-                    employeeId: (int) $row['employee_id'],
-                    punchType: $punchType,
-                    punchTime: $punchTime->toDateTimeString(),
-                    punchSource: PunchSource::ManualEntry,
-                    captureMethod: CaptureMethod::FileUpload,
-                    notes: "Imported via batch [{$batchNumber}]. ".(string) $row['notes'],
-                    idempotencyHash: $idempotency,
-                ));
+                $this->adapterManager->capture($tenantId, CaptureMethod::FileUpload, [
+                    'employee_id' => (int) $row['employee_id'],
+                    'punch_type' => $punchType,
+                    'punch_time' => $punchTime->toDateTimeString(),
+                    'notes' => "Imported via batch [{$batchNumber}]. ".(string) $row['notes'],
+                    'idempotency_hash' => $idempotency,
+                ]);
 
                 $processed++;
             }
@@ -196,6 +198,179 @@ final class BatchAttendanceImportService
 
             return $batchRecord->refresh();
         });
+    }
+
+    private function normalizeImportDate(string $value): string
+    {
+        if ($value === '' || ! is_numeric($value)) {
+            return $value;
+        }
+
+        $serial = (float) $value;
+        if ($serial < 1.0) {
+            return $value;
+        }
+
+        // Excel 1900 date system (with 1900 leap-year bug offset: day 0 = 1899-12-30)
+        $days = (int) floor($serial);
+
+        return CarbonImmutable::create(1899, 12, 30, 0, 0, 0, 'UTC')
+            ->addDays($days)
+            ->toDateString();
+    }
+
+    private function normalizeImportTime(string $value): string
+    {
+        if ($value === '' || ! is_numeric($value)) {
+            return $value;
+        }
+
+        $serial = (float) $value;
+        if ($serial < 0.0) {
+            return $value;
+        }
+
+        $fraction = $serial - floor($serial);
+        $seconds = (int) round($fraction * 86400);
+        if ($seconds >= 86400) {
+            $seconds = 86399;
+        }
+
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        $secs = $seconds % 60;
+
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $secs);
+    }
+
+    private function isXlsxFile(string $filePath): bool
+    {
+        if (! is_file($filePath)) {
+            return false;
+        }
+
+        $handle = fopen($filePath, 'rb');
+        if ($handle === false) {
+            return false;
+        }
+
+        $magic = fread($handle, 4);
+        fclose($handle);
+
+        return $magic === "PK\x03\x04";
+    }
+
+    /**
+     * Parse the first worksheet of an Excel .xlsx file into associative rows.
+     *
+     * @return list<array<string, string>>
+     */
+    private function parseXlsx(string $filePath): array
+    {
+        if (! class_exists(ZipArchive::class)) {
+            throw new InvalidArgumentException('Excel (.xlsx) import requires the PHP zip extension.');
+        }
+
+        $zip = new ZipArchive;
+        if ($zip->open($filePath) !== true) {
+            throw new InvalidArgumentException('Unable to open Excel (.xlsx) file.');
+        }
+
+        try {
+            $sharedStrings = [];
+            $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
+            if ($sharedXml !== false) {
+                $sst = @simplexml_load_string($sharedXml);
+                if ($sst instanceof SimpleXMLElement) {
+                    foreach ($sst->si as $si) {
+                        if (isset($si->t)) {
+                            $sharedStrings[] = (string) $si->t;
+                        } else {
+                            $text = '';
+                            foreach ($si->r as $run) {
+                                $text .= (string) $run->t;
+                            }
+                            $sharedStrings[] = $text;
+                        }
+                    }
+                }
+            }
+
+            $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            if ($sheetXml === false) {
+                throw new InvalidArgumentException('Excel (.xlsx) file does not contain worksheet 1.');
+            }
+
+            $sheet = @simplexml_load_string($sheetXml);
+            if (! $sheet instanceof SimpleXMLElement || ! isset($sheet->sheetData->row)) {
+                return [];
+            }
+
+            $rawRows = [];
+            foreach ($sheet->sheetData->row as $rowNode) {
+                $rowCells = [];
+                foreach ($rowNode->c as $cell) {
+                    $ref = (string) $cell['r'];
+                    $colLetters = preg_replace('/\d+/', '', $ref) ?: 'A';
+                    $colIdx = $this->columnLettersToIndex($colLetters);
+                    $type = (string) $cell['t'];
+
+                    if ($type === 's') {
+                        $idx = (int) $cell->v;
+                        $value = $sharedStrings[$idx] ?? '';
+                    } elseif ($type === 'inlineStr') {
+                        $value = (string) ($cell->is->t ?? '');
+                    } else {
+                        $value = (string) ($cell->v ?? '');
+                    }
+
+                    $rowCells[$colIdx] = trim($value);
+                }
+
+                if ($rowCells !== []) {
+                    ksort($rowCells);
+                    $maxCol = max(array_keys($rowCells));
+                    $normalized = [];
+                    for ($i = 0; $i <= $maxCol; $i++) {
+                        $normalized[] = $rowCells[$i] ?? '';
+                    }
+                    $rawRows[] = $normalized;
+                }
+            }
+
+            if ($rawRows === []) {
+                return [];
+            }
+
+            $headers = array_map(static fn (string $h): string => strtolower(trim($h)), array_shift($rawRows));
+            $rows = [];
+            foreach ($rawRows as $values) {
+                if (implode('', $values) === '') {
+                    continue;
+                }
+                $row = [];
+                foreach ($headers as $i => $header) {
+                    $row[$header] = $values[$i] ?? '';
+                }
+                $rows[] = $row;
+            }
+
+            return $rows;
+        } finally {
+            $zip->close();
+        }
+    }
+
+    private function columnLettersToIndex(string $letters): int
+    {
+        $letters = strtoupper($letters);
+        $index = 0;
+        $length = strlen($letters);
+        for ($i = 0; $i < $length; $i++) {
+            $index = ($index * 26) + (ord($letters[$i]) - ord('A') + 1);
+        }
+
+        return max(0, $index - 1);
     }
 
     /**

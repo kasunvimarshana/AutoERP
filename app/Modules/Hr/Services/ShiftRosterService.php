@@ -23,6 +23,7 @@ use Modules\Hr\DTOs\ShiftSwapData;
 use Modules\Hr\Enums\LeaveRequestStatus;
 use Modules\Hr\Enums\ShiftAssignmentType;
 use Modules\Hr\Enums\ShiftSwapStatus;
+use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Models\HrHoliday;
 use Modules\Hr\Models\HrLeaveRequest;
 use Modules\Hr\Models\HrShift;
@@ -89,6 +90,16 @@ final class ShiftRosterService
 
     public function assignShift(int $tenantId, ShiftAssignmentData $data): HrShiftAssignment
     {
+        HrEmployee::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $data->employeeId)
+            ->firstOrFail();
+
+        HrShift::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $data->shiftId)
+            ->firstOrFail();
+
         // 1. Validate Overlapping Active Shift Assignments
         if ($data->assignmentType === ShiftAssignmentType::SpecificDate && $data->startDate !== null) {
             $hasOverlap = HrShiftAssignment::query()
@@ -127,6 +138,18 @@ final class ShiftRosterService
 
             if ($hasOverlap) {
                 throw new InvalidArgumentException('Employee already has an active overlapping date-range shift assignment.');
+            }
+
+            $hasLeave = HrLeaveRequest::query()
+                ->where('tenant_id', $tenantId)
+                ->where('employee_id', $data->employeeId)
+                ->whereDate('start_date', '<=', $data->endDate)
+                ->whereDate('end_date', '>=', $data->startDate)
+                ->where('status', LeaveRequestStatus::Approved)
+                ->exists();
+
+            if ($hasLeave) {
+                throw new InvalidArgumentException('Cannot assign shift: Employee has approved leave within this date range.');
             }
         } elseif ($data->assignmentType === ShiftAssignmentType::Recurring && $data->dayOfWeek !== null) {
             $hasOverlap = HrShiftAssignment::query()
@@ -174,6 +197,31 @@ final class ShiftRosterService
     {
         if ($data->requesterEmployeeId === $data->targetEmployeeId) {
             throw new InvalidArgumentException('Cannot request a shift swap with yourself.');
+        }
+
+        HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->requesterEmployeeId)->firstOrFail();
+        HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->targetEmployeeId)->firstOrFail();
+
+        $requesterOnLeave = HrLeaveRequest::query()
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $data->requesterEmployeeId)
+            ->whereDate('start_date', '<=', $data->swapDate)
+            ->whereDate('end_date', '>=', $data->swapDate)
+            ->where('status', LeaveRequestStatus::Approved)
+            ->exists();
+        if ($requesterOnLeave) {
+            throw new InvalidArgumentException('Requester has approved leave on the requested swap date.');
+        }
+
+        $targetOnLeave = HrLeaveRequest::query()
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $data->targetEmployeeId)
+            ->whereDate('start_date', '<=', $data->targetSwapDate)
+            ->whereDate('end_date', '>=', $data->targetSwapDate)
+            ->where('status', LeaveRequestStatus::Approved)
+            ->exists();
+        if ($targetOnLeave) {
+            throw new InvalidArgumentException('Target peer has approved leave on the target swap date.');
         }
 
         $requesterShift = $this->resolveShift($tenantId, $data->requesterEmployeeId, $data->swapDate);
@@ -235,6 +283,21 @@ final class ShiftRosterService
             throw new InvalidArgumentException('Absent employee and cover employee cannot be the same.');
         }
 
+        HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->absentEmployeeId)->firstOrFail();
+        HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->coverEmployeeId)->firstOrFail();
+        HrShift::query()->where('tenant_id', $tenantId)->where('id', $data->shiftId)->firstOrFail();
+
+        $coverOnLeave = HrLeaveRequest::query()
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $data->coverEmployeeId)
+            ->whereDate('start_date', '<=', $data->reallocationDate)
+            ->whereDate('end_date', '>=', $data->reallocationDate)
+            ->where('status', LeaveRequestStatus::Approved)
+            ->exists();
+        if ($coverOnLeave) {
+            throw new InvalidArgumentException('Cover employee has approved leave on the reallocation date.');
+        }
+
         return HrShiftReallocation::create([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $data->organizationUnitId,
@@ -263,6 +326,13 @@ final class ShiftRosterService
 
     public function addRotationStep(HrShiftRotation $rotation, int $daySequence, ?int $shiftId, ?string $notes = null): HrShiftRotationStep
     {
+        if ($shiftId !== null) {
+            HrShift::query()
+                ->where('tenant_id', $rotation->tenant_id)
+                ->where('id', $shiftId)
+                ->firstOrFail();
+        }
+
         return HrShiftRotationStep::create([
             'tenant_id' => $rotation->tenant_id,
             'organization_unit_id' => $rotation->organization_unit_id,
@@ -275,9 +345,38 @@ final class ShiftRosterService
 
     public function assignRotation(int $tenantId, int $employeeId, int $rotationId, string $anchorDate, ?string $endDate = null): HrShiftRotationAssignment
     {
+        if ($endDate !== null && CarbonImmutable::parse($endDate)->lessThan(CarbonImmutable::parse($anchorDate))) {
+            throw new InvalidArgumentException('Rotation assignment end date cannot be before anchor date.');
+        }
+
+        $employee = HrEmployee::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId)
+            ->firstOrFail();
+
+        HrShiftRotation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $rotationId)
+            ->firstOrFail();
+
+        $hasOverlap = HrShiftRotationAssignment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('employee_id', $employeeId)
+            ->where('is_active', true)
+            ->when($endDate !== null, fn ($q) => $q->whereDate('anchor_date', '<=', $endDate))
+            ->where(function ($q) use ($anchorDate): void {
+                $q->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $anchorDate);
+            })
+            ->exists();
+
+        if ($hasOverlap) {
+            throw new InvalidArgumentException('Employee already has an active overlapping shift rotation assignment.');
+        }
+
         return HrShiftRotationAssignment::create([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
+            'organization_unit_id' => $employee->organization_unit_id,
             'employee_id' => $employeeId,
             'shift_rotation_id' => $rotationId,
             'anchor_date' => $anchorDate,

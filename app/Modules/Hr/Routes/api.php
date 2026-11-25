@@ -25,6 +25,7 @@ use Modules\Hr\Http\Controllers\HrCertificationController;
 use Modules\Hr\Http\Controllers\HrDepartmentController;
 use Modules\Hr\Http\Controllers\HrDesignationController;
 use Modules\Hr\Http\Controllers\HrEmploymentTypeController;
+use Modules\Hr\Http\Controllers\HrHolidayController;
 use Modules\Hr\Http\Controllers\HrLeaveController;
 use Modules\Hr\Http\Controllers\HrLicenseController;
 use Modules\Hr\Http\Controllers\HrShiftController;
@@ -192,6 +193,9 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
     Route::get('roster', [HrShiftController::class, 'roster'])
         ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
         ->name('roster.index');
+    Route::get('shift-assignments', [HrShiftController::class, 'assignments'])
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-assignments.index');
     Route::post('shift-assignments', [HrShiftController::class, 'assign'])
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-assignments.store');
@@ -200,6 +204,9 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-assignments.destroy');
 
+    Route::get('shift-swaps', [HrShiftController::class, 'swaps'])
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-swaps.index');
     Route::post('shift-swaps', [HrShiftController::class, 'requestSwap'])
         ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
         ->name('shift-swaps.store');
@@ -211,14 +218,56 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->whereNumber('swap')
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-swaps.manager-action');
+    Route::get('shift-reallocations', [HrShiftController::class, 'reallocations'])
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-reallocations.index');
     Route::post('shift-reallocations', [HrShiftController::class, 'reallocateCover'])
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-reallocations.store');
+
+    // Holiday Calendars & Holidays
+    Route::get('holiday-calendars', [HrHolidayController::class, 'indexCalendars'])
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('holiday-calendars.index');
+    Route::post('holiday-calendars', [HrHolidayController::class, 'storeCalendar'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('holiday-calendars.store');
+    Route::get('holiday-calendars/{calendar}', [HrHolidayController::class, 'showCalendar'])
+        ->whereNumber('calendar')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('holiday-calendars.show');
+    Route::match(['put', 'patch'], 'holiday-calendars/{calendar}', [HrHolidayController::class, 'updateCalendar'])
+        ->whereNumber('calendar')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('holiday-calendars.update');
+    Route::delete('holiday-calendars/{calendar}', [HrHolidayController::class, 'destroyCalendar'])
+        ->whereNumber('calendar')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('holiday-calendars.destroy');
+    Route::get('holiday-calendars/{calendar}/holidays', [HrHolidayController::class, 'indexHolidays'])
+        ->whereNumber('calendar')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('holiday-calendars.holidays.index');
+    Route::post('holiday-calendars/{calendar}/holidays', [HrHolidayController::class, 'storeHoliday'])
+        ->whereNumber('calendar')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('holiday-calendars.holidays.store');
+    Route::match(['put', 'patch'], 'holidays/{holiday}', [HrHolidayController::class, 'updateHoliday'])
+        ->whereNumber('holiday')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('holidays.update');
+    Route::delete('holidays/{holiday}', [HrHolidayController::class, 'destroyHoliday'])
+        ->whereNumber('holiday')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('holidays.destroy');
 
     // Attendance & Punches & Regularizations
     Route::post('attendance/punch', [HrAttendanceController::class, 'punch'])
         ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
         ->name('attendance.punch');
+    Route::post('attendance/capture', [HrAttendanceCaptureController::class, 'capture'])
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.unified');
     Route::post('attendance/capture/web', [HrAttendanceCaptureController::class, 'webPunch'])
         ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
         ->name('attendance.capture.web');
@@ -228,6 +277,9 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
     Route::post('attendance/capture/rfid', [HrAttendanceCaptureController::class, 'rfidPunch'])
         ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
         ->name('attendance.capture.rfid');
+    Route::post('attendance/capture/nfc', [HrAttendanceCaptureController::class, 'nfcPunch'])
+        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->name('attendance.capture.nfc');
     Route::post('attendance/capture/barcode', [HrAttendanceCaptureController::class, 'barcodePunch'])
         ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
         ->name('attendance.capture.barcode');
@@ -337,18 +389,46 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
     Route::post('leave-types', [HrLeaveController::class, 'storeLeaveType'])
         ->middleware($requires(HrAuthorizationService::MANAGE_LEAVES))
         ->name('leave-types.store');
+    Route::get('leave-types/{leaveType}', [HrLeaveController::class, 'showLeaveType'])
+        ->whereNumber('leaveType')
+        ->middleware($requires(HrAuthorizationService::VIEW_LEAVES))
+        ->name('leave-types.show');
+    Route::match(['put', 'patch'], 'leave-types/{leaveType}', [HrLeaveController::class, 'updateLeaveType'])
+        ->whereNumber('leaveType')
+        ->middleware($requires(HrAuthorizationService::MANAGE_LEAVES))
+        ->name('leave-types.update');
+    Route::delete('leave-types/{leaveType}', [HrLeaveController::class, 'destroyLeaveType'])
+        ->whereNumber('leaveType')
+        ->middleware($requires(HrAuthorizationService::MANAGE_LEAVES))
+        ->name('leave-types.destroy');
     Route::get('leave-policies', [HrLeaveController::class, 'leavePolicies'])
         ->middleware($requires(HrAuthorizationService::VIEW_LEAVES))
         ->name('leave-policies.index');
     Route::post('leave-policies', [HrLeaveController::class, 'storeLeavePolicy'])
         ->middleware($requires(HrAuthorizationService::MANAGE_LEAVES))
         ->name('leave-policies.store');
+    Route::get('leave-policies/{leavePolicy}', [HrLeaveController::class, 'showLeavePolicy'])
+        ->whereNumber('leavePolicy')
+        ->middleware($requires(HrAuthorizationService::VIEW_LEAVES))
+        ->name('leave-policies.show');
+    Route::match(['put', 'patch'], 'leave-policies/{leavePolicy}', [HrLeaveController::class, 'updateLeavePolicy'])
+        ->whereNumber('leavePolicy')
+        ->middleware($requires(HrAuthorizationService::MANAGE_LEAVES))
+        ->name('leave-policies.update');
+    Route::delete('leave-policies/{leavePolicy}', [HrLeaveController::class, 'destroyLeavePolicy'])
+        ->whereNumber('leavePolicy')
+        ->middleware($requires(HrAuthorizationService::MANAGE_LEAVES))
+        ->name('leave-policies.destroy');
     Route::get('leave-balances', [HrLeaveController::class, 'balances'])
         ->middleware($requires(HrAuthorizationService::VIEW_LEAVES))
         ->name('leave-balances.index');
     Route::get('leave-requests', [HrLeaveController::class, 'requests'])
         ->middleware($requires(HrAuthorizationService::VIEW_LEAVES))
         ->name('leave-requests.index');
+    Route::get('leave-requests/{leaveRequest}', [HrLeaveController::class, 'showLeaveRequest'])
+        ->whereNumber('leaveRequest')
+        ->middleware($requires(HrAuthorizationService::VIEW_LEAVES))
+        ->name('leave-requests.show');
     Route::post('leave-requests', [HrLeaveController::class, 'apply'])
         ->middleware($requires(HrAuthorizationService::APPLY_LEAVES))
         ->name('leave-requests.apply');
@@ -360,6 +440,9 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->whereNumber('leaveRequest')
         ->middleware($requires(HrAuthorizationService::APPLY_LEAVES))
         ->name('leave-requests.cancel');
+    Route::get('comp-off/claims', [HrLeaveController::class, 'compOffClaims'])
+        ->middleware($requires(HrAuthorizationService::VIEW_LEAVES))
+        ->name('comp-off.index');
     Route::post('comp-off/claim', [HrLeaveController::class, 'claimCompOff'])
         ->middleware($requires(HrAuthorizationService::APPLY_LEAVES))
         ->name('comp-off.claim');

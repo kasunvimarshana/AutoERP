@@ -24,9 +24,11 @@ use Modules\Hr\DTOs\ShiftSwapData;
 use Modules\Hr\Enums\ShiftAssignmentType;
 use Modules\Hr\Enums\ShiftReallocationReason;
 use Modules\Hr\Enums\ShiftStatus;
+use Modules\Hr\Enums\ShiftSwapStatus;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Models\HrShift;
 use Modules\Hr\Models\HrShiftAssignment;
+use Modules\Hr\Models\HrShiftReallocation;
 use Modules\Hr\Models\HrShiftSwap;
 use Modules\Hr\Services\ShiftRosterService;
 
@@ -51,8 +53,9 @@ final class HrShiftController
 
     public function store(TenantScopedRequest $request): JsonResponse
     {
+        $tenantId = $request->tenantId();
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:32'],
+            'code' => ['required', 'string', 'max:32', Rule::unique('hr_shifts', 'code')->where('tenant_id', $tenantId)],
             'name' => ['required', 'string', 'max:100'],
             'color' => ['nullable', 'string', 'max:16'],
             'start_time' => ['required', 'string'],
@@ -110,9 +113,10 @@ final class HrShiftController
 
     public function update(TenantScopedRequest $request, int $shift): JsonResponse
     {
+        $tenantId = $request->tenantId();
         $validated = $request->validate([
             'expected_version' => ['sometimes', 'integer', 'min:1'],
-            'code' => ['required', 'string', 'max:32'],
+            'code' => ['required', 'string', 'max:32', Rule::unique('hr_shifts', 'code')->where('tenant_id', $tenantId)->ignore($shift)],
             'name' => ['required', 'string', 'max:100'],
             'color' => ['nullable', 'string', 'max:16'],
             'start_time' => ['required', 'string'],
@@ -161,7 +165,7 @@ final class HrShiftController
                 autoDeductThresholdMinutes: (int) ($validated['auto_deduct_threshold_minutes'] ?? $shiftModel->auto_deduct_threshold_minutes),
                 isFlexible: (bool) ($validated['is_flexible'] ?? $shiftModel->is_flexible),
                 status: isset($validated['status']) ? ShiftStatus::from($validated['status']) : $shiftModel->status,
-                notes: $validated['notes'] ?? $shiftModel->notes,
+                notes: $request->has('notes') ? ($validated['notes'] ?? null) : $shiftModel->notes,
                 organizationUnitId: $request->organizationUnitId(),
             );
 
@@ -183,38 +187,92 @@ final class HrShiftController
 
         $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $deleted = DB::transaction(function () use ($request, $shift, $expectedVersion): bool {
+        $result = DB::transaction(function () use ($request, $shift, $expectedVersion): string {
+            $tenantId = $request->tenantId();
             $shiftModel = HrShift::query()
-                ->where('tenant_id', $request->tenantId())
+                ->where('tenant_id', $tenantId)
                 ->where('id', $shift)
                 ->lockForUpdate()
                 ->firstOrFail();
 
             if ($expectedVersion !== null && (int) $shiftModel->row_version !== $expectedVersion) {
-                return false;
+                return 'conflict';
+            }
+
+            $inUse = HrShiftAssignment::query()
+                ->where('tenant_id', $tenantId)
+                ->where('shift_id', $shift)
+                ->exists()
+                || HrShiftReallocation::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('shift_id', $shift)
+                    ->exists()
+                || DB::table('hr_shift_rotation_steps')
+                    ->where('tenant_id', $tenantId)
+                    ->where('shift_id', $shift)
+                    ->exists()
+                || DB::table('hr_attendance_records')
+                    ->where('tenant_id', $tenantId)
+                    ->where('shift_id', $shift)
+                    ->exists();
+
+            if ($inUse) {
+                return 'in_use';
             }
 
             $shiftModel->delete();
 
-            return true;
+            return 'deleted';
         });
 
-        if (! $deleted) {
+        if ($result === 'conflict') {
             return response()->json(['message' => 'Shift was changed by someone else. Reload before deleting.'], 409);
+        }
+
+        if ($result === 'in_use') {
+            return response()->json(['message' => 'Cannot delete shift because it is referenced by assignments, rotations, reallocations, or attendance records.'], 422);
         }
 
         return response()->json(null, 204);
     }
 
-    public function assign(TenantScopedRequest $request): JsonResponse
+    public function assignments(TenantScopedRequest $request): JsonResponse
     {
         $validated = $request->validate([
-            'employee_id' => ['required', 'integer'],
-            'shift_id' => ['required', 'integer'],
+            'employee_id' => ['nullable', 'integer'],
+            'shift_id' => ['nullable', 'integer'],
+            'is_cancelled' => ['nullable', 'boolean'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
+        ]);
+
+        $query = HrShiftAssignment::query()
+            ->where('tenant_id', $request->tenantId())
+            ->with(['employee', 'shift'])
+            ->orderByDesc('created_at');
+
+        if (! empty($validated['employee_id'])) {
+            $query->where('employee_id', (int) $validated['employee_id']);
+        }
+        if (! empty($validated['shift_id'])) {
+            $query->where('shift_id', (int) $validated['shift_id']);
+        }
+        if ($request->has('is_cancelled')) {
+            $query->where('is_cancelled', (bool) $validated['is_cancelled']);
+        }
+
+        return response()->json($query->paginate((int) ($validated['per_page'] ?? 25)));
+    }
+
+    public function assign(TenantScopedRequest $request): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $validated = $request->validate([
+            'employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')->where('tenant_id', $tenantId)],
+            'shift_id' => ['required', 'integer', Rule::exists('hr_shifts', 'id')->where('tenant_id', $tenantId)],
             'assignment_type' => ['required', 'string', Rule::enum(ShiftAssignmentType::class)],
             'day_of_week' => ['nullable', 'integer', 'between:1,7'],
             'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'is_custom_timing' => ['nullable', 'boolean'],
             'custom_start_time' => ['nullable', 'string'],
             'custom_end_time' => ['nullable', 'string'],
@@ -242,15 +300,29 @@ final class HrShiftController
     public function cancelAssignment(TenantScopedRequest $request, int $assignment): JsonResponse
     {
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'max:255'],
         ]);
 
-        $assignmentModel = HrShiftAssignment::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('id', $assignment)
-            ->firstOrFail();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $cancelled = $this->rosterService->cancelAssignment($assignmentModel, $validated['reason']);
+        $cancelled = DB::transaction(function () use ($request, $assignment, $validated, $expectedVersion): ?HrShiftAssignment {
+            $assignmentModel = HrShiftAssignment::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('id', $assignment)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $assignmentModel->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            return $this->rosterService->cancelAssignment($assignmentModel, $validated['reason']);
+        });
+
+        if ($cancelled === null) {
+            return response()->json(['message' => 'Shift assignment was changed by someone else. Reload before cancelling.'], 409);
+        }
 
         return response()->json(['data' => $cancelled]);
     }
@@ -259,7 +331,7 @@ final class HrShiftController
     {
         $validated = $request->validate([
             'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'employee_ids' => ['nullable', 'array'],
             'employee_ids.*' => ['integer'],
             'department_id' => ['nullable', 'integer'],
@@ -320,11 +392,36 @@ final class HrShiftController
         return response()->json(['data' => $roster]);
     }
 
-    public function requestSwap(TenantScopedRequest $request): JsonResponse
+    public function swaps(TenantScopedRequest $request): JsonResponse
     {
         $validated = $request->validate([
-            'requester_employee_id' => ['required', 'integer'],
-            'target_employee_id' => ['required', 'integer'],
+            'status' => ['nullable', 'string', Rule::enum(ShiftSwapStatus::class)],
+            'employee_id' => ['nullable', 'integer'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
+        ]);
+
+        $query = HrShiftSwap::query()
+            ->where('tenant_id', $request->tenantId())
+            ->with(['requester', 'targetEmployee', 'requesterShift', 'targetShift'])
+            ->orderByDesc('created_at');
+
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+        if (! empty($validated['employee_id'])) {
+            $empId = (int) $validated['employee_id'];
+            $query->where(fn ($q) => $q->where('requester_employee_id', $empId)->orWhere('target_employee_id', $empId));
+        }
+
+        return response()->json($query->paginate((int) ($validated['per_page'] ?? 25)));
+    }
+
+    public function requestSwap(TenantScopedRequest $request): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $validated = $request->validate([
+            'requester_employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')->where('tenant_id', $tenantId)],
+            'target_employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')->where('tenant_id', $tenantId)],
             'swap_date' => ['required', 'date'],
             'target_swap_date' => ['required', 'date'],
             'reason' => ['required', 'string'],
@@ -347,16 +444,30 @@ final class HrShiftController
     public function peerActionSwap(TenantScopedRequest $request, int $swap): JsonResponse
     {
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'peer_employee_id' => ['required', 'integer'],
             'accept' => ['required', 'boolean'],
         ]);
 
-        $swapModel = HrShiftSwap::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('id', $swap)
-            ->firstOrFail();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $updated = $this->rosterService->peerActionSwap($swapModel, (int) $validated['peer_employee_id'], (bool) $validated['accept']);
+        $updated = DB::transaction(function () use ($request, $swap, $validated, $expectedVersion): ?HrShiftSwap {
+            $swapModel = HrShiftSwap::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('id', $swap)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $swapModel->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            return $this->rosterService->peerActionSwap($swapModel, (int) $validated['peer_employee_id'], (bool) $validated['accept']);
+        });
+
+        if ($updated === null) {
+            return response()->json(['message' => 'Shift swap was changed by someone else. Reload before acting.'], 409);
+        }
 
         return response()->json(['data' => $updated]);
     }
@@ -364,31 +475,73 @@ final class HrShiftController
     public function managerActionSwap(TenantScopedRequest $request, int $swap): JsonResponse
     {
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'approve' => ['required', 'boolean'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $swapModel = HrShiftSwap::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('id', $swap)
-            ->firstOrFail();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $updated = $this->rosterService->managerActionSwap(
-            $swapModel,
-            (int) $request->currentUserId(),
-            (bool) $validated['approve'],
-            $validated['notes'] ?? null,
-        );
+        $updated = DB::transaction(function () use ($request, $swap, $validated, $expectedVersion): ?HrShiftSwap {
+            $swapModel = HrShiftSwap::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('id', $swap)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $swapModel->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            return $this->rosterService->managerActionSwap(
+                $swapModel,
+                (int) $request->currentUserId(),
+                (bool) $validated['approve'],
+                $validated['notes'] ?? null,
+            );
+        });
+
+        if ($updated === null) {
+            return response()->json(['message' => 'Shift swap was changed by someone else. Reload before acting.'], 409);
+        }
 
         return response()->json(['data' => $updated]);
     }
 
-    public function reallocateCover(TenantScopedRequest $request): JsonResponse
+    public function reallocations(TenantScopedRequest $request): JsonResponse
     {
         $validated = $request->validate([
-            'absent_employee_id' => ['required', 'integer'],
-            'cover_employee_id' => ['required', 'integer'],
-            'shift_id' => ['required', 'integer'],
+            'reallocation_date' => ['nullable', 'date'],
+            'absent_employee_id' => ['nullable', 'integer'],
+            'cover_employee_id' => ['nullable', 'integer'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
+        ]);
+
+        $query = HrShiftReallocation::query()
+            ->where('tenant_id', $request->tenantId())
+            ->with(['absentEmployee', 'coverEmployee', 'shift'])
+            ->orderByDesc('reallocation_date');
+
+        if (! empty($validated['reallocation_date'])) {
+            $query->whereDate('reallocation_date', $validated['reallocation_date']);
+        }
+        if (! empty($validated['absent_employee_id'])) {
+            $query->where('absent_employee_id', (int) $validated['absent_employee_id']);
+        }
+        if (! empty($validated['cover_employee_id'])) {
+            $query->where('cover_employee_id', (int) $validated['cover_employee_id']);
+        }
+
+        return response()->json($query->paginate((int) ($validated['per_page'] ?? 25)));
+    }
+
+    public function reallocateCover(TenantScopedRequest $request): JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $validated = $request->validate([
+            'absent_employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')->where('tenant_id', $tenantId)],
+            'cover_employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')->where('tenant_id', $tenantId)],
+            'shift_id' => ['required', 'integer', Rule::exists('hr_shifts', 'id')->where('tenant_id', $tenantId)],
             'reallocation_date' => ['required', 'date'],
             'reason_code' => ['nullable', 'string', Rule::enum(ShiftReallocationReason::class)],
             'notes' => ['nullable', 'string'],

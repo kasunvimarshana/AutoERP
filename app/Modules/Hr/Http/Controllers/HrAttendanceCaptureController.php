@@ -15,6 +15,7 @@ namespace Modules\Hr\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Hr\Enums\CaptureMethod;
 use Modules\Hr\Enums\PunchType;
 use Modules\Hr\Models\HrAttendanceKiosk;
 use Modules\Hr\Services\Capture\AttendanceCaptureService;
@@ -28,6 +29,23 @@ final class HrAttendanceCaptureController
         private readonly BatchAttendanceImportService $importService,
         private readonly DynamicQrSecurityService $qrSecurityService,
     ) {}
+
+    public function capture(TenantScopedRequest $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'capture_method' => ['required', 'string', Rule::enum(CaptureMethod::class)],
+            'payload' => ['required', 'array'],
+        ]);
+
+        $method = CaptureMethod::from($validated['capture_method']);
+        $payload = $validated['payload'];
+        $payload['ip_address'] ??= $request->ip();
+        $payload['organization_unit_id'] ??= $request->organizationUnitId();
+
+        $punch = $this->captureService->capture($request->tenantId(), $method, $payload);
+
+        return response()->json(['data' => $punch], 201);
+    }
 
     public function webPunch(TenantScopedRequest $request): JsonResponse
     {
@@ -98,6 +116,27 @@ final class HrAttendanceCaptureController
         return response()->json(['data' => $punch], 201);
     }
 
+    public function nfcPunch(TenantScopedRequest $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tag_uid' => ['required', 'string', 'max:128'],
+            'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
+            'device_id' => ['nullable', 'string', 'max:64'],
+            'device_uuid' => ['nullable', 'string', 'max:128'],
+        ]);
+
+        $punch = $this->captureService->recordNfcPunch(
+            tenantId: $request->tenantId(),
+            tagUid: $validated['tag_uid'],
+            punchType: PunchType::from($validated['punch_type']),
+            deviceId: $validated['device_id'] ?? null,
+            deviceUuid: $validated['device_uuid'] ?? null,
+            ipAddress: $request->ip(),
+        );
+
+        return response()->json(['data' => $punch], 201);
+    }
+
     public function barcodePunch(TenantScopedRequest $request): JsonResponse
     {
         $validated = $request->validate([
@@ -156,17 +195,19 @@ final class HrAttendanceCaptureController
     public function previewImport(TenantScopedRequest $request): JsonResponse
     {
         $validated = $request->validate([
-            'file' => ['required_without:csv_content', 'nullable', 'file', 'mimes:csv,txt', 'max:5120'],
+            'file' => ['required_without:csv_content', 'nullable', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
             'csv_content' => ['required_without:file', 'nullable', 'string', 'max:5242880'],
         ]);
 
+        $filePath = null;
         if ($request->hasFile('file')) {
-            $csvContent = (string) file_get_contents($request->file('file')->getRealPath());
+            $filePath = $request->file('file')->getRealPath() ?: null;
+            $csvContent = $filePath !== null ? (string) file_get_contents($filePath) : '';
         } else {
             $csvContent = (string) ($validated['csv_content'] ?? '');
         }
 
-        $preview = $this->importService->preview($request->tenantId(), $csvContent);
+        $preview = $this->importService->preview($request->tenantId(), $csvContent, $filePath);
 
         return response()->json(['data' => $preview]);
     }
@@ -174,15 +215,28 @@ final class HrAttendanceCaptureController
     public function commitImport(TenantScopedRequest $request): JsonResponse
     {
         $validated = $request->validate([
-            'file_name' => ['required', 'string', 'max:255'],
-            'csv_content' => ['required', 'string'],
+            'file_name' => ['required_without:file', 'nullable', 'string', 'max:255'],
+            'file' => ['required_without:csv_content', 'nullable', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
+            'csv_content' => ['required_without:file', 'nullable', 'string', 'max:5242880'],
         ]);
+
+        $filePath = null;
+        if ($request->hasFile('file')) {
+            $uploaded = $request->file('file');
+            $filePath = $uploaded->getRealPath() ?: null;
+            $fileName = (string) ($validated['file_name'] ?? $uploaded->getClientOriginalName());
+            $csvContent = $filePath !== null ? (string) file_get_contents($filePath) : '';
+        } else {
+            $fileName = (string) $validated['file_name'];
+            $csvContent = (string) ($validated['csv_content'] ?? '');
+        }
 
         $result = $this->importService->commit(
             tenantId: $request->tenantId(),
             userId: (int) $request->userId(),
-            fileName: $validated['file_name'],
-            csvContent: $validated['csv_content'],
+            fileName: $fileName,
+            csvContent: $csvContent,
+            filePath: $filePath,
         );
 
         return response()->json(['data' => $result], 201);

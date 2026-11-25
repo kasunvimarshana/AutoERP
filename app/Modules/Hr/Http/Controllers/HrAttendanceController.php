@@ -21,6 +21,7 @@ use Modules\Hr\DTOs\PunchData;
 use Modules\Hr\Enums\AttendanceStatus;
 use Modules\Hr\Enums\PunchSource;
 use Modules\Hr\Enums\PunchType;
+use Modules\Hr\Enums\RegularizationStatus;
 use Modules\Hr\Enums\RegularizationType;
 use Modules\Hr\Models\HrAttendanceRecord;
 use Modules\Hr\Models\HrAttendanceRegularization;
@@ -90,10 +91,14 @@ final class HrAttendanceController
     {
         $validated = $request->validate([
             'start_date' => ['nullable', 'date'],
-            'end_date' => ['nullable', 'date'],
+            'end_date' => array_values(array_filter([
+                'nullable',
+                'date',
+                $request->filled('start_date') ? 'after_or_equal:start_date' : null,
+            ])),
             'employee_id' => ['nullable', 'integer'],
             'department_id' => ['nullable', 'integer'],
-            'status' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', Rule::enum(AttendanceStatus::class)],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
 
@@ -118,7 +123,7 @@ final class HrAttendanceController
             $query->whereHas('employee', fn ($q) => $q->where('department_id', $validated['department_id']));
         }
 
-        $records = $query->paginate($validated['per_page'] ?? 25);
+        $records = $query->paginate((int) ($validated['per_page'] ?? 25));
 
         return response()->json($records);
     }
@@ -156,7 +161,7 @@ final class HrAttendanceController
     public function listRegularizations(TenantScopedRequest $request): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', Rule::enum(RegularizationStatus::class)],
             'employee_id' => ['nullable', 'integer'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
@@ -227,7 +232,7 @@ final class HrAttendanceController
     {
         $validated = $request->validate([
             'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
         ]);
 
         $count = $this->regularizationService->lockRecords($request->tenantId(), $validated['start_date'], $validated['end_date']);

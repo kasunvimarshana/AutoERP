@@ -20,6 +20,7 @@ use Modules\Hr\DTOs\DeviceLogSyncResult;
 use Modules\Hr\DTOs\PunchData;
 use Modules\Hr\DTOs\RawBiometricPunchData;
 use Modules\Hr\Enums\BiometricDeviceStatus;
+use Modules\Hr\Enums\CaptureMethod;
 use Modules\Hr\Enums\PunchSource;
 use Modules\Hr\Enums\PunchType;
 use Modules\Hr\Enums\RawPunchSyncStatus;
@@ -209,8 +210,10 @@ final class BiometricDeviceService
                         punchType: $raw->punch_state->toPunchType() ?? PunchType::In,
                         punchTime: $raw->punch_time->toDateTimeString(),
                         punchSource: PunchSource::BiometricDevice,
+                        captureMethod: CaptureMethod::Biometric,
                         deviceId: $device->device_code,
                         organizationUnitId: $device->organization_unit_id ?? $employee->organization_unit_id,
+                        idempotencyHash: $raw->idempotency_hash,
                     )
                 );
 
@@ -245,8 +248,10 @@ final class BiometricDeviceService
                     punchType: $raw->punch_state->toPunchType() ?? PunchType::In,
                     punchTime: $raw->punch_time->toDateTimeString(),
                     punchSource: PunchSource::BiometricDevice,
+                    captureMethod: CaptureMethod::Biometric,
                     deviceId: $device->device_code,
                     organizationUnitId: $device->organization_unit_id ?? $employee->organization_unit_id,
+                    idempotencyHash: $raw->idempotency_hash,
                 )
             );
 

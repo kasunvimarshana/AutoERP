@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\Payroll\Services;
 
+use Carbon\CarbonImmutable;
 use Modules\Hr\Enums\AttendanceStatus;
 use Modules\Hr\Enums\LeaveRequestStatus;
 use Modules\Hr\Models\HrAttendanceRecord;
@@ -74,9 +75,23 @@ final class PayrollAttendanceIntegrationService
             })
             ->get();
 
+        $periodStart = CarbonImmutable::parse($startDate)->startOfDay();
+        $periodEnd = CarbonImmutable::parse($endDate)->startOfDay();
         $unpaidDays = 0.0;
+
         foreach ($unpaidLeaves as $leave) {
-            $unpaidDays += (float) $leave->total_days;
+            $leaveStart = CarbonImmutable::parse($leave->start_date)->startOfDay();
+            $leaveEnd = CarbonImmutable::parse($leave->end_date)->startOfDay();
+
+            if ($leaveStart->greaterThanOrEqualTo($periodStart) && $leaveEnd->lessThanOrEqualTo($periodEnd)) {
+                $unpaidDays += (float) $leave->total_days;
+            } else {
+                $overlapStart = $leaveStart->greaterThan($periodStart) ? $leaveStart : $periodStart;
+                $overlapEnd = $leaveEnd->lessThan($periodEnd) ? $leaveEnd : $periodEnd;
+                if ($overlapEnd->greaterThanOrEqualTo($overlapStart)) {
+                    $unpaidDays += (float) ($overlapStart->diffInDays($overlapEnd) + 1);
+                }
+            }
         }
 
         $overtimeHours = bcdiv((string) $overtimeMinutes, '60', 2);
