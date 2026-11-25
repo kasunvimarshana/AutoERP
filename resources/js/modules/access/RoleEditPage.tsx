@@ -84,14 +84,21 @@ function RoleEditor({ role, permissions, canUpdate, canAssignPermissions, onRefr
     const navigate = useNavigate();
     const [form, setForm] = useState<RoleFormState>(() => mapRoleToForm(role));
     const [initial] = useState<RoleFormState>(() => mapRoleToForm(role));
-    const [permissionIds, setPermissionIds] = useState<number[]>(() => (
+    const [permissionIds, setPermissionIds] = useState<number[]>(() => sortedIds((
         role.permissions ?? []
-    ).map((permission) => permission.id));
+    ).map((permission) => permission.id)));
+    const [initialPermissionIds] = useState<number[]>(() => sortedIds((
+        role.permissions ?? []
+    ).map((permission) => permission.id)));
     const [permissionSearch, setPermissionSearch] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [busyAction, setBusyAction] = useState<string | null>(null);
     const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(initial), [form, initial]);
-    const confirmDiscard = useUnsavedChanges(dirty && busyAction === null);
+    const permissionsDirty = useMemo(
+        () => JSON.stringify(sortedIds(permissionIds)) !== JSON.stringify(initialPermissionIds),
+        [permissionIds, initialPermissionIds],
+    );
+    const confirmDiscard = useUnsavedChanges((dirty || permissionsDirty) && busyAction === null);
 
     const runAction = async (name: string, action: () => Promise<unknown>) => {
         if (busyAction) return;
@@ -142,6 +149,7 @@ function RoleEditor({ role, permissions, canUpdate, canAssignPermissions, onRefr
                     <div className="mt-4 flex justify-end">
                         <Button
                             loading={busyAction === 'permissions'}
+                            disabled={!permissionsDirty}
                             onClick={() => void runAction(
                                 'permissions',
                                 () => accessApi.syncRolePermissions(role.id, role.row_version, permissionIds),
@@ -162,4 +170,8 @@ function mapRoleToForm(role: AccessRole): RoleFormState {
         description: role.description ?? '',
         row_version: role.row_version,
     };
+}
+
+function sortedIds(ids: number[]): number[] {
+    return [...new Set(ids)].sort((left, right) => left - right);
 }

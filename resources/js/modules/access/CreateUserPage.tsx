@@ -48,12 +48,14 @@ export default function CreateUserPage() {
     const canCreate = hasAccessPermission(auth, accessPermissions.usersCreate);
     const canAssignRoles = hasAccessPermission(auth, accessPermissions.usersAssignRoles);
     const canManageOrganizationAccess = hasAccessPermission(auth, accessPermissions.usersManageOrganizationAccess);
-    const roles = useApi((signal) => accessApi.listAllRoles(signal), []);
+    const canLoadCreateOptions = canCreate && canManageOrganizationAccess;
+    const roles = useApi((signal) => accessApi.listAllRoles(signal), [], canLoadCreateOptions && canAssignRoles);
     const organizationUnits = useApi(
         (signal) => accessApi.listAllOrganizationUnits(signal),
         [],
+        canLoadCreateOptions,
     );
-    const passwordPolicy = useApi((signal) => accessApi.getUserPasswordPolicy(signal), []);
+    const passwordPolicy = useApi((signal) => accessApi.getUserPasswordPolicy(signal), [], canLoadCreateOptions);
     const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(emptyState()), [form]);
     const confirmDiscard = useUnsavedChanges(dirty && !submitting);
 

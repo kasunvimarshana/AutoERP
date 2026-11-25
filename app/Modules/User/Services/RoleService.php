@@ -16,8 +16,8 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
-use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
@@ -42,7 +42,12 @@ final class RoleService extends AbstractUserCrudService
     public function list(array $filters): Result
     {
         try {
-            $this->requirePermission(UserPermission::ROLES_VIEW);
+            if (
+                ! $this->authorization->canCurrent(UserPermission::ROLES_VIEW)
+                && ! $this->authorization->canCurrent(UserPermission::USERS_ASSIGN_ROLES)
+            ) {
+                throw new AuthorizationException('This role action is not authorized.');
+            }
             $query = $this->baseQuery()->where('tenant_id', $this->tenantId());
             $search = trim((string) ($filters['search'] ?? ''));
             if ($search !== '') {
@@ -53,6 +58,7 @@ final class RoleService extends AbstractUserCrudService
             $paginator = $query->orderByDesc('is_system')->orderBy('name')
                 ->paginate($perPage, ['*'], 'page', $page);
             $items = array_map(fn (mixed $role): DataRecord => $this->record($role), array_values($paginator->items()));
+
             return Result::success(new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -64,6 +70,7 @@ final class RoleService extends AbstractUserCrudService
         try {
             $this->requirePermission(UserPermission::ROLES_VIEW);
             $role = $this->baseQuery()->where('tenant_id', $this->tenantId())->whereKey($id)->first();
+
             return $role instanceof RoleModel ? Result::success($this->record($role)) : $this->notFound('Role not found.');
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -91,8 +98,10 @@ final class RoleService extends AbstractUserCrudService
                     'updated_by_user_id' => $this->actor->currentUserId(),
                 ]);
                 $this->audit->record('role.created', 'role', $role, null, $role->attributesToArray());
+
                 return $role;
             }, 3);
+
             return Result::success($this->record($this->baseQuery()->whereKey($role->getKey())->firstOrFail()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -127,8 +136,10 @@ final class RoleService extends AbstractUserCrudService
                 ])->save();
                 $this->access->forgetForRoleTenant((int) $role->getKey(), $tenantId);
                 $this->audit->record('role.updated', 'role', $role, $before, $role->attributesToArray());
+
                 return $role;
             }, 3);
+
             return Result::success($this->record($this->baseQuery()->whereKey($role->getKey())->firstOrFail()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -163,6 +174,7 @@ final class RoleService extends AbstractUserCrudService
                 $this->access->forgetForRoleTenant((int) $role->getKey(), $tenantId);
                 $this->audit->record('role.archived', 'role', $role, $before, null);
             }, 3);
+
             return Result::success(true);
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -172,12 +184,39 @@ final class RoleService extends AbstractUserCrudService
     private function baseQuery(): Builder
     {
         return RoleModel::query()
-            ->with(['permissions.permission:id,tenant_id,name,module,description,is_active'])
-            ->withCount(['users as assigned_users_count', 'permissions as permissions_count']);
+            ->with(['permissions' => static function ($query): void {
+                $query->whereHas('permission', static function (Builder $permissionQuery): void {
+                    $permissionQuery->where('is_active', true);
+                })->with(['permission:id,tenant_id,name,module,description,is_active']);
+            }])
+            ->withCount([
+                'users as assigned_users_count',
+                'permissions as permissions_count' => static function (Builder $query): void {
+                    $query->whereHas('permission', static function (Builder $permissionQuery): void {
+                        $permissionQuery->where('is_active', true);
+                    });
+                },
+            ]);
     }
 
     private function record(RoleModel $role): DataRecord
     {
+        $permissions = $role->relationLoaded('permissions')
+            ? $role->permissions->map(static function ($assignment): ?array {
+                $permission = $assignment->permission;
+                if ($permission === null || ! (bool) $permission->getAttribute('is_active')) {
+                    return null;
+                }
+
+                return [
+                    'id' => (int) $permission->getKey(),
+                    'name' => (string) $permission->getAttribute('name'),
+                    'module' => (string) $permission->getAttribute('module'),
+                    'description' => $permission->getAttribute('description'),
+                ];
+            })->filter()->values()->all()
+            : [];
+
         return new DataRecord([
             'id' => (int) $role->getKey(),
             'row_version' => (int) $role->getAttribute('row_version'),
@@ -187,15 +226,10 @@ final class RoleService extends AbstractUserCrudService
             'system_key' => $role->getAttribute('system_key'),
             'is_system' => (bool) $role->getAttribute('is_system'),
             'assigned_users_count' => (int) ($role->getAttribute('assigned_users_count') ?? 0),
-            'permissions_count' => (int) ($role->getAttribute('permissions_count') ?? 0),
-            'permissions' => $role->relationLoaded('permissions')
-                ? $role->permissions->map(static fn ($assignment): ?array => $assignment->permission === null ? null : [
-                    'id' => (int) $assignment->permission->getKey(),
-                    'name' => (string) $assignment->permission->getAttribute('name'),
-                    'module' => (string) $assignment->permission->getAttribute('module'),
-                    'description' => $assignment->permission->getAttribute('description'),
-                ])->filter()->values()->all()
-                : [],
+            'permissions_count' => $role->relationLoaded('permissions')
+                ? count($permissions)
+                : (int) ($role->getAttribute('permissions_count') ?? 0),
+            'permissions' => $permissions,
         ]);
     }
 
@@ -234,13 +268,14 @@ final class RoleService extends AbstractUserCrudService
         if ($id === null) {
             throw new RuntimeException('A tenant context is required.');
         }
+
         return $id;
     }
-
 
     private function nullableString(mixed $value): ?string
     {
         $value = is_scalar($value) ? trim((string) $value) : '';
+
         return $value === '' ? null : $value;
     }
 }

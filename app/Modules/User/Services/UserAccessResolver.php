@@ -15,6 +15,7 @@ namespace Modules\User\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
 use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\User\Constants\UserGuard;
@@ -22,16 +23,19 @@ use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\User\Constants\UserStatus;
 use Modules\User\Constants\UserSystemRole;
 
-final class UserAccessResolver implements TenantUserAccessCheckerInterface, OrganizationUnitUserAccessCheckerInterface
+final class UserAccessResolver implements OrganizationUnitUserAccessCheckerInterface, TenantUserAccessCheckerInterface
 {
-    public function __construct(private readonly OrganizationUnitDirectoryInterface $organizationUnits)
-    {
-    }
+    public function __construct(
+        private readonly OrganizationUnitDirectoryInterface $organizationUnits,
+        private readonly ?PermissionDefinitionRegistryInterface $permissionDefinitions = null,
+    ) {}
 
     /** @var array<string, bool> */
     private array $superAdminCache = [];
+
     /** @var array<string, list<string>> */
     private array $effectiveNameCache = [];
+
     /** @var array<string, list<array{id:int,name:string,module:string,description:string|null}>> */
     private array $catalogueCache = [];
 
@@ -85,7 +89,15 @@ final class UserAccessResolver implements TenantUserAccessCheckerInterface, Orga
     public function can(int $userId, int $tenantId, string $permission): bool
     {
         $permission = trim($permission);
-        return $permission !== '' && in_array($permission, $this->effectivePermissionNames($userId, $tenantId), true);
+        if ($permission === '' || ! $this->isActiveTenantUser($userId, $tenantId)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($userId, $tenantId)) {
+            return true;
+        }
+
+        return in_array($permission, $this->effectivePermissionNames($userId, $tenantId), true);
     }
 
     public function isSuperAdmin(int $userId, int $tenantId): bool
@@ -94,6 +106,7 @@ final class UserAccessResolver implements TenantUserAccessCheckerInterface, Orga
             return false;
         }
         $key = $this->key($userId, $tenantId);
+
         return $this->superAdminCache[$key] ??= DB::table('user_roles')
             ->join('roles', function ($join): void {
                 $join->on('roles.id', '=', 'user_roles.role_id')
@@ -117,10 +130,11 @@ final class UserAccessResolver implements TenantUserAccessCheckerInterface, Orga
             return $this->effectiveNameCache[$key];
         }
         $permissions = $this->isSuperAdmin($userId, $tenantId)
-            ? $this->activePermissionCatalogue($tenantId)
+            ? $this->superAdminCatalogue($tenantId)
             : $this->assignedPermissions($userId, $tenantId);
         $names = array_values(array_unique(array_map(static fn (array $p): string => $p['name'], $permissions)));
         sort($names);
+
         return $this->effectiveNameCache[$key] = $names;
     }
 
@@ -128,8 +142,38 @@ final class UserAccessResolver implements TenantUserAccessCheckerInterface, Orga
     public function effectivePermissions(int $userId, int $tenantId): array
     {
         return $this->isSuperAdmin($userId, $tenantId)
-            ? $this->activePermissionCatalogue($tenantId)
+            ? $this->superAdminCatalogue($tenantId)
             : $this->assignedPermissions($userId, $tenantId);
+    }
+
+    /** @return list<array{id:int,name:string,module:string,description:string|null}> */
+    private function superAdminCatalogue(int $tenantId): array
+    {
+        $catalogue = $this->activePermissionCatalogue($tenantId);
+        $registry = $this->permissionDefinitions ?? (app()->bound(PermissionDefinitionRegistryInterface::class)
+            ? app(PermissionDefinitionRegistryInterface::class)
+            : null);
+        if ($registry === null) {
+            return $catalogue;
+        }
+
+        $byName = [];
+        foreach ($catalogue as $item) {
+            $byName[$item['name']] = $item;
+        }
+        foreach ($registry->all() as $name => $definition) {
+            if (! isset($byName[$name])) {
+                $byName[$name] = [
+                    'id' => 0,
+                    'name' => (string) $name,
+                    'module' => (string) $definition['module'],
+                    'description' => (string) $definition['description'],
+                ];
+            }
+        }
+        ksort($byName);
+
+        return array_values($byName);
     }
 
     /** @return list<string> */
@@ -137,6 +181,7 @@ final class UserAccessResolver implements TenantUserAccessCheckerInterface, Orga
     {
         $names = array_map(static fn (array $p): string => $p['name'], $this->assignedPermissions($userId, $tenantId));
         sort($names);
+
         return array_values(array_unique($names));
     }
 
@@ -193,6 +238,7 @@ final class UserAccessResolver implements TenantUserAccessCheckerInterface, Orga
             return [];
         }
         $key = 'catalogue:'.$tenantId;
+
         return $this->catalogueCache[$key] ??= DB::table('permissions')
             ->where('tenant_id', $tenantId)
             ->where('guard_name', UserGuard::TENANT_API)
@@ -211,6 +257,7 @@ final class UserAccessResolver implements TenantUserAccessCheckerInterface, Orga
     {
         $key = $role instanceof DataRecord ? $role->get('system_key')
             : (is_array($role) ? ($role['system_key'] ?? null) : (is_object($role) ? ($role->system_key ?? null) : null));
+
         return $key === UserSystemRole::SUPER_ADMIN;
     }
 

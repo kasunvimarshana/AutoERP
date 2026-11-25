@@ -19,6 +19,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { organizationUnitPermissions } from '@/modules/organization-unit/organizationUnitPermissions';
 import { accessApi, type AccessUser } from './accessApi';
 import { accessPermissions, hasAccessPermission } from './accessPermissions';
 
@@ -31,6 +32,9 @@ export default function UserListPage() {
     const [page, setPage] = useState(1);
     const debouncedSearch = useDebounce(search);
     const canCreate = hasAccessPermission(auth, accessPermissions.usersCreate);
+    const canViewRoles = hasAccessPermission(auth, accessPermissions.rolesView)
+        || hasAccessPermission(auth, accessPermissions.usersAssignRoles);
+    const canViewOrganizationUnits = hasAccessPermission(auth, organizationUnitPermissions.view);
     const canManage = [
         accessPermissions.usersUpdate,
         accessPermissions.usersAssignRoles,
@@ -46,10 +50,11 @@ export default function UserListPage() {
         page,
         per_page: 25,
     }, signal), [debouncedSearch, status, roleId, organizationUnitId, page]);
-    const roles = useApi((signal) => accessApi.listAllRoles(signal), []);
+    const roles = useApi((signal) => accessApi.listAllRoles(signal), [], canViewRoles);
     const organizationUnits = useApi(
         (signal) => accessApi.listAllOrganizationUnits(signal),
         [],
+        canViewOrganizationUnits,
     );
 
     const columns: DataColumn<AccessUser>[] = [

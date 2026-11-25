@@ -19,6 +19,9 @@ use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Constants\UserStatus;
 use Modules\User\Constants\UserSystemRole;
+use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
@@ -319,6 +322,115 @@ final class UserAccessApiTest extends TestCase
             'expected_version' => 1,
             'name' => 'Renamed System Role',
         ])->assertStatus(409);
+
+        $this->withAuth($context)->putJson("/api/v1/roles/{$context['role_id']}/permissions", [
+            'expected_version' => 1,
+            'permission_ids' => [$permissionId],
+        ])->assertStatus(409);
+    }
+
+    public function test_super_admin_has_unrestricted_access_even_before_new_module_permissions_are_synced(): void
+    {
+        $context = $this->createAuthContext(
+            ['code' => 'SUPR', 'email' => 'super.unrestricted@example.test'],
+            [UserPermission::USERS_VIEW],
+            UserSystemRole::SUPER_ADMIN,
+        );
+
+        // Even though only users.view was seeded in permissions table for this tenant,
+        // Super Admin must have unrestricted access to all modules and actions (e.g., roles.create).
+        $this->withAuth($context)->postJson('/api/v1/roles', [
+            'name' => 'Operations Lead',
+            'description' => 'Created by Super Admin without DB permission sync.',
+        ])->assertCreated();
+
+        // /auth/me must include registered permissions across modules for Super Admin
+        $mePermissions = $this->withAuth($context)->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->json('permissions');
+        self::assertIsArray($mePermissions);
+        self::assertContains(UserPermission::ROLES_CREATE, $mePermissions);
+        self::assertContains('finance.accounts.view', $mePermissions);
+    }
+
+    public function test_inactive_permissions_are_excluded_from_role_and_user_responses(): void
+    {
+        $context = $this->createAuthContext();
+        $activePermId = $this->permissionId($context['tenant_id'], UserPermission::USERS_VIEW);
+        $inactivePermId = (int) DB::table('permissions')->insertGetId([
+            'tenant_id' => $context['tenant_id'],
+            'name' => 'removed.module.view',
+            'guard_name' => UserGuard::TENANT_API,
+            'module' => 'removed',
+            'description' => 'Removed permission',
+            'is_active' => false,
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $roleId = $this->createRole($context['tenant_id'], 'Filtered Role');
+        $this->assignPermission($context['tenant_id'], $roleId, $activePermId);
+        $this->assignPermission($context['tenant_id'], $roleId, $inactivePermId);
+
+        $roleResponse = $this->withAuth($context)->getJson("/api/v1/roles/{$roleId}")
+            ->assertOk()
+            ->assertJsonPath('data.permissions_count', 1);
+        $returnedNames = array_column($roleResponse->json('data.permissions'), 'name');
+        self::assertSame([UserPermission::USERS_VIEW], $returnedNames);
+
+        $userId = $this->createUser($context['tenant_id'], 'filtered.perms@example.test');
+        DB::table('user_permissions')->insert([
+            [
+                'tenant_id' => $context['tenant_id'],
+                'user_id' => $userId,
+                'permission_id' => $activePermId,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => $context['tenant_id'],
+                'user_id' => $userId,
+                'permission_id' => $inactivePermId,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $userResponse = $this->withAuth($context)->getJson("/api/v1/users/{$userId}")->assertOk();
+        $directNames = array_column($userResponse->json('data.direct_permissions'), 'name');
+        self::assertSame([UserPermission::USERS_VIEW], $directNames);
+
+        $this->withAuth($context)->getJson("/api/v1/permissions/{$inactivePermId}")->assertNotFound();
+    }
+
+    public function test_assignment_and_creation_permissions_can_load_required_lookups_without_broad_view_permissions(): void
+    {
+        $roleAssigner = $this->createAuthContext(
+            ['email' => 'role-assigner@example.test'],
+            [UserPermission::ROLES_ASSIGN_PERMISSIONS],
+            null,
+        );
+        $this->withAuth($roleAssigner)->getJson('/api/v1/permissions')->assertOk();
+        $this->withAuth($roleAssigner)->getJson('/api/v1/permissions/modules')->assertOk();
+        $this->withAuth($roleAssigner)->getJson('/api/v1/roles')->assertForbidden();
+
+        $userRoleAssigner = $this->createAuthContext(
+            ['email' => 'user-role-assigner@example.test'],
+            [UserPermission::USERS_ASSIGN_ROLES],
+            null,
+        );
+        $this->withAuth($userRoleAssigner)->getJson('/api/v1/roles')->assertOk();
+        $this->withAuth($userRoleAssigner)->getJson('/api/v1/permissions')->assertForbidden();
+
+        $userCreator = $this->createAuthContext(
+            ['email' => 'user-creator@example.test'],
+            [UserPermission::USERS_CREATE],
+            null,
+        );
+        $this->withAuth($userCreator)->getJson('/api/v1/users/password-policy')->assertOk();
     }
 
     /** @param array<string,mixed> $overrides @param list<string>|null $permissions */
@@ -336,7 +448,7 @@ final class UserAccessApiTest extends TestCase
             'activated_at' => $now,
             'created_at' => $now, 'updated_at' => $now,
         ]);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Head Office', 'HO');
         $email = (string) ($overrides['email'] ?? strtolower($code).'@example.test');
         $userId = $this->createUser($tenantId, $email, ['first_name' => 'Admin']);
@@ -346,7 +458,7 @@ final class UserAccessApiTest extends TestCase
         }
         $this->assignRole($tenantId, $userId, $roleId);
         $this->assignOrganizationUnit($tenantId, $userId, $organizationUnitId, true);
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
@@ -396,6 +508,7 @@ final class UserAccessApiTest extends TestCase
                 'is_active' => true, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
+
         return $ids;
     }
 
@@ -406,7 +519,7 @@ final class UserAccessApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId, 'name' => $name, 'code' => $code,
             'path' => '/'.strtolower($code), 'is_active' => true, 'row_version' => 1,
             'created_at' => now(), 'updated_at' => now(),

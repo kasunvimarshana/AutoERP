@@ -113,7 +113,11 @@ final class UserReadService extends AbstractUserCrudService
     {
         return UserModel::query()->with([
             'roles.role:id,tenant_id,name,description,system_key',
-            'permissions.permission:id,tenant_id,name,module,description',
+            'permissions' => static function ($query): void {
+                $query->whereHas('permission', static function (Builder $permissionQuery): void {
+                    $permissionQuery->where('is_active', true);
+                })->with(['permission:id,tenant_id,name,module,description,is_active']);
+            },
             'organizationUnitAssignments:id,tenant_id,user_id,organization_unit_id,status,is_default',
         ]);
     }
@@ -127,12 +131,19 @@ final class UserReadService extends AbstractUserCrudService
             'description' => $assignment->role->getAttribute('description'),
             'system_key' => $assignment->role->getAttribute('system_key'),
         ])->filter()->values()->all();
-        $directPermissions = $user->permissions->map(static fn ($assignment): ?array => $assignment->permission === null ? null : [
-            'id' => (int) $assignment->permission->getKey(),
-            'name' => (string) $assignment->permission->getAttribute('name'),
-            'module' => (string) $assignment->permission->getAttribute('module'),
-            'description' => $assignment->permission->getAttribute('description'),
-        ])->filter()->values()->all();
+        $directPermissions = $user->permissions->map(static function ($assignment): ?array {
+            $permission = $assignment->permission;
+            if ($permission === null || ! (bool) $permission->getAttribute('is_active')) {
+                return null;
+            }
+
+            return [
+                'id' => (int) $permission->getKey(),
+                'name' => (string) $permission->getAttribute('name'),
+                'module' => (string) $permission->getAttribute('module'),
+                'description' => $permission->getAttribute('description'),
+            ];
+        })->filter()->values()->all();
 
         $organizationUnits = $user->organizationUnitAssignments
             ->filter(static fn ($assignment): bool => (string) $assignment->getAttribute('status') === UserOrganizationUnitStatus::ACTIVE)

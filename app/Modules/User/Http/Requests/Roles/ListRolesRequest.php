@@ -17,7 +17,20 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class ListRolesRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return UserPermission::ROLES_VIEW; }
+    protected function requiredPermission(): ?string
+    {
+        return UserPermission::ROLES_VIEW;
+    }
+
+    /** @return list<string> */
+    protected function requiredPermissions(): array
+    {
+        return [
+            UserPermission::ROLES_VIEW,
+            UserPermission::USERS_ASSIGN_ROLES,
+        ];
+    }
+
     public function rules(): array
     {
         return [

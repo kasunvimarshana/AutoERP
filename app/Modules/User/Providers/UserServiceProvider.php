@@ -15,44 +15,46 @@ namespace Modules\User\Providers;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
+use Modules\Core\Contracts\PermissionCheckerInterface;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
+use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
+use Modules\Core\Contracts\PlatformPermissionDirectoryInterface;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
+use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\User\Console\Commands\SyncPlatformPermissionCatalogCommand;
+use Modules\User\Console\Commands\SyncTenantPermissionCatalogCommand;
+use Modules\User\Constants\UserPermission;
 use Modules\User\Contracts\AuthenticatedUserProviderInterface;
 use Modules\User\Contracts\AuthenticationPrincipalProviderInterface;
 use Modules\User\Contracts\PlatformOperatorAuthenticationDirectoryInterface;
 use Modules\User\Contracts\TenantUserAuthenticationDirectoryInterface;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\User\Contracts\TenantUserRegistrationInterface;
 use Modules\User\Http\Middleware\RequirePlatformPermissionMiddleware;
 use Modules\User\Http\Middleware\RequireTenantPermissionMiddleware;
 use Modules\User\Http\Middleware\UserContextResolutionMiddleware;
 use Modules\User\Models\UserModel;
 use Modules\User\Policies\UserPolicy;
+use Modules\User\Repositories\EloquentUserOrganizationUnitRepository;
 use Modules\User\Repositories\EloquentUserRepository;
 use Modules\User\Repositories\EloquentUserRoleRepository;
-use Modules\User\Repositories\EloquentUserOrganizationUnitRepository;
+use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
 use Modules\User\Repositories\UserRoleRepositoryInterface;
-use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Services\AuthenticatedUserProvider;
 use Modules\User\Services\Authentication\AuthenticationPrincipalProvider;
 use Modules\User\Services\Authentication\PlatformOperatorAuthenticationDirectory;
 use Modules\User\Services\Authentication\TenantUserAuthenticationDirectory;
+use Modules\User\Services\OrganizationUnit\UserOrganizationUnitLifecycleBlocker;
 use Modules\User\Services\PermissionDefinitionRegistry;
 use Modules\User\Services\PlatformOperatorAccessResolver;
 use Modules\User\Services\Provisioning\TenantAccessProvisioner;
+use Modules\User\Services\TenantLimits\UserLimitUsageContributor;
 use Modules\User\Services\TenantUserRegistrationService;
-use Modules\User\Contracts\TenantUserRegistrationInterface;
-use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
-use Modules\Core\Contracts\PermissionCheckerInterface;
-use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
-use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
-use Modules\Core\Contracts\PlatformPermissionDirectoryInterface;
-use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\User\Services\UserAccessResolver;
 use Modules\User\Services\UserPermissionChecker;
-use Modules\Core\Contracts\TenantAccessProvisionerInterface;
-use Modules\User\Constants\UserPermission;
-use Modules\User\Services\TenantLimits\UserLimitUsageContributor;
-use Modules\User\Services\OrganizationUnit\UserOrganizationUnitLifecycleBlocker;
+use Modules\User\Services\UserQuickAccessService;
 
 final class UserServiceProvider extends ServiceProvider
 {
@@ -69,7 +71,7 @@ final class UserServiceProvider extends ServiceProvider
         $this->app->singleton(PermissionDefinitionRegistryInterface::class, PermissionDefinitionRegistry::class);
         $this->app->singleton(TenantAccessProvisionerInterface::class, TenantAccessProvisioner::class);
         $this->app->scoped(UserAccessResolver::class);
-        $this->app->scoped(\Modules\User\Services\UserQuickAccessService::class);
+        $this->app->scoped(UserQuickAccessService::class);
         $this->app->scoped(PlatformOperatorAccessResolver::class);
         $this->app->scoped(PlatformOperatorCheckerInterface::class, PlatformOperatorAccessResolver::class);
         $this->app->scoped(PlatformPermissionCheckerInterface::class, PlatformOperatorAccessResolver::class);
@@ -113,6 +115,7 @@ final class UserServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SyncPlatformPermissionCatalogCommand::class,
+                SyncTenantPermissionCatalogCommand::class,
             ]);
         }
     }

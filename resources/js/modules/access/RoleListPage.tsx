@@ -33,6 +33,8 @@ export default function RoleListPage() {
     const debouncedSearch = useDebounce(search);
     const canCreate = hasAccessPermission(auth, accessPermissions.rolesCreate);
     const canUpdate = hasAccessPermission(auth, accessPermissions.rolesUpdate);
+    const canAssignPermissions = hasAccessPermission(auth, accessPermissions.rolesAssignPermissions);
+    const canEdit = canUpdate || canAssignPermissions;
     const canDelete = hasAccessPermission(auth, accessPermissions.rolesDelete);
     const roles = useApi((signal) => accessApi.listRoles({
         search: debouncedSearch || undefined,
@@ -67,7 +69,7 @@ export default function RoleListPage() {
             render: (row) => (
                 <div className="flex justify-end gap-2">
                     <LinkButton variant="secondary" className="min-h-8 px-3 py-1 text-xs" to={`/access/roles/${row.id}`}>View</LinkButton>
-                    {canUpdate && !row.is_system && <LinkButton variant="secondary" className="min-h-8 px-3 py-1 text-xs" to={`/access/roles/${row.id}/edit`}>Edit</LinkButton>}
+                    {canEdit && !row.is_system && <LinkButton variant="secondary" className="min-h-8 px-3 py-1 text-xs" to={`/access/roles/${row.id}/edit`}>Edit</LinkButton>}
                     {canDelete && !row.is_system && (
                         <Button variant="danger" className="min-h-8 px-3 py-1 text-xs" loading={deletingId === row.id} onClick={() => void deleteRole(row)}>Delete</Button>
                     )}

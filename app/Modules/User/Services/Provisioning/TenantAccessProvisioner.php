@@ -22,6 +22,8 @@ use Modules\User\Constants\UserSystemRole;
 use Modules\User\Models\PermissionModel;
 use Modules\User\Models\RoleModel;
 use Modules\User\Models\RolePermissionModel;
+use Modules\User\Models\UserPermissionModel;
+use Modules\User\Services\UserAccessResolver;
 
 final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
 {
@@ -32,7 +34,7 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
 
     public function provision(int $tenantId): array
     {
-        return DB::transaction(function () use ($tenantId): array {
+        $result = PermissionModel::allowingCatalogueSync(fn (): array => DB::transaction(function () use ($tenantId): array {
             $this->tenantLock->lock($tenantId);
             $definitions = $this->permissionDefinitions->all();
             ksort($definitions);
@@ -67,12 +69,34 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                 $permissionIds[] = (int) $permission->getKey();
             }
 
-            PermissionModel::query()
+            $deactivationQuery = PermissionModel::query()
                 ->where('tenant_id', $tenantId)
                 ->where('guard_name', UserGuard::TENANT_API)
-                ->where('is_active', true)
-                ->when($permissionIds !== [], fn ($query) => $query->whereNotIn('id', $permissionIds))
-                ->update(['is_active' => false, 'row_version' => DB::raw('row_version + 1')]);
+                ->where('is_active', true);
+            if ($permissionIds !== []) {
+                $deactivationQuery->whereNotIn('id', $permissionIds);
+            }
+            $deactivationQuery->update(['is_active' => false, 'row_version' => DB::raw('row_version + 1')]);
+
+            $inactivePermissionIds = PermissionModel::query()
+                ->where('tenant_id', $tenantId)
+                ->where('guard_name', UserGuard::TENANT_API)
+                ->where('is_active', false)
+                ->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->all();
+
+            if ($inactivePermissionIds !== []) {
+                RolePermissionModel::query()
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('permission_id', $inactivePermissionIds)
+                    ->delete();
+
+                UserPermissionModel::query()
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('permission_id', $inactivePermissionIds)
+                    ->delete();
+            }
 
             $role = RoleModel::withTrashed()->firstOrNew([
                 'tenant_id' => $tenantId,
@@ -101,11 +125,13 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
             }
             $roleId = (int) $role->getKey();
 
-            RolePermissionModel::query()
+            $superAdminCleanup = RolePermissionModel::query()
                 ->where('tenant_id', $tenantId)
-                ->where('role_id', $roleId)
-                ->when($permissionIds !== [], fn ($query) => $query->whereNotIn('permission_id', $permissionIds))
-                ->delete();
+                ->where('role_id', $roleId);
+            if ($permissionIds !== []) {
+                $superAdminCleanup->whereNotIn('permission_id', $permissionIds);
+            }
+            $superAdminCleanup->delete();
             foreach ($permissionIds as $permissionId) {
                 RolePermissionModel::query()->firstOrCreate([
                     'tenant_id' => $tenantId,
@@ -115,7 +141,13 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
             }
 
             return ['role_id' => $roleId, 'permission_count' => count($permissionIds)];
-        }, 3);
+        }, 3));
+
+        if (app()->bound(UserAccessResolver::class)) {
+            app(UserAccessResolver::class)->forgetForTenant($tenantId);
+        }
+
+        return $result;
     }
 
     public function catalogueIsReady(int $tenantId, bool $lockForUpdate = false): bool

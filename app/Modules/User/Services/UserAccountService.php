@@ -15,13 +15,13 @@ namespace Modules\User\Services;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
+use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Result;
 use Modules\Core\Tenancy\TenantPlanLimit;
-use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Constants\UserStatus;
@@ -80,6 +80,10 @@ final class UserAccountService extends AbstractUserCrudService
                     throw new RuntimeException('The tenant plan user limit has been reached.');
                 }
 
+                $firstName = trim((string) ($payload['first_name'] ?? ''));
+                if ($firstName === '') {
+                    throw new RuntimeException('First name is required.');
+                }
                 $email = strtolower(trim((string) ($payload['email'] ?? '')));
                 $username = $this->nullableLowerString($payload['username'] ?? null);
                 $this->assertUniqueIdentity($tenantId, $email, $username, null);
@@ -88,7 +92,7 @@ final class UserAccountService extends AbstractUserCrudService
                 $user = UserModel::query()->create([
                     'tenant_id' => $tenantId,
                     'row_version' => 1,
-                    'first_name' => trim((string) ($payload['first_name'] ?? '')),
+                    'first_name' => $firstName,
                     'last_name' => $this->nullableString($payload['last_name'] ?? null),
                     'username' => $username,
                     'email' => $email,
@@ -110,11 +114,13 @@ final class UserAccountService extends AbstractUserCrudService
                     (string) ($payload['password'] ?? ''),
                 );
                 $this->audit->record('account.created', 'user', $user, null, $this->snapshot($user));
+
                 return $user;
             }, 3);
 
             /** @var UserModel $user */
             $user = $created;
+
             return Result::success(new DataRecord($this->snapshot($user->fresh() ?? $user)));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -142,9 +148,14 @@ final class UserAccountService extends AbstractUserCrudService
                     : $user->getAttribute('username');
                 $this->assertUniqueIdentity($tenantId, (string) $user->getAttribute('email'), $username, (int) $user->getKey());
                 $actorId = $this->actor->currentUserId();
+                $firstName = array_key_exists('first_name', $payload)
+                    ? trim((string) $payload['first_name'])
+                    : (string) $user->getAttribute('first_name');
+                if ($firstName === '') {
+                    throw new RuntimeException('First name is required.');
+                }
                 $user->forceFill([
-                    'first_name' => array_key_exists('first_name', $payload)
-                        ? trim((string) $payload['first_name']) : $user->getAttribute('first_name'),
+                    'first_name' => $firstName,
                     'last_name' => array_key_exists('last_name', $payload)
                         ? $this->nullableString($payload['last_name']) : $user->getAttribute('last_name'),
                     'username' => $username,
@@ -154,8 +165,10 @@ final class UserAccountService extends AbstractUserCrudService
                     'updated_by_user_id' => $actorId,
                 ])->save();
                 $this->audit->record('profile.updated', 'user', $user, $before, $this->snapshot($user));
+
                 return $user;
             }, 3);
+
             return Result::success(new DataRecord($this->snapshot($user->fresh() ?? $user)));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -205,8 +218,10 @@ final class UserAccountService extends AbstractUserCrudService
                     'updated_by_user_id' => $this->actor->currentUserId(),
                 ])->save();
                 $this->audit->record('status.changed', 'user', $user, $before, $this->snapshot($user), $reason);
+
                 return $user;
             }, 3);
+
             return Result::success(new DataRecord($this->snapshot($user->fresh() ?? $user)));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -247,6 +262,7 @@ final class UserAccountService extends AbstractUserCrudService
                 $user->delete();
                 $this->audit->record('account.archived', 'user', $user, $before, null, $reason);
             }, 3);
+
             return Result::success(true);
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -306,6 +322,7 @@ final class UserAccountService extends AbstractUserCrudService
         if (! $user instanceof UserModel) {
             throw new RuntimeException('User not found.');
         }
+
         return $user;
     }
 
@@ -329,9 +346,9 @@ final class UserAccountService extends AbstractUserCrudService
         if ($id === null) {
             throw new RuntimeException('A tenant context is required.');
         }
+
         return $id;
     }
-
 
     private function normalizeIds(mixed $ids): array
     {
@@ -346,6 +363,7 @@ final class UserAccountService extends AbstractUserCrudService
             $result[(int) $id] = (int) $id;
         }
         ksort($result);
+
         return array_values($result);
     }
 
@@ -370,12 +388,14 @@ final class UserAccountService extends AbstractUserCrudService
     private function nullableString(mixed $value): ?string
     {
         $value = is_scalar($value) ? trim((string) $value) : '';
+
         return $value === '' ? null : $value;
     }
 
     private function nullableLowerString(mixed $value): ?string
     {
         $value = $this->nullableString($value);
+
         return $value === null ? null : strtolower($value);
     }
 }

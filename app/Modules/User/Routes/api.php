@@ -11,8 +11,10 @@ declare(strict_types=1);
  */
 
 use Illuminate\Support\Facades\Route;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Http\Controllers\PermissionController;
+use Modules\User\Http\Controllers\Platform\PlatformOperatorController;
 use Modules\User\Http\Controllers\RoleController;
 use Modules\User\Http\Controllers\UserController;
 use Modules\User\Http\Controllers\UserDeviceController;
@@ -43,7 +45,7 @@ Route::prefix('api/v1')
             ->middleware('tenant.permission:'.UserPermission::USERS_CREATE)
             ->name('users.store');
         Route::get('users/password-policy', [UserController::class, 'passwordPolicy'])
-            ->middleware('tenant.permission:'.UserPermission::USERS_VIEW)
+            ->middleware('tenant.permission:'.UserPermission::USERS_VIEW.','.UserPermission::USERS_CREATE)
             ->name('users.password-policy');
         Route::get('user/quick-access', [UserQuickAccessController::class, 'show'])->name('quick-access.show');
         Route::put('user/quick-access', [UserQuickAccessController::class, 'update'])->name('quick-access.update');
@@ -120,7 +122,7 @@ Route::prefix('api/v1')
             ->name('users.devices.revoke');
 
         Route::get('roles', [RoleController::class, 'index'])
-            ->middleware('tenant.permission:'.UserPermission::ROLES_VIEW)
+            ->middleware('tenant.permission:'.UserPermission::ROLES_VIEW.','.UserPermission::USERS_ASSIGN_ROLES)
             ->name('roles.index');
         Route::post('roles', [RoleController::class, 'store'])
             ->middleware('tenant.permission:'.UserPermission::ROLES_CREATE)
@@ -143,17 +145,16 @@ Route::prefix('api/v1')
             ->name('roles.permissions.sync');
 
         Route::get('permissions/modules', [PermissionController::class, 'modules'])
-            ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW)
+            ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW.','.UserPermission::ROLES_ASSIGN_PERMISSIONS.','.UserPermission::USERS_ASSIGN_PERMISSIONS)
             ->name('permissions.modules');
         Route::get('permissions', [PermissionController::class, 'index'])
-            ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW)
+            ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW.','.UserPermission::ROLES_ASSIGN_PERMISSIONS.','.UserPermission::USERS_ASSIGN_PERMISSIONS)
             ->name('permissions.index');
         Route::get('permissions/{permission}', [PermissionController::class, 'show'])
             ->whereNumber('permission')
             ->middleware('tenant.permission:'.UserPermission::PERMISSIONS_VIEW)
             ->name('permissions.show');
     });
-
 
 $platformHost = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
 $platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
@@ -164,16 +165,16 @@ Route::prefix('api/v1/platform/operators')
     ->middleware(['api', $platformHost, 'auth:'.$platformGuard, $currentUserMiddleware, $platformOperator])
     ->name('api.v1.platform.operators.')
     ->group(function () use ($platformStepUp): void {
-        Route::get('/', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'index'])
-            ->middleware('platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_VIEW)->name('index');
-        Route::get('{operator}', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'show'])
-            ->whereNumber('operator')->middleware('platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_VIEW)->name('show');
-        Route::post('/', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'store'])
-            ->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('store');
-        Route::put('{operator}/permissions', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'permissions'])
-            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('permissions');
-        Route::patch('{operator}/activate', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'activate'])
-            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('activate');
-        Route::patch('{operator}/deactivate', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'deactivate'])
-            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('deactivate');
+        Route::get('/', [PlatformOperatorController::class, 'index'])
+            ->middleware('platform.permission:'.PlatformPermission::OPERATORS_VIEW)->name('index');
+        Route::get('{operator}', [PlatformOperatorController::class, 'show'])
+            ->whereNumber('operator')->middleware('platform.permission:'.PlatformPermission::OPERATORS_VIEW)->name('show');
+        Route::post('/', [PlatformOperatorController::class, 'store'])
+            ->middleware([$platformStepUp, 'platform.permission:'.PlatformPermission::OPERATORS_MANAGE])->name('store');
+        Route::put('{operator}/permissions', [PlatformOperatorController::class, 'permissions'])
+            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.PlatformPermission::OPERATORS_MANAGE])->name('permissions');
+        Route::patch('{operator}/activate', [PlatformOperatorController::class, 'activate'])
+            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.PlatformPermission::OPERATORS_MANAGE])->name('activate');
+        Route::patch('{operator}/deactivate', [PlatformOperatorController::class, 'deactivate'])
+            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.PlatformPermission::OPERATORS_MANAGE])->name('deactivate');
     });

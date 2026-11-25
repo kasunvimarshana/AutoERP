@@ -20,14 +20,37 @@ final class PermissionModel extends TenantOwnedModel
 {
     protected $table = 'permissions';
 
+    private static bool $allowCatalogueSync = false;
+
     protected $fillable = [
         'tenant_id', 'row_version', 'name', 'guard_name', 'module', 'description', 'is_active',
     ];
 
+    /**
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public static function allowingCatalogueSync(callable $callback): mixed
+    {
+        $previous = self::$allowCatalogueSync;
+        self::$allowCatalogueSync = true;
+        try {
+            return $callback();
+        } finally {
+            self::$allowCatalogueSync = $previous;
+        }
+    }
+
     protected static function booted(): void
     {
-        static::updating(function (self $permission): void {
-            if ($permission->isDirty(['tenant_id', 'name', 'guard_name', 'module'])) {
+        self::updating(function (self $permission): void {
+            $immutable = self::$allowCatalogueSync
+                ? ['tenant_id', 'name', 'guard_name']
+                : ['tenant_id', 'name', 'guard_name', 'module'];
+
+            if ($permission->isDirty($immutable)) {
                 throw new LogicException('Permission catalogue identity is immutable; synchronize the owning module catalogue instead.');
             }
         });

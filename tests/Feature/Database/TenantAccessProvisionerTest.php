@@ -21,6 +21,7 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
 use Modules\User\Database\Seeders\TenantPermissionSeeder;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class TenantAccessProvisionerTest extends TestCase
@@ -122,6 +123,120 @@ final class TenantAccessProvisionerTest extends TestCase
                 ->where('is_active', true)
                 ->count(),
         );
+        self::assertTrue(app(TenantExecutionContextInterface::class)->runForTenant(
+            $tenantId,
+            static fn (): bool => app(TenantAccessProvisionerInterface::class)->isReady($tenantId, (int) $roleId),
+        ));
+    }
+
+    public function test_provisioning_handles_module_modifications_and_cleans_up_removed_permissions(): void
+    {
+        $tenantId = $this->tenant('ACCESS-SYNC');
+        $executionContext = app(TenantExecutionContextInterface::class);
+        $provisioner = app(TenantAccessProvisionerInterface::class);
+
+        $provisioned = $executionContext->runForTenant(
+            $tenantId,
+            static fn (): array => $provisioner->provision($tenantId),
+        );
+
+        // Simulate a permission whose module/description was refactored in a module update
+        $samplePermissionId = (int) DB::table('permissions')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'users.view')
+            ->value('id');
+        DB::table('permissions')
+            ->where('id', $samplePermissionId)
+            ->update(['module' => 'legacy_user', 'description' => 'Outdated description']);
+
+        // Simulate a removed module/permission that was previously assigned to a custom role and a user
+        $removedPermissionId = (int) DB::table('permissions')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'name' => 'deprecated_module.items.view',
+            'guard_name' => UserGuard::TENANT_API,
+            'module' => 'deprecated_module',
+            'description' => 'Removed module permission.',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $customRoleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'name' => 'Custom Role',
+            'active_name_key' => 'custom role',
+            'guard_name' => UserGuard::TENANT_API,
+            'system_key' => null,
+            'is_system' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('role_permissions')->insert([
+            'tenant_id' => $tenantId,
+            'role_id' => $customRoleId,
+            'permission_id' => $removedPermissionId,
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $userId = TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'email' => 'sync-test@example.test',
+        ]);
+        DB::table('user_permissions')->insert([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'permission_id' => $removedPermissionId,
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Re-provisioning must update the refactored module without throwing LogicException,
+        // deactivate the removed permission, and clean up role_permissions & user_permissions.
+        $executionContext->runForTenant(
+            $tenantId,
+            static fn (): array => $provisioner->provision($tenantId),
+        );
+
+        $this->assertDatabaseHas('permissions', [
+            'id' => $samplePermissionId,
+            'module' => 'user',
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('permissions', [
+            'id' => $removedPermissionId,
+            'is_active' => false,
+        ]);
+        $this->assertDatabaseMissing('role_permissions', [
+            'tenant_id' => $tenantId,
+            'role_id' => $customRoleId,
+            'permission_id' => $removedPermissionId,
+        ]);
+        $this->assertDatabaseMissing('user_permissions', [
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'permission_id' => $removedPermissionId,
+        ]);
+        self::assertTrue($executionContext->runForTenant(
+            $tenantId,
+            static fn (): bool => $provisioner->isReady($tenantId, (int) $provisioned['role_id']),
+        ));
+    }
+
+    public function test_tenant_permissions_sync_artisan_command_synchronizes_all_tenants(): void
+    {
+        $tenantId = $this->tenant('ACCESS-CMD');
+
+        $this->artisan('tenant:permissions:sync', ['--tenant' => $tenantId])
+            ->assertExitCode(0);
+
+        $roleId = DB::table('roles')
+            ->where('tenant_id', $tenantId)
+            ->where('system_key', UserSystemRole::SUPER_ADMIN)
+            ->value('id');
+        self::assertIsNumeric($roleId);
         self::assertTrue(app(TenantExecutionContextInterface::class)->runForTenant(
             $tenantId,
             static fn (): bool => app(TenantAccessProvisionerInterface::class)->isReady($tenantId, (int) $roleId),

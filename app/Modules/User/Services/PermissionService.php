@@ -33,7 +33,7 @@ final class PermissionService extends AbstractUserCrudService
     public function list(array $filters): Result
     {
         try {
-            $this->authorize();
+            $this->authorize(true);
             $query = PermissionModel::query()->where('tenant_id', $this->tenantId())
                 ->where('guard_name', UserGuard::TENANT_API)->where('is_active', true);
             $module = trim((string) ($filters['module'] ?? ''));
@@ -48,6 +48,7 @@ final class PermissionService extends AbstractUserCrudService
             $page = max((int) ($filters['page'] ?? 1), 1);
             $paginator = $query->orderBy('module')->orderBy('name')->paginate($perPage, ['*'], 'page', $page);
             $items = array_map(fn (mixed $permission): DataRecord => $this->record($permission), array_values($paginator->items()));
+
             return Result::success(new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -59,7 +60,8 @@ final class PermissionService extends AbstractUserCrudService
         try {
             $this->authorize();
             $permission = PermissionModel::query()->where('tenant_id', $this->tenantId())
-                ->where('guard_name', UserGuard::TENANT_API)->whereKey($id)->first();
+                ->where('guard_name', UserGuard::TENANT_API)->where('is_active', true)->whereKey($id)->first();
+
             return $permission instanceof PermissionModel ? Result::success($this->record($permission)) : $this->notFound('Permission not found.');
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -70,7 +72,8 @@ final class PermissionService extends AbstractUserCrudService
     public function modules(): Result
     {
         try {
-            $this->authorize();
+            $this->authorize(true);
+
             return Result::success(PermissionModel::query()->where('tenant_id', $this->tenantId())
                 ->where('guard_name', UserGuard::TENANT_API)->where('is_active', true)
                 ->distinct()->orderBy('module')->pluck('module')->map(static fn ($module): string => (string) $module)->all());
@@ -90,9 +93,15 @@ final class PermissionService extends AbstractUserCrudService
         ]);
     }
 
-    private function authorize(): void
+    private function authorize(bool $allowAssignmentLookups = false): void
     {
-        if (! $this->authorization->canCurrent(UserPermission::PERMISSIONS_VIEW)) {
+        $allowed = $this->authorization->canCurrent(UserPermission::PERMISSIONS_VIEW)
+            || ($allowAssignmentLookups && (
+                $this->authorization->canCurrent(UserPermission::ROLES_ASSIGN_PERMISSIONS)
+                || $this->authorization->canCurrent(UserPermission::USERS_ASSIGN_PERMISSIONS)
+            ));
+
+        if (! $allowed) {
             throw new AuthorizationException('Permission catalogue access is not authorized.');
         }
     }
@@ -103,6 +112,7 @@ final class PermissionService extends AbstractUserCrudService
         if ($id === null) {
             throw new RuntimeException('A tenant context is required.');
         }
+
         return $id;
     }
 }

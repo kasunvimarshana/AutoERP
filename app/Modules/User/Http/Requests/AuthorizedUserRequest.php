@@ -19,13 +19,29 @@ abstract class AuthorizedUserRequest extends FormRequest
 {
     abstract protected function requiredPermission(): ?string;
 
-    public function authorize(): bool
+    /** @return list<string> */
+    protected function requiredPermissions(): array
     {
         $permission = $this->requiredPermission();
 
-        return $permission === null
-            ? $this->user() !== null
-            : app(UserAuthorizationService::class)->canCurrent($permission);
+        return $permission === null ? [] : [$permission];
+    }
+
+    public function authorize(): bool
+    {
+        $permissions = $this->requiredPermissions();
+        if ($permissions === []) {
+            return $this->user() !== null;
+        }
+
+        $authorization = app(UserAuthorizationService::class);
+        foreach ($permissions as $permission) {
+            if ($authorization->canCurrent($permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function prepareForValidation(): void

@@ -14,13 +14,18 @@ import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CreateUserPage from './CreateUserPage';
 import PermissionCataloguePage from './PermissionCataloguePage';
+import RoleDetailPage from './RoleDetailPage';
+import RoleEditPage from './RoleEditPage';
+import RoleListPage from './RoleListPage';
 import UserDetailPage from './UserDetailPage';
 import UserListPage from './UserListPage';
 import { accessPermissions } from './accessPermissions';
+import { organizationUnitPermissions } from '@/modules/organization-unit/organizationUnitPermissions';
 const apiMocks = vi.hoisted(() => ({
     archiveUser: vi.fn(),
     createUser: vi.fn(),
     changeUserStatus: vi.fn(),
+    getRole: vi.fn(),
     getUser: vi.fn(),
     getUserPasswordPolicy: vi.fn(),
     listAllOrganizationUnits: vi.fn(),
@@ -28,6 +33,7 @@ const apiMocks = vi.hoisted(() => ({
     listPermissions: vi.fn(),
     listPermissionModules: vi.fn(),
     listAllRoles: vi.fn(),
+    listRoles: vi.fn(),
     listUsers: vi.fn(),
     listUserDocuments: vi.fn(),
     listUserDevices: vi.fn(),
@@ -64,11 +70,16 @@ describe('Access pages', () => {
             accessPermissions.userDocumentsManage,
             accessPermissions.userDevicesManage,
         ]);
-        authState.permissions = Object.values(accessPermissions).filter((permission) => !excludedPermissions.has(permission));
+        authState.permissions = [
+            ...Object.values(accessPermissions).filter((permission) => !excludedPermissions.has(permission)),
+            organizationUnitPermissions.view,
+        ];
         apiMocks.listUsers.mockResolvedValue(collection([accessUser()]));
+        apiMocks.getRole.mockResolvedValue(accessRole());
         apiMocks.getUser.mockResolvedValue(accessUser());
         apiMocks.getUserPasswordPolicy.mockResolvedValue({ minimum_length: 12, mixed_case: true, numbers: true, symbols: true });
         apiMocks.listAllRoles.mockResolvedValue([{ id: 5, row_version: 1, name: 'Manager' }]);
+        apiMocks.listRoles.mockResolvedValue(collection([accessRole()]));
         apiMocks.listAllOrganizationUnits.mockResolvedValue([
             { id: 1, name: 'Head Office', is_default: true },
             { id: 2, name: 'Branch Office', is_default: false },
@@ -142,6 +153,32 @@ describe('Access pages', () => {
         expect(screen.getAllByText('System Defined')).not.toHaveLength(0);
         expect(screen.queryByRole('button', { name: /add|edit|delete/i })).not.toBeInTheDocument();
     });
+    it('skips role and organization unit filter fetches for users.view-only actors on UserListPage', async () => {
+        authState.permissions = [accessPermissions.usersView];
+        renderPage(<UserListPage />, ['/access/users']);
+        expect(await screen.findAllByText('Ada User')).not.toHaveLength(0);
+        expect(apiMocks.listAllRoles).not.toHaveBeenCalled();
+        expect(apiMocks.listAllOrganizationUnits).not.toHaveBeenCalled();
+    });
+    it('allows roles.assign_permissions actors to reach role editing and tracks permission dirty state', async () => {
+        const user = userEvent.setup();
+        authState.permissions = [accessPermissions.rolesView, accessPermissions.rolesAssignPermissions];
+
+        renderPage(<RoleListPage />, ['/access/roles']);
+        const editLinks = await screen.findAllByRole('link', { name: 'Edit' });
+        expect(editLinks.length).toBeGreaterThan(0);
+        expect(editLinks[0]).toHaveAttribute('href', '/access/roles/5/edit');
+
+        renderPage(<RoutePage page={<RoleDetailPage />} path="/access/roles/:id" />, ['/access/roles/5']);
+        expect(await screen.findAllByRole('link', { name: 'Edit' })).not.toHaveLength(0);
+
+        renderPage(<RoutePage page={<RoleEditPage />} path="/access/roles/:id/edit" />, ['/access/roles/5/edit']);
+        const savePermissionsButton = await screen.findByRole('button', { name: 'Save Permissions' });
+        expect(savePermissionsButton).toBeDisabled();
+
+        await user.click(screen.getByRole('checkbox'));
+        expect(savePermissionsButton).toBeEnabled();
+    });
 });
 function RoutePage({ page, path }: { page: ReactElement; path: string }) {
     return (
@@ -174,6 +211,19 @@ function accessUser() {
         default_organization_unit_id: 1,
         credentials_ready: true,
         last_login_at: '2026-06-17T10:00:00.000000Z',
+    };
+}
+function accessRole() {
+    return {
+        id: 5,
+        row_version: 1,
+        name: 'Manager',
+        description: 'Branch manager role',
+        system_key: null,
+        is_system: false,
+        assigned_users_count: 1,
+        permissions_count: 0,
+        permissions: [],
     };
 }
 function collection<T>(data: T[]) {

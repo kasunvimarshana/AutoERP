@@ -70,7 +70,7 @@ abstract class AbstractUserCrudService
         if (str_contains($lowerMessage, 'not found')) {
             return $this->failure(UserErrorCode::NOT_FOUND, $message);
         }
-        if (str_contains($lowerMessage, 'already exists') || str_contains($lowerMessage, 'cannot be') || str_contains($lowerMessage, 'before archiving') || str_contains($lowerMessage, 'immutable')) {
+        if (str_contains($lowerMessage, 'already exists') || str_contains($lowerMessage, 'cannot be') || str_contains($lowerMessage, 'before archiving') || str_contains($lowerMessage, 'immutable') || str_contains($lowerMessage, 'system role permissions')) {
             return $this->failure(UserErrorCode::CONFLICT, $message);
         }
 

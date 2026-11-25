@@ -33,6 +33,8 @@ export default function RoleDetailPage() {
     const [deleting, setDeleting] = useState(false);
     const role = useApi((signal) => accessApi.getRole(String(id), signal), [id], Boolean(id));
     const canUpdate = hasAccessPermission(auth, accessPermissions.rolesUpdate);
+    const canAssignPermissions = hasAccessPermission(auth, accessPermissions.rolesAssignPermissions);
+    const canEdit = canUpdate || canAssignPermissions;
     const canDelete = hasAccessPermission(auth, accessPermissions.rolesDelete);
 
     const deleteRole = async (record: AccessRole) => {
@@ -58,7 +60,7 @@ export default function RoleDetailPage() {
                 actions={(
                     <>
                         <Button variant="secondary" onClick={() => navigate('/access/roles')}>Back</Button>
-                        {record && canUpdate && !record.is_system && <LinkButton variant="secondary" to={`/access/roles/${record.id}/edit`}>Edit</LinkButton>}
+                        {record && canEdit && !record.is_system && <LinkButton variant="secondary" to={`/access/roles/${record.id}/edit`}>Edit</LinkButton>}
                         {record && canDelete && !record.is_system && <Button variant="danger" loading={deleting} onClick={() => void deleteRole(record)}>Delete</Button>}
                     </>
                 )}
