@@ -12,13 +12,13 @@ declare(strict_types=1);
 
 namespace Modules\Payroll\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
+use Modules\Core\Models\TenantOwnedModel;
 use Modules\Payroll\Enums\LoanRepaymentStatus;
 use Modules\Payroll\Models\Concerns\ScopesPayrollTenant;
 
-final class PayrollLoanRepayment extends Model
+final class PayrollLoanRepayment extends TenantOwnedModel
 {
     use ScopesPayrollTenant;
 
@@ -29,15 +29,37 @@ final class PayrollLoanRepayment extends Model
     protected $casts = [
         'status' => LoanRepaymentStatus::class,
         'repayment_date' => 'date',
-        'principal_amount' => 'decimal:4',
-        'interest_amount' => 'decimal:4',
-        'total_repaid' => 'decimal:4',
-        'balance_after' => 'decimal:4',
+        'principal_amount' => 'decimal:6',
+        'interest_amount' => 'decimal:6',
+        'total_repaid' => 'decimal:6',
+        'balance_after' => 'decimal:6',
         'row_version' => 'integer',
     ];
 
     protected static function booted(): void
     {
+        parent::booted();
+
+        self::updating(function (self $repayment): void {
+            $originalStatus = $repayment->getOriginal('status');
+            $originalStatusEnum = $originalStatus instanceof LoanRepaymentStatus
+                ? $originalStatus
+                : LoanRepaymentStatus::tryFrom((string) ($originalStatus ?? $repayment->getRawOriginal('status')));
+
+            if ($originalStatusEnum === LoanRepaymentStatus::Deducted) {
+                $allowedDirty = ['status', 'notes', 'row_version', 'updated_at'];
+                $disallowed = array_diff(array_keys($repayment->getDirty()), $allowedDirty);
+
+                if ($disallowed !== []) {
+                    throw new LogicException('Deducted loan repayment records are immutable audit records and cannot have their amounts or references modified.');
+                }
+            }
+
+            if (! $repayment->isDirty('row_version')) {
+                $repayment->row_version = ((int) $repayment->getOriginal('row_version', 1)) + 1;
+            }
+        });
+
         self::deleting(function (self $repayment): void {
             if ($repayment->status === LoanRepaymentStatus::Deducted) {
                 throw new LogicException('Deducted loan repayment records are immutable audit records and cannot be deleted.');

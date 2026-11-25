@@ -28,6 +28,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->unsignedInteger('sort_order')->default(0);
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->softDeletes();
             $table->unique(['tenant_id', 'code'], 'hr_departments_tenant_code_uk');

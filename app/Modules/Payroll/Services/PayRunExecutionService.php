@@ -65,11 +65,12 @@ final class PayRunExecutionService
         ]);
     }
 
-    public function calculatePayRun(int $payRunId, int $userId): PayrollPayRun
+    public function calculatePayRun(int $payRunId, int $userId, ?int $expectedVersion = null): PayrollPayRun
     {
-        return DB::transaction(function () use ($payRunId, $userId): PayrollPayRun {
+        return DB::transaction(function () use ($payRunId, $userId, $expectedVersion): PayrollPayRun {
             /** @var PayrollPayRun $payRun */
             $payRun = PayrollPayRun::query()->with(['period'])->lockForUpdate()->findOrFail($payRunId);
+            $this->assertExpectedVersion($payRun, $expectedVersion);
 
             if (in_array($payRun->status, [PayRunStatus::Approved, PayRunStatus::Paid, PayRunStatus::Reversed], true)) {
                 throw new LogicException(sprintf('Cannot recalculate a pay run with status "%s".', $payRun->status->value));
@@ -81,10 +82,21 @@ final class PayRunExecutionService
             }
 
             // Remove existing draft payslips and line items
-            PayrollPayslip::query()
+            $draftPayslipIds = PayrollPayslip::query()
                 ->where('pay_run_id', $payRun->id)
                 ->where('status', PayslipStatus::Draft->value)
-                ->delete();
+                ->pluck('id');
+
+            if ($draftPayslipIds->isNotEmpty()) {
+                PayrollPayslipItem::query()
+                    ->where('tenant_id', $payRun->tenant_id)
+                    ->whereIn('payslip_id', $draftPayslipIds)
+                    ->delete();
+
+                PayrollPayslip::query()
+                    ->whereIn('id', $draftPayslipIds)
+                    ->delete();
+            }
 
             // Query active salary assignments for this tenant
             $query = PayrollEmployeeSalaryAssignment::query()
@@ -200,11 +212,12 @@ final class PayRunExecutionService
         });
     }
 
-    public function approvePayRun(int $payRunId, int $userId): PayrollPayRun
+    public function approvePayRun(int $payRunId, int $userId, ?int $expectedVersion = null): PayrollPayRun
     {
-        return DB::transaction(function () use ($payRunId, $userId): PayrollPayRun {
+        return DB::transaction(function () use ($payRunId, $userId, $expectedVersion): PayrollPayRun {
             /** @var PayrollPayRun $payRun */
             $payRun = PayrollPayRun::query()->lockForUpdate()->findOrFail($payRunId);
+            $this->assertExpectedVersion($payRun, $expectedVersion);
 
             if ($payRun->status !== PayRunStatus::Calculated && $payRun->status !== PayRunStatus::Verified) {
                 throw new LogicException(sprintf('Pay run in status "%s" cannot be approved.', $payRun->status->value));
@@ -225,11 +238,12 @@ final class PayRunExecutionService
         });
     }
 
-    public function payPayRun(int $payRunId, int $userId): PayrollPayRun
+    public function payPayRun(int $payRunId, int $userId, ?int $expectedVersion = null): PayrollPayRun
     {
-        return DB::transaction(function () use ($payRunId, $userId): PayrollPayRun {
+        return DB::transaction(function () use ($payRunId, $userId, $expectedVersion): PayrollPayRun {
             /** @var PayrollPayRun $payRun */
             $payRun = PayrollPayRun::query()->with(['period'])->lockForUpdate()->findOrFail($payRunId);
+            $this->assertExpectedVersion($payRun, $expectedVersion);
 
             if ($payRun->status !== PayRunStatus::Approved) {
                 throw new LogicException(sprintf('Only approved pay runs can be paid. Current status: "%s".', $payRun->status->value));
@@ -290,11 +304,12 @@ final class PayRunExecutionService
         });
     }
 
-    public function reversePayRun(int $payRunId, int $userId, string $reason): PayrollPayRun
+    public function reversePayRun(int $payRunId, int $userId, string $reason, ?int $expectedVersion = null): PayrollPayRun
     {
-        return DB::transaction(function () use ($payRunId, $userId, $reason): PayrollPayRun {
+        return DB::transaction(function () use ($payRunId, $userId, $reason, $expectedVersion): PayrollPayRun {
             /** @var PayrollPayRun $payRun */
             $payRun = PayrollPayRun::query()->with(['period'])->lockForUpdate()->findOrFail($payRunId);
+            $this->assertExpectedVersion($payRun, $expectedVersion);
 
             if (! in_array($payRun->status, [PayRunStatus::Approved, PayRunStatus::Paid], true)) {
                 throw new LogicException(sprintf('Only approved or paid pay runs can be reversed. Current status: "%s".', $payRun->status->value));
@@ -338,5 +353,12 @@ final class PayRunExecutionService
 
             return $payRun->fresh();
         });
+    }
+
+    private function assertExpectedVersion(PayrollPayRun $payRun, ?int $expectedVersion): void
+    {
+        if ($expectedVersion !== null && (int) $payRun->row_version !== $expectedVersion) {
+            abort(409, 'Pay run was changed by someone else. Reload before saving.');
+        }
     }
 }

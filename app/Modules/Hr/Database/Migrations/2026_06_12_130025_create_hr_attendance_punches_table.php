@@ -42,6 +42,7 @@ return new class extends Migration
             $table->boolean('is_verified')->default(true);
             $table->boolean('is_ignored')->default(false);
             $table->string('notes', 255)->nullable();
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'hr_att_punches_id_tenant_uk');
@@ -49,10 +50,10 @@ return new class extends Migration
             $table->index(['attendance_record_id', 'is_ignored'], 'hr_att_punches_rec_ignore_ix');
             $table->index(['tenant_id', 'idempotency_hash'], 'hr_att_punches_tenant_hash_ix');
 
-            $table->foreign('attendance_record_id', 'hr_att_punches_record_fk')
-                ->references('id')
+            $table->foreign(['attendance_record_id', 'tenant_id'], 'hr_att_punches_record_tenant_fk')
+                ->references(['id', 'tenant_id'])
                 ->on('hr_attendance_records')
-                ->nullOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['employee_id', 'tenant_id'], 'hr_att_punches_employee_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('hr_employees')

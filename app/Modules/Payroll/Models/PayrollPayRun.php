@@ -40,8 +40,27 @@ final class PayrollPayRun extends TenantOwnedModel
                 || in_array($originalStatus, [PayRunStatus::Approved->value, PayRunStatus::Paid->value], true)
                 || in_array($payRun->getRawOriginal('status'), [PayRunStatus::Approved->value, PayRunStatus::Paid->value], true);
 
-            if ($isFinalized && ! $payRun->isDirty('status') && ! $payRun->isDirty(['paid_at', 'paid_by', 'reversed_at', 'reversed_by', 'reversal_reason', 'finance_journal_id'])) {
-                throw new LogicException('Approved or Paid pay runs cannot have their operational totals modified in place.');
+            if ($isFinalized) {
+                $allowedDirty = [
+                    'status',
+                    'paid_at',
+                    'paid_by',
+                    'reversed_at',
+                    'reversed_by',
+                    'reversal_reason',
+                    'finance_journal_id',
+                    'row_version',
+                    'updated_at',
+                ];
+                $disallowed = array_diff(array_keys($payRun->getDirty()), $allowedDirty);
+
+                if ($disallowed !== []) {
+                    throw new LogicException('Approved or Paid pay runs cannot have their operational totals modified in place.');
+                }
+            }
+
+            if (! $payRun->isDirty('row_version')) {
+                $payRun->row_version = ((int) $payRun->getOriginal('row_version', 1)) + 1;
             }
         });
 
@@ -66,12 +85,12 @@ final class PayrollPayRun extends TenantOwnedModel
             'salary_structure_id' => 'integer',
             'pay_run_type' => PayRunType::class,
             'status' => PayRunStatus::class,
-            'total_gross_pay' => 'decimal:4',
-            'total_deductions' => 'decimal:4',
-            'total_employee_statutory' => 'decimal:4',
-            'total_employer_statutory' => 'decimal:4',
-            'total_tax' => 'decimal:4',
-            'total_net_pay' => 'decimal:4',
+            'total_gross_pay' => 'decimal:6',
+            'total_deductions' => 'decimal:6',
+            'total_employee_statutory' => 'decimal:6',
+            'total_employer_statutory' => 'decimal:6',
+            'total_tax' => 'decimal:6',
+            'total_net_pay' => 'decimal:6',
             'total_employees' => 'integer',
             'calculated_by' => 'integer',
             'calculated_at' => 'datetime',

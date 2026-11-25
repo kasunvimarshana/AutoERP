@@ -26,7 +26,7 @@ return new class extends Migration
             $table->string('code', 32);
             $table->string('name', 100);
             $table->unsignedSmallInteger('effective_year');
-            $table->decimal('standard_personal_relief', 15, 4)->default('0.0000');
+            $table->decimal('standard_personal_relief', 20, 6)->default('0.000000');
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 

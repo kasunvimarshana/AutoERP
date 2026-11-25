@@ -26,7 +26,7 @@ return new class extends Migration
             $table->unsignedBigInteger('salary_structure_id');
             $table->unsignedBigInteger('salary_component_id');
             $table->string('calculation_type', 32); // fixed, percentage, formula
-            $table->decimal('amount_or_rate', 15, 4)->default('0.0000');
+            $table->decimal('amount_or_rate', 20, 6)->default('0.000000');
             $table->unsignedBigInteger('percentage_basis_component_id')->nullable();
             $table->string('formula_expression', 255)->nullable();
             $table->unsignedSmallInteger('sort_order')->default(0);
@@ -39,7 +39,7 @@ return new class extends Migration
             $table->foreign(['salary_structure_id', 'tenant_id'], 'payroll_structure_items_structure_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payroll_salary_structures')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreign(['salary_component_id', 'tenant_id'], 'payroll_structure_items_component_fk')
                 ->references(['id', 'tenant_id'])

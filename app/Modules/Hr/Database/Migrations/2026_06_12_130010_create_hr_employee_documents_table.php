@@ -38,6 +38,7 @@ return new class extends Migration
             $table->string('file_path', 500)->nullable();
             $table->string('status')->default('pending');
             $table->text('notes')->nullable();
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->softDeletes();
             $table->index(['tenant_id', 'employee_id'], 'hr_employee_documents_scope_ix');

@@ -26,13 +26,13 @@ return new class extends Migration
             $table->unsignedBigInteger('employee_id');
             $table->string('loan_reference', 64);
             $table->string('loan_type', 32); // loan, advance
-            $table->decimal('principal_amount', 15, 4);
+            $table->decimal('principal_amount', 20, 6);
             $table->decimal('annual_interest_rate', 5, 2)->default(0.00);
             $table->unsignedInteger('term_months')->default(1);
-            $table->decimal('monthly_installment', 15, 4);
-            $table->decimal('total_payable', 15, 4);
-            $table->decimal('total_paid', 15, 4)->default(0.0000);
-            $table->decimal('balance_remaining', 15, 4);
+            $table->decimal('monthly_installment', 20, 6);
+            $table->decimal('total_payable', 20, 6);
+            $table->decimal('total_paid', 20, 6)->default('0.000000');
+            $table->decimal('balance_remaining', 20, 6);
             $table->date('disbursed_date')->nullable();
             $table->unsignedBigInteger('deduction_start_period_id')->nullable();
             $table->string('status', 32)->default('draft'); // draft, approved, active, completed, cancelled

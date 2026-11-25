@@ -21,7 +21,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_reassignments', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vrr_tenant_fk')->restrictOnDelete();
             $table->string('reassignment_type', 32);
             $table->foreignId('customer_agreement_id')->nullable();
             $table->foreignId('vehicle_use_id')->nullable();

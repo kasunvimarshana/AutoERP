@@ -57,28 +57,30 @@ export function OwnerSettlementModal({
     const activeAgreementRef = ownerAgreementReference ?? selectedAgreement?.name;
 
     useEffect(() => {
-        if (!open) {
-            setGeneratedBill(null);
-            setError(null);
-            setSubmitting(false);
-            return;
-        }
+        queueMicrotask(() => {
+            if (!open) {
+                setGeneratedBill(null);
+                setError(null);
+                setSubmitting(false);
+                return;
+            }
 
-        if (ownerAgreementId) {
-            setSelectedAgreement({
-                id: ownerAgreementId,
-                name: ownerAgreementReference || `Agreement #${ownerAgreementId}`,
-            });
-        } else {
-            setSelectedAgreement(null);
-        }
+            if (ownerAgreementId) {
+                setSelectedAgreement({
+                    id: ownerAgreementId,
+                    name: ownerAgreementReference || `Agreement #${ownerAgreementId}`,
+                });
+            } else {
+                setSelectedAgreement(null);
+            }
 
-        setStartDate(defaultStartDate ?? startOfMonth);
-        setEndDate(defaultEndDate ?? today);
-        setInvoiceDate(today);
-        setDueDate('');
-        setWhtRate('10');
-    }, [open, ownerAgreementId, ownerAgreementReference, defaultStartDate, defaultEndDate]);
+            setStartDate(defaultStartDate ?? startOfMonth);
+            setEndDate(defaultEndDate ?? today);
+            setInvoiceDate(today);
+            setDueDate('');
+            setWhtRate('10');
+        });
+    }, [open, ownerAgreementId, ownerAgreementReference, defaultStartDate, defaultEndDate, startOfMonth, today]);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();

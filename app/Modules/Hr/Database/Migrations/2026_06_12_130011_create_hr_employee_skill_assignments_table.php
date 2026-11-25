@@ -35,6 +35,7 @@ return new class extends Migration
             $table->string('proficiency_level');
             $table->decimal('years_of_experience', 20, 6)->default('0.000000');
             $table->boolean('is_primary')->default(false);
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->unique(['employee_id', 'skill_id'], 'hr_employee_skills_uk');
             $table->index(['tenant_id', 'skill_id'], 'hr_employee_skills_lookup_ix');

@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
@@ -76,7 +76,9 @@ export function BillingCycleWizardModal({
     // Attach Charts State
     const [candidateCharts, setCandidateCharts] = useState<EligibleRunningChart[]>([]);
     const [candidateLoading, setCandidateLoading] = useState(false);
-    const [selectedChartIds, setSelectedChartIds] = useState<Set<number>>(new Set());
+    const [selectedChartIds, setSelectedChartIds] = useState<Set<number>>(
+        () => new Set(initialCycle?.charts?.map(c => c.running_chart_id) ?? [])
+    );
 
     // Add Item State
     const [itemType, setItemType] = useState<'addition' | 'deduction'>('addition');
@@ -90,22 +92,29 @@ export function BillingCycleWizardModal({
     // Finalize / Preview State
     const [preview, setPreview] = useState<BillingCyclePreview | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
-    const [finalizeMode, setFinalizeMode] = useState<'supplementary' | 'consolidated'>('supplementary');
+    const [finalizeMode, setFinalizeMode] = useState<'supplementary' | 'consolidated'>(
+        () => (initialCycle?.finalization_mode as 'supplementary' | 'consolidated') || 'supplementary'
+    );
     const [finalInvoiceDate, setFinalInvoiceDate] = useState(today);
     const [finalDueDate, setFinalDueDate] = useState('');
 
+    const prevInitialCycleIdRef = useRef(initialCycle?.id);
     useEffect(() => {
-        setCurrentCycle(initialCycle ?? null);
-        if (initialCycle) {
-            setActiveTab('overview');
-            setFinalizeMode((initialCycle.finalization_mode as 'supplementary' | 'consolidated') || 'supplementary');
-            if (initialCycle.charts) {
-                setSelectedChartIds(new Set(initialCycle.charts.map(c => c.running_chart_id)));
+        if (prevInitialCycleIdRef.current === initialCycle?.id) return;
+        prevInitialCycleIdRef.current = initialCycle?.id;
+        queueMicrotask(() => {
+            setCurrentCycle(initialCycle ?? null);
+            if (initialCycle) {
+                setActiveTab('overview');
+                setFinalizeMode((initialCycle.finalization_mode as 'supplementary' | 'consolidated') || 'supplementary');
+                if (initialCycle.charts) {
+                    setSelectedChartIds(new Set(initialCycle.charts.map(c => c.running_chart_id)));
+                }
+            } else {
+                setPeriodFrom(agreement.starts_on ?? today);
+                setPeriodUntil(agreement.ends_on ?? today);
             }
-        } else {
-            setPeriodFrom(agreement.starts_on ?? today);
-            setPeriodUntil(agreement.ends_on ?? today);
-        }
+        });
     }, [initialCycle, agreement, today]);
 
     const cur = agreement.currency.code;

@@ -22,7 +22,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_running_charts', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vrc_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('vehicle_use_id');
             $table->unsignedBigInteger('vehicle_use_version');

@@ -15,7 +15,9 @@ namespace Modules\Payroll\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Finance\Contracts\FinancePostingInterface;
+use Modules\Finance\Contracts\FinanceSourceReversalInterface;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\Enums\JournalStatus;
@@ -27,6 +29,7 @@ use Modules\Hr\Enums\EmployeeStatus;
 use Modules\Hr\Services\EmployeeCreationService;
 use Modules\Hr\Services\HrDepartmentService;
 use Modules\Payroll\Enums\PayRunStatus;
+use Modules\User\Constants\UserGuard;
 use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\OrganizationUnitFixture;
@@ -68,6 +71,18 @@ final class PayrollApiTest extends TestCase
 
         TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
+        $provisioned = $this->withTenantExecutionContext(
+            $tenantId,
+            static fn (): array => app(TenantAccessProvisionerInterface::class)->provision($tenantId),
+        );
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'role_id' => $provisioned['role_id'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $orgUnitId,
             'identifier' => $email,
@@ -95,7 +110,7 @@ final class PayrollApiTest extends TestCase
             'total_credit' => '100000.000000',
         ]));
 
-        $fakeFinance = new class($journal->id) implements FinancePostingInterface
+        $fakeFinance = new class($journal->id) implements FinancePostingInterface, FinanceSourceReversalInterface
         {
             public bool $reversed = false;
 
@@ -124,9 +139,25 @@ final class PayrollApiTest extends TestCase
 
                 return new PostingResultData($this->journalId, 'JRN-REV-101', 'reversed', '100000.000000', '100000.000000');
             }
+
+            public function reverseSource(
+                int $tenantId,
+                ?int $organizationUnitId,
+                string $sourceModule,
+                string $sourceType,
+                int $sourceId,
+                string $reversalDate,
+                ?int $reversedBy = null,
+                ?string $reason = null,
+            ): PostingResultData {
+                $this->reversed = true;
+
+                return new PostingResultData($this->journalId, 'JRN-REV-101', 'reversed', '100000.000000', '100000.000000');
+            }
         };
 
         $this->app->instance(FinancePostingInterface::class, $fakeFinance);
+        $this->app->instance(FinanceSourceReversalInterface::class, $fakeFinance);
 
         // 1. Create Component via API
         $compResp = $this->withHeaders($headers)->postJson('/api/v1/payroll/components', [
@@ -214,27 +245,49 @@ final class PayrollApiTest extends TestCase
         $payRunResp->assertStatus(201);
         $payRunId = $payRunResp->json('data.id');
 
-        // 7. Calculate Pay Run via API
+        // 7. Calculate Pay Run via API (with optimistic concurrency check)
+        $payRunVersion = (int) $payRunResp->json('data.row_version');
+        $this->withHeaders($headers)->postJson("/api/v1/payroll/pay-runs/{$payRunId}/calculate", [
+            'tenant_id' => $tenantId,
+            'expected_version' => $payRunVersion + 99,
+        ])->assertStatus(409);
+
         $calcResp = $this->withHeaders($headers)->postJson("/api/v1/payroll/pay-runs/{$payRunId}/calculate", [
             'tenant_id' => $tenantId,
+            'expected_version' => $payRunVersion,
         ]);
         $calcResp->assertStatus(200);
         $this->assertSame(PayRunStatus::Calculated->value, $calcResp->json('data.status'));
         $this->assertSame(1, $calcResp->json('data.total_employees'));
+        $payRunVersion = (int) $calcResp->json('data.row_version');
+
+        // 7b. Recalculate Pay Run (verifies draft payslip + item replacement under restrictOnDelete)
+        $recalcResp = $this->withHeaders($headers)->postJson("/api/v1/payroll/pay-runs/{$payRunId}/calculate", [
+            'tenant_id' => $tenantId,
+            'expected_version' => $payRunVersion,
+        ]);
+        $recalcResp->assertStatus(200);
+        $this->assertSame(PayRunStatus::Calculated->value, $recalcResp->json('data.status'));
+        $this->assertSame(1, $recalcResp->json('data.total_employees'));
+        $payRunVersion = (int) $recalcResp->json('data.row_version');
 
         // 8. Approve Pay Run
         $appResp = $this->withHeaders($headers)->postJson("/api/v1/payroll/pay-runs/{$payRunId}/approve", [
             'tenant_id' => $tenantId,
+            'expected_version' => $payRunVersion,
         ]);
         $appResp->assertStatus(200);
         $this->assertSame(PayRunStatus::Approved->value, $appResp->json('data.status'));
+        $payRunVersion = (int) $appResp->json('data.row_version');
 
         // 9. Pay and Post to GL
         $payResp = $this->withHeaders($headers)->postJson("/api/v1/payroll/pay-runs/{$payRunId}/pay", [
             'tenant_id' => $tenantId,
+            'expected_version' => $payRunVersion,
         ]);
         $payResp->assertStatus(200);
         $this->assertSame(PayRunStatus::Paid->value, $payResp->json('data.status'));
+        $payRunVersion = (int) $payResp->json('data.row_version');
 
         // 10. List Payslips
         $slipResp = $this->withHeaders($headers)->getJson("/api/v1/payroll/payslips?tenant_id={$tenantId}&pay_run_id={$payRunId}");
@@ -250,6 +303,7 @@ final class PayrollApiTest extends TestCase
         // 12. Reverse Pay Run
         $revResp = $this->withHeaders($headers)->postJson("/api/v1/payroll/pay-runs/{$payRunId}/reverse", [
             'tenant_id' => $tenantId,
+            'expected_version' => $payRunVersion,
             'reason' => 'Audit review reversal',
         ]);
         $revResp->assertStatus(200);
@@ -297,6 +351,129 @@ final class PayrollApiTest extends TestCase
             'target_pay_period_id' => $periodId,
         ]);
         $retroResp->assertStatus(200);
+
+        // 15. Unprivileged user is rejected with 403 by tenant.permission middleware
+        $unprivEmail = 'payroll-unpriv-'.Str::lower(Str::random(8)).'@example.test';
+        $unprivUserId = TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'email' => $unprivEmail,
+            'password' => 'secret-password',
+        ]);
+        DB::table('user_organization_units')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $orgUnitId,
+            'user_id' => $unprivUserId,
+            'status' => 'active',
+            'is_default' => true,
+            'default_marker' => 'default',
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        TenantAuthenticationFixture::provision($tenantId, $unprivUserId, $unprivEmail);
+        $unprivToken = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
+            'organization_unit_id' => $orgUnitId,
+            'identifier' => $unprivEmail,
+            'password' => 'secret-password',
+        ])->assertOk()->json('token');
+
+        $this->withHeaders([
+            'Authorization' => "Bearer {$unprivToken}",
+            'X-Tenant-Id' => (string) $tenantId,
+        ])->getJson("/api/v1/payroll/components?tenant_id={$tenantId}")->assertStatus(403);
+
+        // 16. Granular permission check: user with only payroll.view can read pay-runs but cannot create/calculate
+        $viewEmail = 'payroll-view-'.Str::lower(Str::random(8)).'@example.test';
+        $viewUserId = TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'email' => $viewEmail,
+            'password' => 'secret-password',
+        ]);
+        DB::table('user_organization_units')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $orgUnitId,
+            'user_id' => $viewUserId,
+            'status' => 'active',
+            'is_default' => true,
+            'default_marker' => 'default',
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        TenantAuthenticationFixture::provision($tenantId, $viewUserId, $viewEmail);
+        $guardName = UserGuard::TENANT_API;
+        $roleName = 'Payroll View Only '.Str::upper(Str::random(4));
+        $viewOnlyRoleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => $roleName,
+            'active_name_key' => Str::lower($roleName),
+            'guard_name' => $guardName,
+            'is_system' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $viewPermId = (int) DB::table('permissions')
+            ->where('tenant_id', $tenantId)
+            ->where('guard_name', $guardName)
+            ->where('name', 'payroll.view')
+            ->value('id');
+        DB::table('role_permissions')->insert([
+            'tenant_id' => $tenantId,
+            'role_id' => $viewOnlyRoleId,
+            'permission_id' => $viewPermId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'user_id' => $viewUserId,
+            'role_id' => $viewOnlyRoleId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $viewToken = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
+            'organization_unit_id' => $orgUnitId,
+            'identifier' => $viewEmail,
+            'password' => 'secret-password',
+        ])->assertOk()->json('token');
+
+        $this->withHeaders([
+            'Authorization' => "Bearer {$viewToken}",
+            'X-Tenant-Id' => (string) $tenantId,
+        ])->getJson("/api/v1/payroll/pay-runs?tenant_id={$tenantId}")->assertOk();
+
+        $this->withHeaders([
+            'Authorization' => "Bearer {$viewToken}",
+            'X-Tenant-Id' => (string) $tenantId,
+        ])->postJson("/api/v1/payroll/pay-runs?tenant_id={$tenantId}", [
+            'pay_period_id' => $periodId,
+            'salary_structure_id' => $structId,
+        ])->assertStatus(403);
+
+        // 16. Soft-delete an unused Salary Structure and verify child items remain intact for audit
+        $tempStructResp = $this->withHeaders($headers)->postJson('/api/v1/payroll/structures', [
+            'tenant_id' => $tenantId,
+            'code' => 'TEMP-DEL',
+            'name' => 'Temporary Structure',
+            'cycle_type' => 'monthly',
+            'items' => [
+                [
+                    'salary_component_id' => $compId,
+                    'calculation_type' => 'fixed',
+                    'amount_or_rate' => 5000,
+                    'sort_order' => 1,
+                ],
+            ],
+        ]);
+        $tempStructResp->assertStatus(201);
+        $tempStructId = (int) $tempStructResp->json('data.id');
+
+        $this->withHeaders($headers)
+            ->deleteJson("/api/v1/payroll/structures/{$tempStructId}?tenant_id={$tenantId}")
+            ->assertOk();
+
+        $this->assertSoftDeleted('payroll_salary_structures', ['id' => $tempStructId]);
+        $this->assertDatabaseHas('payroll_salary_structure_items', ['salary_structure_id' => $tempStructId]);
     }
 
     private function scope(): array

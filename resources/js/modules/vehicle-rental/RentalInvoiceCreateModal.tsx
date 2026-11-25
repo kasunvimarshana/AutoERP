@@ -56,18 +56,21 @@ export function RentalInvoiceCreateModal({
     const [createdBaseInvoice, setCreatedBaseInvoice] = useState<{ id: number; invoice_number: string; grand_total: string } | null>(null);
 
     useEffect(() => {
-        setMode(initialMode);
+        queueMicrotask(() => setMode(initialMode));
     }, [initialMode]);
 
     useEffect(() => {
         if (!selectedLookup) {
-            setAgreement(null);
+            queueMicrotask(() => setAgreement(null));
             return;
         }
 
         let active = true;
-        setLoadingAgreement(true);
-        setError(null);
+        queueMicrotask(() => {
+            if (!active) return;
+            setLoadingAgreement(true);
+            setError(null);
+        });
 
         getAgreement(AgreementKind.Customer, selectedLookup.id)
             .then(ag => {

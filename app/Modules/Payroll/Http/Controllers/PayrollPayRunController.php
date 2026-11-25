@@ -74,10 +74,15 @@ final class PayrollPayRunController
 
     public function calculate(PayrollRequest $request, int $id): JsonResponse
     {
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
         $payRun = PayrollPayRun::query()->where('tenant_id', $request->tenantId())->findOrFail($id);
         $userId = (int) $request->currentUserId();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $updated = $this->executionService->calculatePayRun((int) $payRun->id, $userId);
+        $updated = $this->executionService->calculatePayRun((int) $payRun->id, $userId, $expectedVersion);
 
         return response()->json([
             'message' => 'Pay run calculated successfully.',
@@ -87,10 +92,15 @@ final class PayrollPayRunController
 
     public function approve(PayrollRequest $request, int $id): JsonResponse
     {
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
         $payRun = PayrollPayRun::query()->where('tenant_id', $request->tenantId())->findOrFail($id);
         $userId = (int) $request->currentUserId();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $updated = $this->executionService->approvePayRun((int) $payRun->id, $userId);
+        $updated = $this->executionService->approvePayRun((int) $payRun->id, $userId, $expectedVersion);
 
         return response()->json([
             'message' => 'Pay run approved successfully.',
@@ -100,10 +110,15 @@ final class PayrollPayRunController
 
     public function pay(PayrollRequest $request, int $id): JsonResponse
     {
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
         $payRun = PayrollPayRun::query()->where('tenant_id', $request->tenantId())->findOrFail($id);
         $userId = (int) $request->currentUserId();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $updated = $this->executionService->payPayRun((int) $payRun->id, $userId);
+        $updated = $this->executionService->payPayRun((int) $payRun->id, $userId, $expectedVersion);
 
         return response()->json([
             'message' => 'Pay run finalized and posted to General Ledger.',
@@ -115,12 +130,14 @@ final class PayrollPayRunController
     {
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
         ]);
 
         $payRun = PayrollPayRun::query()->where('tenant_id', $request->tenantId())->findOrFail($id);
         $userId = (int) $request->currentUserId();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $updated = $this->executionService->reversePayRun((int) $payRun->id, $userId, $validated['reason']);
+        $updated = $this->executionService->reversePayRun((int) $payRun->id, $userId, $validated['reason'], $expectedVersion);
 
         return response()->json([
             'message' => 'Pay run and linked GL journals reversed successfully.',

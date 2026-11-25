@@ -21,7 +21,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_billing_cycles', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vrbc_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->string('cycle_number', 64);
             $table->foreignId('customer_agreement_id')->nullable();
@@ -47,7 +47,7 @@ return new class extends Migration
             $table->decimal('tax_amount', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(0);
             $table->decimal('total_billed_amount', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(0);
             $table->decimal('total_paid_amount', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(0);
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'vrbc_currency_fk')->restrictOnDelete();
             $table->decimal('exchange_rate', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->default(1);
             $table->text('notes')->nullable();
             $table->foreignId('created_by')->nullable();

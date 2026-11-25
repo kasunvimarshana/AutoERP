@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '@/shared/components/Modal';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
@@ -134,40 +134,45 @@ export function AgreementPaymentModal({
     const sourceInvoices = showCrossAgreement ? crossInvoices : openInvoices;
 
     // Filter candidate invoices with positive balance
-    const eligibleInvoices = sourceInvoices.filter(
-        d => d.invoice_type !== 'credit' && Number(d.balance_due) > 0 && d.status !== 'draft' && d.status !== 'voided'
+    const eligibleInvoices = useMemo(
+        () => sourceInvoices.filter(
+            d => d.invoice_type !== 'credit' && Number(d.balance_due) > 0 && d.status !== 'draft' && d.status !== 'voided'
+        ),
+        [sourceInvoices]
     );
 
     // Initialize allocations on modal open or when initialInvoiceId is passed
     useEffect(() => {
-        if (!open) {
-            setSuccessPaymentId(null);
-            setError(null);
-            setAllocations({});
-            return;
-        }
-
-        if (initialInvoiceId) {
-            const target = eligibleInvoices.find(inv => inv.id === initialInvoiceId);
-            if (target) {
-                setAllocations({ [target.id]: target.balance_due });
-                // Also default line amount if empty
-                setLines([{
-                    key: FIRST_LINE,
-                    paymentMethodId: '',
-                    amount: target.balance_due,
-                    reference: '',
-                    metadata: {},
-                }]);
+        queueMicrotask(() => {
+            if (!open) {
+                setSuccessPaymentId(null);
+                setError(null);
+                setAllocations({});
+                return;
             }
-        } else if (isAllocateMode && initialPayment) {
-            // Allocate mode defaults
-            setAllocations({});
-        } else {
-            setAllocations({});
-            setLines([emptyLine(FIRST_LINE)]);
-        }
-    }, [open, initialInvoiceId, isAllocateMode, initialPayment]);
+
+            if (initialInvoiceId) {
+                const target = eligibleInvoices.find(inv => inv.id === initialInvoiceId);
+                if (target) {
+                    setAllocations({ [target.id]: target.balance_due });
+                    // Also default line amount if empty
+                    setLines([{
+                        key: FIRST_LINE,
+                        paymentMethodId: '',
+                        amount: target.balance_due,
+                        reference: '',
+                        metadata: {},
+                    }]);
+                }
+            } else if (isAllocateMode && initialPayment) {
+                // Allocate mode defaults
+                setAllocations({});
+            } else {
+                setAllocations({});
+                setLines([emptyLine(FIRST_LINE)]);
+            }
+        });
+    }, [open, initialInvoiceId, isAllocateMode, initialPayment, eligibleInvoices]);
 
     // Payment totals calculation
     const totalLinesAmount = isAllocateMode

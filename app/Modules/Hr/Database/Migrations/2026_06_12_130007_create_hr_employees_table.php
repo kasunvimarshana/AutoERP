@@ -86,7 +86,7 @@ return new class extends Migration
             $table->foreign(['user_id', 'tenant_id'], 'hr_employees_user_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
-                ->nullOnDelete();
+                ->restrictOnDelete();
 
             $table->foreign(['approved_by', 'tenant_id'], 'hr_employees_approved_by_tenant_fk')
                 ->references(['id', 'tenant_id'])

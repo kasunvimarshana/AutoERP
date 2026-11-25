@@ -39,8 +39,17 @@ final class PayrollPayslip extends TenantOwnedModel
                 || in_array($originalStatus, [PayslipStatus::Approved->value, PayslipStatus::Paid->value], true)
                 || in_array($payslip->getRawOriginal('status'), [PayslipStatus::Approved->value, PayslipStatus::Paid->value], true);
 
-            if ($isFinalized && ! $payslip->isDirty('status')) {
-                throw new LogicException('Approved or Paid payslips cannot be updated directly. Adjustments must be recorded via supplementary pay runs or linked adjustment records.');
+            if ($isFinalized) {
+                $allowedDirty = ['status', 'row_version', 'updated_at'];
+                $disallowed = array_diff(array_keys($payslip->getDirty()), $allowedDirty);
+
+                if ($disallowed !== []) {
+                    throw new LogicException('Approved or Paid payslips cannot be updated directly. Adjustments must be recorded via supplementary pay runs or linked adjustment records.');
+                }
+            }
+
+            if (! $payslip->isDirty('row_version')) {
+                $payslip->row_version = ((int) $payslip->getOriginal('row_version', 1)) + 1;
             }
         });
 
@@ -74,15 +83,15 @@ final class PayrollPayslip extends TenantOwnedModel
             'absent_days' => 'decimal:2',
             'overtime_hours' => 'decimal:2',
             'double_time_hours' => 'decimal:2',
-            'base_salary' => 'decimal:4',
-            'prorated_basic_salary' => 'decimal:4',
-            'gross_pay' => 'decimal:4',
-            'total_allowances' => 'decimal:4',
-            'total_deductions' => 'decimal:4',
-            'employee_statutory_deductions' => 'decimal:4',
-            'employer_statutory_contributions' => 'decimal:4',
-            'tax_deduction' => 'decimal:4',
-            'net_pay' => 'decimal:4',
+            'base_salary' => 'decimal:6',
+            'prorated_basic_salary' => 'decimal:6',
+            'gross_pay' => 'decimal:6',
+            'total_allowances' => 'decimal:6',
+            'total_deductions' => 'decimal:6',
+            'employee_statutory_deductions' => 'decimal:6',
+            'employer_statutory_contributions' => 'decimal:6',
+            'tax_deduction' => 'decimal:6',
+            'net_pay' => 'decimal:6',
             'payment_method' => PayrollPaymentMethod::class,
         ]);
     }

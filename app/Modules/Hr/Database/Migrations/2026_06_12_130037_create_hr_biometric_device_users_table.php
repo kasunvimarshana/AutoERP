@@ -27,6 +27,7 @@ return new class extends Migration
             $table->foreignId('employee_id');
             $table->boolean('is_active')->default(true);
             $table->string('sync_status', 32)->default('synced');
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'hr_bio_dev_users_id_tenant_uk');

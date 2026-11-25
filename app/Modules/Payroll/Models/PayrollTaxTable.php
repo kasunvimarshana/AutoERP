@@ -31,7 +31,7 @@ final class PayrollTaxTable extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'effective_year' => 'integer',
-            'standard_personal_relief' => 'decimal:4',
+            'standard_personal_relief' => 'decimal:6',
             'is_active' => 'boolean',
         ]);
     }

@@ -25,8 +25,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->unsignedBigInteger('employee_id');
             $table->unsignedBigInteger('salary_structure_id');
-            $table->decimal('base_salary', 15, 4);
-            $table->decimal('hourly_rate', 15, 4)->default('0.0000');
+            $table->decimal('base_salary', 20, 6);
+            $table->decimal('hourly_rate', 20, 6)->default('0.000000');
             $table->string('payment_method', 32)->default('bank_transfer'); // bank_transfer, cash, cheque
             $table->string('bank_name', 100)->nullable();
             $table->string('bank_account_number', 50)->nullable();

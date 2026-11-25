@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -39,20 +39,20 @@ export function EmployeeCredentialTab({ employeeId }: Props) {
     const [newStatus, setNewStatus] = useState<CredentialStatus>('suspended');
     const [revocationReason, setRevocationReason] = useState('');
 
-    const loadCredentials = () => {
+    const loadCredentials = useCallback(() => {
         setLoading(true);
         setError(null);
         listEmployeeCredentials(employeeId)
             .then((data) => setCredentials(data))
             .catch((err) => setError(err?.response?.data?.message || 'Failed to load credentials.'))
             .finally(() => setLoading(false));
-    };
+    }, [employeeId]);
 
     useEffect(() => {
         queueMicrotask(() => {
             loadCredentials();
         });
-    }, [employeeId]);
+    }, [loadCredentials]);
 
     const handleIssueSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

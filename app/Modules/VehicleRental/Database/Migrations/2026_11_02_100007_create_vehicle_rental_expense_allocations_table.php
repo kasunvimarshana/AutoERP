@@ -21,7 +21,7 @@ return new class extends Migration
         Schema::create('vehicle_rental_expense_allocations', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vr_exp_alloc_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('expense_id');
             $table->unsignedInteger('sequence');

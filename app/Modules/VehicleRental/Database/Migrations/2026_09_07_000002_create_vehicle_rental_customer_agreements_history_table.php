@@ -20,7 +20,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_customer_agreements_history', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vrca_history_tenant_fk')->restrictOnDelete();
             $table->foreignId('agreement_id');
             $table->unsignedBigInteger('row_version');
             $table->foreignId('actor_id');

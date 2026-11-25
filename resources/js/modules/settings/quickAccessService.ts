@@ -422,12 +422,18 @@ export function useQuickAccessConfig() {
 
     useEffect(() => {
         // Fast initial load from LocalStorage cache
-        setItems(getStoredQuickAccessItems(storageKey));
-        setRowVersion(getStoredRowVersion(storageKey));
+        queueMicrotask(() => {
+            setItems(getStoredQuickAccessItems(storageKey));
+            setRowVersion(getStoredRowVersion(storageKey));
+        });
 
         // Background server fetch to sync database single source of truth
         const abortController = new AbortController();
-        refreshFromServer(abortController.signal).catch(() => {});
+        queueMicrotask(() => {
+            if (!abortController.signal.aborted) {
+                refreshFromServer(abortController.signal).catch(() => {});
+            }
+        });
 
         const handleLocalUpdate = () => {
             setItems(getStoredQuickAccessItems(storageKey));

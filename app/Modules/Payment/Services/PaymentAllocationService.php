@@ -275,42 +275,74 @@ final class PaymentAllocationService
             throw new InvalidArgumentException('Payment has a pending allocation to this invoice. Realize or cancel it before topping up.');
         }
 
+        if ($existing instanceof PaymentAllocation) {
+            $previousAmount = $this->math->normalize((string) $existing->allocated_amount);
+            $newTotalAmount = $this->math->add($previousAmount, $allocation->allocatedAmount);
+
+            $this->allocationFinance->reverse(
+                $payment,
+                $existing,
+                $allocation->allocationDate,
+                'Superseded by incremental allocation top-up',
+                $actorId,
+            );
+            $this->invoiceSettlements->reversePaymentAllocation(
+                (int) $existing->invoice_id,
+                $previousAmount,
+            );
+
+            $existing->forceFill([
+                'status' => AllocationStatus::Reversed->value,
+                'active_identity_slot' => null,
+                'row_version' => (int) $existing->row_version + 1,
+                'metadata' => array_merge(is_array($existing->metadata) ? $existing->metadata : [], [
+                    'reversal' => [
+                        'reason' => 'Superseded by incremental allocation top-up',
+                        'reversal_date' => $allocation->allocationDate,
+                        'reversed_at' => now()->toIso8601String(),
+                        'reversed_by' => $actorId,
+                    ],
+                ]),
+            ])->save();
+
+            $settlement = $this->invoiceSettlements->applyPaymentAllocation(
+                $allocation->invoiceId,
+                $newTotalAmount,
+                false,
+            );
+
+            $created = $this->createAllocation([
+                'tenant_id' => $payment->tenant_id,
+                'organization_unit_id' => $payment->organization_unit_id,
+                'payment_id' => $payment->getKey(),
+                'invoice_id' => $allocation->invoiceId,
+                ...$snapshot,
+                'invoice_total' => $invoiceBalance->totalAmount,
+                'invoice_balance_before' => $this->math->add($invoiceBalance->remainingAmount, $previousAmount),
+                'previously_allocated_amount' => $previousAmount,
+                'allocated_amount' => $newTotalAmount,
+                'invoice_balance_after' => $settlement->balanceAfter,
+                'allocation_date' => $allocation->allocationDate,
+                'allocation_method' => $allocation->allocationMethod,
+                'status' => AllocationStatus::Active->value,
+                'realized_at' => now(),
+                'realized_by' => $actorId,
+                'metadata' => [
+                    'supersedes_allocation_id' => (int) $existing->getKey(),
+                    'top_up_amount' => $this->math->normalize($allocation->allocatedAmount),
+                ],
+            ]);
+
+            $this->allocationFinance->post($payment, $created, $actorId);
+
+            return $created;
+        }
+
         $settlement = $this->invoiceSettlements->applyPaymentAllocation(
             $allocation->invoiceId,
             $allocation->allocatedAmount,
             false,
         );
-
-        if ($existing instanceof PaymentAllocation) {
-            $metadata = is_array($existing->metadata) ? $existing->metadata : [];
-            $topUps = $metadata['top_ups'] ?? [];
-            $topUps[] = [
-                'amount' => $this->math->normalize($allocation->allocatedAmount),
-                'allocation_date' => $allocation->allocationDate,
-                'realized_at' => now()->toIso8601String(),
-                'realized_by' => $actorId,
-            ];
-            $metadata['top_ups'] = $topUps;
-
-            $existing->forceFill([
-                'allocated_amount' => $this->math->add(
-                    (string) $existing->allocated_amount,
-                    $allocation->allocatedAmount,
-                ),
-                'invoice_balance_after' => $settlement->balanceAfter,
-                'metadata' => $metadata,
-                'row_version' => (int) $existing->row_version + 1,
-            ])->save();
-
-            $this->allocationFinance->postIncremental(
-                $payment,
-                $existing,
-                $allocation->allocatedAmount,
-                $actorId,
-            );
-
-            return $existing;
-        }
 
         $created = $this->createAllocation([
             'tenant_id' => $payment->tenant_id,
@@ -337,7 +369,7 @@ final class PaymentAllocationService
 
     private function createAllocation(array $attributes): PaymentAllocation
     {
-        $allocation = new PaymentAllocation();
+        $allocation = new PaymentAllocation;
         $allocation->forceFill($attributes);
         $allocation->save();
 

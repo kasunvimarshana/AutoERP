@@ -33,6 +33,7 @@ return new class extends Migration
             $table->string('sync_status', 32)->default('pending');
             $table->string('error_message', 255)->nullable();
             $table->text('raw_payload')->nullable();
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'hr_bio_raw_punches_id_tenant_uk');
@@ -49,10 +50,10 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('hr_employees')
                 ->restrictOnDelete();
-            $table->foreign('attendance_punch_id', 'hr_bio_raw_punches_att_punch_fk')
-                ->references('id')
+            $table->foreign(['attendance_punch_id', 'tenant_id'], 'hr_bio_raw_punches_att_punch_tenant_fk')
+                ->references(['id', 'tenant_id'])
                 ->on('hr_attendance_punches')
-                ->nullOnDelete();
+                ->restrictOnDelete();
         });
     }
 

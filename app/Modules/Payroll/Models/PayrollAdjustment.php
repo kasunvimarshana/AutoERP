@@ -39,8 +39,17 @@ final class PayrollAdjustment extends TenantOwnedModel
                 || $originalStatus === AdjustmentStatus::Applied->value
                 || $adjustment->getRawOriginal('status') === AdjustmentStatus::Applied->value;
 
-            if ($isApplied && ! $adjustment->isDirty('status')) {
-                throw new LogicException('Applied adjustments cannot be modified directly.');
+            if ($isApplied) {
+                $allowedDirty = ['status', 'applied_payslip_id', 'row_version', 'updated_at'];
+                $disallowed = array_diff(array_keys($adjustment->getDirty()), $allowedDirty);
+
+                if ($disallowed !== []) {
+                    throw new LogicException('Applied adjustments cannot be modified directly.');
+                }
+            }
+
+            if (! $adjustment->isDirty('row_version')) {
+                $adjustment->row_version = ((int) $adjustment->getOriginal('row_version', 1)) + 1;
             }
         });
 
@@ -67,7 +76,7 @@ final class PayrollAdjustment extends TenantOwnedModel
             'applied_payslip_id' => 'integer',
             'adjustment_type' => AdjustmentType::class,
             'status' => AdjustmentStatus::class,
-            'amount' => 'decimal:4',
+            'amount' => 'decimal:6',
             'approved_by' => 'integer',
             'approved_at' => 'datetime',
         ]);

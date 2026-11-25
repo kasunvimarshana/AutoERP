@@ -22,7 +22,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_owner_usage_charges', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vruo_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('agreement_id');
             $table->foreignId('running_chart_id');

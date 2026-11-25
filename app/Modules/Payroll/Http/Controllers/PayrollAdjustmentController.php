@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\Payroll\Http\Controllers;
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Modules\Payroll\Enums\AdjustmentStatus;
 use Modules\Payroll\Enums\AdjustmentType;
@@ -29,12 +30,17 @@ final class PayrollAdjustmentController
             'target_pay_period_id' => ['required', 'integer'],
         ]);
 
+        $userId = $request->currentUserId();
+        if ($userId === null) {
+            throw new AuthenticationException('Authenticated user context is required.');
+        }
+
         $adjustment = $retroService->calculateSalaryArrears(
             tenantId: $request->tenantId(),
             employeeId: (int) $validated['employee_id'],
             effectiveFromDate: $validated['effective_from_date'],
             targetPayPeriodId: (int) $validated['target_pay_period_id'],
-            userId: $request->currentUserId() ?? 1,
+            userId: $userId,
         );
 
         if ($adjustment === null) {
@@ -80,6 +86,9 @@ final class PayrollAdjustmentController
         ]);
 
         $userId = $request->currentUserId();
+        if ($userId === null) {
+            throw new AuthenticationException('Authenticated user context is required.');
+        }
 
         $adjustment = PayrollAdjustment::create([
             'tenant_id' => $request->tenantId(),
@@ -100,9 +109,17 @@ final class PayrollAdjustmentController
 
     public function cancel(PayrollRequest $request, int $id): JsonResponse
     {
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
         $adjustment = PayrollAdjustment::query()
             ->where('tenant_id', $request->tenantId())
             ->findOrFail($id);
+
+        if (isset($validated['expected_version']) && (int) $adjustment->row_version !== (int) $validated['expected_version']) {
+            return response()->json(['message' => 'Payroll adjustment was changed by someone else. Reload before saving.'], 409);
+        }
 
         if ($adjustment->status === AdjustmentStatus::Applied) {
             return response()->json(['message' => 'Cannot cancel an applied adjustment.'], 422);

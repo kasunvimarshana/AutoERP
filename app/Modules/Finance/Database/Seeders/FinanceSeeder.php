@@ -400,6 +400,17 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::PurchaseExpense->value => self::ACCOUNT_PURCHASE_EXPENSE,
                 ],
             ],
+            FinancePostingProfileCode::PayrollPayRun->value => [
+                'name' => 'Payroll Pay Run',
+                'rules' => [
+                    FinanceAccountRoleCode::SalariesExpense->value => self::ACCOUNT_OPERATING_EXPENSE,
+                    FinanceAccountRoleCode::EmployerStatutoryExpense->value => self::ACCOUNT_OPERATING_EXPENSE,
+                    FinanceAccountRoleCode::WithholdingPayable->value => self::ACCOUNT_TAX_PAYABLE,
+                    FinanceAccountRoleCode::StatutoryPayable->value => self::ACCOUNT_PAYABLE,
+                    FinanceAccountRoleCode::PayrollDeductionsClearing->value => self::ACCOUNT_PAYABLE,
+                    FinanceAccountRoleCode::SalariesPayable->value => self::ACCOUNT_PAYABLE,
+                ],
+            ],
         ];
 
         $accounts = FinanceAccount::query()->where('tenant_id', $tenantId)->get()->keyBy('code');

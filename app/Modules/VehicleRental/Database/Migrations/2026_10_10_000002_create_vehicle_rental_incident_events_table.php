@@ -21,7 +21,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_incident_events', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vrie_tenant_fk')->restrictOnDelete();
             $table->foreignId('incident_id');
             $table->foreignId('actor_id');
             $table->string('action', IncidentFields::ACTION_LENGTH);

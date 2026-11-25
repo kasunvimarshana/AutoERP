@@ -12,17 +12,23 @@ declare(strict_types=1);
 
 namespace Modules\Payroll\Services;
 
+use Modules\Core\Services\DecimalMath;
 use Modules\Payroll\Models\PayrollTaxTable;
 
 final class PayrollTaxService
 {
+    public function __construct(
+        private readonly DecimalMath $math,
+    ) {}
+
     /**
      * Calculate progressive tax for taxable income.
      */
     public function calculateTax(int $tenantId, string $taxableIncome, int $year): string
     {
-        if (bccomp($taxableIncome, '0.0000', 4) <= 0) {
-            return '0.0000';
+        $zero = $this->math->normalize('0', DecimalMath::SCALE);
+        if ($this->math->compare($taxableIncome, $zero, DecimalMath::SCALE) <= 0) {
+            return $zero;
         }
 
         $taxTable = PayrollTaxTable::query()
@@ -43,40 +49,43 @@ final class PayrollTaxService
         }
 
         if ($taxTable === null || $taxTable->brackets->isEmpty()) {
-            return '0.0000';
+            return $zero;
         }
 
         // Apply personal relief
         $relief = (string) $taxTable->standard_personal_relief;
-        $netTaxable = bcsub($taxableIncome, $relief, 4);
+        $netTaxable = $this->math->sub($taxableIncome, $relief, DecimalMath::SCALE);
 
-        if (bccomp($netTaxable, '0.0000', 4) <= 0) {
-            return '0.0000';
+        if ($this->math->compare($netTaxable, $zero, DecimalMath::SCALE) <= 0) {
+            return $zero;
         }
 
-        $totalTax = '0.0000';
+        $totalTax = $zero;
 
         foreach ($taxTable->brackets as $bracket) {
             $from = (string) $bracket->threshold_from;
             $to = $bracket->threshold_to !== null ? (string) $bracket->threshold_to : null;
-            $rate = bcdiv((string) $bracket->rate_percentage, '100', 4);
+            $rate = $this->math->div((string) $bracket->rate_percentage, '100', DecimalMath::SCALE);
 
-            if (bccomp($netTaxable, $from, 4) <= 0) {
+            if ($this->math->compare($netTaxable, $from, DecimalMath::SCALE) <= 0) {
                 // Income does not reach this bracket
                 continue;
             }
 
+            $remaining = $this->math->sub($netTaxable, $from, DecimalMath::SCALE);
             if ($to !== null) {
-                $bracketCap = bcsub($to, $from, 4);
-                $taxableInBracket = min((float) bcsub($netTaxable, $from, 4), (float) $bracketCap);
+                $bracketCap = $this->math->sub($to, $from, DecimalMath::SCALE);
+                $taxableInBracket = $this->math->compare($remaining, $bracketCap, DecimalMath::SCALE) <= 0
+                    ? $remaining
+                    : $bracketCap;
             } else {
                 // Unbounded upper bracket
-                $taxableInBracket = (float) bcsub($netTaxable, $from, 4);
+                $taxableInBracket = $remaining;
             }
 
-            if ($taxableInBracket > 0) {
-                $bracketTax = bcmul(sprintf('%.4f', $taxableInBracket), $rate, 4);
-                $totalTax = bcadd($totalTax, $bracketTax, 4);
+            if ($this->math->compare($taxableInBracket, $zero, DecimalMath::SCALE) > 0) {
+                $bracketTax = $this->math->mul($taxableInBracket, $rate, DecimalMath::SCALE);
+                $totalTax = $this->math->add($totalTax, $bracketTax, DecimalMath::SCALE);
             }
         }
 

@@ -63,9 +63,9 @@ final class PayrollPayslipItem extends TenantOwnedModel
             'payslip_id' => 'integer',
             'salary_component_id' => 'integer',
             'item_type' => PayslipItemType::class,
-            'rate' => 'decimal:4',
+            'rate' => 'decimal:6',
             'hours_or_quantity' => 'decimal:2',
-            'amount' => 'decimal:4',
+            'amount' => 'decimal:6',
             'is_taxable' => 'boolean',
             'is_statutory' => 'boolean',
         ]);

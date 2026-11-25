@@ -13,45 +13,37 @@ declare(strict_types=1);
 namespace Modules\Payroll\Http\Requests;
 
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Payroll\Services\PayrollAuthorizationService;
 
 class PayrollRequest extends TenantScopedRequest
 {
     public function authorize(): bool
     {
-        return $this->currentUserId() !== null;
+        $userId = $this->currentUserId();
+        if ($userId === null) {
+            return false;
+        }
+
+        try {
+            $tenantId = $this->tenantId();
+        } catch (ValidationException) {
+            return false;
+        }
+
+        $permissions = app(PermissionCheckerInterface::class);
+        foreach (array_keys(PayrollAuthorizationService::descriptions()) as $permission) {
+            if ($permissions->allows($userId, $tenantId, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function rules(): array
     {
         return [];
-    }
-
-    public function currentUserId(): ?int
-    {
-        $id = parent::currentUserId();
-        if ($id !== null) {
-            return $id;
-        }
-
-        $user = $this->user();
-
-        return $user?->id !== null ? (int) $user->id : null;
-    }
-
-    public function tenantId(): int
-    {
-        try {
-            return parent::tenantId();
-        } catch (\Throwable) {
-            $id = $this->input('tenant_id') ?? $this->header('X-Tenant-Id') ?? $this->user()?->tenant_id;
-            if (is_numeric($id) && (int) $id > 0) {
-                return (int) $id;
-            }
-
-            throw ValidationException::withMessages([
-                'tenant_id' => ['A valid tenant context is required.'],
-            ]);
-        }
     }
 }

@@ -63,9 +63,9 @@ export default function RentalInvoicesAndBillsPage() {
     // Keep tab in sync with permissions if changed
     useEffect(() => {
         if (!canCustomerView && canOwnerView && tab === 'ar') {
-            setTab('ap');
+            queueMicrotask(() => setTab('ap'));
         } else if (canCustomerView && !canOwnerView && tab === 'ap') {
-            setTab('ar');
+            queueMicrotask(() => setTab('ar'));
         }
     }, [canCustomerView, canOwnerView, tab]);
 
@@ -132,13 +132,17 @@ export default function RentalInvoicesAndBillsPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        loadSummary(controller.signal);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) void loadSummary(controller.signal);
+        });
         return () => controller.abort();
     }, [loadSummary]);
 
     useEffect(() => {
         const controller = new AbortController();
-        loadDocuments(controller.signal);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) void loadDocuments(controller.signal);
+        });
         return () => controller.abort();
     }, [loadDocuments]);
 

@@ -40,6 +40,7 @@ return new class extends Migration
             $table->boolean('is_primary')->default(false);
             $table->boolean('is_active')->default(true);
             $table->text('notes')->nullable();
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->softDeletes();
             $table->index(['tenant_id', 'employee_id'], 'hr_employee_contacts_scope_ix');

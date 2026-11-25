@@ -929,7 +929,7 @@ final class PurchaseEngineTest extends TestCase
 
         // No implicit conversion or fallback for unresolved historic currencies.
         $otherCurrencyId = CurrencyFixture::create();
-        $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice, $otherCurrencyId, $currencyId): void {
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $note, $invoice, $otherCurrencyId, $currencyId): void {
             DB::table('purchase_debit_notes')->where('id', $note->getKey())->update(['currency_id' => null]);
             $note->refresh();
             try {
@@ -942,16 +942,29 @@ final class PurchaseEngineTest extends TestCase
                 $note->refresh();
             }
 
-            $invoice->currency_id = $otherCurrencyId;
-            $invoice->save();
+            $foreignInvoice = Invoice::forceCreate([
+                'tenant_id' => $tenantId,
+                'invoice_type' => $invoice->invoice_type instanceof \BackedEnum ? $invoice->invoice_type->value : (string) $invoice->invoice_type,
+                'direction' => InvoiceDirection::Inbound->value,
+                'invoice_number' => 'INV-FX-'.Str::upper(Str::random(6)),
+                'invoice_date' => '2026-06-08',
+                'party_type' => 'supplier',
+                'party_id' => (int) $note->supplier_id,
+                'currency_id' => $otherCurrencyId,
+                'exchange_rate' => '1.000000',
+                'subtotal' => '100.000000',
+                'tax_total' => '0.000000',
+                'adjustment_total' => '0.000000',
+                'grand_total' => '100.000000',
+                'balance_due' => '100.000000',
+                'status' => InvoiceStatus::Posted->value,
+                'row_version' => 1,
+            ]);
             try {
-                app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                app(PurchaseDebitNoteService::class)->allocate($note, $foreignInvoice, '1.000000');
                 self::fail('Allocated a debit note in another currency.');
             } catch (InvalidArgumentException $error) {
                 self::assertSame('Purchase debit note currency must match supplier invoice currency.', $error->getMessage());
-            } finally {
-                $invoice->currency_id = $currencyId;
-                $invoice->save();
             }
         });
         $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
@@ -971,18 +984,33 @@ final class PurchaseEngineTest extends TestCase
 
         // A supplier identifier is not sufficient: a purchase debit note must not
         // reduce the balance of an outbound document, even if its party matches.
-        $this->withTenantExecutionContext($tenantId, function () use ($invoice, $note): void {
-            $invoice->forceFill(['direction' => InvoiceDirection::Outbound])->save();
+        $this->withTenantExecutionContext($tenantId, function () use ($invoice, $note, $tenantId): void {
+            $outboundInvoice = Invoice::forceCreate([
+                'tenant_id' => $tenantId,
+                'invoice_type' => $invoice->invoice_type instanceof \BackedEnum ? $invoice->invoice_type->value : (string) $invoice->invoice_type,
+                'direction' => InvoiceDirection::Outbound->value,
+                'invoice_number' => 'INV-OUT-'.Str::upper(Str::random(6)),
+                'invoice_date' => '2026-06-08',
+                'party_type' => 'supplier',
+                'party_id' => (int) $note->supplier_id,
+                'currency_id' => (int) $invoice->currency_id,
+                'exchange_rate' => '1.000000',
+                'subtotal' => '100.000000',
+                'tax_total' => '0.000000',
+                'adjustment_total' => '0.000000',
+                'grand_total' => '100.000000',
+                'balance_due' => '100.000000',
+                'status' => InvoiceStatus::Posted->value,
+                'row_version' => 1,
+            ]);
             try {
-                app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                app(PurchaseDebitNoteService::class)->allocate($note, $outboundInvoice, '1.000000');
                 self::fail('Outbound supplier invoice unexpectedly accepted a purchase debit note.');
             } catch (InvalidArgumentException $error) {
                 self::assertSame(
                     'Purchase debit notes can only be allocated to inbound supplier invoices.',
                     $error->getMessage(),
                 );
-            } finally {
-                $invoice->forceFill(['direction' => InvoiceDirection::Inbound])->save();
             }
         });
         $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
@@ -1021,11 +1049,21 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'PUR-ORG-A');
         $otherOrganizationUnitId = $this->createOrganizationUnit($tenantId, 'PUR-ORG-B');
-        $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
-        [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $this->withTenantExecutionContext($tenantId, function () use ($grn, $organizationUnitId): void {
-            $grn->organization_unit_id = $organizationUnitId;
-            $grn->save();
+        $grn = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId, $item, $organizationUnitId): GoodsReceiptNote {
+            $created = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+                tenantId: $tenantId,
+                receivedDate: '2026-06-06',
+                warehouseId: $warehouseId,
+                supplierType: 'supplier',
+                supplierId: $this->supplierId($tenantId),
+                lines: [
+                    new GoodsReceiptNoteLineData((int) $item->getKey(), '40.000000', '40.000000', '1000.000000', uomId: (int) $item->base_uom_id),
+                ],
+                organizationUnitId: $organizationUnitId,
+            ));
+            app(GoodsReceiptNoteService::class)->post($created);
+
+            return $created->refresh();
         });
 
         try {

@@ -26,7 +26,9 @@ export function ReassignmentHistoryPanel({ customerAgreementId, currencyCode = '
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setLoading(true);
+        });
         listReassignments(customerAgreementId)
             .then(data => {
                 if (!controller.signal.aborted) {

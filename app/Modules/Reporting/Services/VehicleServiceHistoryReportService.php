@@ -17,6 +17,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
 use Modules\Vehicle\Models\Vehicle;
@@ -25,6 +26,10 @@ use Modules\VehicleService\Models\VehicleServiceLegacyHistory;
 
 final class VehicleServiceHistoryReportService
 {
+    public function __construct(
+        private readonly DecimalMath $math,
+    ) {}
+
     public function run(array $params): array
     {
         $vehicle = $this->vehicle($params);
@@ -216,9 +221,9 @@ final class VehicleServiceHistoryReportService
                 'status' => $link->invoice->status instanceof \BackedEnum ? $link->invoice->status->value : (string) $link->invoice->status,
             ])
             ->values();
-        $invoiceTotal = $job->invoiceLinks->sum(fn ($link) => (float) ($link->invoice?->grand_total ?? $link->invoice_total ?? 0));
-        $paidTotal = $job->invoiceLinks->sum(fn ($link) => (float) ($link->invoice?->paid_total ?? 0));
-        $balanceDue = $job->invoiceLinks->sum(fn ($link) => (float) ($link->invoice?->balance_due ?? 0));
+        $invoiceTotal = $this->math->sum($job->invoiceLinks->map(fn ($link): string => (string) ($link->invoice?->grand_total ?? $link->invoice_total ?? '0')), 6);
+        $paidTotal = $this->math->sum($job->invoiceLinks->map(fn ($link): string => (string) ($link->invoice?->paid_total ?? '0')), 6);
+        $balanceDue = $this->math->sum($job->invoiceLinks->map(fn ($link): string => (string) ($link->invoice?->balance_due ?? '0')), 6);
         $jobType = $job->type instanceof \BackedEnum ? $job->type->value : (string) $job->type;
 
         return [
@@ -249,9 +254,9 @@ final class VehicleServiceHistoryReportService
             'job_discount_amount' => (string) $job->job_discount_amount,
             'job_total' => (string) $job->grand_total,
             'invoices' => $invoices->all(),
-            'invoice_total' => number_format($invoiceTotal, 6, '.', ''),
-            'paid_total' => number_format($paidTotal, 6, '.', ''),
-            'balance_due' => number_format($balanceDue, 6, '.', ''),
+            'invoice_total' => $invoiceTotal,
+            'paid_total' => $paidTotal,
+            'balance_due' => $balanceDue,
         ];
     }
 

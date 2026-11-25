@@ -369,13 +369,19 @@ final class PaymentAllocationReversalServiceTest extends TestCase
         $this->assertEqualsWithDelta(500.0, (float) $reversalPayment->unapplied_amount, 0.01);
         $this->assertEqualsWithDelta(1000.0, (float) $this->invoiceBalance($tenantId, $invoice), 0.01);
 
-        $reversedAlloc = $this->withTenantExecutionContext($tenantId, fn () => PaymentAllocation::query()
+        $allAllocations = $this->withTenantExecutionContext($tenantId, fn () => PaymentAllocation::query()
             ->where('payment_id', $payment->getKey())
             ->where('invoice_id', $invoice->getKey())
-            ->firstOrFail());
-        $this->assertSame(AllocationStatus::Reversed, $reversedAlloc->status instanceof AllocationStatus ? $reversedAlloc->status : AllocationStatus::from((string) $reversedAlloc->status));
-        $this->assertNotEmpty($reversedAlloc->metadata['top_up_reversal_references'] ?? []);
-        $this->assertCount(2, $reversedAlloc->metadata['top_up_reversal_references']);
+            ->orderBy('id')
+            ->get());
+        $this->assertCount(3, $allAllocations);
+        foreach ($allAllocations as $alloc) {
+            $this->assertSame(AllocationStatus::Reversed, $alloc->status instanceof AllocationStatus ? $alloc->status : AllocationStatus::from((string) $alloc->status));
+            $this->assertNull($alloc->active_identity_slot);
+            $this->assertNotEmpty($alloc->metadata['reversal'] ?? []);
+        }
+        $this->assertSame((int) $allAllocations[0]->getKey(), $allAllocations[1]->metadata['supersedes_allocation_id'] ?? null);
+        $this->assertSame((int) $allAllocations[1]->getKey(), $allAllocations[2]->metadata['supersedes_allocation_id'] ?? null);
     }
 
     public function test_it_rejects_allocation_reversal_before_payment_date(): void

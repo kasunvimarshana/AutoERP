@@ -224,58 +224,60 @@ export function InvoiceLayoutEditorDrawer({
     useEffect(() => {
         if (!open) return;
 
-        if (layout) {
-            setTemplateType(layout.template_type ?? 'preset');
-            setName(layout.name);
-            setCode(layout.code);
-            setDescription(layout.description ?? '');
-            setPaperSize(layout.paper_size);
-            setOrientation(layout.orientation);
-            setViewTemplate(layout.view_template ?? 'invoice.layouts.standard');
-            setBladeContent(layout.blade_content ?? '');
-            setIsActive(layout.is_active);
-            setCustomCss(layout.custom_css ?? '');
-            setHeaderContent(layout.header_content ?? '');
-            setFooterContent(layout.footer_content ?? '');
+        queueMicrotask(() => {
+            if (layout) {
+                setTemplateType(layout.template_type ?? 'preset');
+                setName(layout.name);
+                setCode(layout.code);
+                setDescription(layout.description ?? '');
+                setPaperSize(layout.paper_size);
+                setOrientation(layout.orientation);
+                setViewTemplate(layout.view_template ?? 'invoice.layouts.standard');
+                setBladeContent(layout.blade_content ?? '');
+                setIsActive(layout.is_active);
+                setCustomCss(layout.custom_css ?? '');
+                setHeaderContent(layout.header_content ?? '');
+                setFooterContent(layout.footer_content ?? '');
 
-            const s = layout.settings ?? {};
-            setPrimaryColor(s.primary_color ?? '#173956');
-            setFontFamily(s.font_family ?? 'sans-serif');
-            setShowLogo(s.show_logo ?? s.show_company_logo ?? true);
-            setShowTaxBreakdown(s.show_tax_breakdown ?? s.show_tax_summary ?? true);
-            setShowPaymentStub(s.show_payment_stub ?? s.show_payment_details ?? true);
-            setShowSignatures(s.show_signatures ?? true);
-            setShowAmountInWords(s.show_amount_in_words ?? true);
-            setShowNotes(s.show_notes ?? true);
-            setShowQrCode(s.show_qr_code ?? false);
-            setNotes(s.notes ?? '');
-            setTerms(s.terms ?? '');
-        } else {
-            setTemplateType('preset');
-            setName('');
-            setCode('');
-            setDescription('');
-            setPaperSize('a4');
-            setOrientation('portrait');
-            setViewTemplate('invoice.layouts.modern');
-            setBladeContent('');
-            setIsActive(true);
-            setCustomCss('');
-            setHeaderContent('');
-            setFooterContent('');
-            setPrimaryColor('#173956');
-            setFontFamily('sans-serif');
-            setShowLogo(true);
-            setShowTaxBreakdown(true);
-            setShowPaymentStub(true);
-            setShowSignatures(true);
-            setShowAmountInWords(true);
-            setShowNotes(true);
-            setShowQrCode(false);
-            setNotes('');
-            setTerms('');
-        }
-        setError(null);
+                const s = layout.settings ?? {};
+                setPrimaryColor(s.primary_color ?? '#173956');
+                setFontFamily(s.font_family ?? 'sans-serif');
+                setShowLogo(s.show_logo ?? s.show_company_logo ?? true);
+                setShowTaxBreakdown(s.show_tax_breakdown ?? s.show_tax_summary ?? true);
+                setShowPaymentStub(s.show_payment_stub ?? s.show_payment_details ?? true);
+                setShowSignatures(s.show_signatures ?? true);
+                setShowAmountInWords(s.show_amount_in_words ?? true);
+                setShowNotes(s.show_notes ?? true);
+                setShowQrCode(s.show_qr_code ?? false);
+                setNotes(s.notes ?? '');
+                setTerms(s.terms ?? '');
+            } else {
+                setTemplateType('preset');
+                setName('');
+                setCode('');
+                setDescription('');
+                setPaperSize('a4');
+                setOrientation('portrait');
+                setViewTemplate('invoice.layouts.modern');
+                setBladeContent('');
+                setIsActive(true);
+                setCustomCss('');
+                setHeaderContent('');
+                setFooterContent('');
+                setPrimaryColor('#173956');
+                setFontFamily('sans-serif');
+                setShowLogo(true);
+                setShowTaxBreakdown(true);
+                setShowPaymentStub(true);
+                setShowSignatures(true);
+                setShowAmountInWords(true);
+                setShowNotes(true);
+                setShowQrCode(false);
+                setNotes('');
+                setTerms('');
+            }
+            setError(null);
+        });
     }, [open, layout]);
 
     const handleTemplateChange = (newTemplate: string) => {

@@ -150,13 +150,13 @@ function PriceDraft({ value, onChange, defaultCurrency, defaultUom }: DraftProps
 
     useEffect(() => {
         if (!currency && defaultCurrency) {
-            setCurrency(defaultCurrency);
+            queueMicrotask(() => setCurrency(defaultCurrency));
         }
     }, [defaultCurrency, currency]);
 
     useEffect(() => {
         if (!uom && defaultUom) {
-            setUom(defaultUom);
+            queueMicrotask(() => setUom(defaultUom));
         }
     }, [defaultUom, uom]);
 

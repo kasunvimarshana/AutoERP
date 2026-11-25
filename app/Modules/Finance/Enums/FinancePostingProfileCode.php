@@ -30,4 +30,5 @@ enum FinancePostingProfileCode: string
     case InternalConsumption = 'internal_consumption';
     case SalesReturn = 'sales_return';
     case PurchaseReturn = 'purchase_return';
+    case PayrollPayRun = 'payroll_pay_run';
 }

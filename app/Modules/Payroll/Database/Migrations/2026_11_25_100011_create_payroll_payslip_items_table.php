@@ -28,9 +28,9 @@ return new class extends Migration
             $table->string('item_type', 32); // earning, allowance, overtime, deduction, employee_statutory, employer_statutory, tax, adjustment
             $table->string('item_code', 32);
             $table->string('item_name', 100);
-            $table->decimal('rate', 15, 4)->default('0.0000');
+            $table->decimal('rate', 20, 6)->default('0.000000');
             $table->decimal('hours_or_quantity', 7, 2)->default('0.00');
-            $table->decimal('amount', 15, 4)->default('0.0000');
+            $table->decimal('amount', 20, 6)->default('0.000000');
             $table->boolean('is_taxable')->default(true);
             $table->boolean('is_statutory')->default(false);
             $table->string('calculation_basis', 255)->nullable();
@@ -43,7 +43,7 @@ return new class extends Migration
             $table->foreign(['payslip_id', 'tenant_id'], 'payroll_payslip_items_payslip_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payroll_payslips')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreign(['salary_component_id', 'tenant_id'], 'payroll_payslip_items_component_fk')
                 ->references(['id', 'tenant_id'])

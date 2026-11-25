@@ -77,19 +77,21 @@ export function RentalQuotationPreviewModal({
     const activeAgreementId = initialAgreementId ?? selectedAgreement?.id;
 
     useEffect(() => {
-        if (!open) {
-            setPreview(null);
-            setError(null);
-            setLoading(false);
-            return;
-        }
+        queueMicrotask(() => {
+            if (!open) {
+                setPreview(null);
+                setError(null);
+                setLoading(false);
+                return;
+            }
 
-        if (initialAgreementId) {
-            setSelectedAgreement({
-                id: initialAgreementId,
-                name: initialAgreementReference || `Agreement #${initialAgreementId}`,
-            });
-        }
+            if (initialAgreementId) {
+                setSelectedAgreement({
+                    id: initialAgreementId,
+                    name: initialAgreementReference || `Agreement #${initialAgreementId}`,
+                });
+            }
+        });
     }, [open, initialAgreementId, initialAgreementReference]);
 
     async function handleGeneratePreview(e?: React.FormEvent) {

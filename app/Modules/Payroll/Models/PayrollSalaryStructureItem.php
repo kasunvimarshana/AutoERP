@@ -35,7 +35,7 @@ final class PayrollSalaryStructureItem extends TenantOwnedModel
             'salary_component_id' => 'integer',
             'percentage_basis_component_id' => 'integer',
             'calculation_type' => CalculationType::class,
-            'amount_or_rate' => 'decimal:4',
+            'amount_or_rate' => 'decimal:6',
             'sort_order' => 'integer',
         ]);
     }

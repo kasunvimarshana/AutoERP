@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Modal } from '@/shared/components/Modal';
@@ -104,11 +104,11 @@ export function AgreementFinancialSummaryPanel({ kind, agreement, canManageAdjus
         [],
         showRefundModal,
     );
-    const paymentMethods = methodsApi.data?.data ?? [];
+    const paymentMethods = useMemo(() => methodsApi.data?.data ?? [], [methodsApi.data?.data]);
 
     useEffect(() => {
         if (showRefundModal && !refundMethodId && paymentMethods.length > 0) {
-            setRefundMethodId(String(paymentMethods[0].id));
+            queueMicrotask(() => setRefundMethodId(String(paymentMethods[0].id)));
         }
     }, [showRefundModal, refundMethodId, paymentMethods]);
 

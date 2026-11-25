@@ -32,8 +32,8 @@ final class PayrollTaxBracket extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'tax_table_id' => 'integer',
             'bracket_order' => 'integer',
-            'threshold_from' => 'decimal:4',
-            'threshold_to' => 'decimal:4',
+            'threshold_from' => 'decimal:6',
+            'threshold_to' => 'decimal:6',
             'rate_percentage' => 'decimal:2',
         ]);
     }

@@ -127,7 +127,7 @@ export function VehicleUseEditor({ agreement, replacement, initialVehicleId, onS
                 controller.abort();
             };
         }
-    }, [company, vehicle, start, end, owner, agreement.id]);
+    }, [kind, company, vehicle, start, end, owner, agreement.id]);
 
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!vehicle || !start || (!company && !owner)) return;

@@ -22,14 +22,14 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_owner_agreements', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vroa_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->unsignedBigInteger('row_version')->default(AgreementFields::INITIAL_VERSION);
             $table->string('reference', AgreementFields::REFERENCE_LENGTH);
             $table->foreignId('supplier_id');
             $table->string('party_name_snapshot');
             $table->string('party_code_snapshot')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'vroa_currency_fk')->restrictOnDelete();
             $table->string('currency_code_snapshot');
             $table->foreignId('vehicle_id');
             $table->string('vehicle_number_snapshot');

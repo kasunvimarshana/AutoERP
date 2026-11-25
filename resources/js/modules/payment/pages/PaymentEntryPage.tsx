@@ -124,7 +124,8 @@ export default function PaymentEntryPage() {
     const [searchParams] = useSearchParams();
     const invoiceId = parsePositiveInteger(searchParams.get('invoice_id'));
     const sellingViewRequested = searchParams.get('view') === 'selling';
-    const initializedInvoiceId = useRef<number | null>(null);
+    const initializedInvoiceIdRef = useRef<number | null>(null);
+    const [initializedInvoiceId, setInitializedInvoiceId] = useState<number | null>(null);
     const initializedEditId = useRef<number | null>(null);
     const [paymentType, setPaymentType] = useState(PAYMENT_TYPE_CUSTOMER_RECEIPT);
     const [direction, setDirection] = useState(PAYMENT_DIRECTION_INBOUND);
@@ -163,7 +164,7 @@ export default function PaymentEntryPage() {
 
     useEffect(() => {
         const invoice = settlementInvoice.data;
-        if (!invoice || invoiceIssue || initializedInvoiceId.current === invoice.id) return;
+        if (!invoice || invoiceIssue || initializedInvoiceIdRef.current === invoice.id) return;
 
         const nextPaymentType = invoice.direction === PAYMENT_DIRECTION_OUTBOUND
             ? PAYMENT_TYPE_CUSTOMER_RECEIPT
@@ -173,66 +174,71 @@ export default function PaymentEntryPage() {
             : PAYMENT_DIRECTION_OUTBOUND;
         const balance = invoice.balance_due ?? '0.000000';
 
-        initializedInvoiceId.current = invoice.id;
-        setPaymentType(nextPaymentType);
-        setDirection(nextDirection);
-        setParty(invoiceParty(invoice));
-        setReference(`Settlement for ${invoice.invoice_number ?? 'invoice'}`);
-        setExchangeRate(invoice.exchange_rate ?? '');
-        setExchangeRateExpanded(!isPositiveDecimal(invoice.exchange_rate ?? '') || compareDecimalStrings(invoice.exchange_rate ?? ZERO_AMOUNT, BASE_EXCHANGE_RATE) !== 0);
-        setLines([{ ...emptyLine(1), amount: balance }]);
-        setSellingRows(emptySellingRows());
-        setNextKey(2);
+        initializedInvoiceIdRef.current = invoice.id;
+        queueMicrotask(() => {
+            setInitializedInvoiceId(invoice.id);
+            setPaymentType(nextPaymentType);
+            setDirection(nextDirection);
+            setParty(invoiceParty(invoice));
+            setReference(`Settlement for ${invoice.invoice_number ?? 'invoice'}`);
+            setExchangeRate(invoice.exchange_rate ?? '');
+            setExchangeRateExpanded(!isPositiveDecimal(invoice.exchange_rate ?? '') || compareDecimalStrings(invoice.exchange_rate ?? ZERO_AMOUNT, BASE_EXCHANGE_RATE) !== 0);
+            setLines([{ ...emptyLine(1), amount: balance }]);
+            setSellingRows(emptySellingRows());
+            setNextKey(2);
+        });
     }, [invoiceIssue, settlementInvoice.data]);
 
     useEffect(() => {
         const p = editPayment.data;
         if (!p || initializedEditId.current === p.id) return;
         if (p.document_status !== 'draft') {
-            setError(toApiError(new Error('Only draft payments can be edited.')));
+            queueMicrotask(() => setError(toApiError(new Error('Only draft payments can be edited.'))));
             return;
         }
         initializedEditId.current = p.id;
-        setPaymentType(p.payment_type ?? PAYMENT_TYPE_CUSTOMER_RECEIPT);
-        setDirection(p.direction ?? PAYMENT_DIRECTION_INBOUND);
-        setPaymentDate(p.payment_date ?? today());
-        setReference(p.reference_number ?? '');
-        setExchangeRate(p.exchange_rate ?? BASE_EXCHANGE_RATE);
-        setExchangeRateExpanded(!isPositiveDecimal(p.exchange_rate ?? '') || compareDecimalStrings(p.exchange_rate ?? ZERO_AMOUNT, BASE_EXCHANGE_RATE) !== 0);
-        if (p.party?.id) {
-            setParty({
-                id: p.party.id,
-                code: p.party.code ?? p.party.number ?? undefined,
-                name: p.party.name ?? 'Party',
-            });
-        }
-        if (p.lines && p.lines.length > 0) {
-            setLines(p.lines.map((l, idx) => ({
-                key: idx + 1,
-                paymentMethodId: String(l.payment_method?.id ?? l.payment_method_id ?? ''),
-                amount: l.amount,
-                reference: l.reference_number ?? '',
-                metadata: {
-                    card_brand: l.card_brand ?? '',
-                    instrument_direction: l.instrument_direction ?? '',
-                    external_bank_name: l.external_bank_name ?? '',
-                    external_bank_branch: l.external_bank_branch ?? '',
-                    instrument_number: l.instrument_number ?? '',
-                },
-            })));
-            setNextKey(p.lines.length + 1);
-        }
-        if (p.allocations && p.allocations.length > 0) {
-            const loadedAllocations: Record<number, string> = {};
-            p.allocations.forEach((alloc) => {
-                const inv = alloc.invoice as { id: number } | undefined;
-                const invId = (alloc.invoice_id as number | undefined) ?? inv?.id;
-                if (invId) {
-                    loadedAllocations[invId] = String(alloc.allocated_amount ?? ZERO_AMOUNT);
-                }
-            });
-            setDocAllocations(loadedAllocations);
-        }
+        queueMicrotask(() => {
+            setPaymentType(p.payment_type ?? PAYMENT_TYPE_CUSTOMER_RECEIPT);
+            setDirection(p.direction ?? PAYMENT_DIRECTION_INBOUND);
+            setPaymentDate(p.payment_date ?? today());
+            setReference(p.reference_number ?? '');
+            setExchangeRate(p.exchange_rate ?? BASE_EXCHANGE_RATE);
+            setExchangeRateExpanded(!isPositiveDecimal(p.exchange_rate ?? '') || compareDecimalStrings(p.exchange_rate ?? ZERO_AMOUNT, BASE_EXCHANGE_RATE) !== 0);
+            if (p.party?.id) {
+                setParty({
+                    id: p.party.id,
+                    code: p.party.code ?? p.party.number ?? undefined,
+                    name: p.party.name ?? 'Party',
+                });
+            }
+            if (p.lines && p.lines.length > 0) {
+                setLines(p.lines.map((l, idx) => ({
+                    key: idx + 1,
+                    paymentMethodId: String(l.payment_method?.id ?? l.payment_method_id ?? ''),
+                    amount: l.amount,
+                    reference: l.reference_number ?? '',
+                    metadata: {
+                        card_brand: l.card_brand ?? '',
+                        instrument_direction: l.instrument_direction ?? '',
+                        external_bank_name: l.external_bank_name ?? '',
+                        external_bank_branch: l.external_bank_branch ?? '',
+                        instrument_number: l.instrument_number ?? '',
+                    },
+                })));
+                setNextKey(p.lines.length + 1);
+            }
+            if (p.allocations && p.allocations.length > 0) {
+                const loadedAllocations: Record<number, string> = {};
+                p.allocations.forEach((alloc) => {
+                    const inv = alloc.invoice as { id: number } | undefined;
+                    const invId = (alloc.invoice_id as number | undefined) ?? inv?.id;
+                    if (invId) {
+                        loadedAllocations[invId] = String(alloc.allocated_amount ?? ZERO_AMOUNT);
+                    }
+                });
+                setDocAllocations(loadedAllocations);
+            }
+        });
     }, [editPayment.data]);
 
     const methods = useApi((signal) => listUsablePaymentMethods({ direction, per_page: 100 }, signal), [direction]);
@@ -240,7 +246,7 @@ export default function PaymentEntryPage() {
     const partyType = settlementInvoice.data?.party_type
         ?? (paymentType === PAYMENT_TYPE_SUPPLIER_PAYMENT ? 'supplier' : 'customer');
     const partyKind = direction === PAYMENT_DIRECTION_INBOUND ? AgreementKind.Customer : AgreementKind.Owner;
-    const isInvoiceSettlement = invoiceId !== null || initializedInvoiceId.current !== null;
+    const isInvoiceSettlement = invoiceId !== null || initializedInvoiceId !== null;
     const isSellingMode = sellingViewRequested || sellingInvoice !== null;
     const openRentalDocs = useApi(
         () => getPartyOpenRentalDocuments(partyKind, party?.id ?? 0),

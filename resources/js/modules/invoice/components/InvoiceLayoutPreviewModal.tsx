@@ -35,14 +35,19 @@ export function InvoiceLayoutPreviewModal({
 
     useEffect(() => {
         if (!open || !layout) {
-            setHtml(null);
-            setError(null);
+            queueMicrotask(() => {
+                setHtml(null);
+                setError(null);
+            });
             return;
         }
 
         const controller = new AbortController();
-        setLoading(true);
-        setError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoading(true);
+            setError(null);
+        });
 
         previewInvoiceLayout(layout.code, invoiceId, controller.signal)
             .then((renderedHtml) => {

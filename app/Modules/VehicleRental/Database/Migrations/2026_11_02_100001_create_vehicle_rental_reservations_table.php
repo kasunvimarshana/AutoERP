@@ -21,7 +21,7 @@ return new class extends Migration
         Schema::create('vehicle_rental_reservations', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vr_reservations_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->string('reservation_number', 100);
             $table->foreignId('customer_id');
@@ -32,7 +32,7 @@ return new class extends Migration
             $table->string('billing_cycle', 30);
             $table->dateTime('requested_start_at');
             $table->dateTime('requested_end_at');
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'vr_reservations_currency_fk')->restrictOnDelete();
             $table->string('currency_code_snapshot', 10);
             $table->decimal('estimated_amount', 20, 6)->default('0.000000');
             $table->decimal('estimated_deposit_amount', 20, 6)->default('0.000000');

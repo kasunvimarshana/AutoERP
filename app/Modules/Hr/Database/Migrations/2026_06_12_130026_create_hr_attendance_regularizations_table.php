@@ -41,10 +41,10 @@ return new class extends Migration
             $table->index(['employee_id', 'attendance_date', 'status'], 'hr_att_reg_emp_date_status_ix');
             $table->index(['tenant_id', 'status'], 'hr_att_reg_tenant_status_ix');
 
-            $table->foreign('attendance_record_id', 'hr_att_reg_record_fk')
-                ->references('id')
+            $table->foreign(['attendance_record_id', 'tenant_id'], 'hr_att_reg_record_tenant_fk')
+                ->references(['id', 'tenant_id'])
                 ->on('hr_attendance_records')
-                ->nullOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['employee_id', 'tenant_id'], 'hr_att_reg_employee_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('hr_employees')

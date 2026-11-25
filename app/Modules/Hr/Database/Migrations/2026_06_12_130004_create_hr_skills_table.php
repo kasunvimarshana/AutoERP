@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->softDeletes();
             $table->unique(['tenant_id', 'code'], 'hr_skills_tenant_code_uk');

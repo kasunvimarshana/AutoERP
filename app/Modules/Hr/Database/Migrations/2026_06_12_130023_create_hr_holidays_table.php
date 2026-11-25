@@ -29,6 +29,7 @@ return new class extends Migration
             $table->boolean('is_comp_off_eligible')->default(true);
             $table->decimal('overtime_multiplier', 5, 2)->default('2.00');
             $table->text('description')->nullable();
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'hr_holidays_id_tenant_uk');

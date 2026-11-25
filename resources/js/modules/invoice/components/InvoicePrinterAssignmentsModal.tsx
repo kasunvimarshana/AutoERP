@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
@@ -45,17 +45,9 @@ export function InvoicePrinterAssignmentsModal({
     const [error, setError] = useState<ApiError | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    const activeLayouts = layouts.filter((l) => l.is_active);
+    const activeLayouts = useMemo(() => layouts.filter((l) => l.is_active), [layouts]);
 
-    useEffect(() => {
-        if (!open) return;
-        void loadAssignments();
-        if (activeLayouts.length > 0 && !selectedLayoutCode) {
-            setSelectedLayoutCode(activeLayouts[0].code);
-        }
-    }, [open, assignScope]);
-
-    const loadAssignments = async () => {
+    const loadAssignments = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -68,7 +60,17 @@ export function InvoicePrinterAssignmentsModal({
         } finally {
             setLoading(false);
         }
-    };
+    }, [assignScope, organizationUnitId]);
+
+    useEffect(() => {
+        if (!open) return;
+        queueMicrotask(() => {
+            void loadAssignments();
+            if (activeLayouts.length > 0) {
+                setSelectedLayoutCode((prev) => prev || activeLayouts[0].code);
+            }
+        });
+    }, [open, loadAssignments, activeLayouts]);
 
     const handleAddAssignment = async (e: React.FormEvent) => {
         e.preventDefault();

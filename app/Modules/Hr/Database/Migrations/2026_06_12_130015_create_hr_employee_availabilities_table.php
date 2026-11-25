@@ -38,6 +38,7 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('ends_at')->nullable();
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->index(['tenant_id', 'employee_id', 'availability_status'], 'hr_employee_availability_lookup_ix');
             $table->index(['source_type', 'source_id'], 'hr_employee_availability_source_ix');

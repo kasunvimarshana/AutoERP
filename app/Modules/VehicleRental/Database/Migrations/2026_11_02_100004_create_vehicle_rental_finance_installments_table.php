@@ -21,7 +21,7 @@ return new class extends Migration
         Schema::create('vehicle_rental_finance_installments', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vr_fin_inst_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('finance_agreement_id');
             $table->unsignedInteger('installment_number');

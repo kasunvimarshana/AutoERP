@@ -31,6 +31,7 @@ class UpsertUomConversionRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'row_version' => ['nullable', 'integer', 'min:0'],
+            'expected_version' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('organization_units', 'id')],
             'metadata' => ['nullable', 'array'],
             'from_uom_id' => array_merge($required, ['integer', 'min:1', $this->tenantExists('unit_of_measures', 'id')]),

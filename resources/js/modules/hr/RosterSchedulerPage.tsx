@@ -6,34 +6,34 @@
  * Phone: +94713525253
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button } from '@/shared/components/Button';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { businessDateInputValue, shiftBusinessDate } from '@/shared/utils/businessDate';
 import { HrShiftSelect } from './components/HrShiftSelect';
 import { EmployeeLookupSelect } from './components/EmployeeLookupSelect';
 import { assignShift, getRoster, reallocateShiftCover, requestShiftSwap } from './hrApi';
 import { hrPermissions } from './hrPermissions';
 import type { EmployeeSummary, HrShift } from './hrTypes';
 
+function currentBusinessWeekDate(offsetFromSunday: number): string {
+    const today = businessDateInputValue();
+    const [year, month, day] = today.split('-').map(Number);
+    const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    return shiftBusinessDate(today, offsetFromSunday - dayOfWeek);
+}
+
 export default function RosterSchedulerPage() {
     const auth = useAuth();
     const canView = hasPermission(auth, hrPermissions.shiftsView);
     const canManage = hasPermission(auth, hrPermissions.shiftsManage);
 
-    const [startDate, setStartDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() - d.getDay() + 1); // Monday
-        return d.toISOString().slice(0, 10);
-    });
-    const [endDate, setEndDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() - d.getDay() + 7); // Sunday
-        return d.toISOString().slice(0, 10);
-    });
+    const [startDate, setStartDate] = useState(() => currentBusinessWeekDate(1)); // Monday
+    const [endDate, setEndDate] = useState(() => currentBusinessWeekDate(7)); // Sunday
 
     const [rosterData, setRosterData] = useState<Array<{
         employee: { id: number; employee_number: string; display_name: string };
@@ -74,20 +74,22 @@ export default function RosterSchedulerPage() {
     const [coverDate, setCoverDate] = useState(startDate);
     const [coverReason, setCoverReason] = useState<'sick_cover' | 'emergency_cover' | 'surge_demand' | 'operational_need'>('sick_cover');
 
-    const fetchRoster = () => {
+    const fetchRoster = useCallback(() => {
         setLoading(true);
         setError(null);
         getRoster({ start_date: startDate, end_date: endDate })
             .then((data) => setRosterData(data))
             .catch((err) => setError(err?.response?.data?.message || 'Failed to load roster'))
             .finally(() => setLoading(false));
-    };
+    }, [startDate, endDate]);
 
     useEffect(() => {
         if (canView) {
-            fetchRoster();
+            queueMicrotask(() => {
+                fetchRoster();
+            });
         }
-    }, [startDate, endDate]);
+    }, [canView, fetchRoster]);
 
     if (!canView) return <AccessDeniedPage />;
 

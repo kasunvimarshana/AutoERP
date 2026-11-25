@@ -172,11 +172,13 @@ export function RunningChartEditor({
 
     useEffect(() => {
         if (!isOtManuallyAdjusted && start && end) {
-            if (calculatedOtMinutes > 0) {
-                setValues(v => ({ ...v, normal_ot_minutes: String(calculatedOtMinutes) }));
-            } else if (values.normal_ot_minutes && values.normal_ot_minutes !== '') {
-                setValues(v => ({ ...v, normal_ot_minutes: '' }));
-            }
+            queueMicrotask(() => {
+                if (calculatedOtMinutes > 0) {
+                    setValues(v => ({ ...v, normal_ot_minutes: String(calculatedOtMinutes) }));
+                } else {
+                    setValues(v => (v.normal_ot_minutes && v.normal_ot_minutes !== '' ? { ...v, normal_ot_minutes: '' } : v));
+                }
+            });
         }
     }, [calculatedOtMinutes, isOtManuallyAdjusted, start, end]);
 

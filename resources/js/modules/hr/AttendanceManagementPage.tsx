@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
@@ -14,6 +14,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button } from '@/shared/components/Button';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { EmployeeLookupSelect } from './components/EmployeeLookupSelect';
 import {
     actionAttendanceRegularization,
@@ -50,12 +51,8 @@ export default function AttendanceManagementPage() {
     const [activeTab, setActiveTab] = useState<ActiveTab>('records');
 
     // Filter states
-    const [startDate, setStartDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() - 7);
-        return d.toISOString().slice(0, 10);
-    });
-    const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [startDate, setStartDate] = useState(() => businessDateInputValue(new Date(), undefined, -7));
+    const [endDate, setEndDate] = useState(() => businessDateInputValue());
     const [selectedEmployee, setSelectedEmployee] = useState<EmployeeSummary | null>(null);
 
     // Records data
@@ -74,7 +71,7 @@ export default function AttendanceManagementPage() {
     const [selectedRecordForQuickResolve, setSelectedRecordForQuickResolve] = useState<HrAttendanceRecord | null>(null);
 
     // Regularize form
-    const [regDate, setRegDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [regDate, setRegDate] = useState(() => businessDateInputValue());
     const [regType, setRegType] = useState<'missing_in' | 'missing_out' | 'both_missing' | 'incorrect_time' | 'forgot_to_punch' | 'on_duty'>('forgot_to_punch');
     const [regInTime, setRegInTime] = useState('');
     const [regOutTime, setRegOutTime] = useState('');
@@ -104,7 +101,7 @@ export default function AttendanceManagementPage() {
     const [importLoading, setImportLoading] = useState(false);
     const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
 
-    const fetchRecords = () => {
+    const fetchRecords = useCallback(() => {
         setLoading(true);
         setError(null);
         listAttendanceRecords({
@@ -115,30 +112,30 @@ export default function AttendanceManagementPage() {
             .then((res) => setRecords(res.data))
             .catch((err) => setError(err?.response?.data?.message || 'Failed to load attendance records'))
             .finally(() => setLoading(false));
-    };
+    }, [startDate, endDate, selectedEmployee?.id]);
 
-    const fetchRegularizations = () => {
+    const fetchRegularizations = useCallback(() => {
         listAttendanceRegularizations({ status: 'pending' })
             .then((data) => setRegularizations(data))
             .catch(() => {});
-    };
+    }, []);
 
-    const fetchAnomalies = () => {
+    const fetchAnomalies = useCallback(() => {
         listAttendanceAnomalies()
             .then((res) => setAnomalies(res.data))
             .catch(() => {});
-    };
+    }, []);
 
-    const fetchKiosks = () => {
+    const fetchKiosks = useCallback(() => {
         listAttendanceKiosks()
             .then((data) => {
                 setKiosks(data);
-                if (data.length > 0 && selectedKioskId === null) {
-                    setSelectedKioskId(data[0].id);
+                if (data.length > 0) {
+                    setSelectedKioskId((prev) => (prev === null ? data[0].id : prev));
                 }
             })
             .catch(() => {});
-    };
+    }, []);
 
     useEffect(() => {
         if (canView) {
@@ -149,7 +146,7 @@ export default function AttendanceManagementPage() {
                 fetchKiosks();
             });
         }
-    }, [startDate, endDate, selectedEmployee]);
+    }, [canView, fetchRecords, fetchRegularizations, fetchAnomalies, fetchKiosks]);
 
     // Dynamic Kiosk Timer
     useEffect(() => {

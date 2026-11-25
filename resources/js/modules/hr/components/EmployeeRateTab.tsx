@@ -52,14 +52,17 @@ export function EmployeeRateTab({ employeeId }: { employeeId: number }) {
 
     useEffect(() => {
         if (crud.editing) {
-            setDraft({
-                rate_type: crud.editing.rate_type,
-                amount: crud.editing.amount,
-                effective_from: crud.editing.effective_from ?? '',
-                effective_to: crud.editing.effective_to ?? '',
-                is_active: crud.editing.is_active,
+            const editing = crud.editing;
+            queueMicrotask(() => {
+                setDraft({
+                    rate_type: editing.rate_type,
+                    amount: editing.amount,
+                    effective_from: editing.effective_from ?? '',
+                    effective_to: editing.effective_to ?? '',
+                    is_active: editing.is_active,
+                });
+                setCurrency(editing.currency ?? null);
             });
-            setCurrency(crud.editing.currency ?? null);
         }
     }, [crud.editing]);
 

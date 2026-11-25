@@ -20,7 +20,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_agreement_adjustments_history', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vraah_tenant_fk')->restrictOnDelete();
             $table->foreignId('adjustment_id');
             $table->string('from_status', 32)->nullable();
             $table->string('to_status', 32);

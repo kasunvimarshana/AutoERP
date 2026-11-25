@@ -28,12 +28,12 @@ return new class extends Migration
             $table->unsignedBigInteger('salary_structure_id')->nullable();
             $table->string('pay_run_type', 32)->default('standard'); // standard, supplementary, correction, bonus
             $table->string('status', 32)->default('draft'); // draft, calculated, verified, approved, paid, reversed
-            $table->decimal('total_gross_pay', 15, 4)->default('0.0000');
-            $table->decimal('total_deductions', 15, 4)->default('0.0000');
-            $table->decimal('total_employee_statutory', 15, 4)->default('0.0000');
-            $table->decimal('total_employer_statutory', 15, 4)->default('0.0000');
-            $table->decimal('total_tax', 15, 4)->default('0.0000');
-            $table->decimal('total_net_pay', 15, 4)->default('0.0000');
+            $table->decimal('total_gross_pay', 20, 6)->default('0.000000');
+            $table->decimal('total_deductions', 20, 6)->default('0.000000');
+            $table->decimal('total_employee_statutory', 20, 6)->default('0.000000');
+            $table->decimal('total_employer_statutory', 20, 6)->default('0.000000');
+            $table->decimal('total_tax', 20, 6)->default('0.000000');
+            $table->decimal('total_net_pay', 20, 6)->default('0.000000');
             $table->unsignedInteger('total_employees')->default(0);
             $table->unsignedBigInteger('calculated_by')->nullable();
             $table->timestamp('calculated_at')->nullable();

@@ -38,4 +38,9 @@ enum FinanceAccountRoleCode: string
     case RealizedFxLoss = 'realized_fx_loss';
     case SalesRevenue = 'sales_revenue';
     case PurchaseExpense = 'purchase_expense';
+    case SalariesExpense = 'salaries_expense';
+    case EmployerStatutoryExpense = 'employer_statutory_expense';
+    case StatutoryPayable = 'statutory_payable';
+    case PayrollDeductionsClearing = 'payroll_deductions_clearing';
+    case SalariesPayable = 'salaries_payable';
 }

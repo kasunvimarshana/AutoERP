@@ -21,7 +21,7 @@ return new class extends Migration
     {
         Schema::create('vehicle_rental_customer_base_charges', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vrcc_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('agreement_id');
             $table->date('period_from');

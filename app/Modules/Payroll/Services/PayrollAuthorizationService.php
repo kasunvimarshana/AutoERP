@@ -40,6 +40,8 @@ final class PayrollAuthorizationService
 
     public const MANAGE_ADJUSTMENTS = 'payroll.adjustments.manage';
 
+    public const MANAGE_LOANS = 'payroll.loans.manage';
+
     /** @return array<string,string> */
     public static function descriptions(): array
     {
@@ -57,6 +59,7 @@ final class PayrollAuthorizationService
             self::REVERSE_PAY_RUN => 'Reverse approved or paid pay runs and reverse GL journals',
             self::VIEW_PAYSLIPS => 'View and download employee payslips',
             self::MANAGE_ADJUSTMENTS => 'Create and apply salary adjustments, retro-pays, and bonuses',
+            self::MANAGE_LOANS => 'Create, approve, disburse, and cancel employee loans and salary advances',
         ];
     }
 }

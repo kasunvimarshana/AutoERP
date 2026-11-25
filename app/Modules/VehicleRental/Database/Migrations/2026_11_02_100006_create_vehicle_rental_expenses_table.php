@@ -21,7 +21,7 @@ return new class extends Migration
         Schema::create('vehicle_rental_expenses', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vr_exp_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->string('expense_number', 100);
             $table->foreignId('customer_agreement_id')->nullable();
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreignId('employee_id')->nullable();
             $table->string('expense_type', 30);
             $table->date('expense_date');
-            $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
+            $table->foreignId('currency_id')->constrained('currencies', indexName: 'vr_exp_currency_fk')->restrictOnDelete();
             $table->string('currency_code_snapshot', 10);
             $table->decimal('net_amount', 20, 6);
             $table->foreignId('tax_group_id')->nullable();

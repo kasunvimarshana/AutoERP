@@ -27,10 +27,10 @@ return new class extends Migration
             $table->unsignedBigInteger('pay_run_id')->nullable();
             $table->unsignedBigInteger('payslip_id')->nullable();
             $table->date('repayment_date');
-            $table->decimal('principal_amount', 15, 4);
-            $table->decimal('interest_amount', 15, 4)->default(0.0000);
-            $table->decimal('total_repaid', 15, 4);
-            $table->decimal('balance_after', 15, 4);
+            $table->decimal('principal_amount', 20, 6);
+            $table->decimal('interest_amount', 20, 6)->default('0.000000');
+            $table->decimal('total_repaid', 20, 6);
+            $table->decimal('balance_after', 20, 6);
             $table->string('status', 32)->default('scheduled'); // scheduled, deducted, manual_payment, reversed
             $table->text('notes')->nullable();
             $table->timestamps();

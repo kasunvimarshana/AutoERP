@@ -45,7 +45,9 @@ export function QuickAccessMenu({ sections, activeItemId }: { sections: Navigati
     const [configuredItems, setConfiguredItems] = useState<QuickAccessItemConfig[]>(() => getStoredQuickAccessItems(storageKey));
 
     useEffect(() => {
-        setConfiguredItems(getStoredQuickAccessItems(storageKey));
+        queueMicrotask(() => {
+            setConfiguredItems(getStoredQuickAccessItems(storageKey));
+        });
         const handleUpdate = () => {
             setConfiguredItems(getStoredQuickAccessItems(storageKey));
         };

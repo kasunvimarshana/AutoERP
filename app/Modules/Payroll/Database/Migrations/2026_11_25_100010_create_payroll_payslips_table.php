@@ -37,15 +37,15 @@ return new class extends Migration
             $table->decimal('absent_days', 5, 2)->default('0.00');
             $table->decimal('overtime_hours', 7, 2)->default('0.00');
             $table->decimal('double_time_hours', 7, 2)->default('0.00');
-            $table->decimal('base_salary', 15, 4)->default('0.0000');
-            $table->decimal('prorated_basic_salary', 15, 4)->default('0.0000');
-            $table->decimal('gross_pay', 15, 4)->default('0.0000');
-            $table->decimal('total_allowances', 15, 4)->default('0.0000');
-            $table->decimal('total_deductions', 15, 4)->default('0.0000');
-            $table->decimal('employee_statutory_deductions', 15, 4)->default('0.0000');
-            $table->decimal('employer_statutory_contributions', 15, 4)->default('0.0000');
-            $table->decimal('tax_deduction', 15, 4)->default('0.0000');
-            $table->decimal('net_pay', 15, 4)->default('0.0000');
+            $table->decimal('base_salary', 20, 6)->default('0.000000');
+            $table->decimal('prorated_basic_salary', 20, 6)->default('0.000000');
+            $table->decimal('gross_pay', 20, 6)->default('0.000000');
+            $table->decimal('total_allowances', 20, 6)->default('0.000000');
+            $table->decimal('total_deductions', 20, 6)->default('0.000000');
+            $table->decimal('employee_statutory_deductions', 20, 6)->default('0.000000');
+            $table->decimal('employer_statutory_contributions', 20, 6)->default('0.000000');
+            $table->decimal('tax_deduction', 20, 6)->default('0.000000');
+            $table->decimal('net_pay', 20, 6)->default('0.000000');
             $table->string('payment_method', 32)->default('bank_transfer');
             $table->text('notes')->nullable();
             $table->timestamps();
@@ -60,7 +60,7 @@ return new class extends Migration
             $table->foreign(['pay_run_id', 'tenant_id'], 'payroll_payslips_pay_run_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payroll_pay_runs')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreign(['employee_id', 'tenant_id'], 'payroll_payslips_employee_fk')
                 ->references(['id', 'tenant_id'])

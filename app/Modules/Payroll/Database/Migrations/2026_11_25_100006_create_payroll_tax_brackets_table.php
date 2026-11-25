@@ -25,8 +25,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->unsignedBigInteger('tax_table_id');
             $table->unsignedSmallInteger('bracket_order');
-            $table->decimal('threshold_from', 15, 4);
-            $table->decimal('threshold_to', 15, 4)->nullable(); // null = unlimited
+            $table->decimal('threshold_from', 20, 6);
+            $table->decimal('threshold_to', 20, 6)->nullable(); // null = unlimited
             $table->decimal('rate_percentage', 5, 2);
             $table->timestamps();
 
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->foreign(['tax_table_id', 'tenant_id'], 'payroll_tax_brackets_table_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payroll_tax_tables')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payroll_tax_brackets_org_unit_fk')
                 ->references(['id', 'tenant_id'])

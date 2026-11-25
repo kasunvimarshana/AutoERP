@@ -36,6 +36,7 @@ return new class extends Migration
             $table->date('issued_date')->nullable();
             $table->date('expiry_date')->nullable();
             $table->string('status')->default('pending');
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->unique(['employee_id', 'license_id'], 'hr_employee_licenses_uk');
             $table->index(['tenant_id', 'license_id'], 'hr_employee_licenses_lookup_ix');

@@ -141,13 +141,17 @@ export default function CustomerInvoicesPage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        loadSummary(controller.signal);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) void loadSummary(controller.signal);
+        });
         return () => controller.abort();
     }, [loadSummary]);
 
     useEffect(() => {
         const controller = new AbortController();
-        loadDocuments(controller.signal);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) void loadDocuments(controller.signal);
+        });
         return () => controller.abort();
     }, [loadDocuments]);
 

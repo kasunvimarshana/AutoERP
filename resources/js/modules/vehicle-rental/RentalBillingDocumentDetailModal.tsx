@@ -65,16 +65,21 @@ export function RentalBillingDocumentDetailModal({
 
     useEffect(() => {
         if (!open || !documentId) {
-            setDetail(null);
-            setEditing(false);
-            setCancelling(false);
-            setError(null);
+            queueMicrotask(() => {
+                setDetail(null);
+                setEditing(false);
+                setCancelling(false);
+                setError(null);
+            });
             return;
         }
 
         let active = true;
-        setLoading(true);
-        setError(null);
+        queueMicrotask(() => {
+            if (!active) return;
+            setLoading(true);
+            setError(null);
+        });
 
         getRentalBillingDetail(documentId)
             .then(data => {

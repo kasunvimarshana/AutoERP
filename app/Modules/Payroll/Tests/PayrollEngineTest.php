@@ -15,8 +15,11 @@ namespace Modules\Payroll\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use LogicException;
 use Modules\Finance\Contracts\FinancePostingInterface;
+use Modules\Finance\Contracts\FinanceSourceReversalInterface;
+use Modules\Finance\Database\Seeders\FinanceSeeder;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\Enums\JournalStatus;
@@ -63,6 +66,7 @@ use Modules\Payroll\Services\PayrollProrationService;
 use Modules\Payroll\Services\PayrollRetroactivePayService;
 use Modules\Payroll\Services\PayrollTaxService;
 use Modules\Payroll\Services\PayRunExecutionService;
+use Modules\Tenant\Models\TenantModel;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantUserFixture;
@@ -176,16 +180,16 @@ final class PayrollEngineTest extends TestCase
             $taxService = app(PayrollTaxService::class);
 
             // Test 1: Under personal relief (90k income) -> 0 tax
-            $this->assertSame('0.0000', $taxService->calculateTax($tenantId, '90000.0000', 2026));
+            $this->assertSame('0.000000', $taxService->calculateTax($tenantId, '90000.0000', 2026));
 
             // Test 2: 130k income -> net taxable = 30k. Falls entirely in 6% bracket -> 30k * 6% = 1800
-            $this->assertSame('1800.0000', $taxService->calculateTax($tenantId, '130000.0000', 2026));
+            $this->assertSame('1800.000000', $taxService->calculateTax($tenantId, '130000.0000', 2026));
 
             // Test 3: 180k income -> net taxable = 80k. Bracket 1: 50k * 6% = 3000. Bracket 2: 30k * 12% = 3600. Total = 6600
-            $this->assertSame('6600.0000', $taxService->calculateTax($tenantId, '180000.0000', 2026));
+            $this->assertSame('6600.000000', $taxService->calculateTax($tenantId, '180000.0000', 2026));
 
             // Test 4: 250k income -> net taxable = 150k. Bracket 1: 3000. Bracket 2: 6000. Bracket 3: 50k * 18% = 9000. Total = 18000
-            $this->assertSame('18000.0000', $taxService->calculateTax($tenantId, '250000.0000', 2026));
+            $this->assertSame('18000.000000', $taxService->calculateTax($tenantId, '250000.0000', 2026));
         });
     }
 
@@ -358,21 +362,21 @@ final class PayrollEngineTest extends TestCase
             // Allowances = 10,000 (Transport)
             // Overtime = 7,500 (4 hrs @ 1,875)
             // Adjustment Bonus = 5,000
-            // Gross Pay = 200,000 + 10,000 + 7,500 + 5,000 = 222,500.0000
-            $this->assertSame('222500.0000', (string) $payslip->gross_pay);
+            // Gross Pay = 200,000 + 10,000 + 7,500 + 5,000 = 222,500.000000
+            $this->assertSame('222500.000000', (string) $payslip->gross_pay);
 
             // Deductions:
             // Unpaid Leave (1 day @ 10,000) = 10,000
             // Absent (1 day @ 10,000) = 10,000
-            // Total Deductions = 20,000.0000
-            $this->assertSame('20000.0000', (string) $payslip->total_deductions);
+            // Total Deductions = 20,000.000000
+            $this->assertSame('20000.000000', (string) $payslip->total_deductions);
 
-            // Statutory: Basic = 200,000 -> 8% EPF Employee = 16,000.0000. Employer 12% = 24,000.0000
-            $this->assertSame('16000.0000', (string) $payslip->employee_statutory_deductions);
-            $this->assertSame('24000.0000', (string) $payslip->employer_statutory_contributions);
+            // Statutory: Basic = 200,000 -> 8% EPF Employee = 16,000.000000. Employer 12% = 24,000.000000
+            $this->assertSame('16000.000000', (string) $payslip->employee_statutory_deductions);
+            $this->assertSame('24000.000000', (string) $payslip->employer_statutory_contributions);
 
-            // Net Pay = Gross (222,500) - Deductions (20,000) - EE Statutory (16,000) - Tax (0) = 186,500.0000
-            $this->assertSame('186500.0000', (string) $payslip->net_pay);
+            // Net Pay = Gross (222,500) - Deductions (20,000) - EE Statutory (16,000) - Tax (0) = 186,500.000000
+            $this->assertSame('186500.000000', (string) $payslip->net_pay);
 
             // 10. Approve Pay Run
             $approvedRun = $executionService->approvePayRun((int) $payRun->id, $userId);
@@ -411,7 +415,7 @@ final class PayrollEngineTest extends TestCase
             ]);
 
             // Fake FinancePostingInterface to verify double-entry posting contract
-            $fakeFinance = new class($journal->id) implements FinancePostingInterface
+            $fakeFinance = new class($journal->id) implements FinancePostingInterface, FinanceSourceReversalInterface
             {
                 public ?PostingContext $lastContext = null;
 
@@ -444,9 +448,25 @@ final class PayrollEngineTest extends TestCase
 
                     return new PostingResultData($this->journalId, 'JRN-REV-556', 'reversed', '150000.000000', '150000.000000');
                 }
+
+                public function reverseSource(
+                    int $tenantId,
+                    ?int $organizationUnitId,
+                    string $sourceModule,
+                    string $sourceType,
+                    int $sourceId,
+                    string $reversalDate,
+                    ?int $reversedBy = null,
+                    ?string $reason = null,
+                ): PostingResultData {
+                    $this->reversed = true;
+
+                    return new PostingResultData($this->journalId, 'JRN-REV-556', 'reversed', '150000.000000', '150000.000000');
+                }
             };
 
             $this->app->instance(FinancePostingInterface::class, $fakeFinance);
+            $this->app->instance(FinanceSourceReversalInterface::class, $fakeFinance);
 
             $period = PayrollPayPeriod::create([
                 'tenant_id' => $tenantId,
@@ -492,11 +512,14 @@ final class PayrollEngineTest extends TestCase
             $this->assertSame(PayRunStatus::Paid, $paidRun->status);
             $this->assertSame($journal->id, $paidRun->finance_journal_id);
 
-            // Verify Finance Posting Lines Balance
+            // Verify Finance Posting Lines Balance & Semantic Profile Contract
             $this->assertNotNull($fakeFinance->lastContext);
+            $this->assertSame('payroll_pay_run', $fakeFinance->lastContext->postingProfileCode);
+            $this->assertNotNull($fakeFinance->lastContext->currencyId);
             $totalDebit = '0.000000';
             $totalCredit = '0.000000';
             foreach ($fakeFinance->lastContext->lines as $line) {
+                $this->assertNotEmpty($line->profileKey);
                 $totalDebit = bcadd($totalDebit, $line->debit, 6);
                 $totalCredit = bcadd($totalCredit, $line->credit, 6);
             }
@@ -606,6 +629,33 @@ final class PayrollEngineTest extends TestCase
             }
 
             try {
+                $adjustment->update(['status' => AdjustmentStatus::Pending, 'amount' => '3000.0000']);
+                $this->fail('Expected LogicException on piggybacking amount mutation onto status transition.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Applied adjustments cannot be modified directly', $e->getMessage());
+            } finally {
+                $adjustment->refresh();
+            }
+
+            try {
+                $payslip->update(['status' => PayslipStatus::Paid, 'net_pay' => '999999.0000']);
+                $this->fail('Expected LogicException on piggybacking net_pay mutation onto payslip status transition.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Approved or Paid payslips cannot be updated directly', $e->getMessage());
+            } finally {
+                $payslip->refresh();
+            }
+
+            try {
+                $payRun->update(['status' => PayRunStatus::Paid, 'total_net_pay' => '999999.0000']);
+                $this->fail('Expected LogicException on piggybacking total_net_pay mutation onto payRun status transition.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Approved or Paid pay runs cannot have their operational totals modified in place', $e->getMessage());
+            } finally {
+                $payRun->refresh();
+            }
+
+            try {
                 $adjustment->delete();
                 $this->fail('Expected LogicException on deleting applied adjustment.');
             } catch (LogicException $e) {
@@ -677,7 +727,7 @@ final class PayrollEngineTest extends TestCase
             ]);
 
             $this->assertSame(LoanStatus::Draft, $loan->status);
-            $this->assertEquals('5000.0000', $loan->monthly_installment);
+            $this->assertEquals('5000.000000', $loan->monthly_installment);
 
             // Approve and Disburse Loan
             $loanService->approveLoan($loan, $userId);
@@ -706,16 +756,16 @@ final class PayrollEngineTest extends TestCase
             $payslip = PayrollPayslip::query()->with('items')->where('pay_run_id', $payRun->id)->firstOrFail();
 
             // Total Deductions should include $5,000 loan installment + $15,000 advance = $20,000
-            $this->assertEquals('20000.0000', $payslip->total_deductions);
+            $this->assertEquals('20000.000000', $payslip->total_deductions);
             // Net Pay = $100,000 - $20,000 = $80,000
-            $this->assertEquals('80000.0000', $payslip->net_pay);
+            $this->assertEquals('80000.000000', $payslip->net_pay);
 
             $loanItem = $payslip->items->firstWhere('item_code', 'LOAN_REPAYMENT');
             $advanceItem = $payslip->items->firstWhere('item_code', 'SALARY_ADVANCE_RECOVERY');
             $this->assertNotNull($loanItem);
             $this->assertNotNull($advanceItem);
-            $this->assertEquals('5000.0000', $loanItem->amount);
-            $this->assertEquals('15000.0000', $advanceItem->amount);
+            $this->assertEquals('5000.000000', $loanItem->amount);
+            $this->assertEquals('15000.000000', $advanceItem->amount);
 
             // 5. Approve & Pay Run
             $executionService->approvePayRun($payRun->id, $userId);
@@ -725,14 +775,14 @@ final class PayrollEngineTest extends TestCase
             // Loan should have remaining balance $55,000 and remain Active
             $loan->refresh();
             $this->assertSame(LoanStatus::Active, $loan->status);
-            $this->assertEquals('55000.0000', $loan->balance_remaining);
-            $this->assertEquals('5000.0000', $loan->total_paid);
+            $this->assertEquals('55000.000000', $loan->balance_remaining);
+            $this->assertEquals('5000.000000', $loan->total_paid);
 
             // Advance should have remaining balance $0.00 and transition to Completed
             $advance->refresh();
             $this->assertSame(LoanStatus::Completed, $advance->status);
-            $this->assertEquals('0.0000', $advance->balance_remaining);
-            $this->assertEquals('15000.0000', $advance->total_paid);
+            $this->assertEquals('0.000000', $advance->balance_remaining);
+            $this->assertEquals('15000.000000', $advance->total_paid);
 
             // 6. Test Lifecycle Guardrails
             try {
@@ -747,6 +797,27 @@ final class PayrollEngineTest extends TestCase
                 $this->fail('Expected LogicException on altering terms of completed loan.');
             } catch (LogicException $e) {
                 $this->assertStringContainsString('Cannot alter financial terms of a completed loan', $e->getMessage());
+            } finally {
+                $advance->refresh();
+            }
+
+            try {
+                $loan->update(['principal_amount' => '70000.0000']);
+                $this->fail('Expected LogicException on altering terms of active loan.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Cannot alter financial terms of an active loan', $e->getMessage());
+            } finally {
+                $loan->refresh();
+            }
+
+            $deductedRepayment = $loan->repayments()->firstOrFail();
+            try {
+                $deductedRepayment->update(['principal_amount' => '9999.0000']);
+                $this->fail('Expected LogicException on modifying deducted loan repayment.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Deducted loan repayment records are immutable audit records', $e->getMessage());
+            } finally {
+                $deductedRepayment->refresh();
             }
 
             // 7. Reverse Pay Run
@@ -754,13 +825,13 @@ final class PayrollEngineTest extends TestCase
             $this->assertSame(PayRunStatus::Reversed, $reversedRun->status);
 
             $loan->refresh();
-            $this->assertEquals('60000.0000', $loan->balance_remaining);
-            $this->assertEquals('0.0000', $loan->total_paid);
+            $this->assertEquals('60000.000000', $loan->balance_remaining);
+            $this->assertEquals('0.000000', $loan->total_paid);
 
             $advance->refresh();
             $this->assertSame(LoanStatus::Active, $advance->status);
-            $this->assertEquals('15000.0000', $advance->balance_remaining);
-            $this->assertEquals('0.0000', $advance->total_paid);
+            $this->assertEquals('15000.000000', $advance->balance_remaining);
+            $this->assertEquals('0.000000', $advance->total_paid);
         });
     }
 
@@ -821,7 +892,7 @@ final class PayrollEngineTest extends TestCase
             $executionService->payPayRun($mayRun->id, $userId);
 
             $mayPayslip = PayrollPayslip::query()->where('pay_run_id', $mayRun->id)->firstOrFail();
-            $this->assertEquals('100000.0000', $mayPayslip->gross_pay);
+            $this->assertEquals('100000.000000', $mayPayslip->gross_pay);
 
             // Target Upcoming Period (June 2026)
             $junePeriod = PayrollPayPeriod::create([
@@ -854,23 +925,148 @@ final class PayrollEngineTest extends TestCase
             $this->assertNotNull($adjustment);
             $this->assertSame(AdjustmentType::RetroPay, $adjustment->adjustment_type);
             // Difference is $130,000 - $100,000 = $30,000 for May
-            $this->assertEquals('30000.0000', $adjustment->amount);
+            $this->assertEquals('30000.000000', $adjustment->amount);
             $this->assertSame(AdjustmentStatus::Pending, $adjustment->status);
 
             // Historical May payslip remains strictly immutable!
             $mayPayslip->refresh();
-            $this->assertEquals('100000.0000', $mayPayslip->gross_pay);
+            $this->assertEquals('100000.000000', $mayPayslip->gross_pay);
 
             // 4. Calculate June Pay Run - should include $130,000 June basic + $30,000 retro adjustment = $160,000 Gross
             $juneRun = $executionService->createPayRun($tenantId, $junePeriod->id, $structure->id, 'standard', 'June Run', $userId);
             $calculatedJune = $executionService->calculatePayRun($juneRun->id, $userId);
 
-            $this->assertEquals('160000.0000', $calculatedJune->total_gross_pay);
+            $this->assertEquals('160000.000000', $calculatedJune->total_gross_pay);
             $junePayslip = PayrollPayslip::query()->with('items')->where('pay_run_id', $juneRun->id)->firstOrFail();
 
             $retroItem = $junePayslip->items->firstWhere('item_code', 'ADJ_retro_pay');
             $this->assertNotNull($retroItem);
-            $this->assertEquals('30000.0000', $retroItem->amount);
+            $this->assertEquals('30000.000000', $retroItem->amount);
+        });
+    }
+
+    public function test_pay_run_posts_to_real_finance_posting_profile_and_reverses(): void
+    {
+        [$tenantId, $orgUnitId] = $this->scope();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $orgUnitId): void {
+            $userId = TenantUserFixture::create([
+                'tenant_id' => $tenantId,
+                'email' => 'payroll-real-gl-'.Str::lower(Str::random(8)).'@example.test',
+            ]);
+            TenantModel::query()->whereKey($tenantId)->update(['code' => 'AUTOERP']);
+            $this->seed(FinanceSeeder::class);
+
+            $period = PayrollPayPeriod::create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'name' => 'July 2026',
+                'cycle_type' => PayrollCycleType::Monthly,
+                'period_start' => '2026-07-01',
+                'period_end' => '2026-07-31',
+                'payout_date' => '2026-07-31',
+                'total_working_days' => 22,
+            ]);
+
+            $structure = PayrollSalaryStructure::create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'code' => 'FIN_REAL_1',
+                'name' => 'Finance Real Structure',
+                'cycle_type' => PayrollCycleType::Monthly,
+                'is_active' => true,
+            ]);
+
+            $dept = app(HrDepartmentService::class)->create(new HrDepartmentData($tenantId, 'DEP-'.Str::random(4), 'Operations', $orgUnitId));
+            $employee = $this->createEmployee($tenantId, $orgUnitId, 'EMP-REAL-GL-1', $dept->id, '2025-01-01', null);
+
+            PayrollEmployeeSalaryAssignment::create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'employee_id' => $employee->id,
+                'salary_structure_id' => $structure->id,
+                'base_salary' => '120000.000000',
+                'hourly_rate' => '681.818182',
+                'effective_from' => '2026-01-01',
+                'is_active' => true,
+            ]);
+
+            $executionService = app(PayRunExecutionService::class);
+            $payRun = $executionService->createPayRun($tenantId, (int) $period->id, (int) $structure->id, 'standard', 'Real Finance GL', $userId);
+            $executionService->calculatePayRun((int) $payRun->id, $userId);
+            $executionService->approvePayRun((int) $payRun->id, $userId);
+
+            $paidRun = $executionService->payPayRun((int) $payRun->id, $userId);
+            $this->assertSame(PayRunStatus::Paid, $paidRun->status);
+            $this->assertNotNull($paidRun->finance_journal_id);
+
+            $journal = FinanceJournalEntry::query()->with('lines')->findOrFail($paidRun->finance_journal_id);
+            $this->assertSame(JournalStatus::Posted, $journal->status);
+            $this->assertSame($journal->total_debit, $journal->total_credit);
+            $this->assertSame('120000.000000', (string) $journal->total_debit);
+            $this->assertGreaterThanOrEqual(2, $journal->lines->count());
+
+            $reversedRun = $executionService->reversePayRun((int) $payRun->id, $userId, 'Real finance reversal check');
+            $this->assertSame(PayRunStatus::Reversed, $reversedRun->status);
+            $journal->refresh();
+            $this->assertSame(JournalStatus::Reversed, $journal->status);
+        });
+    }
+
+    public function test_payroll_journal_posting_throws_when_tenant_base_currency_is_missing(): void
+    {
+        [$tenantId, $orgUnitId] = $this->scope();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $orgUnitId): void {
+            $userId = TenantUserFixture::create([
+                'tenant_id' => $tenantId,
+                'email' => 'payroll-nocur-'.Str::lower(Str::random(8)).'@example.test',
+            ]);
+            TenantModel::query()->whereKey($tenantId)->update(['base_currency_id' => null]);
+
+            $period = PayrollPayPeriod::create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'name' => 'August 2026',
+                'cycle_type' => PayrollCycleType::Monthly,
+                'period_start' => '2026-08-01',
+                'period_end' => '2026-08-31',
+                'payout_date' => '2026-08-31',
+                'total_working_days' => 21,
+            ]);
+
+            $structure = PayrollSalaryStructure::create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'code' => 'NO_CUR_1',
+                'name' => 'No Currency Structure',
+                'cycle_type' => PayrollCycleType::Monthly,
+                'is_active' => true,
+            ]);
+
+            $dept = app(HrDepartmentService::class)->create(new HrDepartmentData($tenantId, 'DEP-'.Str::random(4), 'Finance', $orgUnitId));
+            $employee = $this->createEmployee($tenantId, $orgUnitId, 'EMP-NOCUR-1', $dept->id, '2025-01-01', null);
+
+            PayrollEmployeeSalaryAssignment::create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'employee_id' => $employee->id,
+                'salary_structure_id' => $structure->id,
+                'base_salary' => '80000.000000',
+                'hourly_rate' => '476.190476',
+                'effective_from' => '2026-01-01',
+                'is_active' => true,
+            ]);
+
+            $executionService = app(PayRunExecutionService::class);
+            $payRun = $executionService->createPayRun($tenantId, (int) $period->id, (int) $structure->id, 'standard', 'Missing Currency', $userId);
+            $executionService->calculatePayRun((int) $payRun->id, $userId);
+            $executionService->approvePayRun((int) $payRun->id, $userId);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Tenant base currency must be configured before posting payroll journals.');
+
+            $executionService->payPayRun((int) $payRun->id, $userId);
         });
     }
 
@@ -891,7 +1087,7 @@ final class PayrollEngineTest extends TestCase
             'total_credit' => '150000.000000',
         ]);
 
-        $fakeFinance = new class($journal->id) implements FinancePostingInterface
+        $fakeFinance = new class($journal->id) implements FinancePostingInterface, FinanceSourceReversalInterface
         {
             public ?PostingContext $lastContext = null;
 
@@ -924,9 +1120,25 @@ final class PayrollEngineTest extends TestCase
 
                 return new PostingResultData($this->journalId, 'JRN-REV-TEST', 'reversed', '150000.000000', '150000.000000');
             }
+
+            public function reverseSource(
+                int $tenantId,
+                ?int $organizationUnitId,
+                string $sourceModule,
+                string $sourceType,
+                int $sourceId,
+                string $reversalDate,
+                ?int $reversedBy = null,
+                ?string $reason = null,
+            ): PostingResultData {
+                $this->reversed = true;
+
+                return new PostingResultData($this->journalId, 'JRN-REV-TEST', 'reversed', '150000.000000', '150000.000000');
+            }
         };
 
         $this->app->instance(FinancePostingInterface::class, $fakeFinance);
+        $this->app->instance(FinanceSourceReversalInterface::class, $fakeFinance);
 
         return $fakeFinance;
     }

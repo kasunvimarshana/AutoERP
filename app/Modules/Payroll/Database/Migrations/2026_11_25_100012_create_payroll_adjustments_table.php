@@ -26,7 +26,7 @@ return new class extends Migration
             $table->unsignedBigInteger('employee_id');
             $table->string('adjustment_type', 32); // addition, deduction, retro_pay, reimbursement, correction
             $table->unsignedBigInteger('salary_component_id')->nullable();
-            $table->decimal('amount', 15, 4);
+            $table->decimal('amount', 20, 6);
             $table->unsignedBigInteger('effective_pay_period_id')->nullable();
             $table->string('status', 32)->default('pending'); // pending, applied, cancelled
             $table->unsignedBigInteger('applied_payslip_id')->nullable();

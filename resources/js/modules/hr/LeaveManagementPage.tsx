@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
@@ -14,6 +14,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button } from '@/shared/components/Button';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { EmployeeLookupSelect } from './components/EmployeeLookupSelect';
 import { HrLeaveTypeSelect } from './components/HrLeaveTypeSelect';
 import {
@@ -45,18 +46,18 @@ export default function LeaveManagementPage() {
 
     // Apply Form
     const [selectedLeaveType, setSelectedLeaveType] = useState<HrLeaveType | null>(null);
-    const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
-    const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [startDate, setStartDate] = useState(() => businessDateInputValue());
+    const [endDate, setEndDate] = useState(() => businessDateInputValue());
     const [durationType, setDurationType] = useState<'full_day' | 'half_day_morning' | 'half_day_afternoon' | 'custom_hours'>('full_day');
     const [totalDays, setTotalDays] = useState('1.00');
     const [reason, setReason] = useState('');
 
     // Comp-off Form
-    const [workedDate, setWorkedDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [workedDate, setWorkedDate] = useState(() => businessDateInputValue());
     const [compOffDays, setCompOffDays] = useState('1.00');
     const [compOffReason, setCompOffReason] = useState('');
 
-    const fetchData = () => {
+    const fetchData = useCallback(() => {
         setLoading(true);
         setError(null);
 
@@ -70,13 +71,15 @@ export default function LeaveManagementPage() {
             })
             .catch((err) => setError(err?.response?.data?.message || 'Failed to load leave data'))
             .finally(() => setLoading(false));
-    };
+    }, [selectedEmployee?.id]);
 
     useEffect(() => {
         if (canView) {
-            fetchData();
+            queueMicrotask(() => {
+                fetchData();
+            });
         }
-    }, [selectedEmployee]);
+    }, [canView, fetchData]);
 
     if (!canView) return <AccessDeniedPage />;
 

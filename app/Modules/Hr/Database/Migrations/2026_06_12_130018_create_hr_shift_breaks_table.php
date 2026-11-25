@@ -30,6 +30,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('duration_minutes');
             $table->boolean('is_paid')->default(false);
             $table->boolean('is_mandatory')->default(true);
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'hr_shift_breaks_id_tenant_uk');

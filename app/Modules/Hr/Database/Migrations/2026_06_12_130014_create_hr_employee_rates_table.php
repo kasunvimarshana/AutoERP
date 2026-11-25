@@ -37,6 +37,7 @@ return new class extends Migration
             $table->date('effective_from')->nullable();
             $table->date('effective_to')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->unsignedInteger('row_version')->default(1);
             $table->timestamps();
             $table->index(['tenant_id', 'employee_id', 'rate_type'], 'hr_employee_rates_lookup_ix');
             $table->index(['effective_from', 'effective_to'], 'hr_employee_rates_dates_ix');

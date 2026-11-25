@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Payroll\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Modules\Payroll\Enums\LoanType;
 use Modules\Payroll\Http\Requests\PayrollRequest;
@@ -100,7 +101,10 @@ final class PayrollLoanController extends Controller
     public function approve(PayrollRequest $request, int $id): JsonResponse
     {
         $tenantId = $request->tenantId();
-        $userId = $request->currentUserId() ?? 1;
+        $userId = $request->currentUserId();
+        if ($userId === null) {
+            throw new AuthenticationException('Authenticated user context is required.');
+        }
 
         $loan = PayrollEmployeeLoan::query()
             ->where('tenant_id', $tenantId)

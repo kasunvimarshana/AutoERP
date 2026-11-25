@@ -59,6 +59,7 @@ class UpsertUnitOfMeasureRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'row_version' => ['nullable', 'integer', 'min:0'],
+            'expected_version' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => [
                 Rule::prohibitedIf($this->clientProvidedOrganizationUnitId),
                 'nullable',

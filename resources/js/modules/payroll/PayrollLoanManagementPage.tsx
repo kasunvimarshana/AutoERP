@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { EmployeeLookupSelect } from '@/modules/hr/components/EmployeeLookupSelect';
 import type { EmployeeSummary } from '@/modules/hr/hrTypes';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { PayPeriodSelect } from './components/PayPeriodSelect';
 import {
     approveLoan,
@@ -46,7 +47,7 @@ export function PayrollLoanManagementPage() {
     // Detail & Disbursement Dialogs
     const [activeLoanDetail, setActiveLoanDetail] = useState<PayrollLoan | null>(null);
     const [isDisburseModalOpen, setIsDisburseModalOpen] = useState(false);
-    const [disburseDate, setDisburseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [disburseDate, setDisburseDate] = useState<string>(() => businessDateInputValue());
     const [disbursePeriod, setDisbursePeriod] = useState<PayPeriod | null>(null);
 
     const loadLoans = useCallback(async () => {

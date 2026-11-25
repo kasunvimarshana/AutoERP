@@ -39,7 +39,9 @@ export function RentalOwnerBillPreviewModal({
     const today = businessDateInputValue();
     const startOfMonth = today.slice(0, 7) + '-01';
 
-    const [selectedAgreement, setSelectedAgreement] = useState<NamedResource | null>(null);
+    const [selectedAgreement, setSelectedAgreement] = useState<NamedResource | null>(() => (
+        initialAgreementId ? { id: initialAgreementId, name: `Owner Agreement #${initialAgreementId}` } : null
+    ));
     const [startDate, setStartDate] = useState(startOfMonth);
     const [endDate, setEndDate] = useState(today);
     const [whtRate, setWhtRate] = useState('10.0');
@@ -49,12 +51,14 @@ export function RentalOwnerBillPreviewModal({
     const [error, setError] = useState<ApiError | null>(null);
 
     useEffect(() => {
-        if (!open) {
-            setPreview(null);
-            setError(null);
-        } else if (initialAgreementId) {
-            setSelectedAgreement({ id: initialAgreementId, name: `Owner Agreement #${initialAgreementId}` });
-        }
+        queueMicrotask(() => {
+            if (!open) {
+                setPreview(null);
+                setError(null);
+            } else if (initialAgreementId) {
+                setSelectedAgreement({ id: initialAgreementId, name: `Owner Agreement #${initialAgreementId}` });
+            }
+        });
     }, [open, initialAgreementId]);
 
     async function handleCalculatePreview(e?: React.FormEvent) {
