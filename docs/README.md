@@ -79,11 +79,11 @@ The AutoERP codebase is continuously verified across strict automated regression
 
 | Quality Gate | Tool / Command | Verified Baseline Status |
 |---|---|---|
-| **Backend Test Suite** | `php artisan test` | **1,370 tests passed** (14,235 assertions, 0 failures) |
-| **Frontend Test Suite** | `npm test` | **176 test files passed** (736 tests passed, 0 failures) |
+| **Backend Test Suite** | `php artisan test` | **1,433 tests passed** (15,106 assertions, 0 failures) |
+| **Frontend Test Suite** | `npm test` | **177 test files passed** (745 tests passed, 0 failures) |
 | **TypeScript Static Check** | `npm run typecheck` | **0 errors** (strict compiler mode) |
 | **ESLint Static Analysis** | `npm run lint` | **0 errors**, 0 warnings |
-| **Database Migrations** | `php artisan test --filter ModuleMigrationBaselineTest` | **262 module tables** (267 total tables), 1:1 migration mapping, 0 alteration patches |
+| **Database Migrations** | `php artisan test --filter ModuleMigrationBaselineTest` | **302 module tables** (307 total tables: 5 root + 302 module), 1:1 migration mapping, 0 alteration patches |
 | **Historical Data Retention** | `php artisan test --filter HistoricalRetentionMigrationTest` | **100% compliance** (`restrictOnDelete()` on status histories) |
 
 ---
@@ -95,7 +95,7 @@ All development, bug fixes, refactoring, and AI-agent interactions must adhere s
 1. **Understand First, Verify Second, Change Third:** Never act on assumptions or guess. Fully understand requirements, module ownership, and data consequences before modifying code.
 2. **Root Cause Design over Compatibility Workarounds:** Fix root causes at their source. Do not preserve legacy flaws or build compatibility patches unless explicitly required.
 3. **Simplicity, Pragmatism & No Overengineering:** Prefer the simplest clean design that solves the problem. Avoid premature optimization or generic frameworks. No dead code.
-4. **Module Ownership & Clear Boundaries:** Each of the 31 modules in `app/Modules/*` owns its models, tables, and logic. Never introduce cross-module workarounds or shadow tables.
+4. **Module Ownership & Clear Boundaries:** Each of the 32 backend modules in `app/Modules/*` (paired with 33 frontend modules in `resources/js/modules/*`) owns its models, tables, and logic. Never introduce cross-module workarounds or shadow tables.
 5. **Backend Authority & Single Source of Truth:** Core calculations, business logic, state transitions, permissions, and validations reside authoritatively on the backend.
 6. **Concurrency, Atomicity & Transaction Immutability:** Write mutations must be atomic, conflict-aware, and version-checked (`expected_version` / `row_version`). Historical operational and financial records are immutable.
 7. **Database Architecture & Explicit Migrations:** One table per migration file. Write every column, constraint, foreign key, and index explicitly line-by-line (KISS + Explicit over DRY). Zero dynamic loops or runtime naming.

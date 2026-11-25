@@ -4,8 +4,8 @@
 **System Architecture:** Modular Monolith (Laravel 12 Backend + React 19 / TypeScript 6 SPA Frontend)  
 **Standard Civil Timezone:** Dynamically Configured Workspace Timezone (`localization.timezone` scoped by tenant/organization unit, with fallback to application `APP_TIMEZONE`)  
 **Arithmetic Precision:** Exact Arbitrary-Precision String Arithmetic via `DecimalMath` (PHP BCMath)  
-**Total Canonical Database Tables:** 267 Tables (262 Modular Migrations + 5 Infrastructure Migrations)  
-**Business Modules:** 31 Domain Modules located in `app/Modules/*`  
+**Total Canonical Database Tables:** 307 Tables (302 Modular Migrations + 5 Infrastructure Migrations)  
+**Business Modules:** 32 Domain Modules located in `app/Modules/*` (paired with 33 frontend modules in `resources/js/modules/*`)  
 **Shared Project Memory:** Append-Only Change Records in `docs/changes/`  
 **Binding Core Axioms:** `AGENTS.md` and `RULES.md`  
 
@@ -39,7 +39,7 @@
    - [4.4 Static Analysis & Type Checking](#44-static-analysis--type-checking)
    - [4.5 Architectural Migration Baseline Verification](#45-architectural-migration-baseline-verification)
 5. [Database Architecture & Schema Standards](#5-database-architecture--schema-standards)
-   - [5.1 The 267 Canonical Tables Overview](#51-the-267-canonical-tables-overview)
+   - [5.1 The 307 Canonical Tables Overview](#51-the-307-canonical-tables-overview)
    - [5.2 The Single-Table Baseline Migration Principle](#52-the-single-table-baseline-migration-principle)
    - [5.3 Explicit Column & Index Design (KISS + Explicit over DRY)](#53-explicit-column--index-design-kiss--explicit-over-dry)
    - [5.4 Foreign Key Constraint Policy & Audit Retention (`restrictOnDelete`)](#54-foreign-key-constraint-policy--audit-retention-restrictondelete)
@@ -53,7 +53,7 @@
    - [6.5 Idempotency Engine & Request Fingerprinting](#65-idempotency-engine--request-fingerprinting)
    - [6.6 Monotonic Document Sequences (`Sequence`)](#66-monotonic-document-sequences-sequence)
    - [6.7 Tamper-Evident Private Object Storage (`PrivateObject`)](#67-tamper-evident-private-object-storage-privateobject)
-7. [Comprehensive 31-Module Catalog & Domain Matrix](#7-comprehensive-31-module-catalog--domain-matrix)
+7. [Comprehensive 32-Module Catalog & Domain Matrix](#7-comprehensive-32-module-catalog--domain-matrix)
    - [7.1 Cross-Cutting Infrastructure Modules](#71-cross-cutting-infrastructure-modules)
    - [7.2 Platform & Identity Modules](#72-platform--identity-modules)
    - [7.3 Master Data Governance Modules](#73-master-data-governance-modules)
@@ -113,7 +113,7 @@ AutoERP rejects two common architectural extremes:
 2. **Premature Microservices:** Where distributed transactions, network serialization, eventual consistency, and network latency introduce immense cognitive and infrastructure overhead before organization scale warrants it.
 
 Instead, AutoERP adopts the **Modular Monolith pattern**:
-- **Independent Domain Modules:** The platform is partitioned into **31 decoupled domain modules** located under `app/Modules/<ModuleName>/`.
+- **Independent Domain Modules:** The platform is partitioned into **32 decoupled backend domain modules** located under `app/Modules/<ModuleName>/` (paired with **33 frontend modules** under `resources/js/modules/`).
 - **Vertical Feature Cohesion:** Each module strictly encapsulates its own Eloquent models, controllers, services, database migrations, seeders, form requests, events, listeners, policies, enums, and automated test suites.
 - **Strict Single-Directional Boundaries:** Cross-module communication occurs exclusively through well-defined service interfaces or event-driven listeners. A module never executes direct SQL writes or updates on another module's database tables.
 - **Unified Single-Process Deployment:** The entire system runs within a single Laravel application context, sharing transactions, database connections, and cache infrastructure while maintaining total logical separation.
@@ -126,7 +126,7 @@ flowchart TD
         UI["Ergonomic UI (Zero Raw IDs, Controlled Lookups, Transparent Calculations)"]
         ROUTER["React Router 7 SPA Routing Engine"]
         STORES["Zustand Client State & React Query Hooks"]
-        VITE["Vite 7 Production Asset Pipeline"]
+        VITE["Vite 8 Production Asset Pipeline"]
         UI --> ROUTER
         ROUTER --> STORES
         STORES --> VITE
@@ -153,7 +153,7 @@ flowchart TD
         AUDIT["Audit Service (Immutable Activity Stream)"]
     end
 
-    subgraph DomainModules["31 Modular Monolith Domains (app/Modules/*)"]
+    subgraph DomainModules["32 Modular Monolith Domains (app/Modules/*)"]
         direction TB
         MASTER["Master Data: Customer, Supplier, Vehicle, Item, Hr, UOM, Warehouse"]
         OPERATIONS["Operations: VehicleRental, VehicleService, Purchase, Selling, Promotion, Expense"]
@@ -198,7 +198,7 @@ The 12 Core Axioms defined in `AGENTS.md` and `RULES.md` govern every line of co
 - *"Wise developers know when to follow the framework and when to break away. Be wise."*
 
 ### Axiom 4: Module Ownership & Clear Boundaries
-- Each of the 31 modules owns only the logic, data models, and business responsibilities assigned to it.
+- Each of the 32 modules owns only the logic, data models, and business responsibilities assigned to it.
 - Fix problems at their source: any bug, missing functionality, or incomplete implementation must be addressed directly within the responsible module.
 - Never compensate for bugs or deficiencies in one module by adding workarounds, shadow tables, or misplaced logic in another module.
 - If business rules or logic are found in the wrong module, relocate them to the owning module rather than expanding the improper module's scope.
@@ -303,7 +303,7 @@ composer install
 # 5. Non-interactively verify and generate the application encryption key
 php artisan app:key:ensure
 
-# 6. Execute all 267 canonical baseline database migrations
+# 6. Execute all 307 canonical baseline database migrations
 php artisan migrate
 
 # 7. Synchronize platform security catalogs and system permissions
@@ -351,9 +351,9 @@ AutoERP provides specialized CLI commands to assist administrators and developer
 |---|---|---|
 | `php artisan app:key:ensure` | `Core` | Checks for an active `APP_KEY` in `.env` and generates one safely without prompt if missing. |
 | `php artisan platform:health` | `Core` | Diagnostics across database connectivity, cache drivers, queue listeners, and private storage. |
-| `php artisan platform:permissions:sync` | `Auth` / `User` | Scans all 31 modules and synchronizes permissions into the platform database catalog. |
+| `php artisan platform:permissions:sync` | `Auth` / `User` | Scans all 32 modules and synchronizes permissions into the platform database catalog. |
 | `php artisan auth:readiness` | `Auth` | Asserts Passport RSA encryption keys, OAuth token tables, and auth guard readiness. |
-| `php artisan auth:client:create` | `Auth` | Provisions a new OAuth client for external API integrations. |
+| `php artisan auth:client-create` | `Auth` | Provisions a new OAuth client for external API integrations. |
 | `php artisan tenant:create` | `Tenant` | Provisions a new tenant workspace, assigning its initial domain, slug, and subscription plan. |
 | `php artisan tenant:activate` | `Tenant` | Activates an onboarded tenant workspace. |
 | `php artisan tenant:domain:revalidate` | `Tenant` | Verifies DNS and SSL records for custom tenant vanity domains. |
@@ -371,12 +371,12 @@ AutoERP enforces a **zero-tolerance policy** for broken tests, type errors, or s
 
 | Quality Gate | Tooling / Framework | Target Baseline & Coverage | Execution Command |
 |---|---|---|---|
-| **Backend Feature & Unit Tests** | PHPUnit 11 | **1,370 Passed / 1,370 Tests (14,235 assertions)** | `php artisan test` |
-| **Frontend Unit & Component Tests** | Vitest 3 + React Testing Library | **176 Passed / 176 Suites (736 tests passed)** | `npm test` |
+| **Backend Feature & Unit Tests** | PHPUnit 11 | **1,433 Passed / 1,433 Tests (15,106 assertions)** | `php artisan test` |
+| **Frontend Unit & Component Tests** | Vitest 5 (`^5.1.2`) + React Testing Library | **177 Passed / 177 Files (745 tests passed)** | `npm test` |
 | **Static TypeScript Verification** | TypeScript Compiler (`tsc`) | **0 Errors across 922 TS/TSX files** (Strict Mode) | `npm run typecheck` |
 | **Frontend Linting & Code Style** | ESLint 9 | **0 Errors** (`resources/js/*`) | `npm run lint` |
 | **Backend Code Style Formatting** | Laravel Pint (PSR-12) | **0 Violations** | `php vendor/bin/pint --test` |
-| **Single-Table Baseline Integrity**| PHPUnit Architecture Test | **100% Compliance (262 modular migrations, 0 `Schema::table`)** | `php artisan test --filter ModuleMigrationBaselineTest` |
+| **Single-Table Baseline Integrity**| PHPUnit Architecture Test | **100% Compliance (302 modular migrations, 0 `Schema::table`)** | `php artisan test --filter ModuleMigrationBaselineTest` |
 | **Audit Retention FK Integrity** | PHPUnit Architecture Test | **100% Compliance (`restrictOnDelete` on status histories)** | `php artisan test --filter HistoricalRetentionMigrationTest` |
 | **Live MySQL Integration Suite** | PHPUnit + MySQL 8 Container | Live database transactions and locking verification | `composer test:mysql` |
 
@@ -385,7 +385,7 @@ AutoERP enforces a **zero-tolerance policy** for broken tests, type errors, or s
 Backend tests are executed against SQLite in-memory databases for lightning-fast execution while maintaining full relational integrity:
 
 ```bash
-# Run the complete backend test suite across all 31 modules
+# Run the complete backend test suite across all 32 modules
 php artisan test
 
 # Run tests for a specific module
@@ -433,7 +433,7 @@ php vendor/bin/pint --test
 
 AutoERP employs specialized architectural unit tests to enforce database design hygiene automatically:
 
-1. **`ModuleMigrationBaselineTest`:** Inspects every migration file across all 31 modules, asserting:
+1. **`ModuleMigrationBaselineTest`:** Inspects every migration file across all 32 modules, asserting:
    - Exactly one table is created per migration file.
    - Timestamps are monotonically ordered.
    - Zero `Schema::table()` alteration patches exist in the repository.
@@ -450,40 +450,41 @@ php artisan test --filter HistoricalRetentionMigrationTest
 
 AutoERP's relational database architecture prioritizes **immutability, explicit structural definitions, audit preservation, and optimistic concurrency**.
 
-### 5.1 The 267 Canonical Tables Overview
+### 5.1 The 307 Canonical Tables Overview
 
-The canonical AutoERP schema consists of **267 tables** across 28 functional areas:
+The canonical AutoERP schema consists of **307 tables** (5 root infrastructure + 302 modular):
 
 - **Infrastructure Framework Tables (5 Tables):** Located in `database/migrations/`:
   - `cache`, `cache_locks`: Application cache and distributed atomic mutex locking.
   - `jobs`, `job_batches`, `failed_jobs`: Asynchronous queue execution and batch tracking.
-- **27 Database-Owning Application Modules (262 Tables):** Located in `app/Modules/<ModuleName>/Database/Migrations/`:
+- **28 Database-Owning Application Modules (302 Tables):** Located in `app/Modules/<ModuleName>/database/migrations/`:
   - `Tenant` (14 tables): Multi-tenant subscriptions, domain mapping, tenant states.
   - `OrganizationUnit` (4 tables): Depots, branches, legal entities, unit hierarchies.
   - `User` (13 tables): Users, roles, permissions, quick-access settings.
   - `Auth` (17 tables): OAuth tokens, platform auth credentials, session lifecycles.
   - `Configuration` (6 tables): Tenant and global settings with immutable revision histories.
-  - `ReferenceData` (11 tables): ISO currencies, countries, languages, civil timezones.
+  - `ReferenceData` (4 tables): ISO currencies, countries, languages, civil timezones.
   - `Idempotency` (1 table): Request payload fingerprints and execution locks.
   - `Sequence` (1 table): Monotonic document sequence numbers.
-  - `Audit` (2 tables): Enterprise immutable activity stream and change diffs.
+  - `Audit` (1 table): Enterprise immutable activity stream and change diffs.
   - `Customer` (10 tables): Corporate debtors, contacts, credit profiles, WhatsApp verification.
   - `Supplier` (11 tables): Creditors, spare parts vendors, vehicle lessors, bank accounts.
-  - `Vehicle` (15 tables): Fleet asset registry, odometers, VIN, revenue licenses, makes/models.
-  - `Hr` (15 tables): Employee directory, departments, designations, driver/mechanic rates.
-  - `Item` (12 tables): Master product catalog, repair labor lines, spare parts, pricing.
-  - `UOM` (4 tables): Units of measure, conversion tables, measurement dimensions.
-  - `Warehouse` (6 tables): Warehouses, workshop bays, aisle/rack/bin storage locations.
-  - `Inventory` (14 tables): Real-time balances, valuation layers, stock movement ledger.
-  - `Purchase` (22 tables): POs, GRN receipts, supplier invoices, returns, debit notes.
+  - `Vehicle` (9 tables): Fleet asset registry, attributes, documents, ownerships, makes/models.
+  - `Hr` (42 tables): Employee directory, departments, designations, shifts, attendance, leave, biometric sync, driver/mechanic rates.
+  - `Item` (10 tables): Master product catalog, repair labor lines, spare parts, pricing.
+  - `UOM` (2 tables): Units of measure, conversion tables.
+  - `Warehouse` (2 tables): Warehouses, workshop bays, storage locations.
+  - `Inventory` (21 tables): Real-time balances, valuation layers, stock movement ledger, stock counts.
+  - `Purchase` (12 tables): POs, GRN receipts, supplier invoices, returns, debit notes.
   - `Selling` (4 tables): Sales orders, quotations, customer delivery lines, sales returns.
-  - `Expense` (6 tables): Corporate overhead expenses, approvals, expense types.
+  - `Expense` (2 tables): Corporate overhead expenses and expense types.
   - `Promotion` (10 tables): Loyalty cards, promotion templates, redemption audit logs.
   - `VehicleService` (16 tables): Workshop job cards, labor lines, commission splits, customer feedback/reviews.
   - `Invoice` (11 tables): Canonical commercial invoices, lines, posting plans, layouts.
   - `Payment` (10 tables): Cash treasury, customer receipts, payouts, cheques.
-  - `Finance` (13 tables): Double-entry GL, Chart of Accounts, fiscal periods, posting profiles.
-  - `Tax` (6 tables): Statutory tax profiles, VAT/NBT/WHT rates, tax snapshots.
+  - `Finance` (18 tables): Double-entry GL, Chart of Accounts, fiscal periods, posting profiles, bank reconciliations, budgets.
+  - `Tax` (9 tables): Statutory tax profiles, VAT/NBT/WHT rates, tax snapshots.
+  - `Payroll` (14 tables): Salary structures, pay runs, loans, statutory deductions, retroactive adjustments.
   - `VehicleRental` (28 tables): Customer/owner agreements, running charts, billing cycles, incidents.
 - **Architectural Modules with Zero Tables (4 Modules):**
   - `Core`: Technical base classes, `TenantOwnedModel`, BCMath `DecimalMath`.
@@ -496,7 +497,7 @@ The canonical AutoERP schema consists of **267 tables** across 28 functional are
 In AutoERP, migrations represent **immutable database schema specifications**, not application code:
 - **One Table Per Migration File:** Every database table is created by exactly one migration file.
 - **Elimination of Patch Migrations:** Historical `Schema::table()` alteration migrations and `UpgradeMigrations` are strictly forbidden. All column additions, index alterations, and constraint updates are merged directly into the original creation migration.
-- **Clean Baseline History:** When migrating fresh (`php artisan migrate:fresh`), all 267 tables are constructed in a single deterministic pass.
+- **Clean Baseline History:** When migrating fresh (`php artisan migrate:fresh`), all 307 tables are constructed in a single deterministic pass.
 
 ### 5.3 Explicit Column & Index Design (KISS + Explicit over DRY)
 
@@ -586,7 +587,7 @@ All tenant-scoped models extend [`TenantOwnedModel`](file:///d:/project-new/Auto
 
 ### 6.4 Role-Based Access Control (RBAC) & Route Entitlements
 
-- **Granular Permissions:** Over 150 discrete permissions are registered across the 31 modules (e.g. `vehicle.rental.agreement.create`, `invoice.post`, `vehicle.odometer.override`).
+- **Granular Permissions:** Over 150 discrete permissions are registered across the 32 modules (e.g. `vehicle.rental.agreement.create`, `invoice.post`, `vehicle.odometer.override`).
 - **Route Protection Middleware:**
   - `tenant.permission:{permission}`: Verifies the authenticated user holds the required permission.
   - `tenant.feature:{feature}`: Asserts that the tenant's active subscription tier entitles access to the requested module or feature.
@@ -619,9 +620,9 @@ Sensitive attachments (police accident reports, signed contracts, driver license
 
 ---
 
-## 7. Comprehensive 31-Module Catalog & Domain Matrix
+## 7. Comprehensive 32-Module Catalog & Domain Matrix
 
-AutoERP organizes its business capabilities into **31 decoupled modules** in `app/Modules/*`:
+AutoERP organizes its business capabilities into **32 decoupled backend modules** in `app/Modules/*` (paired with **33 frontend modules** in `resources/js/modules/*`):
 
 ### 7.1 Cross-Cutting Infrastructure Modules
 
@@ -676,6 +677,7 @@ AutoERP organizes its business capabilities into **31 decoupled modules** in `ap
 | **`Finance`** | General Ledger Accounting | `FinanceAccount`, `FinanceJournalEntry`, `FinancePostingProfile` | Double-entry GL, Chart of Accounts, fiscal accounting periods, semantic posting rules. |
 | **`Tax`** | Statutory Taxation Engine | `TaxProfile`, `TaxCategory`, `TaxRate` | VAT/NBT/WHT tax calculation profiles and line-level tax snapshots. |
 | **`Voucher`** | Unified Voucher Views | *None (Presentation composite)* | Read-only unified views over transactions, receipts, and disbursement vouchers. |
+| **`Payroll`** | Workforce Payroll Engine | `PayrollRun`, `PayrollRunLine`, `EmployeeSalaryStructure`, `EmployeeLoan` | Multi-cycle pay runs, statutory deductions, employee loans, retroactive adjustments, GL posting. |
 | **`Reporting`** | Business Intelligence | *None (Document engine)* | Printable HTML layouts, Spatie Laravel PDF exports, CSV/Excel data streams. |
 
 ---
@@ -1027,7 +1029,7 @@ AutoERP features an enterprise reporting engine supporting interactive HTML grid
 To reset the database cleanly from scratch and verify full baseline integrity:
 
 ```bash
-# Drops all tables, re-runs all 267 canonical migrations, and seeds master baseline
+# Drops all tables, re-runs all 307 canonical migrations, and seeds master baseline
 php artisan migrate:fresh --seed
 ```
 

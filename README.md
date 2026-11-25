@@ -4,10 +4,10 @@
 [![Laravel](https://img.shields.io/badge/Laravel-12.x-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/)
 [![React](https://img.shields.io/badge/React-19.x-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-7.x-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.x-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-1%2C300%2B%20Passing-brightgreen?style=flat-square)](file:///d:/project-new/AutoERP/tests)
-[![Migrations](https://img.shields.io/badge/Database%20Tables-266%20Canonical-blue?style=flat-square)](file:///d:/project-new/AutoERP/database/migrations)
+[![Tests](https://img.shields.io/badge/Tests-1%2C433%20Passing-brightgreen?style=flat-square)](file:///d:/project-new/AutoERP/tests)
+[![Migrations](https://img.shields.io/badge/Database%20Tables-307%20Canonical-blue?style=flat-square)](file:///d:/project-new/AutoERP/database/migrations)
 
 > AutoERP is a mission-critical, multi-tenant enterprise resource planning platform engineered as a clean **Modular Monolith**. It unifies dual-plane multi-tenancy, commercial vehicle fleet leasing and operations, automotive workshop repair jobs, supply chain procurement, inventory warehousing with FIFO/WAC valuation, canonical commercial invoicing, cash treasury management, double-entry general ledger accounting, statutory taxation, and executive business reporting.
 
@@ -26,7 +26,7 @@
   - [6.3 Step-by-Step Manual Setup](#63-step-by-step-manual-setup)
   - [6.4 Local Development Workflow (`composer dev`)](#64-local-development-workflow-composer-dev)
   - [6.5 Environment Configuration (`.env`)](#65-environment-configuration-env)
-- [7. Complete Domain Module Catalog (31 Modules)](#7-complete-domain-module-catalog-31-modules)
+- [7. Complete Domain Module Catalog (32 Modules)](#7-complete-domain-module-catalog-32-modules)
 - [8. Database Architecture & Schema Governance](#8-database-architecture--schema-governance)
   - [8.1 The Single-Table Baseline Migration Principle](#81-the-single-table-baseline-migration-principle)
   - [8.2 Key Naming & Integrity Standards](#82-key-naming--integrity-standards)
@@ -76,7 +76,7 @@ Every engineer, contributor, and AI agent working on AutoERP must strictly adher
 1. **Understand First, Verify Second, Change Third:** Never act on assumptions or guess. Fully understand requirements, module ownership, and data consequences before modifying code. Fix only the requested issue using the smallest safe change.
 2. **Root Cause Design over Compatibility Workarounds:** Prioritize correctness, readability, and long-term maintainability over backward compatibility. Do not carry forward legacy flaws or patch bad designs. Fix underlying root causes.
 3. **Simplicity, Pragmatism & No Overengineering:** Prefer the simplest clean design that correctly solves the problem. Avoid premature optimization, speculative features, or generic frameworks. Dead code is prohibited.
-4. **Module Ownership & Clear Boundaries:** Each of the 31 domain modules strictly owns its models, business logic, and tables. Never compensate for a bug in one module by creating shadow tables or workarounds in another.
+4. **Module Ownership & Clear Boundaries:** Each of the 32 domain modules strictly owns its models, business logic, and tables. Never compensate for a bug in one module by creating shadow tables or workarounds in another.
 5. **Backend Authority & Single Source of Truth:** The backend is the single authoritative source of truth for business logic, validations, state transitions, calculations, and permissions. The frontend provides immediate presentation feedback only; it never substitutes for backend enforcement.
 6. **Concurrency, Atomicity & Transaction Immutability:** Concurrency is assumed across all write operations. Every write mutation must be atomic, conflict-aware, and version-checked (`expected_version` / `row_version`). Historical operational and financial ledger records are immutable; adjustments and reversals must be recorded as separate, linked audit records.
 7. **Database Architecture & Explicit Migrations:** One table per migration file. Migrations represent immutable database schema history: write every column, foreign key, constraint, and index explicitly line-by-line (**KISS + Explicit over DRY**). Dynamic loops, runtime conditionals, or programmatic column names in migrations are prohibited.
@@ -90,7 +90,7 @@ Every engineer, contributor, and AI agent working on AutoERP must strictly adher
 
 ## 3. System Architecture & High-Level Design
 
-AutoERP implements a **Modular Monolith** architecture where business capabilities are segregated into 31 autonomous modules within `app/Modules/*`, communicating via explicit contracts, service boundaries, and database relationships.
+AutoERP implements a **Modular Monolith** architecture where business capabilities are segregated into 32 autonomous backend modules within `app/Modules/*` (paired with 33 frontend modules in `resources/js/modules/*`), communicating via explicit contracts, service boundaries, and database relationships.
 
 ```mermaid
 flowchart TD
@@ -122,7 +122,7 @@ flowchart TD
         AUDIT_SVC["Audit Logging (Immutable Operational Change Log)"]
     end
 
-    subgraph DomainTiers["31 Decoupled Domain Modules (app/Modules/*)"]
+    subgraph DomainTiers["32 Decoupled Domain Modules (app/Modules/*)"]
         direction TB
         subgraph MasterData["Master Data Tier"]
             CUST["Customer"]
@@ -193,13 +193,13 @@ flowchart TD
 - **Styling:** Tailwind CSS 4.0+.
 - **Routing:** React Router 7.x (SPA client routing).
 - **State Management:** Zustand 5.x and React hooks.
-- **Build Tool:** Vite 7.x with Hot Module Replacement (HMR).
+- **Build Tool & Test Runner:** Vite 8.x (`^8.3.8`) with Hot Module Replacement (HMR) and Vitest 5.x (`^5.1.2`).
 - **Notifications:** React-Toastify 11.x.
 
 ### Database & Storage
 - **Primary Database:** MySQL 8.0+ (standard local and production runtime).
 - **Test Database:** SQLite in-memory or file-backed (automated test runs).
-- **Schema Management:** 266 canonical, single-table baseline migrations.
+- **Schema Management:** 307 canonical, single-table baseline migrations (5 root + 302 modular).
 - **Attachment Storage:** Private tenant disks managed by `PrivateObject` with SHA-256 verification.
 
 ---
@@ -214,7 +214,7 @@ AutoERP/
 │   ├── Console/Commands/         # Core application console commands
 │   ├── Models/                   # Base User model (delegates to Modules/User)
 │   ├── Providers/                # Base Laravel application service providers
-│   └── Modules/                  # 31 Autonomous Domain Modules
+│   └── Modules/                  # 32 Autonomous Domain Modules
 │       ├── Audit/                # Immutable change logs and activity streams
 │       ├── Auth/                 # OAuth Passport authentication, refresh cookies
 │       ├── Configuration/        # Version-controlled key-value configurations
@@ -222,13 +222,14 @@ AutoERP/
 │       ├── Customer/             # Corporate debtors, credit profiles, contacts
 │       ├── Expense/              # Corporate overhead expenses and approvals
 │       ├── Finance/              # Double-entry General Ledger, Chart of Accounts
-│       ├── Hr/                   # Employee directory, drivers, mechanics, rates
+│       ├── Hr/                   # Employee directory, attendance, biometrics, shifts
 │       ├── Idempotency/          # Mutation request SHA-256 fingerprinting
 │       ├── Inventory/            # Real-time stock balances, FIFO/WAC valuation
 │       ├── Invoice/              # Canonical commercial invoice engine
 │       ├── Item/                 # Product catalog, spare parts, labor lines
 │       ├── OrganizationUnit/     # Physical branches, depots, workshop bays
 │       ├── Payment/              # Cash receipts, disbursements, cheque printing
+│       ├── Payroll/              # Salary structures, pay runs, loans, statutory deductions
 │       ├── PrivateObject/        # Secure tamper-evident private file storage
 │       ├── Promotion/            # Loyalty programs, service promo cards
 │       ├── Purchase/             # Procurement, GRN, Fast Purchase
@@ -258,7 +259,7 @@ AutoERP/
 │   ├── css/                      # Global styles and Tailwind CSS 4 directives
 │   ├── js/                       # React 19 / TypeScript 6 SPA application
 │   │   ├── app/                  # Application root, error boundaries, providers
-│   │   ├── modules/              # Module-specific UI views, dialogs, and hooks
+│   │   ├── modules/              # 33 Module-specific UI views, dialogs, and hooks
 │   │   └── shared/               # Reusable components (LookupSelect, businessDate)
 │   └── views/                    # welcome.blade.php (SPA host) and printable layouts
 ├── routes/
@@ -270,8 +271,8 @@ AutoERP/
 │   └── TestCase.php              # Base testing harness with tenant fixtures
 ├── AGENTS.md                     # Binding agent core axioms and engineering rules
 ├── composer.json                 # PHP dependencies, scripts, and dev tools
-├── package.json                  # Frontend dependencies, Vite, Vitest, TypeScript
-└── vite.config.ts                # Vite 7 build configuration
+├── package.json                  # Frontend dependencies, Vite 8.x, Vitest 5.x, TypeScript
+└── vite.config.ts                # Vite 8 build configuration
 ```
 
 ---
@@ -336,7 +337,7 @@ composer install
 # 5. Generate application encryption key safely
 php artisan app:key:ensure
 
-# 6. Run all 266 canonical database migrations
+# 6. Run all 307 canonical database migrations
 php artisan migrate
 
 # 7. Synchronize platform security catalogue
@@ -386,20 +387,20 @@ Key configuration variables defined in `.env.example`:
 |---|---|---|
 | `APP_ENV` | `local` | Application runtime environment (`local`, `production`, `testing`). |
 | `APP_KEY` | *(Generated)* | 32-character AES encryption key generated via `app:key:ensure`. |
-| `APP_TIMEZONE` | `UTC` | Default fallback civil business timezone when tenant localization setting is not specified. |
-| `DB_CONNECTION` | `mysql` | Primary database driver (`mysql` for dev/prod, `sqlite` for tests). |
+| `APP_TIMEZONE` | `Asia/Colombo` | Default fallback civil business timezone when tenant localization setting is not specified. |
+| `DB_CONNECTION` | `sqlite` | Default `.env.example` driver (`sqlite` out-of-the-box/tests; `mysql` for standard local/prod). |
 | `AUTOERP_CURRENCY_CODE` | `LKR` | Default operational currency code for financial transactions. |
 | `TENANT_LOCAL_FALLBACK_ENABLED` | `true` | Allows local development without multi-tenant subdomain DNS configuration. |
 | `TENANT_LOCAL_FALLBACK_TENANT_CODE`| `AUTOERP` | The default fallback tenant code resolved during local single-domain dev. |
 | `PDF_DRIVER` | `dompdf` | PDF rendering driver (`dompdf` or `spatie`). |
 | `FILESYSTEM_DISK` | `local` | Default disk storage driver. |
-| `PRIVATE_OBJECT_DEFAULT_DISK` | `tenant_private` | Storage disk for tamper-evident private files with SHA-256 verification. |
+| `PRIVATE_OBJECT_DEFAULT_DISK` | `"${FILESYSTEM_DISK}"` | Storage disk for tamper-evident private files with SHA-256 verification. |
 
 ---
 
-## 7. Complete Domain Module Catalog (31 Modules)
+## 7. Complete Domain Module Catalog (32 Modules)
 
-AutoERP organizes its business capabilities into **31 decoupled modules** in `app/Modules/*`:
+AutoERP organizes its business capabilities into **32 decoupled backend modules** in `app/Modules/*` (and **33 frontend modules** in `resources/js/modules/*`):
 
 | # | Module | Category | Primary Eloquent Models | Core Public Responsibilities |
 |---|---|---|---|---|
@@ -433,7 +434,8 @@ AutoERP organizes its business capabilities into **31 decoupled modules** in `ap
 | 28 | **`Finance`** | Financial Core | `FinanceAccount`, `FinanceJournalEntry`, `FinancePostingProfile` | Double-entry GL, Chart of Accounts, fiscal accounting periods, semantic posting rules. |
 | 29 | **`Tax`** | Financial Core | `TaxProfile`, `TaxCategory`, `TaxRate` | VAT/NBT/WHT tax calculation profiles and line-level tax snapshots. |
 | 30 | **`Voucher`** | Financial Core | *None (Presentation composite)* | Read-only unified views over transactions, receipts, and disbursement vouchers. |
-| 31 | **`Reporting`** | Business Intel | *None (Document engine)* | Printable HTML layouts, Spatie Laravel PDF exports, CSV/Excel data streams. |
+| 31 | **`Payroll`** | Financial Core | `PayrollRun`, `PayrollRunLine`, `EmployeeSalaryStructure`, `EmployeeLoan` | Multi-cycle pay runs, statutory deductions, employee loans, retroactive adjustments, GL posting. |
+| 32 | **`Reporting`** | Business Intel | *None (Document engine)* | Printable HTML layouts, Spatie Laravel PDF exports, CSV/Excel data streams. |
 
 ---
 
@@ -443,7 +445,7 @@ AutoERP organizes its business capabilities into **31 decoupled modules** in `ap
 
 In AutoERP, database migrations are treated as **immutable database schema specifications**, not dynamic application code:
 
-- **266 Canonical Tables:** 5 Laravel infrastructure tables in `database/migrations/` and 261 modular migrations in `app/Modules/*/Database/Migrations/`.
+- **307 Canonical Tables:** 5 Laravel infrastructure tables in `database/migrations/` and 302 modular migrations in `app/Modules/*/database/migrations/`.
 - **One Table Per Migration File:** Every database table is created by exactly one migration file named `YYYY_MM_DD_HHMMSS_create_<table_name>_table.php`.
 - **Zero Patch Migrations:** Historical `Schema::table()` alteration migrations and `UpgradeMigrations` are strictly eliminated. All column additions, index alterations, and constraint updates are consolidated directly into the canonical creation migration.
 - **KISS + Explicit over DRY:** Write every column, default value, foreign key constraint, and index explicitly line-by-line. Never use dynamic loops (`foreach ($columns as $col)`), runtime conditionals, or programmatic identifier naming.
@@ -852,9 +854,9 @@ AutoERP maintains a strict zero-regression quality gate. All checks must pass wi
 
 | Gate | Command | Description |
 |---|---|---|
-| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,370 PHPUnit tests (14,235 assertions) across all 31 modules using SQLite in-memory. |
+| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,433 PHPUnit tests (15,106 assertions) across all 32 modules using SQLite in-memory. |
 | **MySQL Integration Tests** | `composer test:mysql` | Runs integration tests against a live MySQL instance (`phpunit.mysql.xml`). |
-| **Frontend Unit Tests** | `npm test` | Runs 176 Vitest test suites (736 tests) in JSDOM mode. |
+| **Frontend Unit Tests** | `npm test` | Runs 177 Vitest test files (745 tests) in JSDOM mode. |
 | **TypeScript Compilation** | `npm run typecheck` | Validates TypeScript types across `resources/js` with zero emissions (`tsc --noEmit`). |
 | **ESLint Quality Check** | `npm run lint` | Lints React 19 / TypeScript code (`eslint resources/js`). |
 | **PHP Code Style (Pint)** | `vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |
@@ -871,12 +873,22 @@ AutoERP provides specialized CLI commands for administrative and operational tas
 |---|---|
 | `php artisan app:key:ensure` | Checks for `APP_KEY` and generates one non-interactively if missing. |
 | `php artisan auth:readiness` | Verifies OAuth Passport encryption keys, token tables, and auth providers. |
-| `php artisan auth:client:create` | Creates an OAuth client for API access. |
+| `php artisan auth:client-create` | Creates a tenant-owned OAuth client with exact redirects and security policy. |
+| `php artisan auth:clear-resets` | Flushes expired password reset tokens. |
+| `php artisan auth:incident` | Finds an Auth incident in local Laravel logs by correlation ID. |
+| `php artisan auth:retention:purge` | Purges expired Auth operational records according to configured retention periods. |
+| `php artisan hr:detect-missing-punches` | Scans attendance records to detect and flag missing clock-out punches. |
 | `php artisan platform:permissions:sync` | Scans all modules and synchronizes permissions into the platform catalog. |
 | `php artisan platform:health` | Performs system diagnostics across database, cache, queues, and storage. |
 | `php artisan tenant:create` | Provisions a new tenant with initial domain and plan configuration. |
 | `php artisan tenant:activate` | Activates an onboarded tenant workspace. |
+| `php artisan tenant:suspend` | Suspends an active tenant through the validated lifecycle. |
+| `php artisan tenant:deactivate` | Deactivates a tenant through the validated lifecycle. |
+| `php artisan tenant:expire` | Deactivates active tenants whose subscription or trial has expired. |
 | `php artisan tenant:domains:revalidate` | Validates and verifies tenant custom domains and DNS mapping. |
+| `php artisan tenant:events:publish` | Publishes pending tenant lifecycle events from the durable outbox. |
+| `php artisan tenant:events:retry-dead` | Moves selected dead tenant outbox events back to the pending queue. |
+| `php artisan tenant:permissions:sync` | Synchronizes tenant permission catalogues and Super Admin roles from registered modules. |
 | `php artisan tenant:storage:cleanup` | Prunes orphaned private files and cleans up temporary attachments. |
 | `php artisan customers:audit-phone-numbers` | Read-only audit of missing, duplicate, and invalid customer phone/WhatsApp numbers. |
 | `php artisan vehicle-service:import-legacy-history` | Safely parses and imports legacy FoxPro workshop service histories. |
@@ -888,7 +900,7 @@ AutoERP provides specialized CLI commands for administrative and operational tas
 ### Fresh Database Baseline Reset
 To reset the database cleanly from scratch and verify full baseline integrity:
 ```bash
-# Drops all tables, re-runs all 266 canonical migrations, and seeds master baseline
+# Drops all tables, re-runs all 307 canonical migrations, and seeds master baseline
 php artisan migrate:fresh --seed
 ```
 
@@ -926,7 +938,7 @@ php artisan view:cache
 
 ### AI-Agent Decision Sequence
 When modifying code or implementing new features:
-1. **Identify Module Responsibility:** Determine which of the 31 modules owns the capability. If logic belongs elsewhere, implement it in the owning module.
+1. **Identify Module Responsibility:** Determine which of the 32 modules owns the capability. If logic belongs elsewhere, implement it in the owning module.
 2. **Check Single Source of Truth:** Ensure no business rule or calculation is duplicated.
 3. **Verify Evidence & Policies:** Consult `docs/project_knowledgebase.md` (and `docs/knowledgebase.md`). If no commercial policy exists, physical facts may be recorded, but **no monetary transaction may be invented**.
 4. **Enforce Optimistic Concurrency:** Require `expected_version` and increment `row_version` on every write.

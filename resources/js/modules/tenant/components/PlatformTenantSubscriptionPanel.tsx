@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { businessDateTimeInputValue } from '@/shared/utils/businessDate';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -305,7 +306,7 @@ export function PlatformTenantSubscriptionPanel({
                                 label="Starts at"
                                 type="datetime-local"
                                 value={startsAt}
-                                max={toLocalDateTime(new Date().toISOString())}
+                                max={businessDateTimeInputValue()}
                                 onChange={(event) => {
                                     setStartsAt(event.target.value);
                                     setReadinessCheck(null);

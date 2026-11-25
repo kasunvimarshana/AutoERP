@@ -18,4 +18,10 @@ enum PayRunType: string
     case Supplementary = 'supplementary';
     case Correction = 'correction';
     case Bonus = 'bonus';
+
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 }

@@ -31,9 +31,9 @@ AutoERP enforces a zero-tolerance policy for broken tests, type errors, or linti
 | **Backend Code Style (Pint)** | `php vendor/bin/pint --test` | **0 PSR-12 violations** |
 | **Migration Baseline Integrity**| `php artisan test --filter ModuleMigrationBaselineTest` | **1 passed (3 assertions)**: 1:1 table migration mapping, 0 alteration patches |
 | **Historical Retention Integrity** | `php artisan test --filter HistoricalRetentionMigrationTest` | **1 passed (22 assertions)**: 100% `restrictOnDelete()` compliance on audit tables |
-| **Frontend Test Suite** | `npm test` or `npx vitest run` | **176 passed / 176 test files (735 tests passed)** |
-| **Backend Test Suite** | `php artisan test` | **1,364 passed / 1,364 tests (14,218 assertions)** |
-| **Live MySQL Integration** | `composer test:mysql` | Multi-connection transactions & locking verification |
+| **Frontend Test Suite** | `npm test` or `npx vitest run` | **177 passed / 177 test files (745 tests passed)** |
+| **Backend Test Suite** | `php artisan test` | **1,433 passed / 1,433 tests (15,106 assertions)** |
+| **Live MySQL Integration** | `composer test:mysql` or `php vendor/bin/phpunit -c phpunit.mysql.xml` | Multi-connection transactions, schema/FK/column-sensitive changes & locking verification (required whenever modifying migrations, FKs, or raw/custom SQL column queries) |
 
 ---
 
@@ -67,7 +67,11 @@ Migrations represent **immutable database schema specifications**, not dynamic a
 - **Historical Master Snapshots:** Master party and item identities are copied into immutable header and line snapshots at creation time. Historical document rendering reads frozen snapshots, never mutable master entities.
 - **Optimistic Concurrency Control:** Every mutable operational entity carries an unsigned integer `row_version`. API mutations require `expected_version` and atomically assert `WHERE row_version = ?` while incrementing.
 - **Explicit Optional Form Defaulting & Field Presence:** In form requests and DTOs, distinguish between omitted fields and explicitly cleared fields (`null`/`""`) using `$this->has('field')`. Partial updates must preserve existing database entity values for omitted fields.
-- **Blade Template Sandboxing & Tenant Layout Isolation:** Custom Blade templates and layouts (e.g. invoices, vouchers, printouts) must never include unescaped raw PHP execution or direct arbitrary filesystem includes outside registered tenant views.
+- **Blade Template Sandboxing, Raw CSS/HTML Guardrail & Tenant Layout Isolation:** Custom Blade templates and layouts (e.g. invoices, vouchers, printouts) must never include unescaped raw PHP execution or direct arbitrary filesystem includes outside registered tenant views. Any raw CSS or HTML output (such as `<style>{!! ... !!}</style>`) must enforce tag-breakout and dangerous-construct validation and defensive sanitization (e.g. `InvoiceCssSanitizer` / `InvoiceBladeSecurityValidator`) to block `</style`, `<script`, HTML tag breakouts, `javascript:`, `vbscript:`, `data:text/html`, and `expression(`.
+- **Controller & API Endpoint Standards:**
+  - Always paginate `index()` endpoints (e.g. `->paginate($perPage)` bounded `1..100`, default `20`) rather than unbounded `->get()`.
+  - Use Backed Enum `::values()` with `Rule::in(...::values())` instead of hardcoded `'in:...'` validation strings.
+  - Enforce `expected_version` optimistic concurrency checks on all versioned `update()` endpoints.
 - **Token Rotation Grace Window:** Refresh token rotation must provide an idempotent concurrency grace window (30 seconds) to prevent simultaneous API requests from triggering false token revocation.
 - **Dual-Timestamp Architecture & Backdated CRUD Safety:**
   - Authoritative physical timestamps (`created_at`, `posted_at`, `reversed_at`, `updated_at`, `deleted_at`) represent the server-owned moment of recording and must never be altered or accepted from user input.

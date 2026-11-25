@@ -35,6 +35,7 @@ use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Models\PaymentAllocation;
+use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 use Modules\VehicleRental\Enums\AgreementKind;
@@ -1407,13 +1408,15 @@ final class RentalBillingDocumentService
             ],
         ];
 
+        $periodStart = $fromDate->startOfDay()->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
+        $periodEnd = $untilDate->endOfDay()->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT);
+
         // Query any completed RunningCharts
         $charts = RunningChart::query()
             ->forContext($context->tenantId, $context->organizationUnitId)
             ->whereHas('vehicleUse', fn ($q) => $q->where('customer_agreement_id', $agreement->id))
-            ->where('date', '>=', $fromStr)
-            ->where('date', '<=', $untilStr)
-            ->with(['vehicle', 'driver'])
+            ->where('starts_at', '<=', $periodEnd)
+            ->where('ends_at', '>=', $periodStart)
             ->get();
 
         $commercialKm = '0.000000';

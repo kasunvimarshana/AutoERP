@@ -13,6 +13,8 @@ declare(strict_types=1);
 namespace Modules\Payroll\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
+use Modules\Payroll\Enums\PayRunType;
 use Modules\Payroll\Http\Requests\PayrollRequest;
 use Modules\Payroll\Models\PayrollPayRun;
 use Modules\Payroll\Services\PayRunExecutionService;
@@ -38,7 +40,9 @@ final class PayrollPayRunController
             $query->where('status', $request->input('status'));
         }
 
-        return response()->json(['data' => $query->latest()->get()]);
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
+        return response()->json($query->latest()->paginate($perPage));
     }
 
     public function store(PayrollRequest $request): JsonResponse
@@ -46,7 +50,7 @@ final class PayrollPayRunController
         $validated = $request->validate([
             'pay_period_id' => ['required', 'integer'],
             'salary_structure_id' => ['nullable', 'integer'],
-            'pay_run_type' => ['nullable', 'string', 'in:standard,supplementary,correction,bonus'],
+            'pay_run_type' => ['nullable', 'string', Rule::in(PayRunType::values())],
             'notes' => ['nullable', 'string'],
         ]);
 

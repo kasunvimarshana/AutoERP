@@ -20,12 +20,14 @@ final class PayrollStatutoryRuleController
 {
     public function index(PayrollRequest $request): JsonResponse
     {
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
         $rules = PayrollStatutoryRule::query()
             ->where('tenant_id', $request->tenantId())
             ->orderBy('name')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json(['data' => $rules]);
+        return response()->json($rules);
     }
 
     public function store(PayrollRequest $request): JsonResponse

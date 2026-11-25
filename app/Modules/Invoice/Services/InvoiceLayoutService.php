@@ -29,6 +29,7 @@ use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceLayout;
 use Modules\Invoice\Validators\InvoiceBladeSecurityValidator;
+use Modules\Invoice\Validators\InvoiceCssSanitizer;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -701,7 +702,13 @@ final readonly class InvoiceLayoutService
 
     private function validateCustomContent(?string $css, ?string $header, ?string $footer): void
     {
-        $all = ($css ?? '').' '.($header ?? '').' '.($footer ?? '');
+        if ($css !== null && InvoiceCssSanitizer::containsDangerousConstructs($css)) {
+            throw ValidationException::withMessages([
+                'custom_css' => ['The custom CSS contains forbidden HTML tags or unsafe script constructs.'],
+            ]);
+        }
+
+        $all = ($header ?? '').' '.($footer ?? '');
         if (preg_match('/<script\b[^>]*>|javascript:/i', $all) === 1) {
             throw ValidationException::withMessages([
                 'custom_content' => ['Custom content must not contain script tags or active JavaScript.'],

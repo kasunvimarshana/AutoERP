@@ -80,10 +80,9 @@ final class VehicleQueryService
             'vehicle_service_jobs' => 'vehicle_id',
             'vehicle_rental_owner_agreements' => 'vehicle_id',
             'vehicle_rental_uses' => 'vehicle_id',
-            'vehicle_rental_running_charts' => 'vehicle_id',
             'vehicle_rental_finance_agreements' => 'vehicle_id',
             'vehicle_rental_expenses' => 'vehicle_id',
-            'vehicle_rental_reservations' => 'vehicle_id',
+            'vehicle_rental_reservations' => 'requested_vehicle_id',
             'promotion_cards' => 'vehicle_id',
             'vehicle_ownerships' => 'vehicle_id',
         ];

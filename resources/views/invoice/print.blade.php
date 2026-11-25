@@ -288,9 +288,12 @@ Phone: +94713525253
             .layout-thermal .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         }
     </style>
-    @if (! empty($layout['custom_css']))
+    @php
+        $safeCustomCss = \Modules\Invoice\Validators\InvoiceCssSanitizer::sanitize($layout['custom_css'] ?? null);
+    @endphp
+    @if (! empty($safeCustomCss))
         <style>
-            {!! $layout['custom_css'] !!}
+            {!! $safeCustomCss !!}
         </style>
     @endif
 </head>

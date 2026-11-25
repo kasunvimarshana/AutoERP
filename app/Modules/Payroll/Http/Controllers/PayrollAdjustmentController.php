@@ -14,6 +14,7 @@ namespace Modules\Payroll\Http\Controllers;
 
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 use Modules\Payroll\Enums\AdjustmentStatus;
 use Modules\Payroll\Enums\AdjustmentType;
 use Modules\Payroll\Http\Requests\PayrollRequest;
@@ -71,14 +72,16 @@ final class PayrollAdjustmentController
             $query->where('status', $request->input('status'));
         }
 
-        return response()->json(['data' => $query->latest()->get()]);
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
+        return response()->json($query->latest()->paginate($perPage));
     }
 
     public function store(PayrollRequest $request): JsonResponse
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
-            'adjustment_type' => ['required', 'string', 'in:addition,deduction,retro_pay,reimbursement,correction'],
+            'adjustment_type' => ['required', 'string', Rule::in(AdjustmentType::values())],
             'salary_component_id' => ['nullable', 'integer'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'effective_pay_period_id' => ['nullable', 'integer'],

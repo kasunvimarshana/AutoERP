@@ -18,4 +18,10 @@ enum SalaryComponentType: string
     case Deduction = 'deduction';
     case Statutory = 'statutory';
     case EmployerContribution = 'employer_contribution';
+
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 }

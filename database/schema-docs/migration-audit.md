@@ -6,7 +6,7 @@ Scope: canonical create migrations and the architecture-foundation ownership mil
 
 ## Verified result
 
-- 267 migration files create 267 unique tables (262 modular migrations across 27 modules + 5 infrastructure migrations).
+- 307 migration files create 307 unique tables (302 modular migrations across 28 database-owning modules + 5 infrastructure migrations; 32 total backend modules, 33 frontend modules).
 - Every migration creates exactly one table and drops the same table in `down()`.
 - No migration uses `Schema::table()` patching.
 - No duplicate migration timestamps or table creations remain.
@@ -97,7 +97,7 @@ Tables (9): `vehicle_makes`, `vehicle_types`, `vehicle_categories`, `vehicle_mod
 
 ### Hr
 
-Tables (16): `hr_departments`, `hr_designations`, `hr_employment_types`, `hr_skills`, `hr_certifications`, `hr_licenses`, `hr_employees`, `hr_employee_contacts`, `hr_employee_addresses`, `hr_employee_documents`, `hr_employee_skill_assignments`, `hr_employee_certification_assignments`, `hr_employee_license_assignments`, `hr_employee_rates`, `hr_employee_availabilities`, `hr_employee_status_histories`.
+Tables (42): `hr_departments`, `hr_designations`, `hr_employment_types`, `hr_skills`, `hr_certifications`, `hr_licenses`, `hr_employees`, `hr_employee_contacts`, `hr_employee_addresses`, `hr_employee_documents`, `hr_employee_skill_assignments`, `hr_employee_certification_assignments`, `hr_employee_license_assignments`, `hr_employee_rates`, `hr_employee_availabilities`, `hr_employee_status_histories`, `hr_shifts`, `hr_shift_breaks`, `hr_shift_assignments`, `hr_shift_swaps`, `hr_shift_reallocations`, `hr_holiday_calendars`, `hr_holidays`, `hr_attendance_records`, `hr_attendance_punches`, `hr_attendance_regularizations`, `hr_attendance_adjustments`, `hr_leave_types`, `hr_leave_policies`, `hr_leave_balances`, `hr_leave_requests`, `hr_comp_off_claims`, `hr_shift_rotations`, `hr_shift_rotation_steps`, `hr_shift_rotation_assignments`, `hr_biometric_devices`, `hr_biometric_device_users`, `hr_biometric_raw_punches`, `hr_attendance_geofences`, `hr_attendance_kiosks`, `hr_employee_attendance_credentials`, `hr_attendance_batch_imports`.
 
 ### Inventory
 
@@ -131,6 +131,10 @@ Tables (28): `vehicle_rental_customer_agreements`, `vehicle_rental_customer_agre
 
 Tables (16): `vehicle_service_job_types`, `vehicle_service_jobs`, `vehicle_service_inspections`, `vehicle_service_job_lines`, `vehicle_service_line_employees`, `vehicle_service_documents`, `vehicle_service_invoice_links`, `vehicle_service_payment_links`, `vehicle_service_status_histories`, `vehicle_service_supervisor_commission_policies`, `vehicle_service_labor_item_commission_rules`, `vehicle_service_job_discounts`, `vehicle_service_legacy_import_batches`, `vehicle_service_legacy_histories`, `vehicle_service_legacy_history_items`, `vehicle_service_job_feedbacks`.
 
+### Payroll
+
+Tables (14): `payroll_salary_components`, `payroll_salary_structures`, `payroll_salary_structure_items`, `payroll_employee_salary_assignments`, `payroll_tax_tables`, `payroll_tax_brackets`, `payroll_statutory_rules`, `payroll_pay_periods`, `payroll_pay_runs`, `payroll_payslips`, `payroll_payslip_items`, `payroll_adjustments`, `payroll_employee_loans`, `payroll_loan_repayments`.
+
 ### Audit
 
 Tables (1): `audit_logs`.
@@ -141,9 +145,9 @@ Tables (4): `countries`, `currencies`, `languages`, `timezones`.
 
 ## Runtime release gates
 
-- **PHPUnit Test Suite:** 1,370 tests passed (14,235 assertions, 0 failures) across all 31 modules on SQLite in-memory and MySQL integration profiles.
-- **Migration Architecture Integrity:** `ModuleMigrationBaselineTest` and `HistoricalRetentionMigrationTest` 100% compliant (262 modular migrations, 0 `Schema::table` patches, `restrictOnDelete` enforced on all status history tables).
-- **Frontend Test Suite:** 176 Vitest test suites (736 tests passed, 0 failures) with React 19 testing library.
+- **PHPUnit Test Suite:** 1,433 tests passed (15,106 assertions, 0 failures) across all 32 modules on SQLite in-memory and MySQL integration profiles.
+- **Migration Architecture Integrity:** `ModuleMigrationBaselineTest` and `HistoricalRetentionMigrationTest` 100% compliant (302 modular migrations, 5 root migrations, 307 total, 0 `Schema::table` patches, `restrictOnDelete` enforced on all status history tables).
+- **Frontend Test Suite:** 177 Vitest test files (745 tests passed, 0 failures) with React 19 testing library (Vitest 5.x).
 - **TypeScript Static Typing:** 0 errors across 922+ source files in strict compilation mode (`tsc --noEmit`).
 - **Code Style & Formatting:** 0 Pint violations (`vendor/bin/pint --test`) and 0 ESLint errors.
 

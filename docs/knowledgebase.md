@@ -4,7 +4,7 @@
 **System Architecture:** Modular Monolith (Laravel 12 Backend + React 19 / TypeScript 6 SPA Frontend)  
 **Standard Civil Timezone:** Dynamically Configured Workspace Timezone (`localization.timezone` scoped by tenant/organization unit, with fallback to application `APP_TIMEZONE`)  
 **Arithmetic Precision:** Exact Arbitrary-Precision String Arithmetic via `DecimalMath` (PHP BCMath)  
-**Business Modules:** 31 Domain Modules located in `app/Modules/*`  
+**Business Modules:** 32 Domain Modules located in `app/Modules/*` (paired with 33 frontend modules in `resources/js/modules/*`)  
 **Shared Project Memory:** Append-Only Change Records in `docs/changes/`  
 **Binding Core Axioms:** `AGENTS.md` and `RULES.md`  
 
@@ -21,7 +21,7 @@ Every module, class, database table, API route, and UI component in AutoERP must
 1. **Understand First, Verify Second, Change Third:** Never act on assumptions or guess. Fully understand requirements, system context, module ownership, and data consequences before modifying code. Fix only requested issues using the smallest safe change.
 2. **Root Cause Design over Compatibility Workarounds:** Prioritize correctness, readability, and long-term maintainability over backward compatibility. Do not carry forward legacy design flaws or preserve historical mistakes with patches. Fix underlying designs at the root source.
 3. **Simplicity, Pragmatism & No Overengineering:** Prefer the simplest clean design that correctly solves the problem. Avoid premature optimization, speculative features, or generic frameworks. Dead code is prohibited.
-4. **Module Ownership & Clear Boundaries:** Each of the 31 modules strictly owns its models, business logic, and database tables. Never compensate for a deficiency in one module by adding workarounds or shadow tables in another.
+4. **Module Ownership & Clear Boundaries:** Each of the 32 modules strictly owns its models, business logic, and database tables. Never compensate for a deficiency in one module by adding workarounds or shadow tables in another.
 5. **Backend Authority & Single Source of Truth:** The backend is the single authoritative source of truth for business rules, calculations, permissions, validations, and state transitions. The frontend provides immediate user feedback and presentation only; it never substitutes for backend enforcement.
 6. **Concurrency, Atomicity & Transaction Immutability:** Concurrency is assumed across all writes. Every write mutation must be atomic, conflict-aware, and version-checked (`expected_version` / `row_version`). Historical operational and financial ledger records are immutable; adjustments and reversals must be recorded as separate, linked audit records.
 7. **Database Architecture & Explicit Migrations:** One table per migration file. Migrations represent immutable database schema history: write every column, foreign key, constraint, and index explicitly line-by-line (KISS + Explicit over DRY). Dynamic loops, runtime conditionals, or programmatic column names in migrations are prohibited.
@@ -48,7 +48,7 @@ flowchart TD
         UI["Ergonomic UI (Zero Raw IDs, Controlled Lookups, Transparent Calculations)"]
         ROUTER["React Router 7 (Single-Page Application Routing)"]
         STATE["Zustand Client Stores & Custom React Query Hooks"]
-        VITE["Vite 7 SPA Build Pipeline"]
+        VITE["Vite 8 SPA Build Pipeline"]
         UI --> ROUTER
         ROUTER --> STATE
         STATE --> VITE
@@ -75,7 +75,7 @@ flowchart TD
         AUDIT["Audit Service (Immutable Activity Stream)"]
     end
 
-    subgraph DomainModules["31 Modular Monolith Domains (app/Modules/*)"]
+    subgraph DomainModules["32 Modular Monolith Domains (app/Modules/*)"]
         direction TB
         MASTER["Master Data: Customer, Supplier, Vehicle, Item, Hr, UOM, Warehouse"]
         OPERATIONS["Operations: VehicleRental, VehicleService, Purchase, Selling, Promotion, Expense"]
@@ -172,9 +172,9 @@ Every change to the codebase must pass all verification gates with zero errors:
 
 | Check | Command | Description |
 |---|---|---|
-| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,370 PHPUnit tests (14,235 assertions) across all 31 modules using SQLite in-memory. |
+| **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,433 PHPUnit tests (15,106 assertions) across all 32 modules using SQLite in-memory. |
 | **MySQL Integration Tests** | `composer test:mysql` | Runs integration tests against a live MySQL instance (`phpunit.mysql.xml`). |
-| **Frontend Unit Tests** | `npm test` | Runs 176 Vitest test suites (736 tests) in JSDOM mode. |
+| **Frontend Unit Tests** | `npm test` | Runs 177 Vitest test files (745 tests) in JSDOM mode (Vitest 5.x). |
 | **TypeScript Typecheck** | `npm run typecheck` | Validates TypeScript types across `resources/js` with zero emissions (`tsc --noEmit`). |
 | **ESLint Quality Check** | `npm run lint` | Lints React 19 / TypeScript code (`eslint resources/js`). |
 | **PHP Code Style (Pint)** | `vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |
@@ -189,7 +189,7 @@ The system provides dedicated console commands for maintenance and administratio
 |---|---|
 | `php artisan app:key:ensure` | Checks for `APP_KEY` and generates one non-interactively if missing. |
 | `php artisan auth:readiness` | Verifies OAuth Passport encryption keys, token tables, and auth providers. |
-| `php artisan auth:client:create` | Creates an OAuth client for API access. |
+| `php artisan auth:client-create` | Creates a tenant-owned OAuth client for API access. |
 | `php artisan platform:permissions:sync` | Scans all modules and synchronizes permissions into the platform catalog. |
 | `php artisan platform:health` | Performs system diagnostics across database, cache, queues, and storage. |
 | `php artisan tenant:create` | Provisions a new tenant with initial domain and plan configuration. |
@@ -325,14 +325,14 @@ In AutoERP, database migrations are treated as **immutable database schema speci
 
 ### 4.2 Migration Inventory & Discovery
 
-The system comprises **267 canonical database tables**:
+The system comprises **307 canonical database tables** (5 root + 302 modular):
 - **5 Infrastructure Migrations** in `database/migrations/`:
   1. `0001_01_01_000001_create_cache_table.php`
   2. `0001_01_01_000002_create_cache_locks_table.php`
   3. `0001_01_01_000003_create_jobs_table.php`
   4. `0001_01_01_000004_create_job_batches_table.php`
   5. `0001_01_01_000005_create_failed_jobs_table.php`
-- **262 Modular Migrations** distributed across 27 database-owning modules in `app/Modules/<ModuleName>/Database/Migrations/`.
+- **302 Modular Migrations** distributed across 28 database-owning modules in `app/Modules/<ModuleName>/database/migrations/`.
 - Every module service provider loads its migrations uniformly:
   ```php
   $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
@@ -408,7 +408,7 @@ Sensitive attachments—such as police accident reports, vehicle damage photogra
 
 ## 6. Complete Module Catalog & Domain Boundary Matrix
 
-AutoERP organizes its business capabilities into **31 decoupled modules** in `app/Modules/*`:
+AutoERP organizes its business capabilities into **32 decoupled backend modules** in `app/Modules/*` (paired with **33 frontend modules** in `resources/js/modules/*`):
 
 | Module | Architectural Role | Key Eloquent Models | Core Public Responsibilities |
 |---|---|---|---|
@@ -442,6 +442,7 @@ AutoERP organizes its business capabilities into **31 decoupled modules** in `ap
 | **`Tax`** | Statutory Taxation | `TaxProfile`, `TaxCategory`, `TaxRate` | VAT/NBT/WHT tax calculation profiles and line-level tax snapshots. |
 | **`VehicleRental`** | Commercial Fleet Rental | `CustomerAgreement`, `OwnerAgreement`, `RunningChart` | Dual-sided commercial contracts, custody tracking, running charts, billing & settlements. |
 | **`Voucher`** | Unified Voucher Views | *None (Presentation composite)* | Read-only unified views over transactions, receipts, and disbursement vouchers. |
+| **`Payroll`** | Workforce Payroll Engine | `PayrollRun`, `PayrollRunLine`, `EmployeeSalaryStructure`, `EmployeeLoan` | Multi-cycle pay runs, statutory deductions, employee loans, retroactive adjustments, GL posting. |
 | **`Reporting`** | Business Intelligence | *None (Document engine)* | Printable HTML layouts, Spatie Laravel PDF exports, CSV/Excel data streams. |
 
 ---
@@ -710,7 +711,7 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 
 To reset the database cleanly from scratch and verify full baseline integrity:
 ```bash
-# Drops all tables, re-runs all 267 canonical migrations, and seeds master baseline
+# Drops all tables, re-runs all 307 canonical migrations, and seeds master baseline
 php artisan migrate:fresh --seed
 ```
 

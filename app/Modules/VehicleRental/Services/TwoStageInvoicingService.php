@@ -606,7 +606,7 @@ final class TwoStageInvoicingService
     {
         $cycle = BillingCycle::query()
             ->forContext($context->tenantId, $context->organizationUnitId)
-            ->with(['charts.runningChart', 'charts.vehicle', 'items.vehicle', 'items.driver', 'initialInvoice.balance'])
+            ->with(['charts.runningChart', 'charts.vehicle.make', 'charts.vehicle.model', 'items.vehicle', 'items.driver', 'initialInvoice.balance'])
             ->findOrFail($cycleId);
 
         if ($cycle->status === BillingCycleStatus::Cancelled) {
@@ -640,7 +640,7 @@ final class TwoStageInvoicingService
                     ->orWhere('returned_at', '>=', $cycle->period_from->startOfDay());
             })
             ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-            ->with('vehicle')
+            ->with(['vehicle.make', 'vehicle.model'])
             ->orderBy('starts_at')
             ->get();
 
@@ -694,7 +694,7 @@ final class TwoStageInvoicingService
 
         if ($chartsByVehicle->isNotEmpty()) {
             foreach ($chartsByVehicle as $vehicleId => $vCharts) {
-                $vehicle = $vCharts->first()->vehicle ?? Vehicle::query()->find($vehicleId);
+                $vehicle = $vCharts->first()->vehicle ?? Vehicle::query()->with(['make', 'model'])->find($vehicleId);
                 $regNo = $vehicle?->registration_number ?? $vehicle?->vehicle_number ?? "Vehicle #{$vehicleId}";
                 $label = $vehicle ? trim("{$regNo} · {$vehicle->make} {$vehicle->model}") : $regNo;
                 $isReplacement = (bool) $vCharts->first()->is_replacement;
@@ -802,7 +802,7 @@ final class TwoStageInvoicingService
             $usesByVehicle = $uses->groupBy('vehicle_id');
             foreach ($usesByVehicle as $vehicleId => $vUses) {
                 $firstUse = $vUses->first();
-                $vehicle = $firstUse->vehicle ?? Vehicle::query()->find($vehicleId);
+                $vehicle = $firstUse->vehicle ?? Vehicle::query()->with(['make', 'model'])->find($vehicleId);
                 $vehicleId = (int) $vehicleId;
                 $regNo = $vehicle?->registration_number ?? $vehicle?->vehicle_number ?? "Vehicle #{$vehicleId}";
                 $label = $vehicle ? trim("{$regNo} · {$vehicle->make} {$vehicle->model}") : $regNo;
@@ -2055,7 +2055,7 @@ final class TwoStageInvoicingService
                     ->orWhere('returned_at', '>=', $cycle->period_from->startOfDay());
             })
             ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-            ->with('vehicle')
+            ->with(['vehicle.make', 'vehicle.model'])
             ->orderBy('starts_at')
             ->get();
 
@@ -3377,7 +3377,7 @@ final class TwoStageInvoicingService
                     ->orWhere('returned_at', '>=', $from);
             })
             ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-            ->with('vehicle')
+            ->with(['vehicle.make', 'vehicle.model'])
             ->orderBy('starts_at')
             ->get();
 

@@ -1,6 +1,6 @@
 # AutoERP Table Catalog
 
-This catalog documents the complete schema produced by the 267 canonical create migrations across all 31 modules and infrastructure. The enclosing section is the owning module for every listed table. The ownership catalogue reflects the fully verified baseline migrations with zero `Schema::table()` patches and strict single-table fresh-baseline compliance.
+This catalog documents the complete schema produced by the 307 canonical create migrations (5 root + 302 modular) across all 32 backend modules (paired with 33 frontend modules) and infrastructure. The enclosing section is the owning module for every listed table. The ownership catalogue reflects the fully verified baseline migrations with zero `Schema::table()` patches and strict single-table fresh-baseline compliance.
 
 Conventions:
 

@@ -172,10 +172,26 @@ final class PayrollApiTest extends TestCase
         $compResp->assertStatus(201);
         $compId = $compResp->json('data.id');
 
-        // 2. List Components
-        $listComp = $this->withHeaders($headers)->getJson("/api/v1/payroll/components?tenant_id={$tenantId}");
+        // 2. List Components (paginated)
+        $listComp = $this->withHeaders($headers)->getJson("/api/v1/payroll/components?tenant_id={$tenantId}&per_page=10");
         $listComp->assertStatus(200);
         $this->assertNotEmpty($listComp->json('data'));
+        $this->assertSame(10, $listComp->json('per_page'));
+
+        // 2b. Update Component with optimistic concurrency check
+        $compVersion = (int) ($compResp->json('data.row_version') ?? 1);
+        $this->withHeaders($headers)->putJson("/api/v1/payroll/components/{$compId}", [
+            'tenant_id' => $tenantId,
+            'expected_version' => $compVersion + 99,
+            'name' => 'Stale Update',
+        ])->assertStatus(409);
+
+        $updateCompResp = $this->withHeaders($headers)->putJson("/api/v1/payroll/components/{$compId}", [
+            'tenant_id' => $tenantId,
+            'expected_version' => $compVersion,
+            'name' => 'Housing Allowance Updated',
+        ])->assertStatus(200);
+        $this->assertSame($compVersion + 1, (int) $updateCompResp->json('data.row_version'));
 
         // 3. Create Structure via API
         $structResp = $this->withHeaders($headers)->postJson('/api/v1/payroll/structures', [

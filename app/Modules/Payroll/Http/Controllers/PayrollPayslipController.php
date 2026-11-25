@@ -37,7 +37,9 @@ final class PayrollPayslipController
             $query->where('status', $request->input('status'));
         }
 
-        return response()->json(['data' => $query->latest()->get()]);
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
+        return response()->json($query->latest()->paginate($perPage));
     }
 
     public function show(PayrollRequest $request, int $id): JsonResponse

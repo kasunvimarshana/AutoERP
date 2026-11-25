@@ -22,13 +22,15 @@ final class PayrollTaxTableController
 {
     public function index(PayrollRequest $request): JsonResponse
     {
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
         $tables = PayrollTaxTable::query()
             ->with(['brackets'])
             ->where('tenant_id', $request->tenantId())
             ->orderByDesc('effective_year')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json(['data' => $tables]);
+        return response()->json($tables);
     }
 
     public function store(PayrollRequest $request): JsonResponse

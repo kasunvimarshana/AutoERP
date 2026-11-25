@@ -18,4 +18,10 @@ enum CalculationType: string
     case Percentage = 'percentage';
     case HourlyRate = 'hourly_rate';
     case Formula = 'formula';
+
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 }

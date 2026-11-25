@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Payroll\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 use Modules\Payroll\Enums\PayrollCycleType;
 use Modules\Payroll\Http\Requests\PayrollRequest;
 use Modules\Payroll\Models\PayrollPayPeriod;
@@ -21,19 +22,21 @@ final class PayrollPeriodController
 {
     public function index(PayrollRequest $request): JsonResponse
     {
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
         $periods = PayrollPayPeriod::query()
             ->where('tenant_id', $request->tenantId())
             ->orderByDesc('period_start')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json(['data' => $periods]);
+        return response()->json($periods);
     }
 
     public function store(PayrollRequest $request): JsonResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'cycle_type' => ['required', 'string', 'in:monthly,bi_weekly,weekly'],
+            'cycle_type' => ['required', 'string', Rule::in(PayrollCycleType::values())],
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after_or_equal:period_start'],
             'payout_date' => ['required', 'date', 'after_or_equal:period_start'],

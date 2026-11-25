@@ -14,6 +14,7 @@ namespace Modules\Payroll\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Modules\Payroll\Enums\CalculationType;
 use Modules\Payroll\Enums\PayrollCycleType;
 use Modules\Payroll\Http\Requests\PayrollRequest;
@@ -25,13 +26,15 @@ final class PayrollStructureController
     public function index(PayrollRequest $request): JsonResponse
     {
         $tenantId = $request->tenantId();
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
         $structures = PayrollSalaryStructure::query()
             ->with(['items.component'])
             ->where('tenant_id', $tenantId)
             ->orderBy('name')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json(['data' => $structures]);
+        return response()->json($structures);
     }
 
     public function store(PayrollRequest $request): JsonResponse
@@ -39,12 +42,20 @@ final class PayrollStructureController
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:32'],
             'name' => ['required', 'string', 'max:100'],
-            'cycle_type' => ['required', 'string', 'in:monthly,bi_weekly,weekly'],
+            'cycle_type' => ['required', 'string', Rule::in(PayrollCycleType::values())],
             'currency_id' => ['nullable', 'integer'],
             'description' => ['nullable', 'string'],
             'items' => ['nullable', 'array'],
             'items.*.salary_component_id' => ['required_with:items', 'integer'],
-            'items.*.calculation_type' => ['required_with:items', 'string', 'in:fixed,percentage,formula'],
+            'items.*.calculation_type' => [
+                'required_with:items',
+                'string',
+                Rule::in([
+                    CalculationType::Fixed->value,
+                    CalculationType::Percentage->value,
+                    CalculationType::Formula->value,
+                ]),
+            ],
             'items.*.amount_or_rate' => ['required_with:items', 'numeric'],
             'items.*.percentage_basis_component_id' => ['nullable', 'integer'],
             'items.*.formula_expression' => ['nullable', 'string'],
@@ -102,13 +113,21 @@ final class PayrollStructureController
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:100'],
-            'cycle_type' => ['sometimes', 'string', 'in:monthly,bi_weekly,weekly'],
+            'cycle_type' => ['sometimes', 'string', Rule::in(PayrollCycleType::values())],
             'currency_id' => ['nullable', 'integer'],
             'description' => ['nullable', 'string'],
             'is_active' => ['sometimes', 'boolean'],
             'items' => ['sometimes', 'array'],
             'items.*.salary_component_id' => ['required_with:items', 'integer'],
-            'items.*.calculation_type' => ['required_with:items', 'string', 'in:fixed,percentage,formula'],
+            'items.*.calculation_type' => [
+                'required_with:items',
+                'string',
+                Rule::in([
+                    CalculationType::Fixed->value,
+                    CalculationType::Percentage->value,
+                    CalculationType::Formula->value,
+                ]),
+            ],
             'items.*.amount_or_rate' => ['required_with:items', 'numeric'],
             'items.*.percentage_basis_component_id' => ['nullable', 'integer'],
             'items.*.formula_expression' => ['nullable', 'string'],

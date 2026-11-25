@@ -19,6 +19,7 @@ use Modules\Invoice\Enums\InvoiceLayoutTemplate;
 use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
 use Modules\Invoice\Enums\InvoicePaperSize;
+use Modules\Invoice\Validators\InvoiceCssSanitizer;
 
 final class StoreInvoiceLayoutRequest extends FormRequest
 {
@@ -50,7 +51,16 @@ final class StoreInvoiceLayoutRequest extends FormRequest
                 'max:2000000',
             ],
             'is_active' => ['nullable', 'boolean'],
-            'custom_css' => ['nullable', 'string', 'max:50000'],
+            'custom_css' => [
+                'nullable',
+                'string',
+                'max:50000',
+                static function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (is_string($value) && InvoiceCssSanitizer::containsDangerousConstructs($value)) {
+                        $fail('The custom CSS contains forbidden HTML tags or unsafe script constructs.');
+                    }
+                },
+            ],
             'header_content' => ['nullable', 'string', 'max:10000'],
             'footer_content' => ['nullable', 'string', 'max:10000'],
             'settings' => ['nullable', 'array'],

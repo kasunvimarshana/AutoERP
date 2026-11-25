@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AutoERP Enterprise System
+
+  Author: Kasun Vimarshana
+  Email: kasunvmail@gmail.com
+  Phone: +94713525253
+-->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="tests/bootstrap/mysql.php"

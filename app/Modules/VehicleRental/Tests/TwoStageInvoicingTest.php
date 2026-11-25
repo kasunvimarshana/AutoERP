@@ -1759,7 +1759,7 @@ final class TwoStageInvoicingTest extends TestCase
             $expense->expense_type = RentalExpenseType::Toll;
             $expense->status = RentalExpenseStatus::Approved;
             $expense->expense_date = '2026-09-05';
-            $expense->currency_id = 1;
+            $expense->currency_id = (int) $customerAg->currency_id;
             $expense->net_amount = '450.000000';
             $expense->tax_amount = '0.000000';
             $expense->gross_amount = '450.000000';

@@ -17,4 +17,10 @@ enum PayrollPaymentMethod: string
     case BankTransfer = 'bank_transfer';
     case Cash = 'cash';
     case Cheque = 'cheque';
+
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 }

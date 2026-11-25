@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Payroll\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 use Modules\Payroll\Enums\PayrollPaymentMethod;
 use Modules\Payroll\Http\Requests\PayrollRequest;
 use Modules\Payroll\Models\PayrollEmployeeSalaryAssignment;
@@ -38,7 +39,9 @@ final class PayrollAssignmentController
             $query->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
         }
 
-        return response()->json(['data' => $query->latest('effective_from')->get()]);
+        $perPage = min(100, max(1, (int) $request->input('per_page', 20)));
+
+        return response()->json($query->latest('effective_from')->paginate($perPage));
     }
 
     public function store(PayrollRequest $request): JsonResponse
@@ -48,7 +51,7 @@ final class PayrollAssignmentController
             'salary_structure_id' => ['required', 'integer'],
             'base_salary' => ['required', 'numeric', 'min:0'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'payment_method' => ['nullable', 'string', 'in:bank_transfer,cash,cheque'],
+            'payment_method' => ['nullable', 'string', Rule::in(PayrollPaymentMethod::values())],
             'bank_name' => ['nullable', 'string', 'max:100'],
             'bank_account_number' => ['nullable', 'string', 'max:50'],
             'effective_from' => ['required', 'date'],
@@ -96,7 +99,7 @@ final class PayrollAssignmentController
             'salary_structure_id' => ['sometimes', 'integer'],
             'base_salary' => ['sometimes', 'numeric', 'min:0'],
             'hourly_rate' => ['sometimes', 'numeric', 'min:0'],
-            'payment_method' => ['sometimes', 'string', 'in:bank_transfer,cash,cheque'],
+            'payment_method' => ['sometimes', 'string', Rule::in(PayrollPaymentMethod::values())],
             'bank_name' => ['nullable', 'string', 'max:100'],
             'bank_account_number' => ['nullable', 'string', 'max:50'],
             'effective_from' => ['sometimes', 'date'],

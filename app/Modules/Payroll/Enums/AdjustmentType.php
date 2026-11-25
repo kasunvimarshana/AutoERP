@@ -19,4 +19,10 @@ enum AdjustmentType: string
     case RetroPay = 'retro_pay';
     case Reimbursement = 'reimbursement';
     case Correction = 'correction';
+
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 }
