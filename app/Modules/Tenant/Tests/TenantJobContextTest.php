@@ -22,9 +22,10 @@ final class TenantJobContextTest extends TestCase
 {
     public function test_queue_middleware_restores_and_clears_tenant_context(): void
     {
-        $execution = new TenantExecutionContext();
+        $execution = new TenantExecutionContext;
         $middleware = new RestoreTenantJobContext($execution);
-        $job = new class implements TenantAwareJobInterface {
+        $job = new class implements TenantAwareJobInterface
+        {
             public function tenantJobContext(): TenantJobContext
             {
                 return new TenantJobContext(42);

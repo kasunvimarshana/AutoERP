@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Hr\Services;
 
 use Carbon\CarbonImmutable;
+use Carbon\CarbonPeriod;
 use InvalidArgumentException;
 use Modules\Hr\DTOs\ResolvedShiftData;
 use Modules\Hr\DTOs\ShiftAssignmentData;
@@ -454,6 +455,230 @@ final class ShiftRosterService
             graceOutMinutes: 0,
             resolutionSource: 'rest_day',
         );
+    }
+
+    /**
+     * Batch-resolve shifts for a set of employees across a date range using preloaded data (no N+1 queries).
+     *
+     * @param  list<int>  $employeeIds
+     * @return array<int, array<string, ResolvedShiftData>>
+     */
+    public function resolveRosterBatch(int $tenantId, array $employeeIds, string $startDate, string $endDate): array
+    {
+        if ($employeeIds === []) {
+            return [];
+        }
+
+        $reallocations = HrShiftReallocation::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('cover_employee_id', $employeeIds)
+            ->whereDate('reallocation_date', '>=', $startDate)
+            ->whereDate('reallocation_date', '<=', $endDate)
+            ->with('shift')
+            ->get()
+            ->groupBy(static fn (HrShiftReallocation $item): string => $item->cover_employee_id.'|'.CarbonImmutable::parse($item->reallocation_date)->toDateString());
+
+        $swapsAsRequester = HrShiftSwap::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('requester_employee_id', $employeeIds)
+            ->whereDate('swap_date', '>=', $startDate)
+            ->whereDate('swap_date', '<=', $endDate)
+            ->where('status', ShiftSwapStatus::ManagerApproved)
+            ->with('targetShift')
+            ->get()
+            ->groupBy(static fn (HrShiftSwap $item): string => $item->requester_employee_id.'|'.CarbonImmutable::parse($item->swap_date)->toDateString());
+
+        $swapsAsTarget = HrShiftSwap::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('target_employee_id', $employeeIds)
+            ->whereDate('target_swap_date', '>=', $startDate)
+            ->whereDate('target_swap_date', '<=', $endDate)
+            ->where('status', ShiftSwapStatus::ManagerApproved)
+            ->with('requesterShift')
+            ->get()
+            ->groupBy(static fn (HrShiftSwap $item): string => $item->target_employee_id.'|'.CarbonImmutable::parse($item->target_swap_date)->toDateString());
+
+        $assignments = HrShiftAssignment::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('employee_id', $employeeIds)
+            ->where('is_cancelled', false)
+            ->with('shift')
+            ->get()
+            ->groupBy('employee_id');
+
+        $rotationAssignments = HrShiftRotationAssignment::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('employee_id', $employeeIds)
+            ->where('is_active', true)
+            ->whereDate('anchor_date', '<=', $endDate)
+            ->where(static function ($q) use ($startDate): void {
+                $q->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $startDate);
+            })
+            ->with(['rotation.steps.shift'])
+            ->get()
+            ->groupBy('employee_id');
+
+        $holidaysByDate = HrHoliday::query()
+            ->where('tenant_id', $tenantId)
+            ->whereDate('holiday_date', '>=', $startDate)
+            ->whereDate('holiday_date', '<=', $endDate)
+            ->get()
+            ->keyBy(static fn (HrHoliday $holiday): string => CarbonImmutable::parse($holiday->holiday_date)->toDateString());
+
+        $period = CarbonPeriod::create($startDate, $endDate);
+        $dates = [];
+        foreach ($period as $day) {
+            $dates[] = $day->toDateString();
+        }
+
+        $resolvedByEmployee = [];
+
+        foreach ($employeeIds as $employeeId) {
+            $empAssignments = $assignments->get($employeeId, collect());
+            $empRotations = $rotationAssignments->get($employeeId, collect());
+            $empDays = [];
+
+            foreach ($dates as $civilDate) {
+                $key = $employeeId.'|'.$civilDate;
+                $date = CarbonImmutable::parse($civilDate);
+
+                // 1. Shift Reallocation
+                $reallocation = $reallocations->get($key)?->first();
+                if ($reallocation !== null && $reallocation->shift !== null) {
+                    $empDays[$civilDate] = $this->buildResolvedShift($reallocation->shift, $civilDate, 'reallocation');
+
+                    continue;
+                }
+
+                // 2. Approved Shift Swap
+                $swapReq = $swapsAsRequester->get($key)?->first();
+                if ($swapReq !== null && $swapReq->targetShift !== null) {
+                    $empDays[$civilDate] = $this->buildResolvedShift($swapReq->targetShift, $civilDate, 'swap');
+
+                    continue;
+                }
+
+                $swapTgt = $swapsAsTarget->get($key)?->first();
+                if ($swapTgt !== null && $swapTgt->requesterShift !== null) {
+                    $empDays[$civilDate] = $this->buildResolvedShift($swapTgt->requesterShift, $civilDate, 'swap');
+
+                    continue;
+                }
+
+                // 3. Specific-Date Override
+                $specificDate = $empAssignments->first(static fn (HrShiftAssignment $a): bool => $a->assignment_type === ShiftAssignmentType::SpecificDate
+                    && $a->start_date !== null
+                    && CarbonImmutable::parse($a->start_date)->toDateString() === $civilDate);
+                if ($specificDate !== null && $specificDate->shift !== null) {
+                    $empDays[$civilDate] = $this->buildResolvedShift($specificDate->shift, $civilDate, 'specific_date', $specificDate);
+
+                    continue;
+                }
+
+                // 4. Date-Range Assignment
+                $dateRange = $empAssignments->first(static fn (HrShiftAssignment $a): bool => $a->assignment_type === ShiftAssignmentType::DateRange
+                    && $a->start_date !== null
+                    && $a->end_date !== null
+                    && CarbonImmutable::parse($a->start_date)->toDateString() <= $civilDate
+                    && CarbonImmutable::parse($a->end_date)->toDateString() >= $civilDate);
+                if ($dateRange !== null && $dateRange->shift !== null) {
+                    $empDays[$civilDate] = $this->buildResolvedShift($dateRange->shift, $civilDate, 'date_range', $dateRange);
+
+                    continue;
+                }
+
+                // 4b. Shift Rotation Assignment
+                $rotationAssignment = $empRotations->first(static fn (HrShiftRotationAssignment $r): bool => CarbonImmutable::parse($r->anchor_date)->toDateString() <= $civilDate
+                    && ($r->end_date === null || CarbonImmutable::parse($r->end_date)->toDateString() >= $civilDate));
+                if ($rotationAssignment !== null && $rotationAssignment->rotation !== null) {
+                    $anchor = CarbonImmutable::parse($rotationAssignment->anchor_date);
+                    $dayDiff = $anchor->diffInDays($date);
+                    $cycleDays = max(1, (int) $rotationAssignment->rotation->cycle_days);
+                    $stepSequence = ($dayDiff % $cycleDays) + 1;
+
+                    $step = $rotationAssignment->rotation->steps->firstWhere('day_sequence', $stepSequence);
+                    if ($step !== null) {
+                        if ($step->shift !== null) {
+                            $empDays[$civilDate] = $this->buildResolvedShift($step->shift, $civilDate, 'rotation');
+
+                            continue;
+                        }
+
+                        $empDays[$civilDate] = new ResolvedShiftData(
+                            shift: null,
+                            shiftDate: $civilDate,
+                            isWorkingDay: false,
+                            isRestDay: true,
+                            isHoliday: false,
+                            holidayName: null,
+                            startTime: null,
+                            endTime: null,
+                            isOvernight: false,
+                            scheduledMinutes: 0,
+                            graceInMinutes: 0,
+                            graceOutMinutes: 0,
+                            resolutionSource: 'rotation_rest',
+                        );
+
+                        continue;
+                    }
+                }
+
+                // 5. Recurring Weekly Assignment (1=Mon ... 7=Sun)
+                $dayOfWeek = (int) $date->dayOfWeekIso;
+                $recurring = $empAssignments->first(static fn (HrShiftAssignment $a): bool => $a->assignment_type === ShiftAssignmentType::Recurring
+                    && (int) $a->day_of_week === $dayOfWeek);
+                if ($recurring !== null && $recurring->shift !== null) {
+                    $empDays[$civilDate] = $this->buildResolvedShift($recurring->shift, $civilDate, 'recurring', $recurring);
+
+                    continue;
+                }
+
+                // 6. Public Holiday
+                $holiday = $holidaysByDate->get($civilDate);
+                if ($holiday !== null) {
+                    $empDays[$civilDate] = new ResolvedShiftData(
+                        shift: null,
+                        shiftDate: $civilDate,
+                        isWorkingDay: false,
+                        isRestDay: false,
+                        isHoliday: true,
+                        holidayName: $holiday->name,
+                        startTime: null,
+                        endTime: null,
+                        isOvernight: false,
+                        scheduledMinutes: 0,
+                        graceInMinutes: 0,
+                        graceOutMinutes: 0,
+                        resolutionSource: 'holiday',
+                    );
+
+                    continue;
+                }
+
+                // 7. Default Rest Day
+                $empDays[$civilDate] = new ResolvedShiftData(
+                    shift: null,
+                    shiftDate: $civilDate,
+                    isWorkingDay: false,
+                    isRestDay: true,
+                    isHoliday: false,
+                    holidayName: null,
+                    startTime: null,
+                    endTime: null,
+                    isOvernight: false,
+                    scheduledMinutes: 0,
+                    graceInMinutes: 0,
+                    graceOutMinutes: 0,
+                    resolutionSource: 'rest_day',
+                );
+            }
+
+            $resolvedByEmployee[$employeeId] = $empDays;
+        }
+
+        return $resolvedByEmployee;
     }
 
     private function buildResolvedShift(

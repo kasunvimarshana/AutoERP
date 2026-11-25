@@ -18,6 +18,7 @@ use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 final class ListTenantPlansService
 {
     private const DEFAULT_PAGE_SIZE = 20;
+
     private const MAX_PAGE_SIZE = 100;
 
     public function __construct(private readonly TenantPlanRepositoryInterface $plans) {}

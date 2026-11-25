@@ -52,6 +52,7 @@ final class UserDeviceService extends AbstractUserCrudService
             $page = max((int) ($filters['page'] ?? 1), 1);
             $paginator = $query->orderByDesc('last_active_at')->paginate($perPage, ['*'], 'page', $page);
             $items = array_map(fn (mixed $device): DataRecord => $this->record($device), array_values($paginator->items()));
+
             return Result::success(new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -80,7 +81,7 @@ final class UserDeviceService extends AbstractUserCrudService
                 $existing = UserDeviceModel::query()->where('tenant_id', $tenantId)->where('user_id', $user->getKey())
                     ->where('device_token_hash', $tokenHash)->lockForUpdate()->first();
                 $before = $existing?->attributesToArray();
-                $device = $existing ?? new UserDeviceModel();
+                $device = $existing ?? new UserDeviceModel;
                 $device->forceFill([
                     'tenant_id' => $tenantId,
                     'user_id' => $user->getKey(),
@@ -97,8 +98,10 @@ final class UserDeviceService extends AbstractUserCrudService
                         : 1,
                 ])->save();
                 $this->audit->record('device.registered', 'user_device', $device, $before, $device->attributesToArray());
+
                 return $device;
             }, 3);
+
             return Result::success($this->record($device));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -120,8 +123,10 @@ final class UserDeviceService extends AbstractUserCrudService
                     'last_active_at' => $this->clock->now(),
                     'row_version' => $expectedVersion + 1,
                 ])->save();
+
                 return $device;
             }, 3);
+
             return Result::success($this->record($device));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -149,8 +154,10 @@ final class UserDeviceService extends AbstractUserCrudService
                     'row_version' => $expectedVersion + 1,
                 ])->save();
                 $this->audit->record('device.revoked', 'user_device', $device, $before, $device->attributesToArray());
+
                 return $device;
             }, 3);
+
             return Result::success($this->record($device));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -180,6 +187,7 @@ final class UserDeviceService extends AbstractUserCrudService
         if (! $user instanceof UserModel) {
             throw new RuntimeException('User not found.');
         }
+
         return $user;
     }
 
@@ -189,6 +197,7 @@ final class UserDeviceService extends AbstractUserCrudService
         if ($lock) {
             $query->lockForUpdate();
         }
+
         return $query->first();
     }
 
@@ -219,13 +228,14 @@ final class UserDeviceService extends AbstractUserCrudService
         if ($id === null) {
             throw new RuntimeException('A tenant context is required.');
         }
+
         return $id;
     }
-
 
     private function nullableString(mixed $value): ?string
     {
         $value = is_scalar($value) ? trim((string) $value) : '';
+
         return $value === '' ? null : $value;
     }
 }

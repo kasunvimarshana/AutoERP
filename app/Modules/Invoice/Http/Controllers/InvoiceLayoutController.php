@@ -41,12 +41,14 @@ final class InvoiceLayoutController
         $isActive = $request->has('is_active')
             ? filter_var($request->query('is_active'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
             : null;
+        $perPage = min(100, max(1, (int) $request->query('per_page', 20)));
 
         $items = $this->layouts->list(
             $tenantId,
             is_string($search) ? $search : null,
             is_string($paperSize) ? $paperSize : null,
             $isActive,
+            $perPage,
         );
 
         $defaults = $this->layouts->getActiveDefaults($tenantId, $organizationUnitId);
@@ -57,9 +59,13 @@ final class InvoiceLayoutController
         }
 
         return response()->json([
-            'data' => InvoiceLayoutResource::collection($items),
+            'data' => InvoiceLayoutResource::collection($items->items()),
             'meta' => [
                 'defaults' => $defaults,
+                'current_page' => $items->currentPage(),
+                'last_page' => $items->lastPage(),
+                'per_page' => $items->perPage(),
+                'total' => $items->total(),
             ],
         ]);
     }

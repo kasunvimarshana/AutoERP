@@ -24,12 +24,20 @@ final class StoreVehicleRequest extends TenantScopedRequest
 {
     use MapsVehicleData;
 
-    public function rules(): array { return self::vehicleRules(); }
-    public function toData(): CreateVehicleData { return $this->mapVehicleData($this->validated()); }
+    public function rules(): array
+    {
+        return self::vehicleRules();
+    }
+
+    public function toData(): CreateVehicleData
+    {
+        return $this->mapVehicleData($this->validated());
+    }
 
     public static function vehicleRules(string $prefix = ''): array
     {
         $key = fn (string $name): string => $prefix.$name;
+
         return [
             $key('tenant_id') => $prefix === '' ? ['required', 'integer', 'min:1'] : ['prohibited'],
             $key('organization_unit_id') => $prefix === '' ? ['nullable', 'integer', 'min:1'] : ['prohibited'],

@@ -56,7 +56,7 @@ final class PlatformAuditLogController extends Controller
     {
         $record = $this->get->execute($id);
         if ($record === null) {
-            throw (new ModelNotFoundException())->setModel(AuditLog::class, [$id]);
+            throw (new ModelNotFoundException)->setModel(AuditLog::class, [$id]);
         }
 
         return new AuditLogDetailResource($record, $this->authorization->canViewSensitive());

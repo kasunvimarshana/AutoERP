@@ -21,8 +21,10 @@ use Modules\User\Constants\UserGuard;
 use Modules\VehicleRental\Enums\DriverMode;
 use Modules\VehicleRental\Enums\RentalBasis;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
+use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalReservationService;
+use Modules\VehicleRental\Services\VehicleUseAvailabilityBlocker;
 use Tests\TestCase;
 
 final class RentalReservationTest extends TestCase
@@ -269,7 +271,7 @@ final class RentalReservationTest extends TestCase
             );
 
             // VehicleUseAvailabilityBlocker should report conflict for the overlapping period
-            $blocker = app(\Modules\VehicleRental\Services\VehicleUseAvailabilityBlocker::class);
+            $blocker = app(VehicleUseAvailabilityBlocker::class);
             $this->assertTrue($blocker->conflicts(
                 $context->tenantId,
                 $vehicleId,
@@ -359,7 +361,7 @@ final class RentalReservationTest extends TestCase
         [$context, $customerData] = $this->loginFixture();
 
         // 1. POST reservation with empty optional strings
-        $response = $this->postJson($this->rentalRoot . '/reservations', [
+        $response = $this->postJson($this->rentalRoot.'/reservations', [
             'customer_id' => $customerData['party_id'],
             'requested_vehicle_id' => '',
             'requested_vehicle_category_id' => '',
@@ -381,11 +383,11 @@ final class RentalReservationTest extends TestCase
         $this->assertNull($response->json('data.source'));
 
         // 2. GET index with empty filter query params
-        $indexResponse = $this->getJson($this->rentalRoot . '/reservations?search=&customer_id=&requested_vehicle_id=&status=&from=&until=');
+        $indexResponse = $this->getJson($this->rentalRoot.'/reservations?search=&customer_id=&requested_vehicle_id=&status=&from=&until=');
         $indexResponse->assertOk();
 
         // 3. PUT update reservation with empty strings
-        $updateResponse = $this->putJson($this->rentalRoot . '/reservations/' . $reservationId, [
+        $updateResponse = $this->putJson($this->rentalRoot.'/reservations/'.$reservationId, [
             'expected_version' => $version,
             'customer_id' => $customerData['party_id'],
             'rental_mode' => DriverMode::SelfDrive->value,
@@ -402,7 +404,7 @@ final class RentalReservationTest extends TestCase
         $newVersion = $updateResponse->json('data.row_version');
 
         // 4. Transition to confirmed
-        $transResponse = $this->patchJson($this->rentalRoot . '/reservations/' . $reservationId . '/transition', [
+        $transResponse = $this->patchJson($this->rentalRoot.'/reservations/'.$reservationId.'/transition', [
             'expected_version' => $newVersion,
             'status' => RentalReservationStatus::Confirmed->value,
             'reason' => 'Confirmed via phone',
@@ -411,7 +413,7 @@ final class RentalReservationTest extends TestCase
         $confirmedVersion = $transResponse->json('data.row_version');
 
         // 5. Convert to agreement with empty optional reference and notes
-        $convertResponse = $this->postJson($this->rentalRoot . '/reservations/' . $reservationId . '/convert', [
+        $convertResponse = $this->postJson($this->rentalRoot.'/reservations/'.$reservationId.'/convert', [
             'expected_version' => $confirmedVersion,
             'reference' => '',
             'notes' => '',
@@ -424,7 +426,7 @@ final class RentalReservationTest extends TestCase
     {
         [$context, $customerData] = $this->loginFixture();
 
-        $response = $this->postJson($this->rentalRoot . '/reservations', [
+        $response = $this->postJson($this->rentalRoot.'/reservations', [
             'customer_id' => $customerData['party_id'],
             'rental_mode' => DriverMode::SelfDrive->value,
             'billing_cycle' => RentalBasis::Daily->value,
@@ -435,12 +437,12 @@ final class RentalReservationTest extends TestCase
 
         $reservationId = (int) $response->json('data.id');
 
-        $this->deleteJson($this->rentalRoot . '/reservations/' . $reservationId)->assertStatus(405);
+        $this->deleteJson($this->rentalRoot.'/reservations/'.$reservationId)->assertStatus(405);
 
         $this->withTenantExecutionContext($context->tenantId, function () use ($reservationId): void {
             $this->expectException(\LogicException::class);
             $this->expectExceptionMessage('Rental reservations must be preserved for audit history.');
-            \Modules\VehicleRental\Models\RentalReservation::query()->findOrFail($reservationId)->delete();
+            RentalReservation::query()->findOrFail($reservationId)->delete();
         });
     }
 }

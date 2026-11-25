@@ -65,7 +65,7 @@ final class SupplierQueryService
         }
 
         $this->assertSupplierIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException())->setModel(Supplier::class, [$id]);
+        throw (new ModelNotFoundException)->setModel(Supplier::class, [$id]);
     }
 
     public function supplier(int $id, int $tenantId, ?int $organizationUnitId): Supplier
@@ -77,7 +77,7 @@ final class SupplierQueryService
         }
 
         $this->assertSupplierIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException())->setModel(Supplier::class, [$id]);
+        throw (new ModelNotFoundException)->setModel(Supplier::class, [$id]);
     }
 
     public function delete(Supplier $supplier): void

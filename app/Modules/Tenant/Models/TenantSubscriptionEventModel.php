@@ -12,12 +12,13 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Models;
 
-use Modules\Core\Models\TenantOwnedModel;
 use LogicException;
+use Modules\Core\Models\TenantOwnedModel;
 
 final class TenantSubscriptionEventModel extends TenantOwnedModel
 {
     public $timestamps = false;
+
     protected $table = 'tenant_subscription_events';
 
     protected $fillable = [
@@ -27,10 +28,10 @@ final class TenantSubscriptionEventModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::updating(static function (): never {
+        self::updating(static function (): never {
             throw new LogicException('Tenant history records are immutable.');
         });
-        static::deleting(static function (): never {
+        self::deleting(static function (): never {
             throw new LogicException('Tenant history records cannot be deleted.');
         });
     }

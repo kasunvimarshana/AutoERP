@@ -15,7 +15,6 @@ namespace Modules\Payment\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\Tenancy\TenantFeature;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
@@ -263,7 +262,7 @@ final class PaymentReceiptTest extends TestCase
                 'is_active' => true,
             ]);
 
-            $payment = new Payment();
+            $payment = new Payment;
             $payment->forceFill([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $orgId,
@@ -289,7 +288,7 @@ final class PaymentReceiptTest extends TestCase
             ]);
             $payment->save();
 
-            $line = new PaymentLine();
+            $line = new PaymentLine;
             $line->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_id' => $payment->getKey(),

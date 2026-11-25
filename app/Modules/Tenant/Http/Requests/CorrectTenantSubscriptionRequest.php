@@ -18,7 +18,10 @@ use Modules\Tenant\Constants\TenantSubscriptionStatus;
 
 final class CorrectTenantSubscriptionRequest extends FormRequest
 {
-    public function authorize(): bool { return auth()->check(); }
+    public function authorize(): bool
+    {
+        return auth()->check();
+    }
 
     /** @return array<string, mixed> */
     public function rules(): array

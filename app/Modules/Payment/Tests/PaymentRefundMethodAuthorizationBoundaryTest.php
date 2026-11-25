@@ -26,7 +26,7 @@ final class PaymentRefundMethodAuthorizationBoundaryTest extends TestCase
             $routes,
         );
         self::assertStringContainsString(
-            "->middleware(\$requires(PaymentPermission::PAYMENTS_REFUND))",
+            '->middleware($requires(PaymentPermission::PAYMENTS_REFUND))',
             $routes,
         );
         self::assertStringContainsString(

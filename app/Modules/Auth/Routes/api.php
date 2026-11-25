@@ -11,13 +11,13 @@ declare(strict_types=1);
  */
 
 use Illuminate\Support\Facades\Route;
-use Modules\Auth\Http\Controllers\TenantAuthController;
-use Modules\Auth\Http\Controllers\TenantOAuthController;
-use Modules\Auth\Http\Controllers\TenantSessionController;
 use Modules\Auth\Http\Controllers\AuthReadinessController;
 use Modules\Auth\Http\Controllers\OrganizationUnitContextController;
 use Modules\Auth\Http\Controllers\PlatformAuthController;
 use Modules\Auth\Http\Controllers\PlatformSecurityController;
+use Modules\Auth\Http\Controllers\TenantAuthController;
+use Modules\Auth\Http\Controllers\TenantOAuthController;
+use Modules\Auth\Http\Controllers\TenantSessionController;
 use Modules\Core\Authorization\PlatformPermission;
 
 $tenantGuard = (string) config('module-auth.protected_route_guard', 'auth-api');

@@ -33,7 +33,6 @@ use Modules\VehicleRental\Services\RunningChartReportService;
 use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\TwoStageInvoicingService;
 use Modules\VehicleRental\Services\VehicleUseService;
-use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
@@ -218,6 +217,7 @@ final class OwnerVehicleInternalUseTest extends TestCase
         // Verify Running Chart Owner Report sheet generation
         $report = $this->withTenantExecutionContext($context->tenantId, function () use ($context, $owner): array {
             $reportService = app(RunningChartReportService::class);
+
             return $reportService->generate($context, [
                 'agreement_id' => $owner->id,
                 'start_date' => '2026-09-01',

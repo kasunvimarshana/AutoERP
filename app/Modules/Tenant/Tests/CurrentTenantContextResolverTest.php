@@ -19,11 +19,11 @@ use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\DTOs\CurrentUserContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
+use Modules\Core\Support\SystemClock;
+use Modules\Core\Support\TenantExecutionContext;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
-use Modules\Core\Support\SystemClock;
-use Modules\Core\Support\TenantExecutionContext;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
@@ -176,10 +176,10 @@ final class CurrentTenantContextResolverTest extends TestCase
             $tenants ?? $this->createMock(TenantRepositoryInterface::class),
             $domains ?? $this->createMock(TenantDomainRepositoryInterface::class),
             $userAccess ?? $this->createMock(TenantUserAccessCheckerInterface::class),
-            new TenantDomainReadinessPolicy(),
-            new TenantSubscriptionPolicy(new SystemClock()),
+            new TenantDomainReadinessPolicy,
+            new TenantSubscriptionPolicy(new SystemClock),
             new PlatformHostPolicy($this->app),
-            new TenantExecutionContext(),
+            new TenantExecutionContext,
         );
     }
 

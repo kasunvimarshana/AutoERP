@@ -67,12 +67,14 @@ final class LanguageController extends Controller
     public function update(UpdateLanguageRequest $request, int $language): LanguageResource
     {
         $validated = $request->validated();
+
         return new LanguageResource($this->catalog->update($language, (int) $validated['expected_version'], $validated));
     }
 
     public function setStatus(SetReferenceStatusRequest $request, int $language): LanguageResource
     {
         $validated = $request->validated();
+
         return new LanguageResource($this->catalog->setActive(
             $language,
             (int) $validated['expected_version'],

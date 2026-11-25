@@ -130,7 +130,7 @@ final class TenantDomainOperationalVerificationService
                             'operational_error_message' => null,
                             'operational_claim_token' => null,
                             'operational_claimed_at' => null,
-                    'operational_claim_lease_expires_at' => null,
+                            'operational_claim_lease_expires_at' => null,
                         ],
                     );
                     if ($updated === null) {
@@ -220,7 +220,7 @@ final class TenantDomainOperationalVerificationService
             'operational_error_message' => $message,
             'operational_claim_token' => null,
             'operational_claimed_at' => null,
-                    'operational_claim_lease_expires_at' => null,
+            'operational_claim_lease_expires_at' => null,
         ]);
 
         return $updated === null

@@ -24,13 +24,13 @@ final class OrganizationUnitLegalProfileModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::updating(static function (self $profile): void {
+        self::updating(static function (self $profile): void {
             if (! $profile->isDirty('row_version')) {
                 $profile->row_version = ((int) $profile->getOriginal('row_version')) + 1;
             }
         });
 
-        static::deleting(static function (): void {
+        self::deleting(static function (): void {
             throw new LogicException('Organization legal profiles are retained for historical document traceability.');
         });
     }

@@ -14,7 +14,6 @@ namespace Modules\OrganizationUnit\Services\OrganizationUnitDocuments;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
@@ -28,6 +27,7 @@ use Modules\OrganizationUnit\Services\Contracts\OrganizationUnitDomainServiceInt
 use Modules\OrganizationUnit\Services\Storage\OrganizationUnitAssetStorageService;
 use Modules\OrganizationUnit\Support\OrganizationUnitContext;
 use Modules\OrganizationUnit\Support\OrganizationUnitNameKey;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Tenant\Services\Storage\TenantStoragePathPolicy;
 use RuntimeException;
 use Throwable;
@@ -129,7 +129,7 @@ final class OrganizationUnitDocumentService
                     throw OrganizationUnitException::conflict('Document name already exists for this organization unit.');
                 }
 
-                $document = new OrganizationUnitDocumentModel();
+                $document = new OrganizationUnitDocumentModel;
                 $document->forceFill([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,

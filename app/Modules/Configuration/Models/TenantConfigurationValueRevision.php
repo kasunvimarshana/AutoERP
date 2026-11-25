@@ -13,9 +13,9 @@ declare(strict_types=1);
 namespace Modules\Configuration\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Core\Models\Concerns\HasImmutableTenantOwnership;
 use Modules\Core\Models\Concerns\HasTenantScope;
-use Modules\Configuration\Constants\ConfigurationScope;
 
 final class TenantConfigurationValueRevision extends ConfigurationValueRevision
 {

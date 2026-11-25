@@ -53,9 +53,9 @@ return new class extends Migration
             )->references(['id', 'tenant_id'])
                 ->on('auth_registration_invitations')
                 ->restrictOnDelete();
-            $table->index(['status', 'lease_expires_at', 'requested_at'], 'auth_reg_invite_deliveries_work_ix', );
-            $table->index(['tenant_id', 'invitation_id', 'requested_at'], 'auth_reg_invite_deliveries_invitation_ix', );
-            $table->index(['provider', 'provider_message_id'], 'auth_reg_invite_deliveries_provider_ix', );
+            $table->index(['status', 'lease_expires_at', 'requested_at'], 'auth_reg_invite_deliveries_work_ix');
+            $table->index(['tenant_id', 'invitation_id', 'requested_at'], 'auth_reg_invite_deliveries_invitation_ix');
+            $table->index(['provider', 'provider_message_id'], 'auth_reg_invite_deliveries_provider_ix');
         });
     }
 

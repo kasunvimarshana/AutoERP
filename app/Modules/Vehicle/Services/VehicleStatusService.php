@@ -38,7 +38,9 @@ final class VehicleStatusService
     {
         $from = $vehicle->status instanceof VehicleStatus ? $vehicle->status : VehicleStatus::from((string) $vehicle->status);
         $this->assertTransition($from, $data->newStatus);
-        if ($from === $data->newStatus) { return $vehicle; }
+        if ($from === $data->newStatus) {
+            return $vehicle;
+        }
 
         return DB::transaction(function () use ($vehicle, $data, $from): Vehicle {
             VehicleStatusHistory::query()->create([
@@ -70,7 +72,9 @@ final class VehicleStatusService
     public function assertTransition(VehicleStatus $from, VehicleStatus $to): void
     {
         $terminal = [VehicleStatus::Sold, VehicleStatus::Scrapped];
-        if ($from === $to) { return; }
+        if ($from === $to) {
+            return;
+        }
         if (in_array($from, $terminal, true) && ! in_array($to, [VehicleStatus::Inactive, VehicleStatus::Blocked], true)) {
             throw new InvalidArgumentException('Invalid vehicle status transition.');
         }

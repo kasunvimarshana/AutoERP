@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Resources;
 
-use Modules\Core\Services\DecimalMath;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Services\DecimalMath;
 
 abstract class PurchaseResource extends JsonResource
 {

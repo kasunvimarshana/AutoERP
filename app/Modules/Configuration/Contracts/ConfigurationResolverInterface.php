@@ -17,5 +17,6 @@ use Modules\Configuration\Data\ResolvedConfigurationValue;
 interface ConfigurationResolverInterface
 {
     public function resolve(string $key, int $tenantId, ?int $organizationUnitId = null): ResolvedConfigurationValue;
+
     public function value(string $key, int $tenantId, ?int $organizationUnitId = null): mixed;
 }

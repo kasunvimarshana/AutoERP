@@ -89,7 +89,7 @@ final class PaymentPostingPolicyTest extends TestCase
 
     private function policy(): PaymentPostingPolicyService
     {
-        return new PaymentPostingPolicyService(new PaymentRefundPolicyService(new DecimalMath()));
+        return new PaymentPostingPolicyService(new PaymentRefundPolicyService(new DecimalMath));
     }
 
     private function payment(

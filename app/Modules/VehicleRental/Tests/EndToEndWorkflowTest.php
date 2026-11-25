@@ -15,20 +15,16 @@ namespace Modules\VehicleRental\Tests;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\RunningChartAction;
-use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
-use Modules\VehicleRental\Http\Resources\RunningChartRegisterResource;
-use Modules\VehicleRental\Http\Resources\VehicleUseResource;
-use Modules\VehicleRental\Models\RunningChart;
-use Modules\VehicleRental\Models\VehicleUse;
+use Modules\VehicleRental\Http\Resources\RunningChartResource;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RunningChartRegisterService;
@@ -121,7 +117,7 @@ final class EndToEndWorkflowTest extends TestCase
             ]);
 
             // Agrees to standard 8h baseline -> 10h trip duration = 2h (120 mins) calculated overtime
-            $chartResource = (new \Modules\VehicleRental\Http\Resources\RunningChartResource($chart))->toArray(request());
+            $chartResource = (new RunningChartResource($chart))->toArray(request());
             self::assertEquals('8.0', $chartResource['agreed_baseline_hours']);
             self::assertSame(120, $chartResource['calculated_ot_minutes']);
             self::assertSame('150.000000', $chartResource['total_km']);

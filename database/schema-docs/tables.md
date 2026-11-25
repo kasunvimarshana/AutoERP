@@ -350,6 +350,32 @@ No database tables. PrivateObject owns the private-storage capability and canoni
 | `hr_employee_rates` | Stores effective rates used by hr employee rate. | No declared foreign keys. | tenant scoped; organization-unit aware |
 | `hr_employee_availabilities` | Stores hr employee availability records used by the owning module. | No declared foreign keys. | tenant scoped; organization-unit aware |
 | `hr_employee_status_histories` | Records status transitions and audit context for hr employee status history. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `hr_shifts` | Stores shift definitions, working hours, grace windows, and break policies. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_shift_breaks` | Stores scheduled break windows belonging to an HR shift. | `shift_id` -> `hr_shifts.id` | tenant scoped; organization-unit aware |
+| `hr_shift_assignments` | Stores recurring, date-range, and specific-date employee shift assignments. | `employee_id` -> `hr_employees.id`; `shift_id` -> `hr_shifts.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_shift_swaps` | Tracks peer-to-peer and manager-approved shift swap requests. | `requester_employee_id`, `target_employee_id` -> `hr_employees.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_shift_reallocations` | Tracks cover assignments when an employee is absent for a scheduled shift. | `absent_employee_id`, `cover_employee_id` -> `hr_employees.id`; `shift_id` -> `hr_shifts.id` | tenant scoped; organization-unit aware |
+| `hr_holiday_calendars` | Stores yearly public holiday calendar headers per tenant or branch. | No declared foreign keys. | tenant scoped; organization-unit aware |
+| `hr_holidays` | Stores individual public and company holidays under a holiday calendar. | `holiday_calendar_id` -> `hr_holiday_calendars.id` | tenant scoped; organization-unit aware |
+| `hr_attendance_records` | Stores daily calculated attendance records, worked/overtime minutes, and anomaly flags. | `employee_id` -> `hr_employees.id`; `shift_id` -> `hr_shifts.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_attendance_punches` | Stores immutable clock-in/out/break punch events across all capture channels. | `employee_id` -> `hr_employees.id`; `attendance_record_id` -> `hr_attendance_records.id` | tenant scoped; organization-unit aware |
+| `hr_attendance_regularizations` | Stores employee attendance regularization requests and approval workflow state. | `employee_id` -> `hr_employees.id`; `attendance_record_id` -> `hr_attendance_records.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_attendance_adjustments` | Stores immutable administrative attendance adjustment audit records. | `attendance_record_id` -> `hr_attendance_records.id` | tenant scoped; organization-unit aware |
+| `hr_leave_types` | Stores leave type definitions, attachment requirements, and sandwich-rule flags. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_leave_policies` | Stores leave accrual, carry-forward, and eligibility policies per leave type. | `leave_type_id` -> `hr_leave_types.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_leave_balances` | Stores annual employee leave balances (entitled, carried forward, accrued, taken, pending). | `employee_id` -> `hr_employees.id`; `leave_type_id` -> `hr_leave_types.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_leave_requests` | Stores employee leave applications, approval state, and cancellation metadata. | `employee_id` -> `hr_employees.id`; `leave_type_id` -> `hr_leave_types.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_comp_off_claims` | Stores compensatory-off claims earned from holiday or rest-day work. | `employee_id` -> `hr_employees.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_shift_rotations` | Stores multi-day cyclic shift rotation pattern headers. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_shift_rotation_steps` | Stores ordered day-sequence shift steps within a shift rotation pattern. | `shift_rotation_id` -> `hr_shift_rotations.id`; `shift_id` -> `hr_shifts.id` | tenant scoped; organization-unit aware |
+| `hr_shift_rotation_assignments` | Assigns employees to cyclic shift rotations with anchor dates. | `employee_id` -> `hr_employees.id`; `shift_rotation_id` -> `hr_shift_rotations.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_biometric_devices` | Stores biometric hardware device configurations, protocols, and sync health state. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_biometric_device_users` | Maps hardware biometric PINs/user IDs to HR employees. | `biometric_device_id` -> `hr_biometric_devices.id`; `employee_id` -> `hr_employees.id` | tenant scoped; organization-unit aware |
+| `hr_biometric_raw_punches` | Stores deduplicated raw biometric punch payloads staged for attendance processing. | `biometric_device_id` -> `hr_biometric_devices.id` | tenant scoped; organization-unit aware |
+| `hr_attendance_geofences` | Stores GPS geofence coordinates, radiuses, and office IP CIDR whitelists. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_attendance_kiosks` | Stores dynamic TOTP QR kiosk terminals and HMAC rotation settings. | `geofence_id` -> `hr_attendance_geofences.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_employee_attendance_credentials` | Stores employee RFID cards, NFC tags, barcodes, and mobile device UUID bindings. | `employee_id` -> `hr_employees.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `hr_attendance_batch_imports` | Tracks two-phase CSV/Excel attendance import batches and validation summaries. | No declared foreign keys. | tenant scoped; organization-unit aware |
 
 ## Vehicle
 
@@ -432,6 +458,25 @@ No independent database tables. Voucher provides unified debit/credit financial 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
 | `audit_logs` | Immutable, append-only audit events with actor/scope snapshots and bounded sanitized payloads. | No declared foreign keys. | unique `audit_logs_event_uuid_uk`; unique `audit_logs_producer_fingerprint_uk`; tenant scoped; organization-unit aware |
+
+## Payroll
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `payroll_salary_components` | Stores earning, deduction, and employer-contribution component definitions. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_salary_structures` | Stores reusable salary structure templates per pay cycle. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_salary_structure_items` | Stores component calculation rules within a salary structure. | `salary_structure_id` -> `payroll_salary_structures.id`; `salary_component_id` -> `payroll_salary_components.id` | tenant scoped; organization-unit aware |
+| `payroll_employee_salary_assignments` | Stores employee base salary, hourly rate, structure assignment, and bank details. | `employee_id` -> `hr_employees.id`; `salary_structure_id` -> `payroll_salary_structures.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_tax_tables` | Stores progressive income tax table headers by effective year. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_tax_brackets` | Stores ordered progressive tax brackets and rates for a tax table. | `tax_table_id` -> `payroll_tax_tables.id` | tenant scoped; organization-unit aware |
+| `payroll_statutory_rules` | Stores statutory contribution rules (EPF/ETF/social security) and rates. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_pay_periods` | Stores payroll calendar pay periods and open/closed lifecycle state. | No declared foreign keys. | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_pay_runs` | Stores batch pay run headers, totals, approval state, and GL posting references. | `pay_period_id` -> `payroll_pay_periods.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_payslips` | Stores individual employee payslip headers, worked/leave metrics, and net pay. | `pay_run_id` -> `payroll_pay_runs.id`; `employee_id` -> `hr_employees.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_payslip_items` | Stores itemized earnings, deductions, taxes, and statutory lines per payslip. | `payslip_id` -> `payroll_payslips.id`; `salary_component_id` -> `payroll_salary_components.id` | tenant scoped; organization-unit aware |
+| `payroll_adjustments` | Stores ad-hoc, bonus, overtime, and retroactive arrears adjustments. | `employee_id` -> `hr_employees.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_employee_loans` | Stores employee loan and salary advance headers, principal, and balance. | `employee_id` -> `hr_employees.id` | tenant scoped; organization-unit aware; optimistic concurrency |
+| `payroll_loan_repayments` | Stores scheduled and payslip-deducted loan repayment installments. | `employee_loan_id` -> `payroll_employee_loans.id` | tenant scoped; organization-unit aware |
 
 ---
 

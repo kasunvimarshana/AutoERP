@@ -64,7 +64,7 @@ final class PostingProfileService
                 $this->assertProfileIdentity($profile, $tenantId, $organizationUnitId);
                 $this->assertExpectedVersion($profile, $expectedVersion);
             } else {
-                $profile = new FinancePostingProfile();
+                $profile = new FinancePostingProfile;
                 $profile->forceFill([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
@@ -127,7 +127,7 @@ final class PostingProfileService
                     );
                 }
 
-                ($existing ?? new FinancePostingProfileRule())->forceFill([
+                ($existing ?? new FinancePostingProfileRule)->forceFill([
                     'tenant_id' => $tenantId,
                     'posting_profile_id' => $profile->getKey(),
                     'line_key' => $lineKey,

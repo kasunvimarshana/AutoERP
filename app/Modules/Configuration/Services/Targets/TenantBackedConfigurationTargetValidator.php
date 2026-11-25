@@ -41,7 +41,7 @@ final class TenantBackedConfigurationTargetValidator implements ConfigurationTar
     {
         $target = $this->targets->find($tenantId);
         if ($target === null) {
-            throw (new ModelNotFoundException())->setModel('tenant', [$tenantId]);
+            throw (new ModelNotFoundException)->setModel('tenant', [$tenantId]);
         }
 
         return $target;

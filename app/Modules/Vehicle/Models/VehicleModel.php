@@ -22,6 +22,7 @@ final class VehicleModel extends TenantOwnedModel
     use SoftDeletes;
 
     protected $table = 'vehicle_models';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -36,6 +37,13 @@ final class VehicleModel extends TenantOwnedModel
         ]);
     }
 
-    public function make(): BelongsTo { return $this->belongsTo(VehicleMake::class, 'vehicle_make_id'); }
-    public function vehicles(): HasMany { return $this->hasMany(Vehicle::class, 'vehicle_model_id'); }
+    public function make(): BelongsTo
+    {
+        return $this->belongsTo(VehicleMake::class, 'vehicle_make_id');
+    }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class, 'vehicle_model_id');
+    }
 }

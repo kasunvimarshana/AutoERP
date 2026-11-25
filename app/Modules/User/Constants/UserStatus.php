@@ -15,8 +15,11 @@ namespace Modules\User\Constants;
 final class UserStatus
 {
     public const INVITED = 'invited';
+
     public const ACTIVE = 'active';
+
     public const INACTIVE = 'inactive';
+
     public const SUSPENDED = 'suspended';
 
     /** @return list<string> */

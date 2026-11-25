@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -10,4 +11,5 @@ declare(strict_types=1);
  */
 
 namespace Modules\Supplier\Http\Requests;
+
 final class UpdateSupplierContactRequest extends SupplierContactRequest {}

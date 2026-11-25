@@ -48,7 +48,6 @@ final class ConfigurationResolutionPrecedenceTest extends TestCase
         self::assertSame(20, $resolved->organizationUnitId);
     }
 
-
     public function test_nearest_parent_override_is_used_before_tenant_value(): void
     {
         $resolved = $this->resolver([

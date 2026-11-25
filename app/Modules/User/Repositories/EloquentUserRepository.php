@@ -36,6 +36,7 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
     {
         return $this->executionContext->runForTenant($tenantId, function () use ($id, $tenantId): ?DataRecord {
             $model = $this->query()->where('tenant_id', $tenantId)->whereKey($id)->lockForUpdate()->first();
+
             return $model instanceof Model ? $this->toRecord($model) : null;
         });
     }
@@ -60,6 +61,7 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
                     $query->where('email', $normalized)->orWhere('username', $normalized);
                 })
                 ->first();
+
             return $model instanceof Model ? $this->toRecord($model) : null;
         });
     }
@@ -105,6 +107,7 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
                 fn (mixed $model): ?DataRecord => $model instanceof Model ? $this->toRecord($model) : null,
                 $paginator->items(),
             )));
+
             return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
         });
     }
@@ -127,6 +130,7 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
                 $query->where($query->getModel()->getKeyName(), '!=', $excludeId);
             }
             $model = $query->first();
+
             return $model instanceof Model ? $this->toRecord($model) : null;
         });
     }

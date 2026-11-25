@@ -113,7 +113,7 @@ final class GenerateSequenceNumberServiceTest extends TestCase
 
         return new GenerateSequenceNumberService(
             $repository,
-            new SequenceDomainService(),
+            new SequenceDomainService,
             $transactions,
         );
     }

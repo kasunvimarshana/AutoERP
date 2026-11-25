@@ -34,10 +34,10 @@ final class TenantModel extends CoreModel
 
     protected static function booted(): void
     {
-        static::saving(static function (self $tenant): void {
+        self::saving(static function (self $tenant): void {
             TenantLifecycleState::assertValid($tenant->getAttributes());
         });
-        static::deleting(static function (): never {
+        self::deleting(static function (): never {
             throw new LogicException('Tenants are archived, never hard deleted.');
         });
     }

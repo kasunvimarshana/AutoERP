@@ -86,9 +86,9 @@ final class OrganizationUnitAuditService
     }
 
     /**
-     * @param array<string, mixed>|null $before
-     * @param array<string, mixed>|null $after
-     * @param list<string> $tags
+     * @param  array<string, mixed>|null  $before
+     * @param  array<string, mixed>|null  $after
+     * @param  list<string>  $tags
      */
     private function record(
         string $action,

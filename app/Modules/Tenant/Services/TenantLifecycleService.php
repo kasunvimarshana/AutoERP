@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services;
 
-use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Constants\AuditActorType;
+use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Audit\Data\PlatformAuditActorData;
@@ -37,9 +37,13 @@ use RuntimeException;
 final class TenantLifecycleService
 {
     private const OUTCOME_SUCCESS = 'success';
+
     private const OUTCOME_NOT_FOUND = 'not_found';
+
     private const OUTCOME_VERSION_CONFLICT = 'version_conflict';
+
     private const OUTCOME_INVALID_TRANSITION = 'invalid_transition';
+
     private const OUTCOME_READINESS_BLOCKED = 'readiness_blocked';
 
     public function __construct(

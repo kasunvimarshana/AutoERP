@@ -21,6 +21,7 @@ use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
 final class ConfigurationValueValidator
 {
     private const MAX_TEXT_LENGTH = 10000;
+
     private const MAX_ENCODED_BYTES = 65535;
 
     public function __construct(
@@ -205,7 +206,9 @@ final class ConfigurationValueValidator
         $right = $this->decimal($right);
         $leftNegative = str_starts_with($left, '-');
         $rightNegative = str_starts_with($right, '-');
-        if ($leftNegative !== $rightNegative) return $leftNegative ? -1 : 1;
+        if ($leftNegative !== $rightNegative) {
+            return $leftNegative ? -1 : 1;
+        }
 
         $comparison = $this->compareUnsignedDecimals(
             $leftNegative ? substr($left, 1) : $left,
@@ -223,7 +226,9 @@ final class ConfigurationValueValidator
             return strlen($leftWhole) <=> strlen($rightWhole);
         }
         $wholeComparison = strcmp($leftWhole, $rightWhole);
-        if ($wholeComparison !== 0) return $wholeComparison <=> 0;
+        if ($wholeComparison !== 0) {
+            return $wholeComparison <=> 0;
+        }
         $scale = max(strlen($leftFraction), strlen($rightFraction));
 
         return strcmp(str_pad($leftFraction, $scale, '0'), str_pad($rightFraction, $scale, '0')) <=> 0;

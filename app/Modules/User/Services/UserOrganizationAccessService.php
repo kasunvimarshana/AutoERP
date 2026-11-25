@@ -15,10 +15,10 @@ namespace Modules\User\Services;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
-use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
 use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Result;
 use Modules\User\Constants\UserOrganizationUnitStatus;
@@ -110,8 +110,10 @@ final class UserOrganizationAccessService extends AbstractUserCrudService
                 $this->accessRevoker->revokeSessionsForUser($tenantId, (int) $user->getKey(), 'Organization access changed.');
                 $after = $this->assignmentSnapshot($tenantId, (int) $user->getKey(), false);
                 $this->audit->record('organization_access.synced', 'user', $user, ['assignments' => $before], ['assignments' => $after]);
+
                 return $user;
             }, 3);
+
             return Result::success(new DataRecord($user->fresh()?->attributesToArray() ?? $user->attributesToArray()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -150,6 +152,7 @@ final class UserOrganizationAccessService extends AbstractUserCrudService
         if ($lock) {
             $query->lockForUpdate();
         }
+
         return $query->orderBy('organization_unit_id')->get()
             ->map(static fn (UserOrganizationUnitModel $assignment): array => [
                 'organization_unit_id' => (int) $assignment->getAttribute('organization_unit_id'),
@@ -186,6 +189,7 @@ final class UserOrganizationAccessService extends AbstractUserCrudService
             $result[(int) $id] = (int) $id;
         }
         ksort($result);
+
         return array_values($result);
     }
 
@@ -195,7 +199,7 @@ final class UserOrganizationAccessService extends AbstractUserCrudService
         if ($id === null) {
             throw new RuntimeException('A tenant context is required.');
         }
+
         return $id;
     }
-
 }

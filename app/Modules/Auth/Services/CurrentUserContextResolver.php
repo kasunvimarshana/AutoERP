@@ -138,7 +138,7 @@ final class CurrentUserContextResolver implements CurrentUserContextResolverInte
     }
 
     /**
-     * @param list<string> $fallback
+     * @param  list<string>  $fallback
      * @return list<string>
      */
     private function configArray(string $key, array $fallback): array

@@ -12,18 +12,18 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
-use Modules\Core\Contracts\ClockInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
+use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
+use Modules\Tenant\Constants\TenantSubscriptionStatus;
 use Modules\Tenant\Data\TenantDirectoryFilters;
 use Modules\Tenant\Models\TenantModel;
-use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
-use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
-use Modules\Tenant\Constants\TenantSubscriptionStatus;
-use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
 
 final class EloquentTenantRepository implements TenantRepositoryInterface
 {
@@ -37,24 +37,28 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
     public function findById(int|string $id): ?DataRecord
     {
         $model = $this->query()->find($id);
+
         return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
     public function findByCode(string $code): ?DataRecord
     {
         $model = $this->query()->where('code', strtoupper(trim($code)))->first();
+
         return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
     public function findByUuid(string $uuid): ?DataRecord
     {
         $model = $this->query()->where('uuid', trim($uuid))->first();
+
         return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
     public function findBySlug(string $slug): ?DataRecord
     {
         $model = $this->query()->where('slug', strtolower(trim($slug)))->first();
+
         return $model instanceof TenantModel ? $this->record($model) : null;
     }
 
@@ -146,7 +150,6 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
         );
     }
 
-
     private function applyEffectiveSubscriptionStatus(Builder $query, string $status): void
     {
         $now = $this->clock->now();
@@ -154,6 +157,7 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
         if ($status === TenantSubscriptionStatus::CANCELLED) {
             $query->whereHas('currentSubscription', fn (Builder $pointer) => $pointer
                 ->where('state', TenantCurrentSubscriptionState::CANCELLED));
+
             return;
         }
 
@@ -178,6 +182,7 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
                         });
                 });
             });
+
             return;
         }
 
@@ -186,12 +191,14 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
                 ->whereHas('subscription', function (Builder $subscription) use ($now, $status): void {
                     if ($status === TenantSubscriptionPolicy::SCHEDULED) {
                         $subscription->where('starts_at', '>', $now);
+
                         return;
                     }
                     if ($status === TenantSubscriptionStatus::TRIAL) {
                         $subscription->where('contract_status', TenantSubscriptionStatus::TRIAL)
                             ->where('starts_at', '<=', $now)
                             ->where('trial_ends_at', '>', $now);
+
                         return;
                     }
                     if ($status === TenantSubscriptionStatus::ACTIVE) {
@@ -289,6 +296,7 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
             'reachability_status', 'operational_status', 'verified_at',
             'last_operational_check_at', 'tls_expires_at',
         ]);
+
         return new DataRecord($payload);
     }
 }

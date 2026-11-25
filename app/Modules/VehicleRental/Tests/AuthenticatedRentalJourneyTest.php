@@ -14,7 +14,9 @@ namespace Modules\VehicleRental\Tests;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -22,19 +24,16 @@ use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\Constants\PaymentPermission;
 use Modules\Payment\Enums\PaymentSourceType;
-use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleOwnerType;
-use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
+use Modules\VehicleRental\Enums\IncidentPermission;
 use Modules\VehicleRental\Enums\MileagePolicy;
 use Modules\VehicleRental\Services\RentalAuthorization;
-use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\Support\OrganizationUnitFixture;
-use Tests\Support\TenantAuthenticationFixture;
 use Tests\TestCase;
 
 /** Real Auth login and all middleware; no mocked authorization or injected request context. */
@@ -554,7 +553,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
 
     public function test_authenticated_incident_file_proofs_are_private_versioned_and_permission_scoped(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('tenant_private');
+        Storage::fake('tenant_private');
         $this->getJson(self::ROOT.'/incidents/1/attachments/1')->assertUnauthorized();
         [$context, $customerInput, $ownerInput] = $this->loginFixture();
         $customer = $this->activate('customer', $customerInput);
@@ -570,7 +569,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         ])->assertCreated()->json('data');
         $path = self::ROOT.'/incidents/'.$incident['id'];
         $content = "%PDF-1.4\nFuel receipt\n%%EOF";
-        $file = fn () => \Illuminate\Http\UploadedFile::fake()->createWithContent('receipt.pdf', $content);
+        $file = fn () => UploadedFile::fake()->createWithContent('receipt.pdf', $content);
         $this->post($path.'/attachments', ['expected_version' => 1, 'file' => $file()], ['Accept' => 'application/json'])->assertCreated();
         $updated = $this->getJson($path)->assertOk()->assertJsonPath('data.row_version', 2)
             ->assertJsonMissingPath('data.attachments.0.object_key')->json('data');
@@ -584,7 +583,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->deleteJson($path)->assertStatus(405);
         $this->getJson(self::ROOT.'/incidents/999999/attachments/'.$updated['attachments'][0]['id'])->assertNotFound();
         $this->assertDatabaseCount('invoices', 0);
-        $this->loginFixture(permissions: [\Modules\VehicleRental\Enums\IncidentPermission::View->value]);
+        $this->loginFixture(permissions: [IncidentPermission::View->value]);
         $this->getJson($download)->assertNotFound();
         $this->post($path.'/attachments', ['expected_version' => 2, 'file' => $file()], ['Accept' => 'application/json'])->assertForbidden();
         $this->loginFixture();

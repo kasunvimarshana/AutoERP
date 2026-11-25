@@ -20,9 +20,13 @@ use Tests\TestCase;
 final class PrivateObjectStorageServiceBehaviorTest extends TestCase
 {
     private const DEFAULT_DISK = 'private-object-test';
+
     private const OTHER_DISK = 'private-object-other-test';
+
     private const DIRECTORY = 'tenants/10/documents';
+
     private const FILENAME = 'evidence.txt';
+
     private const CONTENT = 'private object evidence';
 
     protected function setUp(): void

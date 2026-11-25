@@ -14,6 +14,8 @@ namespace Modules\Hr\Http\Controllers;
 
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Hr\DTOs\ShiftAssignmentData;
 use Modules\Hr\DTOs\ShiftData;
@@ -36,13 +38,15 @@ final class HrShiftController
 
     public function index(TenantScopedRequest $request): JsonResponse
     {
+        $perPage = min(100, max(1, (int) $request->input('per_page', 25)));
+
         $shifts = HrShift::query()
             ->where('tenant_id', $request->tenantId())
             ->with('breaks')
             ->orderBy('name')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json(['data' => $shifts]);
+        return response()->json($shifts);
     }
 
     public function store(TenantScopedRequest $request): JsonResponse
@@ -63,7 +67,7 @@ final class HrShiftController
             'auto_deduct_break_minutes' => ['nullable', 'integer', 'min:0'],
             'auto_deduct_threshold_minutes' => ['nullable', 'integer', 'min:0'],
             'is_flexible' => ['nullable', 'boolean'],
-            'status' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', Rule::enum(ShiftStatus::class)],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -106,12 +110,8 @@ final class HrShiftController
 
     public function update(TenantScopedRequest $request, int $shift): JsonResponse
     {
-        $shiftModel = HrShift::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('id', $shift)
-            ->firstOrFail();
-
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'code' => ['required', 'string', 'max:32'],
             'name' => ['required', 'string', 'max:100'],
             'color' => ['nullable', 'string', 'max:16'],
@@ -127,44 +127,81 @@ final class HrShiftController
             'auto_deduct_break_minutes' => ['nullable', 'integer', 'min:0'],
             'auto_deduct_threshold_minutes' => ['nullable', 'integer', 'min:0'],
             'is_flexible' => ['nullable', 'boolean'],
-            'status' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', Rule::enum(ShiftStatus::class)],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $data = new ShiftData(
-            code: $validated['code'],
-            name: $validated['name'],
-            startTime: $validated['start_time'],
-            endTime: $validated['end_time'],
-            color: $validated['color'] ?? $shiftModel->color,
-            isOvernight: (bool) ($validated['is_overnight'] ?? $shiftModel->is_overnight),
-            graceInMinutes: (int) ($validated['grace_in_minutes'] ?? $shiftModel->grace_in_minutes),
-            graceOutMinutes: (int) ($validated['grace_out_minutes'] ?? $shiftModel->grace_out_minutes),
-            halfDayThresholdMinutes: (int) ($validated['half_day_threshold_minutes'] ?? $shiftModel->half_day_threshold_minutes),
-            fullDayThresholdMinutes: (int) ($validated['full_day_threshold_minutes'] ?? $shiftModel->full_day_threshold_minutes),
-            isBreakPaid: (bool) ($validated['is_break_paid'] ?? $shiftModel->is_break_paid),
-            autoDeductBreak: (bool) ($validated['auto_deduct_break'] ?? $shiftModel->auto_deduct_break),
-            autoDeductBreakMinutes: (int) ($validated['auto_deduct_break_minutes'] ?? $shiftModel->auto_deduct_break_minutes),
-            autoDeductThresholdMinutes: (int) ($validated['auto_deduct_threshold_minutes'] ?? $shiftModel->auto_deduct_threshold_minutes),
-            isFlexible: (bool) ($validated['is_flexible'] ?? $shiftModel->is_flexible),
-            status: isset($validated['status']) ? ShiftStatus::from($validated['status']) : $shiftModel->status,
-            notes: $validated['notes'] ?? $shiftModel->notes,
-            organizationUnitId: $request->organizationUnitId(),
-        );
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $updated = $this->rosterService->updateShift($shiftModel, $data);
+        $updated = DB::transaction(function () use ($request, $shift, $validated, $expectedVersion): ?HrShift {
+            $shiftModel = HrShift::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('id', $shift)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $shiftModel->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            $data = new ShiftData(
+                code: $validated['code'],
+                name: $validated['name'],
+                startTime: $validated['start_time'],
+                endTime: $validated['end_time'],
+                color: $validated['color'] ?? $shiftModel->color,
+                isOvernight: (bool) ($validated['is_overnight'] ?? $shiftModel->is_overnight),
+                graceInMinutes: (int) ($validated['grace_in_minutes'] ?? $shiftModel->grace_in_minutes),
+                graceOutMinutes: (int) ($validated['grace_out_minutes'] ?? $shiftModel->grace_out_minutes),
+                halfDayThresholdMinutes: (int) ($validated['half_day_threshold_minutes'] ?? $shiftModel->half_day_threshold_minutes),
+                fullDayThresholdMinutes: (int) ($validated['full_day_threshold_minutes'] ?? $shiftModel->full_day_threshold_minutes),
+                isBreakPaid: (bool) ($validated['is_break_paid'] ?? $shiftModel->is_break_paid),
+                autoDeductBreak: (bool) ($validated['auto_deduct_break'] ?? $shiftModel->auto_deduct_break),
+                autoDeductBreakMinutes: (int) ($validated['auto_deduct_break_minutes'] ?? $shiftModel->auto_deduct_break_minutes),
+                autoDeductThresholdMinutes: (int) ($validated['auto_deduct_threshold_minutes'] ?? $shiftModel->auto_deduct_threshold_minutes),
+                isFlexible: (bool) ($validated['is_flexible'] ?? $shiftModel->is_flexible),
+                status: isset($validated['status']) ? ShiftStatus::from($validated['status']) : $shiftModel->status,
+                notes: $validated['notes'] ?? $shiftModel->notes,
+                organizationUnitId: $request->organizationUnitId(),
+            );
+
+            return $this->rosterService->updateShift($shiftModel, $data);
+        });
+
+        if ($updated === null) {
+            return response()->json(['message' => 'Shift was changed by someone else. Reload before saving.'], 409);
+        }
 
         return response()->json(['data' => $updated]);
     }
 
     public function destroy(TenantScopedRequest $request, int $shift): JsonResponse
     {
-        $shiftModel = HrShift::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('id', $shift)
-            ->firstOrFail();
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
 
-        $shiftModel->delete();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+
+        $deleted = DB::transaction(function () use ($request, $shift, $expectedVersion): bool {
+            $shiftModel = HrShift::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('id', $shift)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $shiftModel->row_version !== $expectedVersion) {
+                return false;
+            }
+
+            $shiftModel->delete();
+
+            return true;
+        });
+
+        if (! $deleted) {
+            return response()->json(['message' => 'Shift was changed by someone else. Reload before deleting.'], 409);
+        }
 
         return response()->json(null, 204);
     }
@@ -174,7 +211,7 @@ final class HrShiftController
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
             'shift_id' => ['required', 'integer'],
-            'assignment_type' => ['required', 'string'],
+            'assignment_type' => ['required', 'string', Rule::enum(ShiftAssignmentType::class)],
             'day_of_week' => ['nullable', 'integer', 'between:1,7'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
@@ -242,12 +279,18 @@ final class HrShiftController
 
         $roster = [];
         $period = CarbonPeriod::create($startDate, $endDate);
+        $employeeIds = $employees->pluck('id')->map(static fn ($id): int => (int) $id)->values()->all();
+        $resolvedBatch = $this->rosterService->resolveRosterBatch($request->tenantId(), $employeeIds, $startDate, $endDate);
 
         foreach ($employees as $emp) {
+            $empId = (int) $emp->id;
             $empDays = [];
             foreach ($period as $day) {
                 $dateStr = $day->toDateString();
-                $resolved = $this->rosterService->resolveShift($request->tenantId(), (int) $emp->id, $dateStr);
+                $resolved = $resolvedBatch[$empId][$dateStr] ?? null;
+                if ($resolved === null) {
+                    continue;
+                }
                 $empDays[$dateStr] = [
                     'shift' => $resolved->shift ? [
                         'id' => $resolved->shift->id,
@@ -347,7 +390,7 @@ final class HrShiftController
             'cover_employee_id' => ['required', 'integer'],
             'shift_id' => ['required', 'integer'],
             'reallocation_date' => ['required', 'date'],
-            'reason_code' => ['nullable', 'string'],
+            'reason_code' => ['nullable', 'string', Rule::enum(ShiftReallocationReason::class)],
             'notes' => ['nullable', 'string'],
         ]);
 

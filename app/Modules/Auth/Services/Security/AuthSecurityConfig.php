@@ -17,7 +17,7 @@ use Modules\Core\Exceptions\ConfigurationException;
 final readonly class AuthSecurityConfig
 {
     /**
-     * @param list<string> $oauthScopes
+     * @param  list<string>  $oauthScopes
      */
     public function __construct(
         public int $accessTokenTtlSeconds,

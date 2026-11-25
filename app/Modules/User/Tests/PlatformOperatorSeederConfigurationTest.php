@@ -23,7 +23,7 @@ final class PlatformOperatorSeederConfigurationTest extends TestCase
         config()->set('user.seeding.platform_operator.email', 'platform@example.com');
         config()->set('user.seeding.platform_operator.password', 'correct-horse-battery-staple');
 
-        $seeder = new PlatformOperatorSeeder();
+        $seeder = new PlatformOperatorSeeder;
 
         $enabled = (fn (): bool => $this->enabled())->call($seeder);
         $email = (fn (): string => $this->requiredEmail())->call($seeder);

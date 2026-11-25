@@ -121,7 +121,7 @@ Generic token issuance, public token introspection, generic verification challen
 
 `auth:incident {correlationId}` locates a support reference in local structured Laravel logs without exposing server logs through a browser endpoint.
 
-`auth:purge-expired` removes expired authorization codes, tokens, sessions, login-attempt history, legacy registration-invitation delivery operations, and processed integration events in dependency-safe order using configured retention periods.
+`auth:retention:purge` removes expired authorization codes, tokens, sessions, login-attempt history, legacy registration-invitation delivery operations, and processed integration events in dependency-safe order using configured retention periods.
 
 Auth configuration is validated during provider boot. Invalid TTL, rate-limit, password, OAuth-scope, cookie, or retention configuration must fail startup rather than silently use an unsafe fallback. Route-level throttling provides a coarse IP boundary; the service-level account/account-IP throttle is the authoritative credential-abuse policy. Both depend on the cache probe covered by `auth:readiness`.
 

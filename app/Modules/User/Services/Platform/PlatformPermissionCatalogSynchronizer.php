@@ -13,8 +13,8 @@ declare(strict_types=1);
 namespace Modules\User\Services\Platform;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Authorization\PlatformPermission;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\User\Models\PlatformPermissionModel;
 
 final class PlatformPermissionCatalogSynchronizer
@@ -41,6 +41,7 @@ final class PlatformPermissionCatalogSynchronizer
                         'is_active' => true,
                     ]);
                     $created++;
+
                     continue;
                 }
 

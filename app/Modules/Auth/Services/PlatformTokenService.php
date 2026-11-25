@@ -202,7 +202,6 @@ final readonly class PlatformTokenService
         return $this->validatePlatformAccessToken($plainToken, $key);
     }
 
-
     private function validatePlatformAccessToken(string $plainToken, string $key): array
     {
         $parsed = $this->codec->parse($plainToken, AuthTokenKeyPrefix::PLATFORM_ACCESS);
@@ -432,11 +431,6 @@ final readonly class PlatformTokenService
                 'updated_at' => $now,
             ]);
     }
-
-
-
-
-
 
     private function runAsControlPlane(callable $callback): mixed
     {

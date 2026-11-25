@@ -16,6 +16,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Warehouse\Services\WarehouseAuthorizationService;
+use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class WarehouseApiTest extends TestCase
@@ -311,10 +315,10 @@ final class WarehouseApiTest extends TestCase
             'activated_at' => $now,
             'created_at' => $now,
             'updated_at' => $now]);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Main', 'MAIN');
         $email = (string) ($overrides['email'] ?? Str::lower($code).'@example.test');
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Warehouse',
             'last_name' => 'Tester',
@@ -351,7 +355,7 @@ final class WarehouseApiTest extends TestCase
             'user_id' => $userId,
         ], $organizationUnitId, true);
 
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
@@ -370,7 +374,7 @@ final class WarehouseApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => $name,
             'code' => $code,

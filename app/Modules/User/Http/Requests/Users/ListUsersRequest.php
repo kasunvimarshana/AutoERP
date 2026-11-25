@@ -19,7 +19,10 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class ListUsersRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return UserPermission::USERS_VIEW; }
+    protected function requiredPermission(): ?string
+    {
+        return UserPermission::USERS_VIEW;
+    }
 
     public function rules(): array
     {

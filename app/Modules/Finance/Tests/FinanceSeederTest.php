@@ -29,8 +29,11 @@ final class FinanceSeederTest extends TestCase
     use RefreshDatabase;
 
     private const ACCOUNT_INVENTORY = '1200';
+
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
+
     private const ACCOUNT_PAYABLE = '2100';
+
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void

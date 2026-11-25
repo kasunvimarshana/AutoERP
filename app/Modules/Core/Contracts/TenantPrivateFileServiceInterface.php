@@ -15,7 +15,7 @@ namespace Modules\Core\Contracts;
 interface TenantPrivateFileServiceInterface
 {
     /**
-     * @param list<string> $allowedMimeTypes
+     * @param  list<string>  $allowedMimeTypes
      * @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string}
      */
     public function storeFile(

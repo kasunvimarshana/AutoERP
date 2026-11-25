@@ -15,17 +15,28 @@ namespace Modules\Finance\DTOs;
 readonly class PostingContext
 {
     public PostingSourceData $source;
+
     public string $postingDate;
+
     public ?int $currencyId;
+
     public string $exchangeRate;
+
     /** @var list<PostingLine> */
     public array $lines;
+
     public ?string $description;
+
     public ?string $postingProfileCode;
+
     public ?string $sourceModule;
+
     public string $sourceType;
+
     public int $sourceId;
+
     public ?string $sourceNumber;
+
     public ?string $sourceDate;
 
     /**

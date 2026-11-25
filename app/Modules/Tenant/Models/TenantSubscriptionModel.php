@@ -55,13 +55,13 @@ final class TenantSubscriptionModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::creating(static function (self $subscription): void {
+        self::creating(static function (self $subscription): void {
             TenantSubscriptionRevisionState::assertValid($subscription->getAttributes());
         });
-        static::updating(static function (): never {
+        self::updating(static function (): never {
             throw new LogicException('Tenant subscription revisions are immutable. Create a new revision instead.');
         });
-        static::deleting(static function (): never {
+        self::deleting(static function (): never {
             throw new LogicException('Tenant subscription revisions cannot be deleted.');
         });
     }

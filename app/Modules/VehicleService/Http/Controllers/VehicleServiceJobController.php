@@ -56,8 +56,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         $lanes = [];
         foreach ($queries->board($request->tenantId(), $request->organizationUnitId(), $request->validated()) as $key => $lane) {
             $lanes[$key] = [
-                'data' => $lane['jobs']->map(fn (VehicleServiceJob $job): array =>
-                    (new VehicleServiceJobResource($job))->resolve($request))->all(),
+                'data' => $lane['jobs']->map(fn (VehicleServiceJob $job): array => (new VehicleServiceJobResource($job))->resolve($request))->all(),
                 'total' => $lane['total'],
                 'has_more' => $lane['has_more'],
             ];
@@ -103,8 +102,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         StoreVehicleServiceJobRequest $request,
         VehicleServiceJobService $service,
         PermissionCheckerInterface $permissions,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $choices = $request->promotionChoices();
         if ($choices !== [] && ! $permissions->allows(
             (int) $request->currentUserId(),

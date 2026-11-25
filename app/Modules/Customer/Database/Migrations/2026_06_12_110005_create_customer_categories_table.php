@@ -20,6 +20,7 @@ return new class extends Migration
     {
         Schema::create('customer_categories', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_categories_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('parent_id')->nullable();

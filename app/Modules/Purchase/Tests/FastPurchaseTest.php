@@ -425,7 +425,7 @@ final class FastPurchaseTest extends TestCase
     {
         foreach (['first_invoice' => 'FP-FIRST-INVOICE', 'last_invoice' => 'FP-LAST-INVOICE'] as $method => $reference) {
             $context = $this->context();
-        $secondStock = $this->item($context['tenant_id'], 'ITEM-STOCK-ALT', ItemType::Stock, true, $context['uom_id']);
+            $secondStock = $this->item($context['tenant_id'], 'ITEM-STOCK-ALT', ItemType::Stock, true, $context['uom_id']);
 
             $this->createFastPurchase($this->payload($context, [
                 'supplier_reference' => $reference,

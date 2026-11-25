@@ -19,10 +19,15 @@ use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 final class PurchaseAdjustmentPolicyResolver
 {
     private const CAPITALIZE = 'capitalize';
+
     private const REDUCE_COST = 'reduce_cost';
+
     private const EXPENSE = 'expense';
+
     private const TAX_ONLY = 'tax_only';
+
     private const DOCUMENT_PAYABLE = 'document_payable';
+
     private const UNSUPPORTED = 'unsupported';
 
     public function __construct(private readonly PurchaseAdjustmentCatalogueService $catalogue) {}

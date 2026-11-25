@@ -11,21 +11,21 @@ declare(strict_types=1);
  */
 
 use Illuminate\Support\Facades\Route;
-use Modules\Tenant\Http\Controllers\TenantController;
-use Modules\Tenant\Http\Controllers\TenantDocumentController;
-use Modules\Tenant\Http\Controllers\TenantDomainController;
-use Modules\Tenant\Http\Controllers\TenantPlanController;
-use Modules\Tenant\Http\Controllers\TenantOnboardingController;
-use Modules\Tenant\Http\Controllers\PlatformTenantDomainController;
-use Modules\Tenant\Http\Controllers\TenantProfileController;
-use Modules\Tenant\Http\Controllers\TenantSubscriptionController;
-use Modules\Tenant\Http\Controllers\TenantSubscriptionPlanController;
-use Modules\Tenant\Http\Controllers\Platform\PlatformTenantHealthController;
-use Modules\Tenant\Http\Controllers\Platform\PlatformTenantTargetController;
 use Modules\Core\Authorization\PlatformPermission;
 use Modules\Tenant\Constants\TenantDomainProbe;
 use Modules\Tenant\Constants\TenantPermission;
+use Modules\Tenant\Http\Controllers\Platform\PlatformTenantHealthController;
+use Modules\Tenant\Http\Controllers\Platform\PlatformTenantTargetController;
+use Modules\Tenant\Http\Controllers\PlatformTenantDomainController;
 use Modules\Tenant\Http\Controllers\Public\TenantDomainProbeController;
+use Modules\Tenant\Http\Controllers\TenantController;
+use Modules\Tenant\Http\Controllers\TenantDocumentController;
+use Modules\Tenant\Http\Controllers\TenantDomainController;
+use Modules\Tenant\Http\Controllers\TenantOnboardingController;
+use Modules\Tenant\Http\Controllers\TenantPlanController;
+use Modules\Tenant\Http\Controllers\TenantProfileController;
+use Modules\Tenant\Http\Controllers\TenantSubscriptionController;
+use Modules\Tenant\Http\Controllers\TenantSubscriptionPlanController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
@@ -56,7 +56,6 @@ $platformMiddleware = [
     $platformOperatorMiddleware,
 ];
 
-
 Route::get(TenantDomainProbe::PATH, TenantDomainProbeController::class)
     ->middleware(['api', $domainProbeThrottle])
     ->name('tenant-domain.probe');
@@ -64,7 +63,7 @@ Route::get(TenantDomainProbe::PATH, TenantDomainProbeController::class)
 Route::prefix('api/v1/platform')
     ->middleware($platformMiddleware)
     ->name('platform.')
-    ->group(function () use ($platformStepUpMiddleware, $domainVerificationThrottle) : void {
+    ->group(function () use ($platformStepUpMiddleware, $domainVerificationThrottle): void {
         foreach ([
             'configuration-targets' => PlatformPermission::CONFIGURATION_VIEW,
             'audit-targets' => PlatformPermission::AUDIT_VIEW,
@@ -223,7 +222,6 @@ Route::prefix('api/v1/platform')
             ->middleware([$platformStepUpMiddleware, 'platform.permission:'.PlatformPermission::PLANS_MANAGE])
             ->whereNumber('tenantPlan')
             ->name('tenant-plans.activate');
-
 
         Route::get('health', [PlatformTenantHealthController::class, 'index'])
             ->middleware('platform.permission:'.PlatformPermission::HEALTH_VIEW)

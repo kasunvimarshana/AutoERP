@@ -25,12 +25,21 @@ final class ReferenceDataAuthorizationService
         private readonly PermissionCheckerInterface $permissions,
     ) {}
 
-    public function canViewCurrent(): bool { return $this->allows(ReferenceDataPermission::VIEW); }
-    public function canManageCurrent(): bool { return $this->allows(ReferenceDataPermission::MANAGE); }
+    public function canViewCurrent(): bool
+    {
+        return $this->allows(ReferenceDataPermission::VIEW);
+    }
+
+    public function canManageCurrent(): bool
+    {
+        return $this->allows(ReferenceDataPermission::MANAGE);
+    }
 
     private function allows(string $permission): bool
     {
-        $userId = $this->currentUser->currentUserId(); $tenantId = $this->currentTenant->currentTenantId();
+        $userId = $this->currentUser->currentUserId();
+        $tenantId = $this->currentTenant->currentTenantId();
+
         return $userId !== null && $tenantId !== null && $this->permissions->allows($userId, $tenantId, $permission);
     }
 }

@@ -15,8 +15,8 @@ namespace Modules\Payment\DTOs;
 final class UpdatePaymentData
 {
     /**
-     * @param array<int, PaymentLineData> $lines
-     * @param array<int, PaymentAllocationData> $allocations
+     * @param  array<int, PaymentLineData>  $lines
+     * @param  array<int, PaymentAllocationData>  $allocations
      */
     public function __construct(
         public readonly int $expectedVersion,

@@ -12,9 +12,11 @@ declare(strict_types=1);
 
 namespace Modules\Item\Http\Requests;
 
+use Modules\Item\DTOs\ItemPriceData;
+
 final class StoreItemPriceRequest extends ItemPriceRequest
 {
-    public function toData(): \Modules\Item\DTOs\ItemPriceData
+    public function toData(): ItemPriceData
     {
         return $this->toPriceData();
     }

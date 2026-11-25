@@ -248,6 +248,7 @@ final class FinanceEnterpriseCoreTest extends TestCase
                 name: 'Unrealized FX Loss',
                 normalBalance: NormalBalance::Debit,
             ));
+
             return [$tenantId, $bank, $capital, $receivable, $payable, $gain, $loss];
         });
     }

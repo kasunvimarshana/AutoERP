@@ -107,11 +107,8 @@ final class PayrollStructureController
 
     public function update(PayrollRequest $request, int $id): JsonResponse
     {
-        $structure = PayrollSalaryStructure::query()
-            ->where('tenant_id', $request->tenantId())
-            ->findOrFail($id);
-
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'name' => ['sometimes', 'string', 'max:100'],
             'cycle_type' => ['sometimes', 'string', Rule::in(PayrollCycleType::values())],
             'currency_id' => ['nullable', 'integer'],
@@ -134,12 +131,24 @@ final class PayrollStructureController
             'items.*.sort_order' => ['nullable', 'integer'],
         ]);
 
-        $structure = DB::transaction(function () use ($structure, $validated, $request): PayrollSalaryStructure {
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+
+        $structure = DB::transaction(function () use ($id, $validated, $request, $expectedVersion): ?PayrollSalaryStructure {
+            $structure = PayrollSalaryStructure::query()
+                ->where('tenant_id', $request->tenantId())
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($expectedVersion !== null && (int) $structure->row_version !== $expectedVersion) {
+                return null;
+            }
+
             if (isset($validated['cycle_type'])) {
                 $validated['cycle_type'] = PayrollCycleType::from($validated['cycle_type']);
             }
 
             $structure->update([
+                'row_version' => ((int) $structure->row_version) + 1,
                 'name' => $validated['name'] ?? $structure->name,
                 'cycle_type' => $validated['cycle_type'] ?? $structure->cycle_type,
                 'currency_id' => array_key_exists('currency_id', $validated) ? $validated['currency_id'] : $structure->currency_id,
@@ -166,6 +175,10 @@ final class PayrollStructureController
 
             return $structure->fresh(['items.component']);
         });
+
+        if ($structure === null) {
+            return response()->json(['message' => 'Salary structure was changed by someone else. Reload before saving.'], 409);
+        }
 
         return response()->json(['data' => $structure]);
     }

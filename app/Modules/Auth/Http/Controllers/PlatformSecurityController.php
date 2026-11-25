@@ -25,6 +25,7 @@ final class PlatformSecurityController extends Controller
     public function sessions(ListPlatformSessionsRequest $request): JsonResponse
     {
         $validated = $request->validated();
+
         return $this->noStore(response()->json($this->sessions->page(
             isset($validated['operator_id']) ? (int) $validated['operator_id'] : null,
             (int) ($validated['page'] ?? 1),
@@ -53,6 +54,7 @@ final class PlatformSecurityController extends Controller
     {
         $response->headers->set('Cache-Control', 'no-store, private');
         $response->headers->set('Pragma', 'no-cache');
+
         return $response;
     }
 }

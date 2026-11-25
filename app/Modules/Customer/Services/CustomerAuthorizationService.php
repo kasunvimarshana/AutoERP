@@ -25,12 +25,6 @@ class CustomerAuthorizationService
 
     public const DELETE = 'customers.delete';
 
-
-
-
-
-
-
     public function __construct(private readonly UserAccessResolver $access) {}
 
     public function assert(?int $userId, int $tenantId, string $permission): void

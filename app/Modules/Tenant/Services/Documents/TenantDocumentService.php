@@ -12,19 +12,18 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Documents;
 
-use Modules\Core\Tenancy\TenantPlanLimit;
-
 use InvalidArgumentException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\Core\Tenancy\TenantPlanLimit;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Repositories\TenantDocumentRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
@@ -289,7 +288,7 @@ final class TenantDocumentService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string}
      */
     private function storeUploadedFile(int $tenantId, array $payload): array

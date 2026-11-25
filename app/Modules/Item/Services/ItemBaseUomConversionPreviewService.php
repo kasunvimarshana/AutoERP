@@ -55,5 +55,4 @@ final class ItemBaseUomConversionPreviewService
             'preview_rows' => $rows,
         ];
     }
-
 }

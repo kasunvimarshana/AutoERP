@@ -19,10 +19,15 @@ use Modules\Core\DTOs\PagedResult;
 interface UserRepositoryInterface extends RepositoryPortInterface
 {
     public function countByTenant(int $tenantId): int;
+
     public function lockByIdForTenant(int|string $id, int $tenantId): ?DataRecord;
+
     public function findByTenantAndEmail(int $tenantId, string $email, ?int $excludeId = null, bool $includeDeleted = false): ?DataRecord;
+
     public function findByTenantAndUsername(int $tenantId, string $username, ?int $excludeId = null, bool $includeDeleted = false): ?DataRecord;
+
     public function findByTenantAndLoginIdentifier(int $tenantId, string $identifier): ?DataRecord;
+
     public function pageByFilters(
         int $tenantId,
         ?string $search,

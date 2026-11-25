@@ -25,7 +25,7 @@ final class TaxPartyResolverRegistry
     private array $resolvers = [];
 
     /**
-     * @param iterable<TaxPartyResolverInterface> $resolvers
+     * @param  iterable<TaxPartyResolverInterface>  $resolvers
      */
     public function __construct(iterable $resolvers)
     {

@@ -14,6 +14,4 @@ namespace Tests\Feature;
 
 use Modules\VehicleRental\Tests\RentalQuotationPreviewTest;
 
-final class VehicleRentalQuotationPreviewTest extends RentalQuotationPreviewTest
-{
-}
+final class VehicleRentalQuotationPreviewTest extends RentalQuotationPreviewTest {}

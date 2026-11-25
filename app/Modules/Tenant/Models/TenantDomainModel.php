@@ -21,8 +21,8 @@ final class TenantDomainModel extends TenantOwnedModel
 {
     protected static function booted(): void
     {
-        static::saving(static function (self $model): void {
-            (new TenantDomainReadinessPolicy())->assertValid($model->getAttributes());
+        self::saving(static function (self $model): void {
+            (new TenantDomainReadinessPolicy)->assertValid($model->getAttributes());
         });
     }
 

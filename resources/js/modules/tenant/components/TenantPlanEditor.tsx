@@ -22,6 +22,7 @@ import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
+import { businessTimestampWithOffset } from '@/shared/utils/businessDate';
 import { findDefaultCurrency } from '@/shared/utils/currency';
 import { compareDecimalStrings, isNonNegativeDecimal } from '@/shared/utils/decimal';
 import { formatLimitLabel, formatPlanMoney, humanize } from '../tenantPresentation';
@@ -449,9 +450,11 @@ function validatePlanForm(values: { name: string; slug: string; price: string; c
     else if (parsedCurrencyId !== null && (!Number.isSafeInteger(parsedCurrencyId) || parsedCurrencyId < 1)) fields.currency_id = ['Select a valid billing currency.'];
     let parsedEffectiveAt: string | null = null;
     if (values.effectiveAt !== '') {
-        const date = new Date(values.effectiveAt);
-        if (Number.isNaN(date.getTime())) fields.effective_at = ['Select a valid effective date.'];
-        else parsedEffectiveAt = date.toISOString();
+        try {
+            parsedEffectiveAt = new Date(businessTimestampWithOffset(values.effectiveAt)).toISOString();
+        } catch {
+            fields.effective_at = ['Select a valid effective date.'];
+        }
     }
     const parsedLimits: Partial<TenantPlanLimits> = {};
     for (const [key, raw] of Object.entries(values.limits) as Array<[keyof TenantPlanLimits, string]>) {

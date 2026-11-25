@@ -19,6 +19,7 @@ use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 final class VehicleServiceCommissionService
 {
     private const ZERO_AMOUNT = '0.000000';
+
     private const PERCENTAGE_BASE = '100.000000';
 
     public function __construct(private readonly DecimalMath $math) {}

@@ -14,6 +14,7 @@ namespace Modules\Item\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Item\Http\Requests\ListItemRequest;
 use Modules\Item\Http\Requests\StoreItemRequest;
 use Modules\Item\Http\Requests\StoreItemWithRelationsRequest;
@@ -25,6 +26,7 @@ use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemQueryService;
 use Modules\Item\Services\ItemUpdateService;
 use Modules\Item\Services\ItemUsageModuleCatalogue;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class ItemController
 {
@@ -80,9 +82,22 @@ final class ItemController
     public function update(UpdateItemRequest $request, int $item): ItemResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), ItemAuthorizationService::UPDATE);
+        $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
 
-        $model = $this->queries->item($item, $request->tenantId(), $request->organizationUnitId());
-        $updated = $this->updates->update($model, $request->toData());
+        $updated = DB::transaction(function () use ($request, $item, $expectedVersion) {
+            $model = $this->queries->item($item, $request->tenantId(), $request->organizationUnitId());
+            $model = $model->newQuery()->lockForUpdate()->findOrFail($model->getKey());
+
+            if ($expectedVersion !== null && (int) $model->row_version !== $expectedVersion) {
+                throw new ConflictHttpException('Item was changed by someone else. Reload before saving.');
+            }
+
+            $nextVersion = ((int) $model->row_version) + 1;
+            $saved = $this->updates->update($model, $request->toData());
+            $saved->forceFill(['row_version' => $nextVersion])->save();
+
+            return $saved;
+        });
 
         return new ItemResource($updated->load(['category', 'brand', 'tenant.baseCurrency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup']));
     }

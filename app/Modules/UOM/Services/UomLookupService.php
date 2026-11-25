@@ -13,7 +13,6 @@ declare(strict_types=1);
 namespace Modules\UOM\Services;
 
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
-use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\UOM\Constants\UomDefaults;

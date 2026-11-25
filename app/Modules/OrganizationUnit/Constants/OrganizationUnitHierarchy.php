@@ -15,7 +15,9 @@ namespace Modules\OrganizationUnit\Constants;
 final class OrganizationUnitHierarchy
 {
     public const ROOT_MARKER = 'root';
+
     public const DEFAULT_MAXIMUM_PATH_LENGTH = 1024;
+
     public const MINIMUM_PATH_LENGTH = 64;
 
     /** @return list<string> */

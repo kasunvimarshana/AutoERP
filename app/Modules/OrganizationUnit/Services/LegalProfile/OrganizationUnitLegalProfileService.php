@@ -55,7 +55,7 @@ final class OrganizationUnitLegalProfileService
                     'expected_version' => ['Expected version must be omitted when creating the organization legal profile.'],
                 ]);
             } else {
-                $profile = new OrganizationUnitLegalProfileModel();
+                $profile = new OrganizationUnitLegalProfileModel;
                 $profile->tenant_id = $tenantId;
                 $profile->organization_unit_id = $organizationUnitId;
                 $profile->row_version = 1;

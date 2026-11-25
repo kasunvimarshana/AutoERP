@@ -15,9 +15,12 @@ namespace Tests\Feature\Hr;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Customer\Models\Customer;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Services\EmployeeQueryService;
+use Modules\Vehicle\Models\Vehicle;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
@@ -59,7 +62,7 @@ final class EmployeeBlockerTest extends TestCase
 
             $supervisor = $this->createEmployee($tenantId, $orgId, 'Supervisor Bob', 'EMP-SUP-01');
 
-            $customer = \Modules\Customer\Models\Customer::query()->create([
+            $customer = Customer::query()->create([
                 'tenant_id' => $tenantId,
                 'customer_number' => 'CN-SUP-'.Str::upper(Str::random(6)),
                 'customer_type' => 'individual',
@@ -68,7 +71,7 @@ final class EmployeeBlockerTest extends TestCase
                 'status' => 'active',
             ]);
 
-            $vehicle = \Modules\Vehicle\Models\Vehicle::query()->create([
+            $vehicle = Vehicle::query()->create([
                 'tenant_id' => $tenantId,
                 'vehicle_number' => 'VN-SUP-'.Str::upper(Str::random(6)),
                 'registration_number' => 'REG-SUP-'.Str::upper(Str::random(6)),
@@ -111,7 +114,7 @@ final class EmployeeBlockerTest extends TestCase
 
             $technician = $this->createEmployee($tenantId, $orgId, 'Tech Sam', 'EMP-TCH-01');
 
-            $customer = \Modules\Customer\Models\Customer::query()->create([
+            $customer = Customer::query()->create([
                 'tenant_id' => $tenantId,
                 'customer_number' => 'CN-SVC-'.Str::upper(Str::random(6)),
                 'customer_type' => 'individual',
@@ -120,7 +123,7 @@ final class EmployeeBlockerTest extends TestCase
                 'status' => 'active',
             ]);
 
-            $vehicle = \Modules\Vehicle\Models\Vehicle::query()->create([
+            $vehicle = Vehicle::query()->create([
                 'tenant_id' => $tenantId,
                 'vehicle_number' => 'VN-SVC-'.Str::upper(Str::random(6)),
                 'registration_number' => 'REG-SVC-'.Str::upper(Str::random(6)),
@@ -227,7 +230,7 @@ final class EmployeeBlockerTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
 
         return $tenantId;
     }

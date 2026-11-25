@@ -23,10 +23,12 @@ use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\DriverIdentitySource;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
+use Modules\VehicleRental\Models\BillingCycleChart;
 use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\OwnerUsageCharge;
 use Modules\VehicleRental\Models\RunningChart;
@@ -168,10 +170,10 @@ final class RunningChartService
                 if (trim($reason ?? '') === '') {
                     throw ValidationException::withMessages(['reason' => ['Explain the reversal.']]);
                 }
-                $isAttachedToFinalizedCycle = \Modules\VehicleRental\Models\BillingCycleChart::query()
+                $isAttachedToFinalizedCycle = BillingCycleChart::query()
                     ->where('tenant_id', $context->tenantId)
                     ->where('running_chart_id', $chart->id)
-                    ->whereHas('billingCycle', fn ($q) => $q->where('status', \Modules\VehicleRental\Enums\BillingCycleStatus::Finalized))
+                    ->whereHas('billingCycle', fn ($q) => $q->where('status', BillingCycleStatus::Finalized))
                     ->exists();
 
                 if ($isAttachedToFinalizedCycle) {

@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Services;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
@@ -184,7 +185,7 @@ final class UserQuickAccessService
                     'is_default' => false,
                     'row_version' => (int) $created->row_version,
                 ]);
-            } catch (\Illuminate\Database\QueryException) {
+            } catch (QueryException) {
                 return Result::failure(new Error(
                     UserErrorCode::STALE_RECORD,
                     'Quick Access settings were updated by another session. Please reload to see the latest changes.'

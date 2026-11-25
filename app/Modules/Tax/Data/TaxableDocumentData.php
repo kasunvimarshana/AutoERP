@@ -15,7 +15,7 @@ namespace Modules\Tax\Data;
 final readonly class TaxableDocumentData
 {
     /**
-     * @param list<TaxableDocumentLineData> $lines
+     * @param  list<TaxableDocumentLineData>  $lines
      */
     public function __construct(
         public int $tenantId,

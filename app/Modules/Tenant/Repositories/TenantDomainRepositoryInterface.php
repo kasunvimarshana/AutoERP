@@ -78,7 +78,6 @@ interface TenantDomainRepositoryInterface
         int $limit,
     ): array;
 
-
     /** @return list<DataRecord> */
     public function claimDueForOperationalVerification(
         DateTimeInterface $dueAt,

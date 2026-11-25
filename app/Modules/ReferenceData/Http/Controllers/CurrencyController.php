@@ -67,12 +67,14 @@ final class CurrencyController extends Controller
     public function update(UpdateCurrencyRequest $request, int $currency): CurrencyResource
     {
         $validated = $request->validated();
+
         return new CurrencyResource($this->catalog->update($currency, (int) $validated['expected_version'], $validated));
     }
 
     public function setStatus(SetReferenceStatusRequest $request, int $currency): CurrencyResource
     {
         $validated = $request->validated();
+
         return new CurrencyResource($this->catalog->setActive(
             $currency,
             (int) $validated['expected_version'],

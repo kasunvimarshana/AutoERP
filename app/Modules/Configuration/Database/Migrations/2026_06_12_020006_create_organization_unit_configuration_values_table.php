@@ -40,7 +40,7 @@ return new class extends Migration
                 ['tenant_id', 'organization_unit_id', 'key'],
                 'organization_configuration_values_scope_key_uk',
             );
-            $table->index(['tenant_id', 'organization_unit_id', 'updated_at'], 'organization_configuration_values_scope_updated_ix', );
+            $table->index(['tenant_id', 'organization_unit_id', 'updated_at'], 'organization_configuration_values_scope_updated_ix');
 
             $table->unique(['id', 'tenant_id'], 'organization_unit_configuration_values_id_tenant_uk');
         });

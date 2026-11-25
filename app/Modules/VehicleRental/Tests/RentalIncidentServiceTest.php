@@ -12,9 +12,12 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
+use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\IncidentReviewAction;
 use Modules\VehicleRental\Enums\IncidentStatus;
 use Modules\VehicleRental\Services\RentalAuthorization;
@@ -64,13 +67,13 @@ final class RentalIncidentServiceTest extends TestCase
             self::assertSame(1, $service->list($context, 10, 'Receipt 101')->total());
             self::assertSame(0, $service->list($context, 10, 'NonExistentRef')->total());
             self::assertSame(1, $service->history($context, $incident->id, 10)->total());
-            self::assertSame(0, \Illuminate\Support\Facades\DB::table('invoices')->where('tenant_id', $context->tenantId)->count());
+            self::assertSame(0, DB::table('invoices')->where('tenant_id', $context->tenantId)->count());
 
             $reviewed = $service->review($context, $incident->id, $incident->row_version, IncidentReviewAction::Confirm, 'Verified physical receipt');
             self::assertSame(IncidentStatus::Confirmed, $reviewed->status);
             self::assertSame(2, $reviewed->row_version);
             self::assertSame(2, $service->history($context, $incident->id, 10)->total());
-            self::assertSame(0, \Illuminate\Support\Facades\DB::table('invoices')->where('tenant_id', $context->tenantId)->count());
+            self::assertSame(0, DB::table('invoices')->where('tenant_id', $context->tenantId)->count());
 
             try {
                 $reviewed->forceFill(['description' => 'Unapproved rewrite'])->save();
@@ -100,9 +103,9 @@ final class RentalIncidentServiceTest extends TestCase
                 self::assertStringContainsString('vehicle assignment changed', $conflict->getMessage());
             }
 
-            self::assertSame(0, \Illuminate\Support\Facades\DB::table('vehicle_rental_incidents')
+            self::assertSame(0, DB::table('vehicle_rental_incidents')
                 ->where('tenant_id', $context->tenantId)->count());
-            self::assertSame(0, \Illuminate\Support\Facades\DB::table('vehicle_rental_incident_events')
+            self::assertSame(0, DB::table('vehicle_rental_incident_events')
                 ->where('tenant_id', $context->tenantId)->count());
         });
     }
@@ -123,11 +126,11 @@ final class RentalIncidentServiceTest extends TestCase
                 'tenant_id' => $context->tenantId,
                 'code' => 'OTHER-INCIDENT-CHART', 'name' => 'Other incident chart branch',
             ]);
-            $otherContext = new \Modules\VehicleRental\Data\AgreementContext(
+            $otherContext = new AgreementContext(
                 $context->tenantId, $otherId, $context->actorId,
             );
 
-            $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+            $this->expectException(ModelNotFoundException::class);
             $service->runningChartOptions($otherContext, $use->id, 10);
         });
     }
@@ -164,17 +167,17 @@ final class RentalIncidentServiceTest extends TestCase
                 'tenant_id' => $context->tenantId,
                 'code' => 'OTHER-INCIDENT', 'name' => 'Other Rental branch',
             ]);
-            $other = new \Modules\VehicleRental\Data\AgreementContext($context->tenantId, $otherId, $context->actorId);
+            $other = new AgreementContext($context->tenantId, $otherId, $context->actorId);
             self::assertSame(1, $service->vehicleUseOptions($context, $use->vehicle_label_snapshot, 10)->total());
             self::assertSame(0, $service->vehicleUseOptions($other, $use->vehicle_label_snapshot, 10)->total());
             self::assertSame(0, $service->list($other, 10)->total());
             try {
                 $service->find($other, $incident->id);
                 self::fail('Foreign organization incident was visible.');
-            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            } catch (ModelNotFoundException) {
                 self::assertTrue(true);
             }
-            $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+            $this->expectException(ModelNotFoundException::class);
             $service->create($other, [
                 'vehicle_use_id' => $use->id,
                 'expected_use_version' => $use->row_version,
@@ -220,7 +223,7 @@ final class RentalIncidentServiceTest extends TestCase
                 'description' => 'Incident delete prohibition test',
             ]);
 
-            $this->expectException(\LogicException::class);
+            $this->expectException(LogicException::class);
             $this->expectExceptionMessage('Rental incident evidence is immutable and cannot be deleted.');
             $incident->delete();
         });

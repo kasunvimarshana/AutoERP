@@ -38,7 +38,9 @@ use Modules\Item\Services\ItemBundleService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemLookupService;
 use Modules\Item\Services\ItemQueryService;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class ItemEngineTest extends TestCase
@@ -458,7 +460,7 @@ final class ItemEngineTest extends TestCase
             'created_at' => now(),
             'updated_at' => now()]);
 
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
 
         return $tenantId;
     }
@@ -473,7 +475,7 @@ final class ItemEngineTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$code,
             'code' => $code,

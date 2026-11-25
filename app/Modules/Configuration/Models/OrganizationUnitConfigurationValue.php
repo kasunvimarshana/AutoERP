@@ -17,6 +17,7 @@ use Modules\Core\Models\TenantOwnedModel;
 final class OrganizationUnitConfigurationValue extends TenantOwnedModel
 {
     protected $table = 'organization_unit_configuration_values';
+
     protected $fillable = ['tenant_id', 'organization_unit_id', 'key', 'definition_version', 'value', 'value_type', 'is_sensitive'];
 
     protected function casts(): array

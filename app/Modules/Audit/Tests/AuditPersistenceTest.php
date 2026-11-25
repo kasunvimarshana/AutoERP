@@ -30,7 +30,7 @@ final class AuditPersistenceTest extends TestCase
         $visible = $this->auditLog(tenantId: 10, organizationUnitId: 100, subjectId: 'visible');
         $otherOrganization = $this->auditLog(tenantId: 10, organizationUnitId: 200, subjectId: 'other-org');
         $otherTenant = $this->auditLog(tenantId: 20, organizationUnitId: 100, subjectId: 'other-tenant');
-        $reader = new EloquentAuditLogReader(new AuditLog());
+        $reader = new EloquentAuditLogReader(new AuditLog);
         $scope = new AuditReadScope(10, 100, false);
 
         self::assertSame($visible->getKey(), $reader->findVisibleById($scope, (int) $visible->getKey())?->get('id'));
@@ -43,7 +43,7 @@ final class AuditPersistenceTest extends TestCase
         $first = $this->auditLog(10, 100, 'first', '2026-06-22 10:00:00');
         $second = $this->auditLog(10, 200, 'second', '2026-06-22 10:00:00');
         $this->auditLog(20, 100, 'other-tenant', '2026-06-22 11:00:00');
-        $reader = new EloquentAuditLogReader(new AuditLog());
+        $reader = new EloquentAuditLogReader(new AuditLog);
         $query = new AuditQueryData(null, null, null, null, null, null, null, null, null, 1, null);
 
         $page = $reader->cursorPage(new AuditReadScope(10, null, true), $query);

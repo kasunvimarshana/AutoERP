@@ -15,8 +15,11 @@ namespace Modules\Configuration\Constants;
 final class ConfigurationPermission
 {
     public const ENTRIES_VIEW = 'configuration.entries.view';
+
     public const ENTRIES_MANAGE_TENANT = 'configuration.entries.manage_tenant';
+
     public const ENTRIES_MANAGE_ORGANIZATION = 'configuration.entries.manage_organization';
+
     public const ENTRIES_MANAGE_SENSITIVE = 'configuration.entries.manage_sensitive';
 
     /** @return array<string, string> */

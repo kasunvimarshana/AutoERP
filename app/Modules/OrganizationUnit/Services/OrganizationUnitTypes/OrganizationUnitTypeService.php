@@ -58,6 +58,7 @@ final class OrganizationUnitTypeService
     {
         try {
             $type = $this->findScoped($id);
+
             return $type instanceof OrganizationUnitTypeModel
                 ? Result::success($this->record($type))
                 : Result::failure(new Error(OrganizationUnitErrorCode::NOT_FOUND, 'Organization-unit type not found.'));
@@ -78,7 +79,7 @@ final class OrganizationUnitTypeService
             }
 
             $type = DB::transaction(function () use ($tenantId, $name, $nameKey, $level, $payload): OrganizationUnitTypeModel {
-                $created = new OrganizationUnitTypeModel();
+                $created = new OrganizationUnitTypeModel;
                 $created->forceFill([
                     'tenant_id' => $tenantId,
                     'name' => $name,
@@ -210,6 +211,7 @@ final class OrganizationUnitTypeService
             ->where('type_id', $type->getKey())
             ->count();
         unset($payload['name_key']);
+
         return new DataRecord($payload);
     }
 

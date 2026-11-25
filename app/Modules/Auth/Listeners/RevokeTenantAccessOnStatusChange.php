@@ -27,7 +27,9 @@ use Modules\Tenant\Events\TenantStatusChanged;
 final readonly class RevokeTenantAccessOnStatusChange
 {
     private const SOURCE_SYSTEM = 'tenant';
+
     private const EVENT_TYPE = 'tenant.status_changed';
+
     private const REVOCATION_REASON = 'Tenant is not active.';
 
     public function __construct(private ClockInterface $clock) {}

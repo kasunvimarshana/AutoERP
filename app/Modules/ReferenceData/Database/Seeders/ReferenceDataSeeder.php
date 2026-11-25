@@ -15,7 +15,6 @@ namespace Modules\ReferenceData\Database\Seeders;
 use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\ReferenceData\Models\CountryModel;
 use Modules\ReferenceData\Models\CurrencyModel;

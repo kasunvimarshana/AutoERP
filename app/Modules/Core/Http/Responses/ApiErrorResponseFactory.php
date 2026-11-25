@@ -13,8 +13,8 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Responses;
 
 use Illuminate\Http\JsonResponse;
-use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
 use InvalidArgumentException;
+use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
 use Symfony\Component\HttpFoundation\Response;
 
 final class ApiErrorResponseFactory

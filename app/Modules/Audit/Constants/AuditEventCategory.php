@@ -15,14 +15,23 @@ namespace Modules\Audit\Constants;
 final class AuditEventCategory
 {
     public const AUTHENTICATION = 'authentication';
+
     public const AUTHORIZATION = 'authorization';
+
     public const ADMINISTRATION = 'administration';
+
     public const CONFIGURATION = 'configuration';
+
     public const DATA = 'data';
+
     public const FINANCIAL = 'financial';
+
     public const INVENTORY = 'inventory';
+
     public const SECURITY = 'security';
+
     public const WORKFLOW = 'workflow';
+
     public const SYSTEM = 'system';
 
     /** @return list<string> */

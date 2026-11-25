@@ -89,11 +89,8 @@ final class PayrollTaxTableController
 
     public function update(PayrollRequest $request, int $id): JsonResponse
     {
-        $taxTable = PayrollTaxTable::query()
-            ->where('tenant_id', $request->tenantId())
-            ->findOrFail($id);
-
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'name' => ['sometimes', 'string', 'max:100'],
             'effective_year' => ['sometimes', 'integer'],
             'standard_personal_relief' => ['nullable', 'numeric'],
@@ -105,8 +102,20 @@ final class PayrollTaxTableController
             'brackets.*.rate_percentage' => ['required_with:brackets', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        $taxTable = DB::transaction(function () use ($taxTable, $validated, $request): PayrollTaxTable {
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+
+        $taxTable = DB::transaction(function () use ($id, $validated, $request, $expectedVersion): ?PayrollTaxTable {
+            $taxTable = PayrollTaxTable::query()
+                ->where('tenant_id', $request->tenantId())
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($expectedVersion !== null && (int) $taxTable->row_version !== $expectedVersion) {
+                return null;
+            }
+
             $taxTable->update([
+                'row_version' => ((int) $taxTable->row_version) + 1,
                 'name' => $validated['name'] ?? $taxTable->name,
                 'effective_year' => $validated['effective_year'] ?? $taxTable->effective_year,
                 'standard_personal_relief' => array_key_exists('standard_personal_relief', $validated)
@@ -132,6 +141,10 @@ final class PayrollTaxTableController
 
             return $taxTable->fresh(['brackets']);
         });
+
+        if ($taxTable === null) {
+            return response()->json(['message' => 'Tax table was changed by someone else. Reload before saving.'], 409);
+        }
 
         return response()->json(['data' => $taxTable]);
     }

@@ -108,7 +108,7 @@ final class PaymentUpdateService
                     throw new InvalidArgumentException('Payment method was not found while updating payment lines.');
                 }
 
-                $paymentLine = new PaymentLine();
+                $paymentLine = new PaymentLine;
                 $paymentLine->forceFill([
                     'tenant_id' => $locked->tenant_id,
                     'organization_unit_id' => $locked->organization_unit_id,

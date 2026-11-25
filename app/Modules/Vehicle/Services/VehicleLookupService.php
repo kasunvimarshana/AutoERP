@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\Vehicle\DTOs\VehicleResultData;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
-use Modules\Vehicle\Models\VehicleOwnership;
 
 final class VehicleLookupService
 {

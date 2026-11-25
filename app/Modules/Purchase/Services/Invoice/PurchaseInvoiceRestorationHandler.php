@@ -87,7 +87,7 @@ final class PurchaseInvoiceRestorationHandler implements InvoiceSourceRestoratio
     }
 
     /**
-     * @param list<int> $ids
+     * @param  list<int>  $ids
      * @return Collection<int, GoodsReceiptNote>
      */
     private function goodsReceipts(InvoiceSourceRestorationContext $context, array $ids): Collection

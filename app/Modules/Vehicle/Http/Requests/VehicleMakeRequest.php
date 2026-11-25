@@ -22,6 +22,7 @@ abstract class VehicleMakeRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'code' => ['required', 'string', 'max:80'],
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string'],

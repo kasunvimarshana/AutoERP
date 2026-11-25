@@ -15,9 +15,13 @@ namespace Modules\Tenant\Constants;
 final class TenantOnboardingStep
 {
     public const ROOT_ORGANIZATION = 'root_organization';
+
     public const PERMISSION_CATALOGUE = 'permission_catalogue';
+
     public const SUPER_ADMIN_ROLE = 'super_admin_role';
+
     public const AUTHENTICATION_PROVIDER = 'authentication_provider';
+
     public const INITIAL_ADMIN_ACCOUNT = 'initial_admin_account';
 
     /** @return list<string> */

@@ -102,5 +102,4 @@ final class PurchaseReturnResource extends PurchaseResource
             'date' => null,
         ];
     }
-
 }

@@ -12,17 +12,16 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Onboarding;
 
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Core\DTOs\DataRecord;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantReadinessCheck;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
-use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
-use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 use Modules\Tenant\Services\Domains\TenantRoutingReadinessPolicy;
 use Modules\Tenant\Services\Platform\TenantInfrastructureCapabilityService;
@@ -193,8 +192,8 @@ final class TenantReadinessService
     }
 
     /**
-     * @param array<string, bool> $checks
-     * @param list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}> $additional
+     * @param  array<string, bool>  $checks
+     * @param  list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}>  $additional
      * @return list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}>
      */
     private function blockers(array $checks, array $additional = []): array

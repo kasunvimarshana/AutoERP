@@ -19,7 +19,7 @@ final class PaymentMassAssignmentBoundaryTest extends TestCase
 {
     public function test_payment_is_totally_guarded_and_owner_service_writes_explicitly(): void
     {
-        $payment = new Payment();
+        $payment = new Payment;
         $service = file_get_contents(dirname(__DIR__).'/Services/PaymentCreationService.php');
 
         self::assertSame(['*'], $payment->getGuarded());

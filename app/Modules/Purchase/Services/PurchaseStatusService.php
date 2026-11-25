@@ -128,5 +128,4 @@ final class PurchaseStatusService
 
         throw new InvalidArgumentException($message);
     }
-
 }

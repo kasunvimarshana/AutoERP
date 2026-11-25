@@ -21,7 +21,7 @@ final class AuditQueryFactoryTest extends TestCase
     {
         config()->set('audit.display_timezone', 'Asia/Colombo');
 
-        $query = (new AuditQueryFactory())->fromValidated([
+        $query = (new AuditQueryFactory)->fromValidated([
             'from_date' => '2026-06-22',
             'to_date' => '2026-06-22',
             'per_page' => 999,

@@ -281,5 +281,4 @@ final class ItemBaseUomConversionService
             'warnings' => $validation['warnings'],
         ];
     }
-
 }

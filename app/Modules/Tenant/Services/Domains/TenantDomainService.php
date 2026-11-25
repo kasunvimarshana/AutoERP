@@ -503,5 +503,4 @@ final class TenantDomainService
 
         return $value === '' ? null : $value;
     }
-
 }

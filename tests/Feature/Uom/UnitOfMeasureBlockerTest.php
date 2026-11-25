@@ -19,7 +19,7 @@ use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\UOM\Constants\UomErrorCode;
 use Modules\UOM\Services\UnitOfMeasures\DeleteUnitOfMeasureService;
 use Modules\UOM\Services\UnitOfMeasures\UpdateUnitOfMeasureService;
-use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\TestCase;
 
 final class UnitOfMeasureBlockerTest extends TestCase
@@ -214,7 +214,7 @@ final class UnitOfMeasureBlockerTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
 
         return $tenantId;
     }

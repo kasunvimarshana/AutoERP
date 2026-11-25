@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Models\UserModel;
 use Modules\Warehouse\Services\WarehouseAuthorizationService;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class BooleanQueryFilterTest extends TestCase
@@ -144,7 +146,7 @@ final class BooleanQueryFilterTest extends TestCase
     {
         $suffix ??= Str::upper(Str::random(8));
 
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,
@@ -157,7 +159,7 @@ final class BooleanQueryFilterTest extends TestCase
     private function userWithWarehousePermissions(int $tenantId, int $organizationUnitId, string $suffix): int
     {
         $now = now();
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Warehouse',
             'last_name' => 'Filter',

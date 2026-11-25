@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
-use InvalidArgumentException;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
@@ -180,5 +180,4 @@ final class PurchaseInvoiceQuantityUpdater
 
         return $lineQuantities;
     }
-
 }

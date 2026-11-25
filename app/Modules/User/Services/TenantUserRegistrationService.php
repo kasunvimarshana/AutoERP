@@ -14,8 +14,8 @@ namespace Modules\User\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\User\Constants\UserStatus;
 use Modules\User\Contracts\TenantUserRegistrationInterface;
@@ -171,5 +171,4 @@ final class TenantUserRegistrationService implements TenantUserRegistrationInter
 
         return $value === '' ? null : $value;
     }
-
 }

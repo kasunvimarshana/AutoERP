@@ -28,7 +28,7 @@ final class TaxMasterDataServiceScopeTest extends TestCase
     {
         config()->set('tax.calculation_methods', ['percentage']);
 
-        $tax = new Tax();
+        $tax = new Tax;
         $tax->forceFill([
             'tenant_id' => 1,
             'organization_unit_id' => 10,
@@ -49,7 +49,7 @@ final class TaxMasterDataServiceScopeTest extends TestCase
 
     public function test_existing_customer_tax_profile_scope_guard_runs_before_party_resolution(): void
     {
-        $profile = new CustomerTaxProfile();
+        $profile = new CustomerTaxProfile;
         $profile->forceFill([
             'tenant_id' => 1,
             'organization_unit_id' => 10,
@@ -68,7 +68,7 @@ final class TaxMasterDataServiceScopeTest extends TestCase
 
     public function test_existing_supplier_tax_profile_scope_guard_runs_before_party_resolution(): void
     {
-        $profile = new SupplierTaxProfile();
+        $profile = new SupplierTaxProfile;
         $profile->forceFill([
             'tenant_id' => 1,
             'organization_unit_id' => 10,
@@ -87,7 +87,7 @@ final class TaxMasterDataServiceScopeTest extends TestCase
 
     public function test_existing_tax_posting_profile_scope_guard_runs_before_tax_lookup(): void
     {
-        $profile = new TaxPostingProfile();
+        $profile = new TaxPostingProfile;
         $profile->forceFill([
             'tenant_id' => 1,
             'organization_unit_id' => 10,
@@ -108,7 +108,7 @@ final class TaxMasterDataServiceScopeTest extends TestCase
     private function service(): TaxMasterDataService
     {
         return new TaxMasterDataService(
-            new DecimalMath(),
+            new DecimalMath,
             new TaxPartyResolverRegistry([]),
         );
     }

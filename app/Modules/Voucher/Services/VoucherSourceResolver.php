@@ -195,7 +195,7 @@ final class VoucherSourceResolver
     {
         $payment = $reversal->payment;
         if (! $payment instanceof Payment) {
-            throw (new ModelNotFoundException())->setModel(Payment::class);
+            throw (new ModelNotFoundException)->setModel(Payment::class);
         }
 
         $payload = $this->paymentPayload(VoucherType::Reversal, $payment);

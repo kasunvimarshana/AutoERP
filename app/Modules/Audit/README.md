@@ -38,7 +38,14 @@ Use the canonical values from `AuditEventCategory`; feature modules must not inv
 
 ## Current event producers
 
-- Purchase: `purchase.fast_purchase.completed`
+- Auth: organization-unit context switches (`SwitchOrganizationUnitService`)
+- Configuration: configuration value mutations and platform transfer imports (`ConfigurationEntryService`, `ConfigurationTransferService`)
+- Invoice: invoice WhatsApp share events (`InvoiceWhatsAppShareService`)
+- OrganizationUnit: organization-unit lifecycle and access changes (`OrganizationUnitAuditService`)
+- Purchase: `purchase.fast_purchase.completed` and purchase workflow transitions (`FastPurchaseService`, `PurchaseAuditService`)
+- ReferenceData: catalog entry mutations (`AbstractCatalogService`)
+- Tenant: tenant lifecycle, onboarding, plans, subscriptions, documents, domains, and health events (`CreateTenantService`, `UpdateTenantService`, `ExpireTenantsService`, `TenantLifecycleService`, `TenantDocumentService`, `TenantDomainService`, `TenantOnboardingService`, `TenantPlan*Service`, `TenantSubscriptionLifecycleService`, `PlatformTenantHealthService`)
+- User: user security/lifecycle and platform operator events (`UserAuditService`, `PlatformOperatorService`)
 
 Additional modules must emit events from their own application services at confirmed business transition points. Do not add generic model observers or Audit-owned business inference.
 

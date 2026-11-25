@@ -23,6 +23,7 @@ use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
+use Modules\Invoice\Services\InvoiceBalanceUpdater;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoiceStatusService;
@@ -138,7 +139,7 @@ final class InvoiceSettlementServiceTest extends TestCase
             $statuses->transition($creditNote, InvoiceStatus::Posted);
         });
 
-        $balanceUpdater = app(\Modules\Invoice\Services\InvoiceBalanceUpdater::class);
+        $balanceUpdater = app(InvoiceBalanceUpdater::class);
 
         $this->withTenantExecutionContext($tenantId, function () use ($balanceUpdater, $salesInvoice, $creditNote) {
             // 1. Partial allocation of 300 from 500 Credit Note

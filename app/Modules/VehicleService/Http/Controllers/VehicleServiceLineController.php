@@ -47,8 +47,8 @@ final class VehicleServiceLineController extends VehicleServiceController
                 'children.inventoryMovement',
                 'employeeAssignments.employee',
             ])
-            ->get();
-        $this->addAvailableStock($jobModel, $lines);
+            ->paginate($request->perPage());
+        $this->addAvailableStock($jobModel, $lines->getCollection());
 
         return VehicleServiceJobLineResource::collection(
             $lines,

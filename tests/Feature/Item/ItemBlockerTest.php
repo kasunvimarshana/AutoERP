@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Item\Models\Item;
-use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemQueryService;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;

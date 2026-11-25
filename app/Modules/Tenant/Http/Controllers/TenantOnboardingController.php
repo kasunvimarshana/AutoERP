@@ -49,5 +49,4 @@ final class TenantOnboardingController extends Controller
             'data' => $this->readiness->inspect((int) $tenant),
         ]);
     }
-
 }

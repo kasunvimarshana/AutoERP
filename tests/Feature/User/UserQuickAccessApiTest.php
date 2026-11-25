@@ -19,7 +19,9 @@ use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserPermission;
 use Modules\User\Constants\UserStatus;
 use Modules\User\Constants\UserSystemRole;
-use Modules\User\Services\UserQuickAccessService;
+use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
@@ -247,7 +249,7 @@ final class UserQuickAccessApiTest extends TestCase
         $user2Id = $this->createUser($contextA['tenant_id'], 'user2@example.test', ['first_name' => 'User2']);
         $this->assignRole($contextA['tenant_id'], $user2Id, $contextA['role_id']);
         $this->assignOrganizationUnit($contextA['tenant_id'], $user2Id, $contextA['organization_unit_id'], true);
-        
+
         $providerId = (int) DB::table('auth_providers')->where('tenant_id', $contextA['tenant_id'])->where('provider_key', 'internal')->value('id');
         DB::table('auth_identities')->insert([
             'tenant_id' => $contextA['tenant_id'],
@@ -461,7 +463,7 @@ final class UserQuickAccessApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
 
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Head Office', 'HO');
         $email = (string) ($overrides['email'] ?? 'user.'.Str::lower(Str::random(6)).'@example.test');
@@ -472,7 +474,7 @@ final class UserQuickAccessApiTest extends TestCase
         }
         $this->assignRole($tenantId, $userId, $roleId);
         $this->assignOrganizationUnit($tenantId, $userId, $organizationUnitId, true);
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
@@ -525,12 +527,13 @@ final class UserQuickAccessApiTest extends TestCase
                 'is_active' => true, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
+
         return $ids;
     }
 
     private function createOrganizationUnit(int $tenantId, string $name, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId, 'name' => $name, 'code' => $code,
             'path' => '/'.strtolower($code), 'is_active' => true, 'row_version' => 1,
             'created_at' => now(), 'updated_at' => now(),

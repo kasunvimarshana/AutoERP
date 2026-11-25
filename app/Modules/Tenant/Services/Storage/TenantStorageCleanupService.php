@@ -14,8 +14,8 @@ namespace Modules\Tenant\Services\Storage;
 
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Tenant\Models\TenantStorageCleanupJobModel;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -24,11 +24,15 @@ use Throwable;
 final class TenantStorageCleanupService
 {
     private const STATUS_PENDING = 'pending';
+
     private const STATUS_PROCESSING = 'processing';
+
     private const STATUS_COMPLETED = 'completed';
+
     private const STATUS_DEAD = 'dead';
 
     private const ERROR_DELETE_FAILED = 'TENANT_STORAGE_DELETE_FAILED';
+
     private const SAFE_DELETE_MESSAGE = 'The tenant file could not be removed from private storage.';
 
     public function __construct(
@@ -176,6 +180,7 @@ final class TenantStorageCleanupService
 
             if ($completed) {
                 $summary['completed']++;
+
                 continue;
             }
 

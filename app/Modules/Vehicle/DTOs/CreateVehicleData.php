@@ -12,18 +12,18 @@ declare(strict_types=1);
 
 namespace Modules\Vehicle\DTOs;
 
+use Modules\Vehicle\Data\VehicleOwnershipDraftData;
 use Modules\Vehicle\Enums\VehicleFuelType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Enums\VehicleTransmissionType;
-use Modules\Vehicle\Data\VehicleOwnershipDraftData;
 
 final readonly class CreateVehicleData
 {
     /**
-     * @param array<string, mixed>|null $metadata
-     * @param list<VehicleDocumentData> $documents
-     * @param list<VehicleAttributeData> $attributes
-     * @param list<VehicleOwnershipDraftData> $ownerships
+     * @param  array<string, mixed>|null  $metadata
+     * @param  list<VehicleDocumentData>  $documents
+     * @param  list<VehicleAttributeData>  $attributes
+     * @param  list<VehicleOwnershipDraftData>  $ownerships
      */
     public function __construct(
         public int $tenantId,

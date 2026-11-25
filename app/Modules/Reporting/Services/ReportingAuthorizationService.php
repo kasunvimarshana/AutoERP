@@ -18,6 +18,7 @@ use Modules\User\Services\UserAccessResolver;
 final class ReportingAuthorizationService
 {
     public const REPORTS_VIEW = 'reporting.reports.view';
+
     public const REPORTS_EXPORT = 'reporting.reports.export';
 
     public function __construct(private readonly UserAccessResolver $access) {}

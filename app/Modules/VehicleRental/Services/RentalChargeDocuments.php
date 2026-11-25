@@ -118,7 +118,7 @@ final class RentalChargeDocuments
             }
         }
 
-        $adjustment = new AgreementAdjustment();
+        $adjustment = new AgreementAdjustment;
         $adjustment->tenant_id = $context->tenantId;
         $adjustment->organization_unit_id = $context->organizationUnitId;
         if ($customer) {
@@ -232,12 +232,12 @@ final class RentalChargeDocuments
         $adjustment->status = AgreementAdjustmentStatus::Applied;
         $adjustment->save();
 
-        $history = new AgreementAdjustmentHistory();
+        $history = new AgreementAdjustmentHistory;
         $history->tenant_id = $context->tenantId;
         $history->adjustment_id = $adjustment->id;
         $history->from_status = AgreementAdjustmentStatus::Draft;
         $history->to_status = AgreementAdjustmentStatus::Applied;
-        $history->reason = 'Invoice generated: ' . $invoice->invoice_number;
+        $history->reason = 'Invoice generated: '.$invoice->invoice_number;
         $history->user_id = $context->actorId;
         $history->save();
 

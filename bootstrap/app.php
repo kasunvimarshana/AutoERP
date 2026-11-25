@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * AutoERP Enterprise System
  *
@@ -39,8 +41,8 @@ use Modules\Core\Http\Middleware\CurrentTenantMiddleware;
 use Modules\Core\Http\Middleware\CurrentUserMiddleware;
 use Modules\Core\Http\Middleware\EnsureApiErrorResponseMiddleware;
 use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
-use Modules\Core\Http\Middleware\ResolveCurrentTenantMiddleware;
 use Modules\Core\Http\Middleware\RequireCurrentTenantAccessMiddleware;
+use Modules\Core\Http\Middleware\ResolveCurrentTenantMiddleware;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;

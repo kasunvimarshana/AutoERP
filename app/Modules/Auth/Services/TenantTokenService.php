@@ -244,7 +244,6 @@ final readonly class TenantTokenService
         return $this->validateTenantAccessToken($plainToken, $key);
     }
 
-
     private function validateTenantAccessToken(string $plainToken, string $key): array
     {
         $parsed = $this->codec->parse($plainToken, AuthTokenKeyPrefix::TENANT_ACCESS);
@@ -588,11 +587,6 @@ final readonly class TenantTokenService
 
         return array_values(array_unique($items));
     }
-
-
-
-
-
 
     private function runForTenant(int $tenantId, callable $callback): mixed
     {

@@ -12,12 +12,11 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Services\Warehouses;
 
-use Modules\Core\Tenancy\TenantPlanLimit;
-
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
+use Modules\Core\Tenancy\TenantPlanLimit;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\TenantEntitlementService;
 use Modules\Warehouse\Constants\WarehouseErrorCode;

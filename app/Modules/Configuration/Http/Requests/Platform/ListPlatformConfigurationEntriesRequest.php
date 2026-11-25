@@ -24,5 +24,4 @@ final class ListPlatformConfigurationEntriesRequest extends PaginatedPlatformCon
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
     }
-
 }

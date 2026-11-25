@@ -14,12 +14,14 @@ namespace Modules\Item\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Item\Http\Requests\ListItemRequest;
 use Modules\Item\Http\Requests\StoreItemCategoryRequest;
 use Modules\Item\Http\Requests\UpdateItemCategoryRequest;
 use Modules\Item\Http\Resources\ItemCategoryResource;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCategoryService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class ItemCategoryController
 {
@@ -67,11 +69,24 @@ final class ItemCategoryController
     public function update(UpdateItemCategoryRequest $request, int $item_category): ItemCategoryResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), ItemAuthorizationService::MANAGE_CATEGORIES);
+        $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
 
-        return new ItemCategoryResource($this->service->update(
-            $this->service->find($item_category, $request->tenantId(), $request->organizationUnitId()),
-            $request->payload(),
-        ));
+        $updated = DB::transaction(function () use ($request, $item_category, $expectedVersion) {
+            $category = $this->service->find($item_category, $request->tenantId(), $request->organizationUnitId());
+            $category = $category->newQuery()->lockForUpdate()->findOrFail($category->getKey());
+
+            if ($expectedVersion !== null && (int) $category->row_version !== $expectedVersion) {
+                throw new ConflictHttpException('Item category was changed by someone else. Reload before saving.');
+            }
+
+            $nextVersion = ((int) $category->row_version) + 1;
+            $saved = $this->service->update($category, $request->payload());
+            $saved->forceFill(['row_version' => $nextVersion])->save();
+
+            return $saved;
+        });
+
+        return new ItemCategoryResource($updated);
     }
 
     public function destroy(ListItemRequest $request, int $item_category): JsonResponse

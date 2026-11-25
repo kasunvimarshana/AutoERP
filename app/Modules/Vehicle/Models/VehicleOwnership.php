@@ -16,8 +16,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 
 final class VehicleOwnership extends TenantOwnedModel
 {

@@ -14,10 +14,16 @@ namespace Modules\VehicleRental\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
+use Modules\VehicleRental\Enums\AgreementAction;
+use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
+use Modules\VehicleRental\Models\RentalExpense;
+use Modules\VehicleRental\Services\AgreementService;
+use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalExpenseService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\TestCase;
 
 final class RentalExpenseTest extends TestCase
@@ -77,12 +83,12 @@ final class RentalExpenseTest extends TestCase
     public function test_rental_expense_allocates_to_customer_and_owner_agreements(): void
     {
         [$context, $customerData, $ownerData] = $this->fixture();
-        $this->grant($context, array_keys(\Modules\VehicleRental\Services\RentalAuthorization::descriptions()));
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
 
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
-            $agreements = app(\Modules\VehicleRental\Services\AgreementService::class);
-            $customerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerData);
-            $ownerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Owner, $context, $ownerData);
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $ownerAg = $agreements->create(AgreementKind::Owner, $context, $ownerData);
 
             $service = app(RentalExpenseService::class);
             $expense = $service->create([
@@ -212,7 +218,7 @@ final class RentalExpenseTest extends TestCase
         [$context, , $ownerData] = $this->loginFixture();
 
         // 1. Create expense with empty string optional fields
-        $createResponse = $this->postJson($this->rentalRoot . '/expenses', [
+        $createResponse = $this->postJson($this->rentalRoot.'/expenses', [
             'vehicle_id' => $ownerData['vehicle_id'],
             'expense_type' => RentalExpenseType::Fuel->value,
             'expense_date' => '2026-09-15',
@@ -240,22 +246,22 @@ final class RentalExpenseTest extends TestCase
         $this->assertNull($createResponse->json('data.description'));
 
         // 2. Query index with empty filter parameters
-        $this->getJson($this->rentalRoot . '/expenses?search=&expense_type=&vehicle_id=&status=&from=&until=')
+        $this->getJson($this->rentalRoot.'/expenses?search=&expense_type=&vehicle_id=&status=&from=&until=')
             ->assertOk();
 
         // 3. Transition to submitted then approved
-        $submitted = $this->patchJson($this->rentalRoot . '/expenses/' . $expenseId . '/transition', [
+        $submitted = $this->patchJson($this->rentalRoot.'/expenses/'.$expenseId.'/transition', [
             'expected_version' => $version,
             'status' => RentalExpenseStatus::Submitted->value,
         ])->assertOk();
 
-        $approved = $this->patchJson($this->rentalRoot . '/expenses/' . $expenseId . '/transition', [
+        $approved = $this->patchJson($this->rentalRoot.'/expenses/'.$expenseId.'/transition', [
             'expected_version' => $submitted->json('data.row_version'),
             'status' => RentalExpenseStatus::Approved->value,
         ])->assertOk();
 
         // 4. Transition to allocated with empty optional allocation fields
-        $allocated = $this->patchJson($this->rentalRoot . '/expenses/' . $expenseId . '/transition', [
+        $allocated = $this->patchJson($this->rentalRoot.'/expenses/'.$expenseId.'/transition', [
             'expected_version' => $approved->json('data.row_version'),
             'status' => RentalExpenseStatus::Allocated->value,
             'allocations' => [
@@ -285,7 +291,7 @@ final class RentalExpenseTest extends TestCase
     {
         [$context, , $ownerData] = $this->loginFixture();
 
-        $createResponse = $this->postJson($this->rentalRoot . '/expenses', [
+        $createResponse = $this->postJson($this->rentalRoot.'/expenses', [
             'vehicle_id' => $ownerData['vehicle_id'],
             'expense_type' => RentalExpenseType::Fuel->value,
             'expense_date' => '2026-09-15',
@@ -295,24 +301,24 @@ final class RentalExpenseTest extends TestCase
 
         $expenseId = (int) $createResponse->json('data.id');
 
-        $this->deleteJson($this->rentalRoot . '/expenses/' . $expenseId)->assertStatus(405);
+        $this->deleteJson($this->rentalRoot.'/expenses/'.$expenseId)->assertStatus(405);
 
         $this->withTenantExecutionContext($context->tenantId, function () use ($expenseId): void {
             $this->expectException(\LogicException::class);
             $this->expectExceptionMessage('Rental expenses must be preserved for audit history.');
-            \Modules\VehicleRental\Models\RentalExpense::query()->findOrFail($expenseId)->delete();
+            RentalExpense::query()->findOrFail($expenseId)->delete();
         });
     }
 
     public function test_customer_recovery_allocation_can_be_billed_as_invoice_and_double_billing_is_rejected(): void
     {
         [$context, $customerData, $ownerData] = $this->fixture();
-        $this->grant($context, array_keys(\Modules\VehicleRental\Services\RentalAuthorization::descriptions()));
+        $this->grant($context, array_keys(RentalAuthorization::descriptions()));
 
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
-            $agreements = app(\Modules\VehicleRental\Services\AgreementService::class);
-            $customerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerData);
-            $agreements->change(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, \Modules\VehicleRental\Enums\AgreementAction::Activate);
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
             $customerAg->refresh();
 
             $service = app(RentalExpenseService::class);
@@ -352,7 +358,7 @@ final class RentalExpenseTest extends TestCase
             $this->assertSame($invoice->id, $allocation->invoice_id);
 
             // Double billing is rejected
-            $this->expectException(\Symfony\Component\HttpKernel\Exception\ConflictHttpException::class);
+            $this->expectException(ConflictHttpException::class);
             $service->billAllocation($allocation, $context, [
                 'expected_allocation_version' => $allocation->row_version,
                 'expected_agreement_version' => $customerAg->row_version,
@@ -367,9 +373,9 @@ final class RentalExpenseTest extends TestCase
         [$context, $customerData, $ownerData] = $this->loginFixture();
 
         [$allocId, $agreementVersion] = $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): array {
-            $agreements = app(\Modules\VehicleRental\Services\AgreementService::class);
-            $customerAg = $agreements->create(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerData);
-            $activated = $agreements->change(\Modules\VehicleRental\Enums\AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, \Modules\VehicleRental\Enums\AgreementAction::Activate);
+            $agreements = app(AgreementService::class);
+            $customerAg = $agreements->create(AgreementKind::Customer, $context, $customerData);
+            $activated = $agreements->change(AgreementKind::Customer, $context, $customerAg->id, $customerAg->row_version, AgreementAction::Activate);
 
             $service = app(RentalExpenseService::class);
             $expense = $service->create([
@@ -393,7 +399,7 @@ final class RentalExpenseTest extends TestCase
             return [$allocated->allocations->first()->id, $activated->row_version];
         });
 
-        $resp = $this->postJson($this->rentalRoot . '/expenses/allocations/' . $allocId . '/bill', [
+        $resp = $this->postJson($this->rentalRoot.'/expenses/allocations/'.$allocId.'/bill', [
             'expected_allocation_version' => 1,
             'expected_agreement_version' => $agreementVersion,
             'invoice_date' => '2026-09-19',

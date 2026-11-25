@@ -18,6 +18,7 @@ use Modules\Core\Models\CoreModel;
 final class PlatformPermissionModel extends CoreModel
 {
     protected $table = 'platform_permissions';
+
     protected $fillable = ['name', 'description', 'is_active'];
 
     protected function casts(): array

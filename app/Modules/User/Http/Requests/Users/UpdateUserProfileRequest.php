@@ -17,7 +17,10 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class UpdateUserProfileRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return UserPermission::USERS_UPDATE; }
+    protected function requiredPermission(): ?string
+    {
+        return UserPermission::USERS_UPDATE;
+    }
 
     public function rules(): array
     {

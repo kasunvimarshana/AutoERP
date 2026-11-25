@@ -92,6 +92,7 @@ final class AuditPayloadSanitizer
             foreach ($value as $key => $item) {
                 if (is_string($key) && $this->isSensitiveKey($key)) {
                     $result[$key] = (string) config('audit.payload.redacted_value', '[REDACTED]');
+
                     continue;
                 }
 

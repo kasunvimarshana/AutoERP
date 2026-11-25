@@ -24,7 +24,8 @@ interface TenantExecutionContextInterface
      * Execute work inside an explicit tenant boundary.
      *
      * @template T
-     * @param callable(): T $callback
+     *
+     * @param  callable(): T  $callback
      * @return T
      */
     public function runForTenant(int $tenantId, callable $callback): mixed;
@@ -37,7 +38,8 @@ interface TenantExecutionContextInterface
      * must use runForTenant instead.
      *
      * @template T
-     * @param callable(): T $callback
+     *
+     * @param  callable(): T  $callback
      * @return T
      */
     public function runAsControlPlane(callable $callback): mixed;

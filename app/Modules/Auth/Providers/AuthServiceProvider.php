@@ -28,20 +28,20 @@ use Modules\Auth\Enums\AuthScope;
 use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Http\Middleware\RequireRecentPlatformAuthenticationMiddleware;
 use Modules\Auth\Listeners\RevokeTenantAccessOnStatusChange;
+use Modules\Auth\Services\AccessTokenRouter;
 use Modules\Auth\Services\Credentials\PasswordCredentialService;
 use Modules\Auth\Services\CurrentUserContextResolver;
 use Modules\Auth\Services\OrganizationUnit\AuthOrganizationUnitLifecycleBlocker;
 use Modules\Auth\Services\OrganizationUnit\RevokeOrganizationUnitAuthScopeService;
 use Modules\Auth\Services\PlatformSessionService;
-use Modules\Auth\Services\Readiness\AuthReadinessService;
+use Modules\Auth\Services\PlatformTokenService;
 use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
-use Modules\Auth\Services\Security\AuthSecurityConfig;
+use Modules\Auth\Services\Readiness\AuthReadinessService;
 use Modules\Auth\Services\Security\AccountLoginThrottle;
+use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Auth\Services\Security\PasswordHasher;
-use Modules\Auth\Services\PlatformTokenService;
 use Modules\Auth\Services\TenantTokenService;
-use Modules\Auth\Services\AccessTokenRouter;
 use Modules\Auth\Services\UserIntegration\TenantUserAccessRevoker;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Core\Contracts\CurrentUserContextResolverInterface;
@@ -140,6 +140,7 @@ final class AuthServiceProvider extends ServiceProvider
                 }
                 $tenantId = $this->positiveInt($payload['tenant_id'] ?? null);
                 $userId = $this->positiveInt($payload['tenant_user_id'] ?? null);
+
                 return $tenantId === null || $userId === null
                     ? null
                     : $this->app->make(AuthenticationPrincipalProviderInterface::class)
@@ -155,6 +156,7 @@ final class AuthServiceProvider extends ServiceProvider
                     return null;
                 }
                 $operatorId = $this->positiveInt($payload['platform_operator_id'] ?? null);
+
                 return $operatorId === null
                     ? null
                     : $this->app->make(AuthenticationPrincipalProviderInterface::class)
@@ -179,6 +181,7 @@ final class AuthServiceProvider extends ServiceProvider
         try {
             $payload = $this->app->make(AccessTokenRouter::class)->validate($plainToken);
             $request->attributes->set('auth_access_token', $payload);
+
             return $payload;
         } catch (AuthFailure) {
             return [];
@@ -211,6 +214,7 @@ final class AuthServiceProvider extends ServiceProvider
             return null;
         }
         $value = (int) $value;
+
         return $value > 0 ? $value : null;
     }
 }

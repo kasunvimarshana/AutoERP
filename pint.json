@@ -1,0 +1,7 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "new_with_parentheses": false,
+        "self_static_accessor": false
+    }
+}

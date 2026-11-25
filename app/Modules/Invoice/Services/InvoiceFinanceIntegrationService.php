@@ -30,8 +30,7 @@ final class InvoiceFinanceIntegrationService
         string $postingDate,
         array $lines,
         ?string $postingProfileCode = null,
-    ): FinancePostingRequest
-    {
+    ): FinancePostingRequest {
         $invoice = Invoice::query()->findOrFail($invoiceId);
 
         return new FinancePostingRequest(

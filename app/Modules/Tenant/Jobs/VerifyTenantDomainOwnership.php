@@ -17,12 +17,12 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Constants\TenantDomainOwnershipVerificationOutcome;
+use Modules\Tenant\Queue\RestoreTenantJobContext;
 use Modules\Tenant\Queue\TenantAwareJobInterface;
 use Modules\Tenant\Queue\TenantJobContext;
-use Modules\Tenant\Queue\RestoreTenantJobContext;
 use Modules\Tenant\Services\Domains\TenantDomainOwnershipVerificationService;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
 use RuntimeException;
 use Throwable;
 

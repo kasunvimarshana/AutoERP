@@ -14,6 +14,7 @@ namespace Modules\VehicleRental\Tests;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -356,7 +357,7 @@ final class AgreementTest extends TestCase
         [$context, , $owner] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $owner): void {
             $agreement = app(AgreementService::class)->create(AgreementKind::Owner, $context, $owner);
-            self::assertInstanceOf(\Illuminate\Database\Eloquent\Relations\HasMany::class, $agreement->vehicleUses());
+            self::assertInstanceOf(HasMany::class, $agreement->vehicleUses());
             self::assertSame(0, $agreement->vehicleUses()->count());
         });
     }

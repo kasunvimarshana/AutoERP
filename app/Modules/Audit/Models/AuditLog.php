@@ -61,8 +61,8 @@ final class AuditLog extends CoreModel
 
     protected static function booted(): void
     {
-        static::updating(static fn (): never => throw new LogicException('Audit logs are immutable.'));
-        static::deleting(static fn (): never => throw new LogicException('Audit logs cannot be deleted.'));
+        self::updating(static fn (): never => throw new LogicException('Audit logs are immutable.'));
+        self::deleting(static fn (): never => throw new LogicException('Audit logs cannot be deleted.'));
     }
 
     protected function casts(): array

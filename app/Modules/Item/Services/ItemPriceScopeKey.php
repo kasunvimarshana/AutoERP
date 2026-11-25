@@ -17,6 +17,7 @@ use Modules\Item\Enums\ItemPriceType;
 final class ItemPriceScopeKey
 {
     private const GLOBAL_ORGANIZATION_SCOPE = 'global';
+
     private const ALL_VARIANTS_SCOPE = 'all_variants';
 
     public static function for(

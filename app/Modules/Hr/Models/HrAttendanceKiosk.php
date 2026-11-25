@@ -24,6 +24,8 @@ final class HrAttendanceKiosk extends TenantOwnedModel
 
     protected $guarded = ['id'];
 
+    protected $hidden = ['secret_key'];
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

@@ -32,7 +32,7 @@ final class PlatformOperatorModel extends Authenticatable
 
     protected static function booted(): void
     {
-        static::saving(function (self $operator): void {
+        self::saving(function (self $operator): void {
             if (! app()->bound(TenantExecutionContextInterface::class)
                 || ! app(TenantExecutionContextInterface::class)->isControlPlane()
                 || app(TenantExecutionContextInterface::class)->tenantId() !== null
@@ -57,5 +57,4 @@ final class PlatformOperatorModel extends Authenticatable
     {
         return $this->hasMany(PlatformOperatorPermissionModel::class, 'platform_operator_id');
     }
-
 }

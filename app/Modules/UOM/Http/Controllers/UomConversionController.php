@@ -88,7 +88,11 @@ final class UomConversionController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
+            $status = match ($error->code) {
+                UomErrorCode::NOT_FOUND => 404,
+                UomErrorCode::CONFLICT => 409,
+                default => 422,
+            };
 
             return response()->json(['message' => $error->message], $status);
         }
@@ -123,7 +127,11 @@ final class UomConversionController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
+            $status = match ($error->code) {
+                UomErrorCode::NOT_FOUND => 404,
+                UomErrorCode::CONFLICT => 409,
+                default => 422,
+            };
 
             return response()->json(['message' => $error->message], $status);
         }

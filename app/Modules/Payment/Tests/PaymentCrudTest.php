@@ -18,7 +18,6 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\DTOs\UpdatePaymentData;
-use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
@@ -30,7 +29,9 @@ use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentDraftDeletionService;
+use Modules\Payment\Services\PaymentMethodService;
 use Modules\Payment\Services\PaymentUpdateService;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class PaymentCrudTest extends TestCase
@@ -276,7 +277,7 @@ final class PaymentCrudTest extends TestCase
                 'is_active' => true,
             ]);
 
-            $orgId = (int) \Tests\Support\OrganizationUnitFixture::create([
+            $orgId = (int) OrganizationUnitFixture::create([
                 'tenant_id' => $tenantId,
                 'name' => 'Expense Branch',
                 'code' => 'EXPB-'.Str::upper(Str::random(4)),
@@ -308,7 +309,7 @@ final class PaymentCrudTest extends TestCase
                 'updated_at' => now(),
             ]);
 
-            $service = app(\Modules\Payment\Services\PaymentMethodService::class);
+            $service = app(PaymentMethodService::class);
 
             $this->expectException(InvalidArgumentException::class);
             $this->expectExceptionMessage('Payment methods used by expenses cannot be deleted; deactivate the method instead.');
@@ -331,7 +332,7 @@ final class PaymentCrudTest extends TestCase
                 'is_active' => true,
             ]);
 
-            $service = app(\Modules\Payment\Services\PaymentMethodService::class);
+            $service = app(PaymentMethodService::class);
             $service->delete($method);
 
             $this->assertSoftDeleted('payment_methods', ['id' => $method->id]);
@@ -374,7 +375,7 @@ final class PaymentCrudTest extends TestCase
                 'is_active' => true,
             ]);
 
-            $payment = new Payment();
+            $payment = new Payment;
             $payment->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_number' => 'PAY-DRAFT-001',
@@ -399,7 +400,7 @@ final class PaymentCrudTest extends TestCase
             ]);
             $payment->save();
 
-            $line = new PaymentLine();
+            $line = new PaymentLine;
             $line->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_id' => $payment->id,

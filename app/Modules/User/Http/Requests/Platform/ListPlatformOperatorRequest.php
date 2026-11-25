@@ -18,7 +18,10 @@ use Modules\User\Constants\PlatformOperatorStatus;
 
 final class ListPlatformOperatorRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     /** @return array<string, mixed> */
     public function rules(): array

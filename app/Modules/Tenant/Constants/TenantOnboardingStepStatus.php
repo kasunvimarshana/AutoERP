@@ -15,8 +15,11 @@ namespace Modules\Tenant\Constants;
 final class TenantOnboardingStepStatus
 {
     public const PENDING = 'pending';
+
     public const RUNNING = 'running';
+
     public const COMPLETED = 'completed';
+
     public const FAILED = 'failed';
 
     /** @return list<string> */

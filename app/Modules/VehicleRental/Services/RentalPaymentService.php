@@ -46,7 +46,6 @@ use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\Supplier\Models\Supplier;
 use Modules\User\Services\UserAccessResolver;
-use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\AgreementStatus;
@@ -409,7 +408,7 @@ final class RentalPaymentService
 
         $this->authorize($context, $kind, PaymentPermission::PAYMENTS_ALLOCATE);
 
-        return DB::transaction(function () use ($context, $agreementId, $paymentId, $allocations, $effectiveDate): Payment {
+        return DB::transaction(function () use ($context, $paymentId, $allocations, $effectiveDate): Payment {
             $payment = Payment::query()
                 ->where('tenant_id', $context->tenantId)
                 ->where('organization_unit_id', $context->organizationUnitId)

@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Payroll\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Modules\Payroll\Http\Requests\PayrollRequest;
 use Modules\Payroll\Models\PayrollStatutoryRule;
 
@@ -57,11 +58,8 @@ final class PayrollStatutoryRuleController
 
     public function update(PayrollRequest $request, int $id): JsonResponse
     {
-        $rule = PayrollStatutoryRule::query()
-            ->where('tenant_id', $request->tenantId())
-            ->findOrFail($id);
-
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'name' => ['sometimes', 'string', 'max:100'],
             'employee_rate_percentage' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'employer_rate_percentage' => ['sometimes', 'numeric', 'min:0', 'max:100'],
@@ -69,8 +67,29 @@ final class PayrollStatutoryRuleController
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        $rule->update($validated);
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+        unset($validated['expected_version']);
 
-        return response()->json(['data' => $rule->fresh()]);
+        $updated = DB::transaction(function () use ($request, $id, $expectedVersion, $validated): ?PayrollStatutoryRule {
+            $rule = PayrollStatutoryRule::query()
+                ->where('tenant_id', $request->tenantId())
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($expectedVersion !== null && (int) $rule->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            $validated['row_version'] = ((int) $rule->row_version) + 1;
+            $rule->update($validated);
+
+            return $rule->fresh();
+        });
+
+        if ($updated === null) {
+            return response()->json(['message' => 'Statutory rule was changed by someone else. Reload before saving.'], 409);
+        }
+
+        return response()->json(['data' => $updated]);
     }
 }

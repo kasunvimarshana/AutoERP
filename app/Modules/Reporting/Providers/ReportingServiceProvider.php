@@ -13,10 +13,10 @@ declare(strict_types=1);
 namespace Modules\Reporting\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Reporting\Contracts\ReportDataProvider;
 use Modules\Reporting\Services\EloquentReportDataProvider;
 use Modules\Reporting\Services\ReportingAuthorizationService;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class ReportingServiceProvider extends ServiceProvider
 {

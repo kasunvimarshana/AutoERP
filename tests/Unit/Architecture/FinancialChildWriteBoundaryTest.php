@@ -23,10 +23,10 @@ final class FinancialChildWriteBoundaryTest extends TestCase
     public function test_authoritative_financial_children_are_deny_by_default(): void
     {
         foreach ([
-            new InvoiceLine(),
-            new InvoiceBalance(),
-            new PaymentLine(),
-            new PaymentAllocation(),
+            new InvoiceLine,
+            new InvoiceBalance,
+            new PaymentLine,
+            new PaymentAllocation,
         ] as $model) {
             self::assertSame(['*'], $model->getGuarded(), $model::class);
         }

@@ -12,10 +12,10 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\UOM\Models\UomConversionModel;
 

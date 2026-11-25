@@ -233,7 +233,8 @@ final class InventoryBaseUomConversionAdapter implements InventoryBaseUomConvers
 
     /**
      * @template TModel of \Illuminate\Database\Eloquent\Model
-     * @param Builder<TModel> $query
+     *
+     * @param  Builder<TModel>  $query
      * @return Builder<TModel>
      */
     private function scope(Builder $query, Item $item): Builder

@@ -17,6 +17,7 @@ use InvalidArgumentException;
 final class AuthTokenScope
 {
     public const TENANT = 'tenant';
+
     public const PLATFORM = 'platform';
 
     public static function normalize(string $scope): string

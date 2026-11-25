@@ -41,7 +41,7 @@ final class VoucherAccessPolicy
     }
 
     /**
-     * @param array<string, array<string, mixed>> $definitions
+     * @param  array<string, array<string, mixed>>  $definitions
      * @return list<array<string, mixed>>
      */
     public function visibleTypeDefinitions(array $definitions, VoucherAccessScope $scope): array
@@ -66,7 +66,7 @@ final class VoucherAccessPolicy
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     public function constrainListFilters(array $filters, VoucherAccessScope $scope): array

@@ -15,6 +15,7 @@ namespace Modules\Auth\Services;
 use Illuminate\Database\DatabaseManager;
 use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Auth\Constants\AuthTokenKeyPrefix;
+use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Auth\Enums\AuthorizationCodeStatus;
 use Modules\Auth\Enums\ClientStatus;
 use Modules\Auth\Enums\GrantType;
@@ -26,7 +27,6 @@ use Modules\Auth\Models\AuthSessionModel;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 
 final readonly class OAuthAuthorizationService
@@ -42,7 +42,7 @@ final readonly class OAuthAuthorizationService
     ) {}
 
     /**
-     * @param list<string> $requestedScopes
+     * @param  list<string>  $requestedScopes
      * @return array{authorization_code:string,expires_at:string,state:?string}
      */
     public function authorize(
@@ -118,6 +118,7 @@ final readonly class OAuthAuthorizationService
             $code = AuthAuthorizationCodeModel::query()
                 ->where('code_key', $parsed['key'])
                 ->first(['id', 'tenant_id']);
+
             return $code instanceof AuthAuthorizationCodeModel
                 ? ['id' => (int) $code->getKey(), 'tenant_id' => (int) $code->getAttribute('tenant_id')]
                 : null;
@@ -240,6 +241,7 @@ final readonly class OAuthAuthorizationService
         if ($scopes === []) {
             throw new AuthFailure(AuthErrorCode::CLIENT_NOT_ALLOWED, 'At least one allowed OAuth scope is required.', 422);
         }
+
         return $scopes;
     }
 
@@ -263,6 +265,7 @@ final readonly class OAuthAuthorizationService
                 $result[] = trim($entry);
             }
         }
+
         return array_values(array_unique($result));
     }
 

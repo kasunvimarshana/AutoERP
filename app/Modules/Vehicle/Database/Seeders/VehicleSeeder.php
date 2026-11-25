@@ -12,10 +12,10 @@ declare(strict_types=1);
 
 namespace Modules\Vehicle\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;
@@ -31,7 +31,6 @@ final class VehicleSeeder extends Seeder
         if (! Schema::hasTable('vehicles')) {
             return;
         }
-
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);

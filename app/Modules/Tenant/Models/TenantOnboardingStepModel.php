@@ -35,7 +35,7 @@ final class TenantOnboardingStepModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::saving(static function (self $step): void {
+        self::saving(static function (self $step): void {
             TenantOnboardingStepPolicy::assertValid($step->getAttributes());
         });
     }

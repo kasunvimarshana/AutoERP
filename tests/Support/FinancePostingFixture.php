@@ -50,11 +50,9 @@ final class FinancePostingFixture
 
     private const CUSTOMER_ADVANCE_ACCOUNT = '2300';
 
-
     private const SALES_REVENUE_ACCOUNT = '4100';
 
     private const SERVICE_REVENUE_ACCOUNT = '4200';
-
 
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
 
@@ -93,7 +91,6 @@ final class FinancePostingFixture
     }
 
     private const OPERATING_EXPENSE_ACCOUNT = '5400';
-
 
     public static function seedExpensePaymentProfile(int $tenantId, ?int $organizationUnitId = null): void
     {

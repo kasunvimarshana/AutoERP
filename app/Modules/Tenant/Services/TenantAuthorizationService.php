@@ -28,6 +28,7 @@ final class TenantAuthorizationService
     {
         $userId = $this->currentUser->currentUserId();
         $tenantId = $this->currentTenant->currentTenantId();
+
         return $userId !== null && $tenantId !== null
             && $this->permissions->allows($userId, $tenantId, $permission);
     }

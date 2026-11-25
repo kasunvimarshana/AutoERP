@@ -32,8 +32,11 @@ final class PaymentCreationIdempotencyTest extends TestCase
     use RefreshDatabase;
 
     private const PAYMENT_DATE = '2026-07-16';
+
     private const IDEMPOTENCY_KEY = 'payment-create-idempotency-test';
+
     private const PAYMENT_METHOD_CODE = 'IDEMP-CASH';
+
     private const PAYMENT_METHOD_NAME = 'Idempotency Cash';
 
     public function test_payment_recalculation_preserves_six_decimal_micro_amounts(): void

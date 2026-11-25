@@ -18,8 +18,16 @@ use Modules\Core\Models\TenantOwnedModel;
 final class RolePermissionModel extends TenantOwnedModel
 {
     protected $table = 'role_permissions';
+
     protected $fillable = ['tenant_id', 'row_version', 'role_id', 'permission_id', 'created_by_user_id', 'updated_by_user_id'];
 
-    public function role(): BelongsTo { return $this->belongsTo(RoleModel::class, 'role_id'); }
-    public function permission(): BelongsTo { return $this->belongsTo(PermissionModel::class, 'permission_id'); }
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(RoleModel::class, 'role_id');
+    }
+
+    public function permission(): BelongsTo
+    {
+        return $this->belongsTo(PermissionModel::class, 'permission_id');
+    }
 }

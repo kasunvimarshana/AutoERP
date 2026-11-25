@@ -18,7 +18,10 @@ use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 
 final class CreatePlatformOperatorRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     /** @return array<string, mixed> */
     public function rules(PlatformOperatorCredentialProvisionerInterface $credentials): array

@@ -19,24 +19,24 @@ use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
 use Modules\HR\Models\HrEmployee;
 use Modules\VehicleRental\Constants\AgreementFields;
-use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
-use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementAdjustmentCategory;
 use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 use Modules\VehicleRental\Enums\AgreementAdjustmentType;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Enums\BillingCycleStatus;
+use Modules\VehicleRental\Enums\DriverIdentitySource;
 use Modules\VehicleRental\Enums\ReassignmentFinancialStatus;
 use Modules\VehicleRental\Enums\ReassignmentType;
+use Modules\VehicleRental\Enums\RunningChartAction;
+use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\AgreementAdjustment;
 use Modules\VehicleRental\Models\AgreementAdjustmentHistory;
 use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Models\BillingCycleChart;
-use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Models\VehicleRentalReassignment;
@@ -59,7 +59,7 @@ final class VehicleDriverReassignmentService
         string $reason,
         int $expectedVersion
     ): VehicleRentalReassignment {
-        $this->authorization->assertChart($context, \Modules\VehicleRental\Enums\RunningChartAction::Update, true);
+        $this->authorization->assertChart($context, RunningChartAction::Update, true);
 
         return DB::transaction(function () use ($context, $chartId, $newDriverEmployeeId, $reason, $expectedVersion): VehicleRentalReassignment {
             $chart = RunningChart::query()
@@ -100,7 +100,7 @@ final class VehicleDriverReassignmentService
 
             $prevDriverId = $chart->driver_employee_id;
 
-            $chart->driver_identity_source = \Modules\VehicleRental\Enums\DriverIdentitySource::Employee;
+            $chart->driver_identity_source = DriverIdentitySource::Employee;
             $chart->driver_employee_id = $driver->id;
             $chart->driver_name_snapshot = $driver->display_name;
             $chart->driver_reference_snapshot = $driver->employee_number ?? $driver->code;
@@ -108,7 +108,7 @@ final class VehicleDriverReassignmentService
             $chart->row_version += 1;
             $chart->save();
 
-            $reassignment = new VehicleRentalReassignment();
+            $reassignment = new VehicleRentalReassignment;
             $reassignment->tenant_id = $context->tenantId;
             $reassignment->reassignment_type = ReassignmentType::DriverReassignment;
             $reassignment->customer_agreement_id = $chart->vehicleUse?->customer_agreement_id;
@@ -243,7 +243,7 @@ final class VehicleDriverReassignmentService
                                 $financialStatus = ReassignmentFinancialStatus::Pending;
 
                                 // Create an Agreement Adjustment for unearned owner compensation
-                                $adjustment = new AgreementAdjustment();
+                                $adjustment = new AgreementAdjustment;
                                 $adjustment->tenant_id = $context->tenantId;
                                 $adjustment->organization_unit_id = $context->organizationUnitId;
                                 $adjustment->owner_agreement_id = $ownerAgreement->id;
@@ -260,7 +260,7 @@ final class VehicleDriverReassignmentService
                                 $adjustment->row_version = AgreementFields::INITIAL_VERSION;
                                 $adjustment->save();
 
-                                $history = new AgreementAdjustmentHistory();
+                                $history = new AgreementAdjustmentHistory;
                                 $history->tenant_id = $context->tenantId;
                                 $history->adjustment_id = $adjustment->id;
                                 $history->from_status = AgreementAdjustmentStatus::Draft;
@@ -275,7 +275,7 @@ final class VehicleDriverReassignmentService
             }
 
             // 5. Record Reassignment audit trail
-            $reassignment = new VehicleRentalReassignment();
+            $reassignment = new VehicleRentalReassignment;
             $reassignment->tenant_id = $context->tenantId;
             $reassignment->reassignment_type = ReassignmentType::VehicleReplacement;
             $reassignment->customer_agreement_id = $currentUse->customer_agreement_id;
@@ -338,7 +338,7 @@ final class VehicleDriverReassignmentService
                 ->forContext($context->tenantId, $context->organizationUnitId)
                 ->where('vehicle_use_id', $currentUse->id)
                 ->where('ends_at', '>=', $effective)
-                ->where('status', '!=', \Modules\VehicleRental\Enums\RunningChartStatus::Finalized->value)
+                ->where('status', '!=', RunningChartStatus::Finalized->value)
                 ->lockForUpdate()
                 ->get();
 
@@ -347,7 +347,7 @@ final class VehicleDriverReassignmentService
                 if ($prevDriverId === null && $chart->driver_employee_id !== null) {
                     $prevDriverId = $chart->driver_employee_id;
                 }
-                $chart->driver_identity_source = \Modules\VehicleRental\Enums\DriverIdentitySource::Employee;
+                $chart->driver_identity_source = DriverIdentitySource::Employee;
                 $chart->driver_employee_id = $driver->id;
                 $chart->driver_name_snapshot = $driver->display_name;
                 $chart->driver_reference_snapshot = $driver->employee_number ?? $driver->code;
@@ -356,7 +356,7 @@ final class VehicleDriverReassignmentService
                 $chart->save();
             }
 
-            $reassignment = new VehicleRentalReassignment();
+            $reassignment = new VehicleRentalReassignment;
             $reassignment->tenant_id = $context->tenantId;
             $reassignment->reassignment_type = ReassignmentType::DriverReassignment;
             $reassignment->customer_agreement_id = $currentUse->customer_agreement_id;

@@ -17,6 +17,7 @@ use Modules\Core\Models\TenantOwnedModel;
 final class AuthSessionModel extends TenantOwnedModel
 {
     protected $table = 'auth_sessions';
+
     protected $fillable = [
         'public_id', 'tenant_id', 'organization_unit_id', 'provider_id', 'identity_id',
         'user_id', 'status', 'ip_address', 'user_agent', 'device_name',

@@ -35,6 +35,7 @@ use Modules\Finance\Services\JournalPostingService;
 use Modules\Finance\Services\JournalReversalService;
 use Modules\Finance\Services\TrialBalanceService;
 use Tests\Support\CurrencyFixture;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class FinanceEngineTest extends TestCase
@@ -451,7 +452,7 @@ final class FinanceEngineTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$code,
             'code' => $code,

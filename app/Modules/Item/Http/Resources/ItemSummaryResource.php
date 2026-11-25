@@ -74,6 +74,7 @@ final class ItemSummaryResource extends JsonResource
                 fn () => $this->resource->getAttribute('reserved_stock_quantity'),
             ),
             'is_active' => (bool) $this->is_active,
+            'row_version' => (int) ($this->row_version ?? 1),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

@@ -28,6 +28,7 @@ use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\OperationalTime;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\VehicleUseAvailabilityBlocker;
+use Modules\VehicleRental\Services\VehicleUseRegisterService;
 use Modules\VehicleRental\Services\VehicleUseService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceJobType;
@@ -497,7 +498,7 @@ final class VehicleUseTest extends TestCase
             $input['notes'] = 'VIP client high priority';
             $service->plan($context, $customer->id, $customer->row_version, $input);
 
-            $register = app(\Modules\VehicleRental\Services\VehicleUseRegisterService::class);
+            $register = app(VehicleUseRegisterService::class);
             $results = $register->list($context, ['search' => 'VIP client'], 10);
             self::assertSame(1, $results->total());
 

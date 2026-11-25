@@ -17,7 +17,10 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class SyncUserOrganizationAccessRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return UserPermission::USERS_MANAGE_ORGANIZATION_ACCESS; }
+    protected function requiredPermission(): ?string
+    {
+        return UserPermission::USERS_MANAGE_ORGANIZATION_ACCESS;
+    }
 
     public function rules(): array
     {

@@ -19,6 +19,6 @@ final class CustomerCreditProfileWriteBoundaryTest extends TestCase
 {
     public function test_customer_credit_policy_is_deny_by_default(): void
     {
-        self::assertSame(['*'], (new CustomerCreditProfile())->getGuarded());
+        self::assertSame(['*'], (new CustomerCreditProfile)->getGuarded());
     }
 }

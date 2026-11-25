@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Strategies\Allocation;
 
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Inventory\DTOs\AllocationData;
 use Modules\Inventory\Enums\AllocationMethod;
 
 final class BatchAllocationStrategy extends AbstractAllocationStrategy
@@ -22,7 +23,7 @@ final class BatchAllocationStrategy extends AbstractAllocationStrategy
         return AllocationMethod::Batch;
     }
 
-    protected function balanceQuery(\Modules\Inventory\DTOs\AllocationData $data): Builder
+    protected function balanceQuery(AllocationData $data): Builder
     {
         return parent::balanceQuery($data)
             ->join('inventory_batches', 'inventory_batches.id', '=', 'inventory_stock_balances.batch_id')

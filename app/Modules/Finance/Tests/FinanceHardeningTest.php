@@ -548,5 +548,4 @@ final class FinanceHardeningTest extends TestCase
             'created_at' => now(),
             'updated_at' => now()]);
     }
-
 }

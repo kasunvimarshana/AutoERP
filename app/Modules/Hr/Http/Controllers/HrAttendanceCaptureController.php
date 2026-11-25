@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Hr\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Hr\Enums\PunchType;
 use Modules\Hr\Models\HrAttendanceKiosk;
@@ -32,7 +33,7 @@ final class HrAttendanceCaptureController
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
-            'punch_type' => ['required', 'string'],
+            'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -51,7 +52,7 @@ final class HrAttendanceCaptureController
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
-            'punch_type' => ['required', 'string'],
+            'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
             'latitude' => ['required', 'numeric'],
             'longitude' => ['required', 'numeric'],
             'accuracy_meters' => ['nullable', 'integer', 'min:0'],
@@ -82,7 +83,7 @@ final class HrAttendanceCaptureController
     {
         $validated = $request->validate([
             'card_uid' => ['required', 'string', 'max:128'],
-            'punch_type' => ['required', 'string'],
+            'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
             'device_id' => ['nullable', 'string', 'max:64'],
         ]);
 
@@ -101,7 +102,7 @@ final class HrAttendanceCaptureController
     {
         $validated = $request->validate([
             'barcode' => ['required', 'string', 'max:128'],
-            'punch_type' => ['required', 'string'],
+            'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
             'device_id' => ['nullable', 'string', 'max:64'],
         ]);
 
@@ -133,7 +134,7 @@ final class HrAttendanceCaptureController
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
             'qr_token' => ['required', 'string'],
-            'punch_type' => ['required', 'string'],
+            'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
             'latitude' => ['nullable', 'numeric'],
             'longitude' => ['nullable', 'numeric'],
             'device_uuid' => ['nullable', 'string', 'max:128'],
@@ -154,13 +155,15 @@ final class HrAttendanceCaptureController
 
     public function previewImport(TenantScopedRequest $request): JsonResponse
     {
-        $csvContent = '';
+        $validated = $request->validate([
+            'file' => ['required_without:csv_content', 'nullable', 'file', 'mimes:csv,txt', 'max:5120'],
+            'csv_content' => ['required_without:file', 'nullable', 'string', 'max:5242880'],
+        ]);
+
         if ($request->hasFile('file')) {
             $csvContent = (string) file_get_contents($request->file('file')->getRealPath());
-        } elseif ($request->has('csv_content')) {
-            $csvContent = (string) $request->input('csv_content');
         } else {
-            return response()->json(['message' => 'Please provide a file or csv_content payload.'], 422);
+            $csvContent = (string) ($validated['csv_content'] ?? '');
         }
 
         $preview = $this->importService->preview($request->tenantId(), $csvContent);

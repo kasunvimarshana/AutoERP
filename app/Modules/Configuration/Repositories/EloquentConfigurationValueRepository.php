@@ -74,8 +74,7 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
 
             $paginator->setCollection(
                 $paginator->getCollection()->map(
-                    fn (Model $model): StoredConfigurationValue =>
-                        $this->map($model, $context->scope),
+                    fn (Model $model): StoredConfigurationValue => $this->map($model, $context->scope),
                 ),
             );
 
@@ -116,7 +115,7 @@ final class EloquentConfigurationValueRepository implements ConfigurationValueRe
     ): StoredConfigurationValue {
         return $this->withinBoundary($context, function () use ($context, $attributes): StoredConfigurationValue {
             $class = $this->modelClass($context->scope);
-            $model = new $class();
+            $model = new $class;
             $model->fill([
                 ...$this->scopeAttributes($context),
                 ...$attributes,

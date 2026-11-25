@@ -30,6 +30,7 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 final class ConfigurationTransferService
 {
     public const SCHEMA_VERSION = 1;
+
     private const MAX_ENTRIES = 500;
 
     public function __construct(
@@ -158,6 +159,7 @@ final class ConfigurationTransferService
                         $entry['import_value'],
                     );
                     $created++;
+
                     continue;
                 }
                 if ($action === 'update') {
@@ -170,6 +172,7 @@ final class ConfigurationTransferService
                         $entry['import_value'],
                     );
                     $updated++;
+
                     continue;
                 }
                 $unchanged++;

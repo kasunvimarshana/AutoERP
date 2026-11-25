@@ -32,7 +32,7 @@ final class OrganizationUnitFixture
      * Tests that explicitly exercise a missing profile may pass
      * `create_legal_profile => false`.
      *
-     * @param array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     public static function create(array $attributes): int
     {

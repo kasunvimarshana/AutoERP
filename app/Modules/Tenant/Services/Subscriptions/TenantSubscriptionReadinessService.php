@@ -13,11 +13,11 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Subscriptions;
 
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Contracts\TenantLimitUsageContributorInterface;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
-use Modules\Core\Contracts\TenantLimitUsageContributorInterface;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 final class TenantSubscriptionReadinessService

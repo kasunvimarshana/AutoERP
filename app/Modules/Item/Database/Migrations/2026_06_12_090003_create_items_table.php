@@ -20,6 +20,7 @@ return new class extends Migration
     {
         Schema::create('items', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'items_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('item_category_id')->nullable();

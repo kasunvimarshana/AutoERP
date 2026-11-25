@@ -15,14 +15,23 @@ namespace Modules\OrganizationUnit\Constants;
 final class OrganizationUnitPermission
 {
     public const VIEW = 'organization-units.view';
+
     public const CREATE = 'organization-units.create';
+
     public const UPDATE = 'organization-units.update';
+
     public const ACTIVATE = 'organization-units.activate';
+
     public const DEACTIVATE = 'organization-units.deactivate';
+
     public const RETIRE = 'organization-units.retire';
+
     public const TYPES_VIEW = 'organization-unit-types.view';
+
     public const TYPES_MANAGE = 'organization-unit-types.manage';
+
     public const DOCUMENTS_VIEW = 'organization-unit-documents.view';
+
     public const DOCUMENTS_MANAGE = 'organization-unit-documents.manage';
 
     /** @return array<string, string> */

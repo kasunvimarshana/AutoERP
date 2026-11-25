@@ -12,11 +12,11 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Services\OrganizationUnits;
 
-use Modules\Core\Exceptions\DomainException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\ClockInterface;
+use Modules\Core\Exceptions\DomainException;
 use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 use Modules\OrganizationUnit\Exceptions\OrganizationUnitException;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -80,7 +80,7 @@ final class OrganizationHierarchyService
                 return $existing->refresh();
             }
 
-            $root = new OrganizationUnitModel();
+            $root = new OrganizationUnitModel;
             $root->forceFill([
                 'tenant_id' => $tenantId,
                 'type_id' => (int) $type->getKey(),
@@ -122,7 +122,7 @@ final class OrganizationHierarchyService
             $this->assertPathLength($path);
             $this->assertPathAvailable($tenantId, $path, null);
 
-            $unit = new OrganizationUnitModel();
+            $unit = new OrganizationUnitModel;
             $unit->forceFill([
                 'tenant_id' => $tenantId,
                 'type_id' => (int) $type->getKey(),
@@ -322,6 +322,7 @@ final class OrganizationHierarchyService
         }
 
         $id = $query->value('id');
+
         return is_numeric($id) ? (int) $id : null;
     }
 
@@ -463,6 +464,7 @@ final class OrganizationHierarchyService
         if ($name === '') {
             throw new DomainException('Organization-unit name is required.');
         }
+
         return $name;
     }
 
@@ -472,6 +474,7 @@ final class OrganizationHierarchyService
         if ($code === '' || preg_match('/^[A-Z0-9][A-Z0-9_-]{0,99}$/D', $code) !== 1) {
             throw new DomainException('Organization-unit code must use letters, numbers, underscores, or hyphens.');
         }
+
         return $code;
     }
 
@@ -481,6 +484,7 @@ final class OrganizationHierarchyService
         if ($slug === '') {
             throw new DomainException('Organization-unit hierarchy segment could not be derived.');
         }
+
         return $slug;
     }
 

@@ -15,8 +15,8 @@ namespace Modules\Reporting\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Modules\Reporting\Http\Requests\ReportRunRequest;
-use Modules\Reporting\Services\ReportService;
 use Modules\Reporting\Services\ReportingAuthorizationService;
+use Modules\Reporting\Services\ReportService;
 
 final class ReportController
 {

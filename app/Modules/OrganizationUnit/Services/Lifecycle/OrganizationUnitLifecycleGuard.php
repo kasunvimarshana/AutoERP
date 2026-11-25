@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Services\Lifecycle;
 
-use Modules\OrganizationUnit\Exceptions\OrganizationUnitException;
 use Modules\Core\Contracts\OrganizationUnitLifecycleBlockerInterface;
+use Modules\OrganizationUnit\Exceptions\OrganizationUnitException;
 
 final class OrganizationUnitLifecycleGuard
 {

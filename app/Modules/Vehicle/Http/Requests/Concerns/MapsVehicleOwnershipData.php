@@ -13,8 +13,8 @@ declare(strict_types=1);
 namespace Modules\Vehicle\Http\Requests\Concerns;
 
 use Modules\Vehicle\Data\VehicleOwnershipDraftData;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 
 trait MapsVehicleOwnershipData
 {

@@ -12,13 +12,13 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Onboarding;
 
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Constants\TenantOnboardingStep;
 use Modules\Tenant\Constants\TenantOnboardingStepStatus;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Models\TenantOnboardingStepModel;
-use Modules\Core\Contracts\TenantAccessProvisionerInterface;
-use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
+use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 
 final class TenantFoundationCompletionPolicy
 {

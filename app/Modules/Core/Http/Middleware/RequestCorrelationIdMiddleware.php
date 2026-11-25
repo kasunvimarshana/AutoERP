@@ -21,6 +21,7 @@ use Symfony\Component\HttpFoundation\Response;
 final class RequestCorrelationIdMiddleware
 {
     public const ATTRIBUTE = 'correlation_id';
+
     public const HEADER = 'X-Correlation-ID';
 
     public function handle(Request $request, Closure $next): Response

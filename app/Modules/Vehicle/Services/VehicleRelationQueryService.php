@@ -35,8 +35,15 @@ final class VehicleRelationQueryService
         return $vehicle->statusHistories()->orderByDesc('changed_at')->orderByDesc('id')->paginate($perPage);
     }
 
-    public function document(Vehicle $vehicle, int $id): VehicleDocument { return $this->relation($vehicle, VehicleDocument::class, $id); }
-    public function attribute(Vehicle $vehicle, int $id): VehicleAttribute { return $this->relation($vehicle, VehicleAttribute::class, $id); }
+    public function document(Vehicle $vehicle, int $id): VehicleDocument
+    {
+        return $this->relation($vehicle, VehicleDocument::class, $id);
+    }
+
+    public function attribute(Vehicle $vehicle, int $id): VehicleAttribute
+    {
+        return $this->relation($vehicle, VehicleAttribute::class, $id);
+    }
 
     private function relation(Vehicle $vehicle, string $model, int $id): Model
     {

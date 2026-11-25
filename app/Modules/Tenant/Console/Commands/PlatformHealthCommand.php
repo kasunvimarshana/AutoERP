@@ -18,9 +18,13 @@ use Modules\Tenant\Services\Platform\PlatformOperationalInfrastructureHealthServ
 final class PlatformHealthCommand extends Command
 {
     private const STATUS_READY = 'READY';
+
     private const STATUS_FAILED = 'FAILED';
+
     private const CHECK_MAIL = 'mail';
+
     private const CHECK_QUEUE = 'queue';
+
     private const CHECK_MIGRATIONS = 'migrations';
 
     protected $signature = 'platform:health';

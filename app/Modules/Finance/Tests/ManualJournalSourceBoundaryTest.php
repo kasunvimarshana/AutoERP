@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\User\Models\UserModel;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
@@ -105,7 +106,7 @@ final class ManualJournalSourceBoundaryTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Manual Journal Organization '.$suffix,
             'code' => 'ORG-MJS-'.$suffix,

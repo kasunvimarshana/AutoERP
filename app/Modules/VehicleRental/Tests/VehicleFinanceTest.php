@@ -18,6 +18,7 @@ use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\VehicleRental\Enums\VehicleFinanceAgreementStatus;
 use Modules\VehicleRental\Enums\VehicleFinanceInstallmentStatus;
+use Modules\VehicleRental\Models\VehicleFinanceAgreement;
 use Modules\VehicleRental\Services\VehicleFinanceService;
 use Tests\TestCase;
 
@@ -213,7 +214,7 @@ final class VehicleFinanceTest extends TestCase
         [$context, , $ownerData] = $this->loginFixture();
 
         // 1. Create finance agreement with empty optional fields
-        $response = $this->postJson($this->rentalRoot . '/finance-agreements', [
+        $response = $this->postJson($this->rentalRoot.'/finance-agreements', [
             'supplier_id' => $ownerData['party_id'],
             'vehicle_id' => $ownerData['vehicle_id'],
             'agreement_number' => '',
@@ -239,11 +240,11 @@ final class VehicleFinanceTest extends TestCase
         $this->assertNull($response->json('data.remarks'));
 
         // 2. Query agreements with empty query parameters
-        $this->getJson($this->rentalRoot . '/finance-agreements?search=&supplier_id=&vehicle_id=&status=&from=&until=')
+        $this->getJson($this->rentalRoot.'/finance-agreements?search=&supplier_id=&vehicle_id=&status=&from=&until=')
             ->assertOk();
 
         // 3. Refresh due statuses with empty as_at
-        $this->patchJson($this->rentalRoot . '/finance-agreements/installments/refresh-due-statuses', [
+        $this->patchJson($this->rentalRoot.'/finance-agreements/installments/refresh-due-statuses', [
             'as_at' => '',
         ])->assertOk();
     }
@@ -252,7 +253,7 @@ final class VehicleFinanceTest extends TestCase
     {
         [$context, , $ownerData] = $this->loginFixture();
 
-        $response = $this->postJson($this->rentalRoot . '/finance-agreements', [
+        $response = $this->postJson($this->rentalRoot.'/finance-agreements', [
             'supplier_id' => $ownerData['party_id'],
             'vehicle_id' => $ownerData['vehicle_id'],
             'agreement_date' => '2026-03-01',
@@ -267,12 +268,12 @@ final class VehicleFinanceTest extends TestCase
 
         $agreementId = (int) $response->json('data.id');
 
-        $this->deleteJson($this->rentalRoot . '/finance-agreements/' . $agreementId)->assertStatus(405);
+        $this->deleteJson($this->rentalRoot.'/finance-agreements/'.$agreementId)->assertStatus(405);
 
         $this->withTenantExecutionContext($context->tenantId, function () use ($agreementId): void {
             $this->expectException(\LogicException::class);
             $this->expectExceptionMessage('Vehicle finance agreements must be preserved for audit history.');
-            \Modules\VehicleRental\Models\VehicleFinanceAgreement::query()->findOrFail($agreementId)->delete();
+            VehicleFinanceAgreement::query()->findOrFail($agreementId)->delete();
         });
     }
 }

@@ -33,7 +33,7 @@ return new class extends Migration
                 ['tenant_id', 'key'],
                 'tenant_configuration_values_tenant_key_uk',
             );
-            $table->index(['tenant_id', 'updated_at'], 'tenant_configuration_values_tenant_updated_ix', );
+            $table->index(['tenant_id', 'updated_at'], 'tenant_configuration_values_tenant_updated_ix');
 
             $table->unique(['id', 'tenant_id'], 'tenant_configuration_values_id_tenant_uk');
         });

@@ -26,7 +26,7 @@ final class TenantRoutingReadinessPolicyTest extends TestCase
 
         $result = (new TenantRoutingReadinessPolicy(
             $this->app,
-            new TenantDomainReadinessPolicy(),
+            new TenantDomainReadinessPolicy,
         ))->inspect('autoerp', null);
 
         self::assertTrue($result['ready']);
@@ -47,7 +47,7 @@ final class TenantRoutingReadinessPolicyTest extends TestCase
 
         $result = (new TenantRoutingReadinessPolicy(
             $this->app,
-            new TenantDomainReadinessPolicy(),
+            new TenantDomainReadinessPolicy,
         ))->inspect('AUTOERP', null);
 
         self::assertFalse($result['ready']);
@@ -68,7 +68,7 @@ final class TenantRoutingReadinessPolicyTest extends TestCase
 
         $result = (new TenantRoutingReadinessPolicy(
             $this->app,
-            new TenantDomainReadinessPolicy(),
+            new TenantDomainReadinessPolicy,
         ))->inspect('AUTOERP', null);
 
         self::assertFalse($result['ready']);

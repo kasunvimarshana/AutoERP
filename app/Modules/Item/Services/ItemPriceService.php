@@ -27,6 +27,7 @@ use Modules\Item\Validators\ItemValidationService;
 final class ItemPriceService
 {
     private const OPEN_ENDED_EFFECTIVE_DATE = '9999-12-31';
+
     private const MAX_CORRECTION_REASON_LENGTH = 1000;
 
     public function __construct(

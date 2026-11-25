@@ -240,7 +240,6 @@ final class ConfigurationDefinitionRegistry implements ConfigurationDefinitionRe
         );
     }
 
-
     private function decimalBoundary(mixed $value, string $key, string $name): ?string
     {
         if ($value === null || $value === '') {

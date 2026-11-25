@@ -28,8 +28,7 @@ final class PurchaseReturnValuationService
         GoodsReceiptNoteLine $sourceLine,
         string $returnedQuantity,
         ?int $currentReturnId = null,
-    ): PurchaseReturnLineValuationData
-    {
+    ): PurchaseReturnLineValuationData {
         return $this->calculateFromReceiptLine(
             $sourceLine,
             $returnedQuantity,
@@ -47,8 +46,7 @@ final class PurchaseReturnValuationService
         string $returnedQuantity,
         int $currentReturnId,
         array $postedLineSums,
-    ): PurchaseReturnLineValuationData
-    {
+    ): PurchaseReturnLineValuationData {
         return $this->calculateFromReceiptLine(
             $sourceLine,
             $returnedQuantity,
@@ -62,8 +60,7 @@ final class PurchaseReturnValuationService
         GoodsReceiptNoteLine $sourceLine,
         string $returnedQuantity,
         ?int $currentReturnId = null,
-    ): PurchaseReturnLineValuationData
-    {
+    ): PurchaseReturnLineValuationData {
         return $this->previewFromReceiptLine($sourceLine, $returnedQuantity, $currentReturnId);
     }
 
@@ -76,8 +73,7 @@ final class PurchaseReturnValuationService
         ?int $currentReturnId,
         ?array $postedLineSums,
         bool $allowReadQueries,
-    ): PurchaseReturnLineValuationData
-    {
+    ): PurchaseReturnLineValuationData {
         $sourceQuantity = $this->math->normalize((string) $sourceLine->accepted_quantity);
         $returnedQuantity = $this->math->normalize($returnedQuantity);
         $previouslyReturned = $this->math->normalize((string) $sourceLine->returned_quantity);

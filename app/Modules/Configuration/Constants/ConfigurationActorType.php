@@ -15,7 +15,9 @@ namespace Modules\Configuration\Constants;
 final class ConfigurationActorType
 {
     public const SYSTEM = 'system';
+
     public const PLATFORM_OPERATOR = 'platform_operator';
+
     public const TENANT_USER = 'tenant_user';
 
     /** @return list<string> */

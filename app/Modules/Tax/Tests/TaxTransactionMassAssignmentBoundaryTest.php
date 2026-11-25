@@ -19,7 +19,7 @@ final class TaxTransactionMassAssignmentBoundaryTest extends TestCase
 {
     public function test_tax_transaction_is_totally_guarded_and_owner_service_writes_explicitly(): void
     {
-        $transaction = new TaxTransaction();
+        $transaction = new TaxTransaction;
         $service = file_get_contents(dirname(__DIR__).'/Services/TaxSnapshotService.php');
 
         self::assertSame(['*'], $transaction->getGuarded());

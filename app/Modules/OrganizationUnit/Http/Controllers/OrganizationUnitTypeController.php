@@ -34,6 +34,7 @@ final class OrganizationUnitTypeController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::TYPES_VIEW);
         $result = $this->types->list();
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : response()->json(['data' => OrganizationUnitTypeResource::collection($result->valueOrFail())->resolve($request)]);
@@ -43,6 +44,7 @@ final class OrganizationUnitTypeController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::TYPES_VIEW);
         $result = $this->types->get($organizationUnitType);
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitTypeResource($result->valueOrFail());
@@ -52,6 +54,7 @@ final class OrganizationUnitTypeController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::TYPES_MANAGE);
         $result = $this->types->create($request->validated());
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : (new OrganizationUnitTypeResource($result->valueOrFail()))->response()->setStatusCode(201);
@@ -61,6 +64,7 @@ final class OrganizationUnitTypeController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::TYPES_MANAGE);
         $result = $this->types->update($organizationUnitType, $request->validated());
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitTypeResource($result->valueOrFail());
@@ -70,6 +74,7 @@ final class OrganizationUnitTypeController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::TYPES_MANAGE);
         $result = $this->types->delete($organizationUnitType, (int) $request->validated('expected_version'));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : response()->json(null, 204);

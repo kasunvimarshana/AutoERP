@@ -15,9 +15,13 @@ namespace Modules\Tenant\Constants;
 final class TenantStatus
 {
     public const DRAFT = 'draft';
+
     public const ACTIVE = 'active';
+
     public const INACTIVE = 'inactive';
+
     public const SUSPENDED = 'suspended';
+
     public const ARCHIVED = 'archived';
 
     /** @return list<string> */

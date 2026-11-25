@@ -34,14 +34,14 @@ final class AuditEventValidatorTest extends TestCase
             producerKey: 'purchase:order:42:posted',
         );
 
-        (new AuditEventValidator())->validate($event);
+        (new AuditEventValidator)->validate($event);
 
         self::assertTrue(true);
     }
 
     public function test_it_accepts_every_canonical_event_category(): void
     {
-        $validator = new AuditEventValidator();
+        $validator = new AuditEventValidator;
 
         foreach (AuditEventCategory::values() as $category) {
             $validator->validate(new AuditEventData(
@@ -64,7 +64,7 @@ final class AuditEventValidatorTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Unsupported audit event category');
 
-        (new AuditEventValidator())->validate($event);
+        (new AuditEventValidator)->validate($event);
     }
 
     public function test_platform_actor_snapshots_accept_a_pre_authentication_user(): void
@@ -76,7 +76,7 @@ final class AuditEventValidatorTest extends TestCase
             actorGuard: 'platform-invitation',
         );
 
-        (new AuditEventValidator())->validatePlatformActor($actor);
+        (new AuditEventValidator)->validatePlatformActor($actor);
 
         self::assertTrue(true);
     }
@@ -94,7 +94,7 @@ final class AuditEventValidatorTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('non-user actor type');
 
-        (new AuditEventValidator())->validateSystem($event);
+        (new AuditEventValidator)->validateSystem($event);
     }
 
     public function test_source_type_and_identifier_must_be_supplied_together(): void
@@ -111,7 +111,7 @@ final class AuditEventValidatorTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('source type and source identifier');
 
-        (new AuditEventValidator())->validate($event);
+        (new AuditEventValidator)->validate($event);
     }
 
     public function test_system_events_require_a_positive_tenant_scope(): void
@@ -127,7 +127,6 @@ final class AuditEventValidatorTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Tenant identifier must be positive');
 
-        (new AuditEventValidator())->validateSystem($event);
+        (new AuditEventValidator)->validateSystem($event);
     }
-
 }

@@ -17,6 +17,7 @@ use Modules\Core\Models\CoreModel;
 final class AuthPlatformLoginAttemptModel extends CoreModel
 {
     protected $table = 'auth_platform_login_attempts';
+
     protected $fillable = [
         'platform_operator_id', 'login_identifier_hash', 'was_successful',
         'failure_code', 'ip_address', 'user_agent', 'attempted_at',

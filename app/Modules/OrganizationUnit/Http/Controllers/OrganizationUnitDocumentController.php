@@ -45,6 +45,7 @@ final class OrganizationUnitDocumentController extends Controller
         }
         $page = $result->valueOrFail();
         abort_unless($page instanceof PagedResult, 500);
+
         return response()->json([
             'data' => OrganizationUnitDocumentResource::collection($page->items)->resolve($request),
             'meta' => $page->paginationMeta(),
@@ -55,6 +56,7 @@ final class OrganizationUnitDocumentController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::DOCUMENTS_VIEW);
         $result = $this->documents->get($organizationUnit, $document);
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitDocumentResource($result->valueOrFail());
@@ -64,6 +66,7 @@ final class OrganizationUnitDocumentController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::DOCUMENTS_MANAGE);
         $result = $this->documents->create($organizationUnit, $this->payload($request));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : (new OrganizationUnitDocumentResource($result->valueOrFail()))->response()->setStatusCode(201);
@@ -73,6 +76,7 @@ final class OrganizationUnitDocumentController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::DOCUMENTS_MANAGE);
         $result = $this->documents->update($organizationUnit, $document, $this->payload($request));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitDocumentResource($result->valueOrFail());
@@ -82,6 +86,7 @@ final class OrganizationUnitDocumentController extends Controller
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), OrganizationUnitPermission::DOCUMENTS_MANAGE);
         $result = $this->documents->delete($organizationUnit, $document, (int) $request->validated('expected_version'));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : response()->json(null, 204);
@@ -98,9 +103,14 @@ final class OrganizationUnitDocumentController extends Controller
         $record = $download['record'] ?? null;
         $stream = $download['stream'] ?? null;
         abort_unless($record instanceof DataRecord && is_resource($stream), 500);
+
         return response()->streamDownload(
             static function () use ($stream): void {
-                try { fpassthru($stream); } finally { fclose($stream); }
+                try {
+                    fpassthru($stream);
+                } finally {
+                    fclose($stream);
+                }
             },
             (string) $record->require('original_filename'),
             [
@@ -122,6 +132,7 @@ final class OrganizationUnitDocumentController extends Controller
             $payload['file_tmp_path'] = $temporaryPath;
             $payload['file_original_name'] = $file->getClientOriginalName();
         }
+
         return $payload;
     }
 }

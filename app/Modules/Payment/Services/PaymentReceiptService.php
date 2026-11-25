@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Models\Payment;
@@ -45,7 +47,7 @@ final class PaymentReceiptService
         if ($payment->allocations->isNotEmpty()) {
             $invoiceIds = $payment->allocations->pluck('invoice_id')->filter()->all();
             if (! empty($invoiceIds)) {
-                $invoiceSources = \Illuminate\Support\Facades\DB::table('invoice_sources')
+                $invoiceSources = DB::table('invoice_sources')
                     ->where('tenant_id', $payment->tenant_id)
                     ->whereIn('invoice_id', $invoiceIds)
                     ->whereNotNull('source_document_number')
@@ -91,7 +93,7 @@ final class PaymentReceiptService
         if ($missingSnapshots->isNotEmpty()) {
             $missingIds = $missingSnapshots->pluck('invoice_id')->filter()->all();
             if (! empty($missingIds)) {
-                $legacyInvoices = \Illuminate\Support\Facades\DB::table('invoices')
+                $legacyInvoices = DB::table('invoices')
                     ->where('tenant_id', $payment->tenant_id)
                     ->whereIn('id', $missingIds)
                     ->get(['id', 'invoice_number', 'invoice_date'])
@@ -106,7 +108,7 @@ final class PaymentReceiptService
                 ? $alloc->invoice_number_snapshot
                 : ($legacy?->invoice_number ?? "INV-#{$alloc->invoice_id}");
             $invDate = $alloc->invoice_date_snapshot?->toDateString()
-                ?? ($legacy?->invoice_date ? \Carbon\Carbon::parse($legacy->invoice_date)->toDateString() : '—');
+                ?? ($legacy?->invoice_date ? Carbon::parse($legacy->invoice_date)->toDateString() : '—');
 
             $allocMeta = is_array($alloc->metadata) ? $alloc->metadata : [];
             $allocAgrRef = $allocMeta['agreement_reference'] ?? ($invoiceSources[$alloc->invoice_id] ?? null);
@@ -140,11 +142,11 @@ final class PaymentReceiptService
             $agreementRefs = array_values(array_unique(array_filter($invoiceSources)));
         }
         if (empty($agreementRefs) && ! empty($payment->source_id)) {
-            $ref = \Illuminate\Support\Facades\DB::table('customer_agreements')
+            $ref = DB::table('customer_agreements')
                 ->where('tenant_id', $payment->tenant_id)
                 ->where('id', $payment->source_id)
                 ->value('reference')
-                ?? \Illuminate\Support\Facades\DB::table('owner_agreements')
+                ?? DB::table('owner_agreements')
                     ->where('tenant_id', $payment->tenant_id)
                     ->where('id', $payment->source_id)
                     ->value('reference');
@@ -171,7 +173,7 @@ final class PaymentReceiptService
         if (! $partyName && $payment->party_id && $payment->party_type) {
             $table = $payment->party_type === 'customer' ? 'customers' : ($payment->party_type === 'supplier' ? 'suppliers' : null);
             if ($table) {
-                $p = \Illuminate\Support\Facades\DB::table($table)->where('id', $payment->party_id)->first();
+                $p = DB::table($table)->where('id', $payment->party_id)->first();
                 if ($p) {
                     $partyName = $p->name ?? null;
                     $partyCode = $p->customer_number ?? $p->supplier_number ?? $p->code ?? '';

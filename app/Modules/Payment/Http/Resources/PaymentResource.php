@@ -15,13 +15,14 @@ namespace Modules\Payment\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Payment\Services\PaymentCapabilityService;
+use Modules\Payment\Services\PaymentSettlementService;
 
 final class PaymentResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
         $capabilities = app(PaymentCapabilityService::class);
-        $settlements = app(\Modules\Payment\Services\PaymentSettlementService::class);
+        $settlements = app(PaymentSettlementService::class);
 
         return [
             'id' => (int) $this->getKey(),

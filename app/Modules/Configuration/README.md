@@ -10,6 +10,12 @@ Runtime overrides are stored in one table per explicit scope:
 - `tenant_configuration_values`
 - `organization_unit_configuration_values`
 
+Immutable configuration change history is recorded in companion revision tables:
+
+- `global_configuration_value_revisions`
+- `tenant_configuration_value_revisions`
+- `organization_unit_configuration_value_revisions`
+
 Resolution order is organization unit, tenant, global, then the owner-defined default. Consumers depend on `ConfigurationResolverInterface`; they must not query configuration tables directly.
 
 Resolution uses request-scoped memoization only. Cross-request cache state is intentionally avoided so a committed configuration change cannot be hidden by stale cache data.

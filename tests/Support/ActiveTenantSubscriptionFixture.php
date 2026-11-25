@@ -23,7 +23,7 @@ final class ActiveTenantSubscriptionFixture
     /**
      * Create the minimal active commercial contract required by tenant runtime tests.
      *
-     * @param list<string>|null $enabledModules
+     * @param  list<string>|null  $enabledModules
      */
     public static function create(int $tenantId, ?array $enabledModules = null): int
     {

@@ -9,7 +9,6 @@ declare(strict_types=1);
  *
  * Phone: +94713525253
  */
-
 const AUTOERP_SUPPORTED_MYSQL_TEST_CONNECTIONS = ['mysql', 'mariadb'];
 const AUTOERP_TEST_DATABASE_SUFFIX = '_test';
 

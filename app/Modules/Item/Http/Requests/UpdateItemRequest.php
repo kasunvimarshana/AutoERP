@@ -36,6 +36,7 @@ final class UpdateItemRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => [Rule::prohibitedIf($this->clientProvidedOrganizationUnitId), 'nullable', 'integer', 'min:1'],
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'code' => ['sometimes', 'string', 'max:80'],
             'name' => ['sometimes', 'string', 'max:255'],
             'item_type' => ['sometimes', Rule::enum(ItemType::class)],

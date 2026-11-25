@@ -25,9 +25,13 @@ use Throwable;
 final class TenantEventOutboxService
 {
     private const EVENT_STATUS_CHANGED = 'tenant.status_changed';
+
     private const STATUS_PENDING = 'pending';
+
     private const STATUS_PROCESSING = 'processing';
+
     private const STATUS_PUBLISHED = 'published';
+
     private const STATUS_DEAD = 'dead';
 
     public function __construct(
@@ -162,7 +166,7 @@ final class TenantEventOutboxService
                         'claimed_at' => null,
                         'claim_lease_expires_at' => null,
                         'last_error_code' => null,
-                    'last_error_message' => null,
+                        'last_error_message' => null,
                         'updated_at' => $this->clock->now(),
                     ]);
                 if ($updated === 1) {

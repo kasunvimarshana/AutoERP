@@ -14,8 +14,8 @@ namespace Modules\Purchase\Http\Controllers;
 
 use Modules\Purchase\Http\Requests\FastPurchaseRequest;
 use Modules\Purchase\Http\Resources\FastPurchaseResource;
-use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\FastPurchaseService;
+use Modules\Purchase\Services\PurchaseAuthorizationService;
 
 final class FastPurchaseController
 {

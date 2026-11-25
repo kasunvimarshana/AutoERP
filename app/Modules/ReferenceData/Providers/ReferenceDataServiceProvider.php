@@ -13,12 +13,12 @@ declare(strict_types=1);
 namespace Modules\ReferenceData\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
-use Modules\ReferenceData\Services\ReferenceValueLookup;
-use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
-use Modules\ReferenceData\Services\EloquentCurrencyDirectory;
-use Modules\ReferenceData\Constants\ReferenceDataPermission;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\ReferenceData\Constants\ReferenceDataPermission;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
+use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
+use Modules\ReferenceData\Services\EloquentCurrencyDirectory;
+use Modules\ReferenceData\Services\ReferenceValueLookup;
 
 final class ReferenceDataServiceProvider extends ServiceProvider
 {

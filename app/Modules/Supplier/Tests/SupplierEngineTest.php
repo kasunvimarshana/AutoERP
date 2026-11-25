@@ -49,6 +49,7 @@ use Modules\Supplier\Services\SupplierLookupService;
 use Modules\Supplier\Services\SupplierStatusService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\Support\CurrencyFixture;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class SupplierEngineTest extends TestCase
@@ -301,7 +302,7 @@ final class SupplierEngineTest extends TestCase
     public function test_same_tenant_cross_organization_category_assignment_is_rejected(): void
     {
         [$tenantId, $organizationUnitId] = $this->scopeContext();
-        $otherOrganizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        $otherOrganizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Other Organization',
             'code' => 'ORG-OTHER-'.Str::upper(Str::random(4)),
@@ -416,7 +417,7 @@ final class SupplierEngineTest extends TestCase
             'base_currency_id' => $currencyId,
             'created_at' => now(),
             'updated_at' => now()]);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,

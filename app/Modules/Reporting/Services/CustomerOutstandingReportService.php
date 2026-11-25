@@ -15,11 +15,10 @@ namespace Modules\Reporting\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Reporting\Enums\ReceivableAgingBucket;
 use Modules\Reporting\Http\Requests\CustomerOutstandingReportRequest;
-use Modules\VehicleService\Enums\VehicleServiceInvoiceSettlementMode;
-use Modules\Core\Services\DecimalMath;
 
 final class CustomerOutstandingReportService
 {

@@ -16,23 +16,23 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
-use Modules\Tenant\Http\Requests\ListTenantPlanRequest;
 use Modules\Tenant\Http\Requests\ListTenantPlanAssignmentRequest;
+use Modules\Tenant\Http\Requests\ListTenantPlanRequest;
 use Modules\Tenant\Http\Requests\TenantVersionRequest;
 use Modules\Tenant\Http\Requests\UpsertTenantPlanRequest;
 use Modules\Tenant\Http\Resources\TenantPlanResource;
-use Modules\Tenant\Http\Resources\TenantResource;
 use Modules\Tenant\Http\Resources\TenantPlanRevisionResource;
+use Modules\Tenant\Http\Resources\TenantResource;
 use Modules\Tenant\Http\Support\TenantApiResponder;
 use Modules\Tenant\Services\Plans\ActivateTenantPlanService;
 use Modules\Tenant\Services\Plans\CreateTenantPlanService;
 use Modules\Tenant\Services\Plans\DeactivateTenantPlanService;
 use Modules\Tenant\Services\Plans\GetTenantPlanService;
-use Modules\Tenant\Services\Plans\ListTenantPlansService;
 use Modules\Tenant\Services\Plans\ListTenantPlanAssignmentsService;
 use Modules\Tenant\Services\Plans\ListTenantPlanRevisionsService;
-use Modules\Tenant\Services\Plans\UpdateTenantPlanService;
+use Modules\Tenant\Services\Plans\ListTenantPlansService;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
+use Modules\Tenant\Services\Plans\UpdateTenantPlanService;
 
 final class TenantPlanController extends Controller
 {

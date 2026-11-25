@@ -16,9 +16,9 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\VehicleUse;
 
@@ -51,9 +51,9 @@ final class VehicleUseRegisterService
             ->with(OperationalFields::USE_RELATIONS)
             ->when($filters['use_status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['kind'] ?? null, function ($q, $kind) {
-                if ($kind === \Modules\VehicleRental\Enums\AgreementKind::Owner->value) {
+                if ($kind === AgreementKind::Owner->value) {
                     $q->whereNotNull('owner_agreement_id');
-                } elseif ($kind === \Modules\VehicleRental\Enums\AgreementKind::Customer->value) {
+                } elseif ($kind === AgreementKind::Customer->value) {
                     $q->whereNotNull('customer_agreement_id');
                 } elseif ($kind === 'internal') {
                     $q->whereNull('customer_agreement_id');

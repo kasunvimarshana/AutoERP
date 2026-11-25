@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Invoice\Models\Invoice;
 use Modules\VehicleRental\Constants\AgreementFields;
-use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementAdjustmentCategory;
 use Modules\VehicleRental\Enums\AgreementAdjustmentStatus;
 use Modules\VehicleRental\Enums\AgreementAdjustmentType;
@@ -115,7 +114,7 @@ final class AgreementAdjustmentController
         }
 
         $adjustment = DB::transaction(function () use ($context, $data, $customerAgId, $ownerAgId): AgreementAdjustment {
-            $adjustment = new AgreementAdjustment();
+            $adjustment = new AgreementAdjustment;
             $adjustment->tenant_id = $context->tenantId;
             $adjustment->organization_unit_id = $context->organizationUnitId;
             $adjustment->customer_agreement_id = $customerAgId;
@@ -134,7 +133,7 @@ final class AgreementAdjustmentController
             $adjustment->row_version = AgreementFields::INITIAL_VERSION;
             $adjustment->save();
 
-            $history = new AgreementAdjustmentHistory();
+            $history = new AgreementAdjustmentHistory;
             $history->tenant_id = $context->tenantId;
             $history->adjustment_id = $adjustment->id;
             $history->from_status = AgreementAdjustmentStatus::Draft;
@@ -197,7 +196,7 @@ final class AgreementAdjustmentController
             $record->row_version += 1;
             $record->save();
 
-            $history = new AgreementAdjustmentHistory();
+            $history = new AgreementAdjustmentHistory;
             $history->tenant_id = $context->tenantId;
             $history->adjustment_id = $record->id;
             $history->from_status = $fromStatus;

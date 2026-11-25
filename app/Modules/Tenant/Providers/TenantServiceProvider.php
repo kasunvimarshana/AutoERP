@@ -15,13 +15,16 @@ namespace Modules\Tenant\Providers;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
 use Modules\Core\Contracts\TenantDirectoryInterface;
 use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TenantPrivateFileServiceInterface;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 use Modules\Tenant\Console\Commands\PlatformHealthCommand;
 use Modules\Tenant\Console\Commands\TenantActivateCommand;
 use Modules\Tenant\Console\Commands\TenantCreateCommand;
@@ -43,40 +46,41 @@ use Modules\Tenant\Models\TenantDomainModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Tenant\Models\TenantPlanModel;
 use Modules\Tenant\Models\TenantPlanRevisionModel;
+use Modules\Tenant\Models\TenantPrimaryDomainModel;
 use Modules\Tenant\Models\TenantSubscriptionEventModel;
 use Modules\Tenant\Models\TenantSubscriptionModel;
-use Modules\Tenant\Models\TenantPrimaryDomainModel;
 use Modules\Tenant\Repositories\EloquentTenantDocumentRepository;
 use Modules\Tenant\Repositories\EloquentTenantDomainRepository;
 use Modules\Tenant\Repositories\EloquentTenantPlanRepository;
 use Modules\Tenant\Repositories\EloquentTenantPlanRevisionRepository;
-use Modules\Tenant\Repositories\EloquentTenantSubscriptionRepository;
 use Modules\Tenant\Repositories\EloquentTenantRepository;
+use Modules\Tenant\Repositories\EloquentTenantSubscriptionRepository;
 use Modules\Tenant\Repositories\TenantDocumentRepositoryInterface;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantPlanRepositoryInterface;
 use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
-use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
+use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
+use Modules\Tenant\Services\Authentication\TenantAuthenticationDirectory;
+use Modules\Tenant\Services\Concurrency\TenantAggregateLock;
 use Modules\Tenant\Services\Contracts\TenantBrandingAssetReaderInterface;
+use Modules\Tenant\Services\Contracts\TenantConfigurationTargetReaderInterface;
 use Modules\Tenant\Services\Contracts\TenantDomainOwnershipVerifierInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
-use Modules\Tenant\Services\Concurrency\TenantAggregateLock;
-use Modules\Tenant\Services\Authentication\TenantAuthenticationDirectory;
-use Modules\Tenant\Services\Contracts\TenantConfigurationTargetReaderInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
 use Modules\Tenant\Services\Directory\TenantConfigurationTargetReader;
 use Modules\Tenant\Services\Directory\TenantDirectory;
 use Modules\Tenant\Services\Domains\DnsTenantDomainOwnershipVerifier;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
+use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use Modules\Tenant\Services\Rules\TenantValueNormalizer;
 use Modules\Tenant\Services\Storage\TenantBrandingAssetReader;
 use Modules\Tenant\Services\Storage\TenantPrivateFileService;
 use Modules\Tenant\Services\Subscriptions\TenantStorageLimitUsageContributor;
-use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
+use Modules\Tenant\Services\TenantEntitlementService;
 
 final class TenantServiceProvider extends ServiceProvider
 {
@@ -95,48 +99,48 @@ final class TenantServiceProvider extends ServiceProvider
         $this->app->scoped(TenantAggregateLockInterface::class, TenantAggregateLock::class);
         $this->app->scoped(TenantAuthenticationDirectoryInterface::class, TenantAuthenticationDirectory::class);
         $this->app->scoped(TenantDirectoryInterface::class, TenantDirectory::class);
-        $this->app->scoped(TenantEntitlementReaderInterface::class, \Modules\Tenant\Services\TenantEntitlementService::class);
+        $this->app->scoped(TenantEntitlementReaderInterface::class, TenantEntitlementService::class);
         $this->app->singleton(TenantPrivateFileServiceInterface::class, TenantPrivateFileService::class);
         $this->app->singleton(TenantRepositoryInterface::class, fn ($app): TenantRepositoryInterface => new EloquentTenantRepository(
             new TenantModel,
-            $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(ClockInterface::class),
             $app->make(TenantSubscriptionPresenter::class),
-            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
+            $app->make(CurrencyDirectoryInterface::class),
         ));
         $this->app->singleton(TenantPlanRepositoryInterface::class, fn ($app): TenantPlanRepositoryInterface => new EloquentTenantPlanRepository(
             new TenantPlanModel,
-            $app->make(\Modules\Core\Contracts\ClockInterface::class),
-            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
+            $app->make(ClockInterface::class),
+            $app->make(CurrencyDirectoryInterface::class),
         ));
         $this->app->singleton(TenantPlanRevisionRepositoryInterface::class, fn ($app): TenantPlanRevisionRepositoryInterface => new EloquentTenantPlanRevisionRepository(
             new TenantPlanModel,
             new TenantPlanRevisionModel,
-            $app->make(\Modules\Core\Contracts\ClockInterface::class),
-            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
+            $app->make(ClockInterface::class),
+            $app->make(CurrencyDirectoryInterface::class),
         ));
         $this->app->scoped(TenantSubscriptionRepositoryInterface::class, fn ($app): TenantSubscriptionRepositoryInterface => new EloquentTenantSubscriptionRepository(
             new TenantSubscriptionModel,
             new TenantCurrentSubscriptionModel,
             new TenantSubscriptionEventModel,
-            $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(ClockInterface::class),
             $app->make(TenantSubscriptionPresenter::class),
-            $app->make(\Modules\ReferenceData\Contracts\CurrencyDirectoryInterface::class),
+            $app->make(CurrencyDirectoryInterface::class),
         ));
         $this->app->tag([TenantStorageLimitUsageContributor::class], 'tenant.limit_usage');
         $this->app->scoped(TenantSubscriptionReadinessService::class, fn ($app): TenantSubscriptionReadinessService => new TenantSubscriptionReadinessService(
             $app->make(TenantRepositoryInterface::class),
             $app->make(TenantPlanRevisionRepositoryInterface::class),
             $app->make(TenantSubscriptionRepositoryInterface::class),
-            $app->make(\Modules\Tenant\Services\Plans\TenantPlanSchema::class),
+            $app->make(TenantPlanSchema::class),
             $app->make(TenantExecutionContextInterface::class),
             $app->tagged('tenant.limit_usage'),
         ));
-        $this->app->singleton(TenantDocumentRepositoryInterface::class, fn ($app): TenantDocumentRepositoryInterface => new EloquentTenantDocumentRepository(new TenantDocumentModel, $app->make(\Modules\Core\Contracts\ClockInterface::class)));
+        $this->app->singleton(TenantDocumentRepositoryInterface::class, fn ($app): TenantDocumentRepositoryInterface => new EloquentTenantDocumentRepository(new TenantDocumentModel, $app->make(ClockInterface::class)));
         $this->app->scoped(TenantDomainRepositoryInterface::class, fn ($app): TenantDomainRepositoryInterface => new EloquentTenantDomainRepository(
             new TenantDomainModel,
             new TenantPrimaryDomainModel,
             $app->make(TenantExecutionContextInterface::class),
-            $app->make(\Modules\Core\Contracts\ClockInterface::class),
+            $app->make(ClockInterface::class),
             $app->make(TenantDomainReadinessPolicy::class),
         ));
     }

@@ -42,7 +42,7 @@ final class VehicleServiceDocumentController extends VehicleServiceController
         int $job,
     ): AnonymousResourceCollection {
         return VehicleServiceDocumentResource::collection(
-            $this->job($request, $job)->documents()->latest()->get(),
+            $this->job($request, $job)->documents()->latest()->paginate($request->perPage()),
         );
     }
 

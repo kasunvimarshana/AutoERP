@@ -34,15 +34,50 @@ final readonly class CurrentTenantContext
         }
     }
 
-    public function tenant(): DataRecord { return $this->tenant; }
-    public function tenantId(): int { return $this->tenantId; }
-    public function tenantCode(): string { return $this->tenantCode; }
-    public function tenantUuid(): string { return $this->tenantUuid; }
-    public function domain(): ?string { return $this->domain; }
-    public function status(): string { return $this->status; }
-    public function isActive(): bool { return $this->status === 'active'; }
-    public function applicationId(): ?string { return $this->applicationId; }
-    public function source(): string { return $this->source; }
+    public function tenant(): DataRecord
+    {
+        return $this->tenant;
+    }
+
+    public function tenantId(): int
+    {
+        return $this->tenantId;
+    }
+
+    public function tenantCode(): string
+    {
+        return $this->tenantCode;
+    }
+
+    public function tenantUuid(): string
+    {
+        return $this->tenantUuid;
+    }
+
+    public function domain(): ?string
+    {
+        return $this->domain;
+    }
+
+    public function status(): string
+    {
+        return $this->status;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    public function applicationId(): ?string
+    {
+        return $this->applicationId;
+    }
+
+    public function source(): string
+    {
+        return $this->source;
+    }
 
     /** @return array<string, mixed> */
     public function toArray(): array

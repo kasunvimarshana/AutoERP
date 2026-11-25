@@ -80,7 +80,9 @@ final class VehicleDocumentService
     public function replace(Vehicle $vehicle, array $documents, ?callable $onFileStored = null): void
     {
         $vehicle->documents()->delete();
-        foreach ($documents as $document) { $this->create($vehicle, $document, $onFileStored); }
+        foreach ($documents as $document) {
+            $this->create($vehicle, $document, $onFileStored);
+        }
     }
 
     public function expiring(int $tenantId, ?int $organizationUnitId, int $days = 30)
@@ -170,8 +172,7 @@ final class VehicleDocumentService
         bool $includeScope = true,
         ?string $filePath = null,
         bool $includeFilePath = true,
-    ): array
-    {
+    ): array {
         return [
             ...($includeScope ? ['tenant_id' => $vehicle->tenant_id, 'organization_unit_id' => $vehicle->organization_unit_id] : []),
             'document_type' => $data->documentType,

@@ -20,7 +20,7 @@ interface JobPromotionHandlerInterface
     public const REDEEM_PERMISSION = 'promotion.redeem';
 
     /**
-     * @param array<string, mixed> $input
+     * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     public function choose(
@@ -38,7 +38,7 @@ interface JobPromotionHandlerInterface
     public function clearLineChoice(int $tenantId, int $lineId): void;
 
     /**
-     * @param array<int, string> $lineQuantities
+     * @param  array<int, string>  $lineQuantities
      */
     public function assertInvoiceChoices(VehicleServiceJob $job, array $lineQuantities): void;
 

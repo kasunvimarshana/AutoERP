@@ -30,6 +30,7 @@ final class ItemCategoryResource extends JsonResource
             'parent' => $this->whenLoaded('parent', fn () => $this->namedResource($this->parent)),
             'is_active' => (bool) $this->is_active,
             'sort_order' => (int) $this->sort_order,
+            'row_version' => (int) ($this->row_version ?? 1),
         ];
     }
 }

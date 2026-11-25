@@ -24,7 +24,7 @@ final class TenantInfrastructureCapabilityServiceTest extends TestCase
         config()->set('tenant.infrastructure.database_strategy', TenantDatabaseStrategy::SHARED_SCHEMA);
         config()->set('tenant.documents.disk', 'tenant_private');
 
-        $capabilities = (new TenantInfrastructureCapabilityService())->inspect();
+        $capabilities = (new TenantInfrastructureCapabilityService)->inspect();
 
         self::assertSame(TenantDatabaseStrategy::SHARED_SCHEMA, $capabilities['database']['strategy']);
         self::assertFalse($capabilities['database']['tenant_specific_profiles_supported']);
@@ -47,11 +47,11 @@ final class TenantInfrastructureCapabilityServiceTest extends TestCase
 
         self::assertStringContainsString('Migrator $migrator', $source);
         self::assertStringContainsString('$migrationStatus = $this->migrationStatus();', $source);
-        self::assertStringContainsString("'ready' => $"."mailReady && $"."queueReady && (bool) $"."migrationStatus['ready']", $source);
-        self::assertStringContainsString("'migrations' => $"."migrationStatus", $source);
+        self::assertStringContainsString("'ready' => $".'mailReady && $'.'queueReady && (bool) $'."migrationStatus['ready']", $source);
+        self::assertStringContainsString("'migrations' => $".'migrationStatus', $source);
         self::assertStringContainsString('getMigrationFiles', $source);
         self::assertStringContainsString('getRepository()->getRan()', $source);
-        self::assertStringContainsString("'pending_count' => count($"."pending)", $source);
+        self::assertStringContainsString("'pending_count' => count($".'pending)', $source);
         self::assertStringContainsString('NON_PRODUCTION_MAILERS', $source);
         self::assertStringContainsString('QUEUE_SYNC', $source);
         self::assertStringContainsString('QUEUE_DATABASE', $source);

@@ -14,11 +14,13 @@ namespace Modules\Vehicle\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Vehicle\Http\Requests\ListVehicleMasterRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleTypeRequest;
 use Modules\Vehicle\Http\Requests\UpdateVehicleTypeRequest;
 use Modules\Vehicle\Http\Resources\VehicleTypeResource;
 use Modules\Vehicle\Services\VehicleTypeService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class VehicleTypeController
 {
@@ -41,12 +43,30 @@ final class VehicleTypeController
 
     public function update(UpdateVehicleTypeRequest $request, int $type): VehicleTypeResource
     {
-        return new VehicleTypeResource($this->types->update($this->types->find($type, $request->tenantId(), $request->organizationUnitId()), $request->toData()));
+        $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
+
+        $updated = DB::transaction(function () use ($request, $type, $expectedVersion) {
+            $model = $this->types->find($type, $request->tenantId(), $request->organizationUnitId());
+            $model = $model->newQuery()->lockForUpdate()->findOrFail($model->getKey());
+
+            if ($expectedVersion !== null && (int) $model->row_version !== $expectedVersion) {
+                throw new ConflictHttpException('Vehicle type was changed by someone else. Reload before saving.');
+            }
+
+            $nextVersion = ((int) $model->row_version) + 1;
+            $saved = $this->types->update($model, $request->toData());
+            $saved->forceFill(['row_version' => $nextVersion])->save();
+
+            return $saved;
+        });
+
+        return new VehicleTypeResource($updated);
     }
 
     public function destroy(ListVehicleMasterRequest $request, int $type): JsonResponse
     {
         $this->types->delete($this->types->find($type, $request->tenantId(), $request->organizationUnitId()));
+
         return response()->json(null, 204);
     }
 

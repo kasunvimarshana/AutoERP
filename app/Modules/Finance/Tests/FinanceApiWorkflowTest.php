@@ -16,6 +16,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\User\Models\UserModel;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class FinanceApiWorkflowTest extends TestCase
@@ -151,7 +153,7 @@ final class FinanceApiWorkflowTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Finance API Org',
             'code' => 'ORG-'.$suffix,
@@ -227,7 +229,7 @@ final class FinanceApiWorkflowTest extends TestCase
 
     private function actingAsFinanceUser(int $tenantId): void
     {
-        $userId = \Tests\Support\TenantUserFixture::create([
+        $userId = TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'email' => 'finance-api-'.Str::lower(Str::random(8)).'@example.test',
         ]);

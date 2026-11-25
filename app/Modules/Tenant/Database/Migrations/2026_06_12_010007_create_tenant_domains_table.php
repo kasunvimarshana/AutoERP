@@ -61,8 +61,8 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'status'], 'tenant_domains_tenant_status_ix');
             $table->index(['tenant_id', 'operational_status'], 'tenant_domains_tenant_operational_ix');
-            $table->index(['operational_status', 'operational_retry_at', 'operational_claimed_at'], 'tenant_domains_operational_retry_ix', );
-            $table->index(['status', 'revalidation_due_at', 'revalidation_claimed_at'], 'tenant_domains_revalidation_ix', );
+            $table->index(['operational_status', 'operational_retry_at', 'operational_claimed_at'], 'tenant_domains_operational_retry_ix');
+            $table->index(['status', 'revalidation_due_at', 'revalidation_claimed_at'], 'tenant_domains_revalidation_ix');
             $table->unique(['id', 'tenant_id'], 'tenant_domains_id_tenant_uk');
         });
     }

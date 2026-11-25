@@ -114,8 +114,7 @@ final class RecordAuditEvent implements AuditRecorderInterface
         AuditEventData $event,
         PlatformAuditActorData $actor,
         ?int $targetTenantId = null,
-    ): void
-    {
+    ): void {
         $this->validator->validate($event);
         $this->validator->validatePlatformActor($actor);
         $scope = $this->ownership->validatePlatformTarget($targetTenantId);

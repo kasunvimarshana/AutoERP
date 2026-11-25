@@ -74,7 +74,6 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
             ->all();
     }
 
-
     public function findDefaultForTenantAndUser(int $tenantId, int $userId): ?DataRecord
     {
         $model = $this->query()
@@ -118,7 +117,6 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
         ]);
     }
 
-
     public function setDefault(int $tenantId, int $userId, int $organizationUnitId): bool
     {
         $this->clearDefaultForUser($tenantId, $userId);
@@ -144,5 +142,4 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
             ->where('user_id', $userId)
             ->delete() === 1;
     }
-
 }

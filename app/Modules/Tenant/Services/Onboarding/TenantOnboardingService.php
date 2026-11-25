@@ -18,6 +18,7 @@ use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
@@ -27,7 +28,6 @@ use Modules\Tenant\Constants\TenantOnboardingStep;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Exceptions\TenantOnboardingOperationException;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
-use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 use Psr\Log\LoggerInterface;
@@ -37,8 +37,11 @@ use Throwable;
 final class TenantOnboardingService
 {
     private const OUTCOME_SUCCESS = 'success';
+
     private const OUTCOME_NOT_FOUND = 'not_found';
+
     private const OUTCOME_VERSION_CONFLICT = 'version_conflict';
+
     private const OUTCOME_INVALID_STATUS = 'invalid_status';
 
     public function __construct(

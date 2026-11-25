@@ -14,8 +14,8 @@ namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 
 final class SupplierBankAccount extends TenantOwnedModel
 {

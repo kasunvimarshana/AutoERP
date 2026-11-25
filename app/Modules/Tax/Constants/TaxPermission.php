@@ -15,15 +15,25 @@ namespace Modules\Tax\Constants;
 final class TaxPermission
 {
     public const LOOKUPS_VIEW = 'tax.lookups.view';
+
     public const CALCULATIONS_RUN = 'tax.calculations.run';
+
     public const TAXES_VIEW = 'tax.taxes.view';
+
     public const TAXES_MANAGE = 'tax.taxes.manage';
+
     public const GROUPS_VIEW = 'tax.groups.view';
+
     public const GROUPS_MANAGE = 'tax.groups.manage';
+
     public const PROFILES_VIEW = 'tax.profiles.view';
+
     public const PROFILES_MANAGE = 'tax.profiles.manage';
+
     public const POSTING_PROFILES_VIEW = 'tax.posting_profiles.view';
+
     public const POSTING_PROFILES_MANAGE = 'tax.posting_profiles.manage';
+
     public const REPORTS_VIEW = 'tax.reports.view';
 
     /** @return array<string, string> */

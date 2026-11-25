@@ -25,6 +25,7 @@ use Modules\VehicleService\Models\VehicleServiceSupervisorCommissionPolicy;
 final class VehicleServiceCommissionPolicyService
 {
     private const ZERO_AMOUNT = '0.000000';
+
     private const VALIDATION_BASE = '100.000000';
 
     public function __construct(
@@ -70,7 +71,7 @@ final class VehicleServiceCommissionPolicyService
             $normalizedValue = $this->validatedValue($type, $value);
 
             if (! $policy instanceof VehicleServiceSupervisorCommissionPolicy) {
-                $policy = new VehicleServiceSupervisorCommissionPolicy();
+                $policy = new VehicleServiceSupervisorCommissionPolicy;
                 $policy->forceFill([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
@@ -139,7 +140,7 @@ final class VehicleServiceCommissionPolicyService
             $normalizedValue = $this->validatedValue($type, $value);
 
             if (! $rule instanceof VehicleServiceLaborItemCommissionRule) {
-                $rule = new VehicleServiceLaborItemCommissionRule();
+                $rule = new VehicleServiceLaborItemCommissionRule;
                 $rule->forceFill([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
@@ -186,7 +187,7 @@ final class VehicleServiceCommissionPolicyService
     }
 
     /**
-     * @param list<int> $itemIds
+     * @param  list<int>  $itemIds
      * @return array<int, array{commission_type: string, commission_value: string}>
      */
     public function laborDefaultsForItems(

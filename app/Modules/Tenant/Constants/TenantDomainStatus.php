@@ -15,7 +15,9 @@ namespace Modules\Tenant\Constants;
 final class TenantDomainStatus
 {
     public const PENDING = 'pending';
+
     public const ACTIVE = 'active';
+
     public const DISABLED = 'disabled';
 
     /** @return list<string> */

@@ -159,7 +159,7 @@ final class VehicleServiceLineItemLookupService
     }
 
     /** @param array{type: 'item'|'batch', model: Item|InventoryBatch} $left
-     * @param array{type: 'item'|'batch', model: Item|InventoryBatch} $right
+     * @param  array{type: 'item'|'batch', model: Item|InventoryBatch}  $right
      */
     private function compare(array $left, array $right, string $search): int
     {

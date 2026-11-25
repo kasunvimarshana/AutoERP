@@ -86,7 +86,7 @@ final class ConfigurationRevisionService
 
         return $revision instanceof ConfigurationValueRevision
             ? $revision
-            : throw (new ModelNotFoundException())->setModel(ConfigurationValueRevision::class, [$revisionId]);
+            : throw (new ModelNotFoundException)->setModel(ConfigurationValueRevision::class, [$revisionId]);
     }
 
     /** @return Builder<ConfigurationValueRevision> */

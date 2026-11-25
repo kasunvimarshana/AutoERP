@@ -18,9 +18,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Modules\Tenant\Constants\TenantDomainOperationalVerificationOutcome;
+use Modules\Tenant\Queue\RestoreTenantJobContext;
 use Modules\Tenant\Queue\TenantAwareJobInterface;
 use Modules\Tenant\Queue\TenantJobContext;
-use Modules\Tenant\Queue\RestoreTenantJobContext;
 use Modules\Tenant\Services\Domains\TenantDomainOperationalVerificationService;
 use RuntimeException;
 

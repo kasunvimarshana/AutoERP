@@ -26,7 +26,7 @@ final class OrganizationUnitModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::saving(static function (self $unit): void {
+        self::saving(static function (self $unit): void {
             $code = trim((string) $unit->getAttribute('code'));
             if ($code === '' || $code !== mb_strtoupper($code) || preg_match('/^[A-Z0-9][A-Z0-9_-]{0,99}$/D', $code) !== 1) {
                 throw new DomainException('Organization-unit code must be a canonical uppercase identifier.');
@@ -70,7 +70,7 @@ final class OrganizationUnitModel extends TenantOwnedModel
             }
         });
 
-        static::deleting(static function (): void {
+        self::deleting(static function (): void {
             throw new DomainException('Organization units are retained for history. Retire the unit instead of deleting it.');
         });
     }

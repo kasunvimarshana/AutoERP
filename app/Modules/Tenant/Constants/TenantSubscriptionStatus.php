@@ -15,8 +15,11 @@ namespace Modules\Tenant\Constants;
 final class TenantSubscriptionStatus
 {
     public const TRIAL = 'trial';
+
     public const ACTIVE = 'active';
+
     public const EXPIRED = 'expired';
+
     public const CANCELLED = 'cancelled';
 
     /** @return list<string> */

@@ -12,10 +12,10 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierCategory;
 use Modules\Supplier\Models\SupplierCategoryAssignment;
@@ -29,7 +29,6 @@ final class SupplierSeeder extends Seeder
         if (! Schema::hasTable('suppliers')) {
             return;
         }
-
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -84,5 +83,4 @@ final class SupplierSeeder extends Seeder
             }
         }, 3);
     }
-
 }

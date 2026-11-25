@@ -15,6 +15,7 @@ namespace Modules\ReferenceData\Constants;
 final class ReferenceDataPermission
 {
     public const VIEW = 'reference_data.view';
+
     public const MANAGE = 'reference_data.manage';
 
     /** @return array<string, string> */

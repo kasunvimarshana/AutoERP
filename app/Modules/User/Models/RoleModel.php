@@ -31,7 +31,7 @@ final class RoleModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::saving(function (self $role): void {
+        self::saving(function (self $role): void {
             if ($role->exists && ($role->isDirty('tenant_id') || $role->isDirty('system_key') || $role->isDirty('is_system'))) {
                 throw new LogicException('Role ownership and system identity are immutable.');
             }

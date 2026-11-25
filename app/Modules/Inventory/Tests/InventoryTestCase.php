@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Inventory\DTOs\StockMovementData;
@@ -54,7 +55,7 @@ abstract class InventoryTestCase extends TestCase
     ): InventoryMovement {
         return $this->withTenantExecutionContext($tenantId, fn (): InventoryMovement => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
-            movementDate: $movementDate ?? (\Illuminate\Support\Carbon::hasTestNow() ? now()->toDateString() : '2026-06-06'),
+            movementDate: $movementDate ?? (Carbon::hasTestNow() ? now()->toDateString() : '2026-06-06'),
             movementType: InventoryMovementType::Receipt,
             direction: InventoryDirection::In,
             itemId: (int) $item->getKey(),

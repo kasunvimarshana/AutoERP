@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Payroll\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Payroll\Enums\PayrollPaymentMethod;
 use Modules\Payroll\Http\Requests\PayrollRequest;
@@ -91,11 +92,8 @@ final class PayrollAssignmentController
 
     public function update(PayrollRequest $request, int $id): JsonResponse
     {
-        $assignment = PayrollEmployeeSalaryAssignment::query()
-            ->where('tenant_id', $request->tenantId())
-            ->findOrFail($id);
-
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'salary_structure_id' => ['sometimes', 'integer'],
             'base_salary' => ['sometimes', 'numeric', 'min:0'],
             'hourly_rate' => ['sometimes', 'numeric', 'min:0'],
@@ -111,8 +109,29 @@ final class PayrollAssignmentController
             $validated['payment_method'] = PayrollPaymentMethod::from($validated['payment_method']);
         }
 
-        $assignment->update($validated);
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+        unset($validated['expected_version']);
 
-        return response()->json(['data' => $assignment->fresh(['employee', 'structure'])]);
+        $updated = DB::transaction(function () use ($request, $id, $expectedVersion, $validated): ?PayrollEmployeeSalaryAssignment {
+            $assignment = PayrollEmployeeSalaryAssignment::query()
+                ->where('tenant_id', $request->tenantId())
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($expectedVersion !== null && (int) $assignment->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            $validated['row_version'] = ((int) $assignment->row_version) + 1;
+            $assignment->update($validated);
+
+            return $assignment->fresh(['employee', 'structure']);
+        });
+
+        if ($updated === null) {
+            return response()->json(['message' => 'Salary assignment was changed by someone else. Reload before saving.'], 409);
+        }
+
+        return response()->json(['data' => $updated]);
     }
 }

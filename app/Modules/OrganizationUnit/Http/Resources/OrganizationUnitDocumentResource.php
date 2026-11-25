@@ -22,6 +22,7 @@ final class OrganizationUnitDocumentResource extends JsonResource
     {
         $values = $this->resource instanceof DataRecord ? $this->resource->toArray() : (is_array($this->resource) ? $this->resource : []);
         unset($values['object_key'], $values['active_name_hash'], $values['deleted_at']);
+
         return $values;
     }
 }

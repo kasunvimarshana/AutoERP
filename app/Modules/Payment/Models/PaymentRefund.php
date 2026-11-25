@@ -21,6 +21,7 @@ use Modules\Tenant\Models\TenantModel;
 final class PaymentRefund extends TenantOwnedModel
 {
     protected $table = 'payment_refunds';
+
     protected $guarded = ['id'];
 
     protected function casts(): array

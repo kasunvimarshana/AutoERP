@@ -16,6 +16,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\UOM\Constants\UomPermission;
+use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class UomApiTest extends TestCase
@@ -306,8 +310,8 @@ final class UomApiTest extends TestCase
             'activated_at' => $now,
             'created_at' => $now,
             'updated_at' => $now]);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        ActiveTenantSubscriptionFixture::create($tenantId);
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main',
             'code' => 'MAIN',
@@ -318,7 +322,7 @@ final class UomApiTest extends TestCase
             'updated_at' => $now,
         ]);
         $email = (string) ($overrides['email'] ?? 'admin@example.test');
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Unit',
             'last_name' => 'Tester',
@@ -367,7 +371,7 @@ final class UomApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,

@@ -21,6 +21,7 @@ final class VehicleType extends TenantOwnedModel
     use SoftDeletes;
 
     protected $table = 'vehicle_types';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -33,5 +34,8 @@ final class VehicleType extends TenantOwnedModel
         ]);
     }
 
-    public function vehicles(): HasMany { return $this->hasMany(Vehicle::class, 'vehicle_type_id'); }
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class, 'vehicle_type_id');
+    }
 }

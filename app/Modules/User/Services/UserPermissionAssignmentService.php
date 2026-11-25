@@ -15,8 +15,8 @@ namespace Modules\User\Services;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
-use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Result;
 use Modules\User\Constants\UserGuard;
@@ -88,6 +88,7 @@ final class UserPermissionAssignmentService extends AbstractUserCrudService
                             'row_version' => (int) $existing->getAttribute('row_version') + 1,
                             'updated_by_user_id' => $actorId,
                         ])->save();
+
                         continue;
                     }
 
@@ -198,5 +199,4 @@ final class UserPermissionAssignmentService extends AbstractUserCrudService
 
         return $tenantId;
     }
-
 }

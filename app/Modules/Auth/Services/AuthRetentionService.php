@@ -43,7 +43,7 @@ final readonly class AuthRetentionService
             $deliveryCutoff = $now->modify('-'.max(1, (int) config('module-auth.retention.invitation_deliveries_days', 90)).' days');
 
             return $this->database->transaction(function () use (
-                $now,
+
                 $codeCutoff,
                 $attemptCutoff,
                 $tokenCutoff,
@@ -117,6 +117,7 @@ final readonly class AuthRetentionService
             }, 3);
         });
     }
+
     /** @param list<string> $terminalStatuses */
     private function purgeTenantRefreshTokens(
         DateTimeInterface $cutoff,
@@ -156,5 +157,4 @@ final readonly class AuthRetentionService
 
         return $deletedTotal;
     }
-
 }

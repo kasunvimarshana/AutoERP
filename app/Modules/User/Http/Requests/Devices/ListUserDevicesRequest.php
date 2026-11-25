@@ -16,7 +16,11 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class ListUserDevicesRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return null; }
+    protected function requiredPermission(): ?string
+    {
+        return null;
+    }
+
     public function rules(): array
     {
         return [

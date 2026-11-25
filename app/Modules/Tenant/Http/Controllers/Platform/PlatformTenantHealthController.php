@@ -14,8 +14,8 @@ namespace Modules\Tenant\Http\Controllers\Platform;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Http\Requests\Platform\RetryPlatformHealthOperationRequest;
 use Modules\Tenant\Http\Requests\Platform\RetryFailedTenantDomainsRequest;
+use Modules\Tenant\Http\Requests\Platform\RetryPlatformHealthOperationRequest;
 use Modules\Tenant\Services\Platform\PlatformTenantHealthService;
 
 final class PlatformTenantHealthController extends Controller

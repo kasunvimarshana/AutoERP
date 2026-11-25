@@ -58,6 +58,7 @@ final class UserDocumentService extends AbstractUserCrudService
             $page = max((int) ($filters['page'] ?? 1), 1);
             $paginator = $query->orderBy('name')->paginate($perPage, ['*'], 'page', $page);
             $items = array_map(fn (mixed $document): DataRecord => $this->record($document), array_values($paginator->items()));
+
             return Result::success(new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -69,6 +70,7 @@ final class UserDocumentService extends AbstractUserCrudService
         try {
             $this->authorizeSubject((int) $userId, UserPermission::USER_DOCUMENTS_VIEW);
             $document = $this->find($this->tenantId(), $userId, $documentId, false);
+
             return $document instanceof UserDocumentModel ? Result::success($this->record($document)) : $this->notFound('User document not found.');
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -105,13 +107,16 @@ final class UserDocumentService extends AbstractUserCrudService
                     'uploaded_by_user_id' => $this->actor->currentUserId(),
                 ]));
                 $this->audit->record('document.created', 'user_document', $document, null, $document->attributesToArray());
+
                 return $document;
             }, 3);
+
             return Result::success($this->record($document));
         } catch (Throwable $exception) {
             if ($storedKey !== null) {
                 $this->assets->discardUnreferenced($this->tenantId(), $storedKey, 'failed user document creation');
             }
+
             return $this->fromThrowable($exception);
         }
     }
@@ -159,14 +164,17 @@ final class UserDocumentService extends AbstractUserCrudService
                     $this->assets->scheduleCleanup($tenantId, $oldKey, 'user document replacement');
                 }
                 $this->audit->record('document.updated', 'user_document', $document, $before, $document->attributesToArray());
+
                 return $document;
             }, 3);
             $this->assets->processCleanup($tenantId, $oldKey);
+
             return Result::success($this->record($document));
         } catch (Throwable $exception) {
             if ($newKey !== null) {
                 $this->assets->discardUnreferenced($this->tenantId(), $newKey, 'failed user document update');
             }
+
             return $this->fromThrowable($exception);
         }
     }
@@ -197,6 +205,7 @@ final class UserDocumentService extends AbstractUserCrudService
                 $this->audit->record('document.deleted', 'user_document', $document, $before, null);
             }, 3);
             $this->assets->processCleanup($tenantId, $objectKey);
+
             return Result::success(true);
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -212,6 +221,7 @@ final class UserDocumentService extends AbstractUserCrudService
             if (! $document instanceof UserDocumentModel) {
                 return $this->notFound('User document not found.');
             }
+
             return Result::success(['record' => $this->record($document), 'stream' => $this->assets->read($tenantId, (string) $document->getAttribute('object_key'))]);
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -234,6 +244,7 @@ final class UserDocumentService extends AbstractUserCrudService
         if (! $user instanceof UserModel) {
             throw new RuntimeException('User not found.');
         }
+
         return $user;
     }
 
@@ -243,6 +254,7 @@ final class UserDocumentService extends AbstractUserCrudService
         if ($lock) {
             $query->lockForUpdate();
         }
+
         return $query->first();
     }
 
@@ -284,7 +296,7 @@ final class UserDocumentService extends AbstractUserCrudService
         if ($id === null) {
             throw new RuntimeException('A tenant context is required.');
         }
+
         return $id;
     }
-
 }

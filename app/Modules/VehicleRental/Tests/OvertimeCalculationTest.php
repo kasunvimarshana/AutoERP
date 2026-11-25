@@ -13,27 +13,27 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Tests;
 
 use Carbon\CarbonImmutable;
-use Modules\VehicleRental\Constants\AgreementFields;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\DriverMode;
 use Modules\VehicleRental\Http\Resources\RunningChartRegisterResource;
 use Modules\VehicleRental\Http\Resources\VehicleUseResource;
-use Modules\VehicleRental\Models\RunningChart;
-use Modules\VehicleRental\Models\VehicleUse;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\OvertimeCalculator;
+use Modules\VehicleRental\Services\RentalAuthorization;
+use Modules\VehicleRental\Services\RunningChartService;
 use Tests\TestCase;
 
 final class OvertimeCalculationTest extends TestCase
 {
     use BuildsRentalFixture;
-    use \Illuminate\Foundation\Testing\RefreshDatabase;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mock(\Modules\VehicleRental\Services\RentalAuthorization::class, fn ($mock) => $mock->shouldReceive('assert')->zeroOrMoreTimes()->shouldReceive('assertChart')->zeroOrMoreTimes()->shouldReceive('assertUse')->zeroOrMoreTimes());
+        $this->mock(RentalAuthorization::class, fn ($mock) => $mock->shouldReceive('assert')->zeroOrMoreTimes()->shouldReceive('assertChart')->zeroOrMoreTimes()->shouldReceive('assertUse')->zeroOrMoreTimes());
     }
 
     public function test_overtime_calculator_standard_8_hour_baseline(): void
@@ -153,7 +153,7 @@ final class OvertimeCalculationTest extends TestCase
             self::assertSame('8.000000', $useResource['customer_agreement']['working_hours']);
             self::assertSame('9.000000', $useResource['owner_agreement']['working_hours']);
 
-            $chart = app(\Modules\VehicleRental\Services\RunningChartService::class)->create(
+            $chart = app(RunningChartService::class)->create(
                 $context,
                 $use->id,
                 $use->row_version,

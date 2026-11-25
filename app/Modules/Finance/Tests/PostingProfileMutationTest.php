@@ -16,7 +16,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Services\PostingProfileService;
 use Tests\TestCase;
 

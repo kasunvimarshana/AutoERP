@@ -21,12 +21,12 @@ use Illuminate\Validation\ValidationException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformOperatorStatus;
-use Modules\Core\Authorization\PlatformPermission;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\User\Models\PlatformOperatorModel;
@@ -80,7 +80,7 @@ final class PlatformOperatorService
             }
 
             return $query->first()
-                ?? throw (new ModelNotFoundException())->setModel(PlatformOperatorModel::class, [$operatorId]);
+                ?? throw (new ModelNotFoundException)->setModel(PlatformOperatorModel::class, [$operatorId]);
         });
     }
 

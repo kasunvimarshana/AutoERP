@@ -449,6 +449,184 @@ final class AttendanceCaptureAndAnomalyTest extends TestCase
         });
     }
 
+    public function test_kiosk_secret_key_hidden_cross_tenant_geofence_rejected_occ_and_partial_update_preserved(): void
+    {
+        $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
+        $tenantId = $this->tenant();
+        $otherTenantId = $this->tenant();
+
+        $otherGeofenceId = $this->withTenantExecutionContext($otherTenantId, function () use ($otherTenantId): int {
+            $otherOrgId = OrganizationUnitFixture::create(['tenant_id' => $otherTenantId, 'name' => 'Other Branch', 'code' => 'OTH-01']);
+
+            return (int) HrAttendanceGeofence::create([
+                'tenant_id' => $otherTenantId,
+                'organization_unit_id' => $otherOrgId,
+                'name' => 'Other Tenant Fence',
+                'code' => 'OTH-GEO',
+                'latitude' => 6.9,
+                'longitude' => 79.8,
+                'radius_meters' => 100,
+                'is_active' => true,
+            ])->id;
+        });
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $otherGeofenceId): void {
+            $userId = $this->createUser($tenantId);
+            $user = UserModel::query()->findOrFail($userId);
+            $this->actingAs($user);
+            $orgId = OrganizationUnitFixture::create(['tenant_id' => $tenantId, 'name' => 'HQ Branch', 'code' => 'HQ-SEC']);
+
+            // Create geofence with optional fields
+            $geoRes = $this->postJson('/api/v1/hr/attendance/geofences', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'name' => 'HQ Fence',
+                'code' => 'HQ-GEO',
+                'latitude' => 6.9271,
+                'longitude' => 79.8612,
+                'radius_meters' => 150,
+                'ip_whitelist' => '10.0.0.0/8',
+                'notes' => 'Keep me',
+                'is_active' => false,
+            ])->assertStatus(201);
+            $geoId = (int) $geoRes->json('data.id');
+
+            // Partial update omitting optional fields preserves ip_whitelist, notes, is_active
+            $updatedGeo = $this->putJson("/api/v1/hr/attendance/geofences/{$geoId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 1,
+                'name' => 'HQ Fence Renamed',
+                'code' => 'HQ-GEO',
+                'latitude' => 6.9271,
+                'longitude' => 79.8612,
+                'radius_meters' => 200,
+            ])->assertStatus(200);
+            self::assertSame('10.0.0.0/8', $updatedGeo->json('data.ip_whitelist'));
+            self::assertSame('Keep me', $updatedGeo->json('data.notes'));
+            self::assertFalse((bool) $updatedGeo->json('data.is_active'));
+            self::assertSame(2, (int) $updatedGeo->json('data.row_version'));
+
+            // Explicit is_active = true followed by is_active = null preserves true
+            $this->putJson("/api/v1/hr/attendance/geofences/{$geoId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 2,
+                'name' => 'HQ Fence Renamed',
+                'code' => 'HQ-GEO',
+                'latitude' => 6.9271,
+                'longitude' => 79.8612,
+                'radius_meters' => 200,
+                'is_active' => true,
+            ])->assertStatus(200);
+
+            $nullActiveGeo = $this->putJson("/api/v1/hr/attendance/geofences/{$geoId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 3,
+                'name' => 'HQ Fence Renamed',
+                'code' => 'HQ-GEO',
+                'latitude' => 6.9271,
+                'longitude' => 79.8612,
+                'radius_meters' => 200,
+                'is_active' => null,
+            ])->assertStatus(200);
+            self::assertTrue((bool) $nullActiveGeo->json('data.is_active'));
+            self::assertSame(4, (int) $nullActiveGeo->json('data.row_version'));
+
+            // Stale expected_version returns 409
+            $this->putJson("/api/v1/hr/attendance/geofences/{$geoId}", [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'expected_version' => 1,
+                'name' => 'Stale',
+                'code' => 'HQ-GEO',
+                'latitude' => 6.9271,
+                'longitude' => 79.8612,
+                'radius_meters' => 200,
+            ])->assertStatus(409);
+
+            // Cross-tenant geofence_id is rejected on kiosk store
+            $this->postJson('/api/v1/hr/attendance/kiosks', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'kiosk_code' => 'KIOSK-X',
+                'name' => 'Cross Tenant Kiosk',
+                'geofence_id' => $otherGeofenceId,
+            ])->assertStatus(422)->assertJsonValidationErrors(['geofence_id']);
+
+            // Valid kiosk never leaks secret_key
+            $kioskRes = $this->postJson('/api/v1/hr/attendance/kiosks', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'kiosk_code' => 'KIOSK-SEC',
+                'name' => 'Secure Kiosk',
+                'geofence_id' => $geoId,
+            ])->assertStatus(201);
+            self::assertArrayNotHasKey('secret_key', $kioskRes->json('data'));
+
+            $kioskList = $this->getJson("/api/v1/hr/attendance/kiosks?tenant_id={$tenantId}&organization_unit_id={$orgId}")
+                ->assertStatus(200);
+            self::assertArrayNotHasKey('secret_key', $kioskList->json('data.0'));
+
+            // Invalid enum returns 422 instead of 500
+            $this->postJson('/api/v1/hr/attendance/capture/web', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+                'employee_id' => 1,
+                'punch_type' => 'not_a_valid_punch_type',
+            ])->assertStatus(422)->assertJsonValidationErrors(['punch_type']);
+
+            // Invalid import payload returns 422
+            $this->postJson('/api/v1/hr/attendance/capture/import/preview', [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgId,
+            ])->assertStatus(422);
+        });
+    }
+
+    public function test_roster_endpoint_batches_queries_without_n_plus_one(): void
+    {
+        $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
+        $tenantId = $this->tenant();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $userId = $this->createUser($tenantId);
+            $user = UserModel::query()->findOrFail($userId);
+            $this->actingAs($user);
+            $orgId = OrganizationUnitFixture::create(['tenant_id' => $tenantId, 'name' => 'HQ Branch', 'code' => 'HQ-ROS']);
+            $shift = $this->createShift($tenantId, $orgId);
+
+            for ($i = 1; $i <= 5; $i++) {
+                $emp = $this->createEmployee($tenantId, $orgId, "Emp {$i}", "EMP-ROS-{$i}");
+                $this->assignShift($tenantId, $orgId, (int) $emp->id, (int) $shift->id);
+            }
+
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+
+            $res = $this->getJson("/api/v1/hr/roster?tenant_id={$tenantId}&organization_unit_id={$orgId}&start_date=2026-11-01&end_date=2026-11-10")
+                ->assertStatus(200);
+
+            $queries = DB::getQueryLog();
+            DB::disableQueryLog();
+
+            self::assertCount(5, $res->json('data'));
+            // 5 employees * 10 days = 50 cells; batching keeps total queries well under 15 (vs 350+ N+1 queries)
+            self::assertLessThan(15, count($queries));
+        });
+    }
+
+    public function test_kiosk_qr_token_route_requires_manage_attendance_permission(): void
+    {
+        $route = app('router')->getRoutes()->getByName('api.v1.hr.attendance.capture.kiosk-token');
+        self::assertNotNull($route);
+        self::assertContains('tenant.permission:hr.attendance.manage', $route->gatherMiddleware());
+        self::assertNotContains('tenant.permission:hr.attendance.punch', $route->gatherMiddleware());
+    }
+
     private function createUser(int $tenantId): int
     {
         return (int) DB::table('users')->insertGetId([

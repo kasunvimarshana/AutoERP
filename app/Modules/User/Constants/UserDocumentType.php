@@ -15,8 +15,11 @@ namespace Modules\User\Constants;
 final class UserDocumentType
 {
     public const IDENTITY = 'identity';
+
     public const EMPLOYMENT = 'employment';
+
     public const CERTIFICATION = 'certification';
+
     public const OTHER = 'other';
 
     /** @return list<string> */

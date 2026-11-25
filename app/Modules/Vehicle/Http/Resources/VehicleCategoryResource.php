@@ -30,6 +30,7 @@ final class VehicleCategoryResource extends JsonResource
             'parent' => $this->relationLoaded('parent') ? $this->namedResource($this->parent) : null,
             'is_active' => (bool) $this->is_active,
             'sort_order' => (int) $this->sort_order,
+            'row_version' => (int) ($this->row_version ?? 1),
         ];
     }
 }

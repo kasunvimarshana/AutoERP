@@ -15,11 +15,11 @@ namespace Modules\Configuration\Tests;
 use Modules\Configuration\Constants\ConfigurationPermission;
 use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Services\ConfigurationAuthorizationService;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
-use Modules\Core\Authorization\PlatformPermission;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigurationAuthorizationServiceTest extends TestCase

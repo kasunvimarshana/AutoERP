@@ -57,7 +57,6 @@ final class EloquentUserRoleRepository extends EloquentRepository implements Use
             ->whereNull('roles.deleted_at')
             ->select(['roles.id', 'roles.name']);
 
-
         return $query
             ->orderBy('roles.name')
             ->get()

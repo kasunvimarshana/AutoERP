@@ -22,7 +22,7 @@ final class AuditPayloadSanitizerTest extends TestCase
     {
         config()->set('audit.payload.sensitive_keys', ['password', 'token', 'client_secret', 'card_number']);
 
-        $sanitizer = new AuditPayloadSanitizer();
+        $sanitizer = new AuditPayloadSanitizer;
         $payload = $sanitizer->sanitize([
             'email' => 'user@example.test',
             'credentials' => [
@@ -45,7 +45,7 @@ final class AuditPayloadSanitizerTest extends TestCase
     {
         config()->set('audit.payload.max_json_bytes', 40);
 
-        $sanitizer = new AuditPayloadSanitizer();
+        $sanitizer = new AuditPayloadSanitizer;
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Audit payload exceeds');
@@ -55,17 +55,17 @@ final class AuditPayloadSanitizerTest extends TestCase
 
     public function test_it_rejects_unsupported_payload_objects(): void
     {
-        $sanitizer = new AuditPayloadSanitizer();
+        $sanitizer = new AuditPayloadSanitizer;
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Audit payloads may contain only');
 
-        $sanitizer->sanitize(['object' => new \stdClass()]);
+        $sanitizer->sanitize(['object' => new \stdClass]);
     }
 
     public function test_it_rejects_non_string_tags(): void
     {
-        $sanitizer = new AuditPayloadSanitizer();
+        $sanitizer = new AuditPayloadSanitizer;
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('tags must be strings');
@@ -73,5 +73,4 @@ final class AuditPayloadSanitizerTest extends TestCase
         /** @phpstan-ignore-next-line */
         $sanitizer->sanitizeTags(['valid', 123]);
     }
-
 }

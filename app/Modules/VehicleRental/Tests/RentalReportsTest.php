@@ -12,25 +12,20 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Tenancy\TenantFeature;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
 use Modules\Vehicle\Models\VehicleDocument;
-use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Services\FleetUtilizationReportService;
 use Modules\VehicleRental\Services\LesseeOutstandingReportService;
 use Modules\VehicleRental\Services\OwnerDisbursementReportService;
 use Modules\VehicleRental\Services\RentalAuthorization;
-use Modules\VehicleRental\Services\RentalIncidentReportService;
 use Modules\VehicleRental\Services\RentalRevenueReportService;
 use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\VehicleProfitabilityReportService;
 use Modules\VehicleRental\Services\VehicleRevenueLicenseReportService;
-use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\TestCase;
 
 final class RentalReportsTest extends TestCase
@@ -347,7 +342,7 @@ final class RentalReportsTest extends TestCase
         // Test Lessee Invoice Listing print export
         $invListingPrint = $this->withHeader('X-Tenant-Id', (string) $context->tenantId)
             ->get(self::ROOT.'/reports/rental-revenue/export/print?start_date=2026-09-01&end_date=2026-09-30&report_type=invoice_listing');
-        $invListingPrint->assertOk()->assertSee("Lessee&#039;s All Invoice Listing", false);
+        $invListingPrint->assertOk()->assertSee('Lessee&#039;s All Invoice Listing', false);
     }
 
     public function test_reports_accept_empty_optional_query_filters(): void

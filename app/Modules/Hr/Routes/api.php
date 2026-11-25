@@ -233,7 +233,7 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->name('attendance.capture.barcode');
     Route::get('attendance/capture/kiosks/{kiosk}/qr-token', [HrAttendanceCaptureController::class, 'kioskQrToken'])
         ->whereNumber('kiosk')
-        ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))
+        ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
         ->name('attendance.capture.kiosk-token');
     Route::post('attendance/capture/qr-scan', [HrAttendanceCaptureController::class, 'scanKioskQr'])
         ->middleware($requires(HrAuthorizationService::PUNCH_ATTENDANCE))

@@ -18,7 +18,6 @@ use Modules\Core\Tenancy\TenantFeature;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\VehicleRental\Services\RentalAuthorization;
-use Modules\VehicleRental\Services\VehicleUseService;
 use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\TenantAuthenticationFixture;
 use Tests\TestCase;

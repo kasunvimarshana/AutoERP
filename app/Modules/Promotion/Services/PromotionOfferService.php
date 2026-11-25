@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\Promotion\Services;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -288,7 +289,7 @@ final class PromotionOfferService
         ]);
     }
 
-    private function scoped(string $table, int $tenantId): \Illuminate\Database\Query\Builder
+    private function scoped(string $table, int $tenantId): Builder
     {
         return DB::table($table)->where('tenant_id', $tenantId);
     }

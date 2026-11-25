@@ -13,8 +13,8 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Customer\Models\Customer;
 use Modules\Core\Services\DecimalMath;
+use Modules\Customer\Models\Customer;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Payment\Enums\PaymentDirection;

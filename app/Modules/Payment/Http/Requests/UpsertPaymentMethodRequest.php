@@ -24,6 +24,7 @@ final class UpsertPaymentMethodRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'code' => ['required', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'method_type' => ['required', Rule::enum(PaymentMethodType::class)],

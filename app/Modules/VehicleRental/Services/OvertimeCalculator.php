@@ -23,9 +23,6 @@ final class OvertimeCalculator
     /**
      * Calculate overtime minutes from trip duration and baseline agreed working hours.
      *
-     * @param CarbonImmutable|string|null $startsAt
-     * @param CarbonImmutable|string|null $endsAt
-     * @param int|float|string|null $baselineHours
      * @return int Overtime in minutes (0 if within baseline or invalid)
      */
     public static function calculateOtMinutes(
@@ -72,13 +69,13 @@ final class OvertimeCalculator
         $minutes = $totalMinutes % self::MINUTES_PER_HOUR;
 
         if ($hours === 0) {
-            return "{$minutes} min" . ($minutes !== 1 ? 's' : '');
+            return "{$minutes} min".($minutes !== 1 ? 's' : '');
         }
 
         if ($minutes === 0) {
-            return "{$hours} hr" . ($hours !== 1 ? 's' : '');
+            return "{$hours} hr".($hours !== 1 ? 's' : '');
         }
 
-        return "{$hours} hr" . ($hours !== 1 ? 's' : '') . " {$minutes} min" . ($minutes !== 1 ? 's' : '');
+        return "{$hours} hr".($hours !== 1 ? 's' : '')." {$minutes} min".($minutes !== 1 ? 's' : '');
     }
 }

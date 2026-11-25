@@ -85,6 +85,7 @@ final class ChequePrintTest extends TestCase
         PaymentPostingStatus $postingStatus = PaymentPostingStatus::NotPosted,
     ): array {
         $tenantId = $this->tenantId();
+
         return $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $documentStatus, $postingStatus): array {
             $method = PaymentMethod::query()->create([
                 'tenant_id' => $tenantId,
@@ -96,7 +97,7 @@ final class ChequePrintTest extends TestCase
                 'requires_instrument_details' => true,
                 'is_active' => true,
             ]);
-            $payment = new Payment();
+            $payment = new Payment;
             $payment->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_number' => 'PAY-TEST-001',
@@ -117,7 +118,7 @@ final class ChequePrintTest extends TestCase
                 'refunded_amount' => '0.000000',
             ]);
             $payment->save();
-            $line = new PaymentLine();
+            $line = new PaymentLine;
             $line->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_id' => $payment->getKey(),

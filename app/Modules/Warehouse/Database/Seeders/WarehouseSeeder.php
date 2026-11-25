@@ -12,10 +12,10 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 
@@ -28,7 +28,6 @@ final class WarehouseSeeder extends Seeder
         if (! Schema::hasTable('warehouses')) {
             return;
         }
-
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -101,5 +100,4 @@ final class WarehouseSeeder extends Seeder
             }
         }, 3);
     }
-
 }

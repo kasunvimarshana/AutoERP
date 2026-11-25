@@ -19,8 +19,11 @@ use Modules\Tenant\Services\Onboarding\TenantOnboardingStatePolicy;
 final class TenantOnboardingStateModel extends TenantOwnedModel
 {
     protected $table = 'tenant_onboarding_states';
+
     protected $primaryKey = 'tenant_id';
+
     public $incrementing = false;
+
     protected $keyType = 'int';
 
     protected $fillable = [
@@ -46,7 +49,7 @@ final class TenantOnboardingStateModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::saving(static function (self $state): void {
+        self::saving(static function (self $state): void {
             TenantOnboardingStatePolicy::assertValid($state->getAttributes());
         });
     }

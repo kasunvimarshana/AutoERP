@@ -22,7 +22,9 @@ use Symfony\Component\HttpFoundation\Response;
 final class CurrentOrganizationUnitMiddleware
 {
     private const MODE_CONFIGURED = 'configured';
+
     private const MODE_REQUIRED = 'required';
+
     private const MODE_OPTIONAL = 'optional';
 
     public function __construct(
@@ -36,6 +38,7 @@ final class CurrentOrganizationUnitMiddleware
             $context = $this->resolver->resolve($request);
         } catch (CurrentOrganizationUnitContextResolutionException $exception) {
             report($exception);
+
             return $this->responses->forStatus(
                 Response::HTTP_UNPROCESSABLE_ENTITY,
                 'Organization unit context could not be resolved.',
@@ -49,6 +52,7 @@ final class CurrentOrganizationUnitMiddleware
                     'Select an organization unit before performing this action.',
                 );
             }
+
             return $next($request);
         }
 

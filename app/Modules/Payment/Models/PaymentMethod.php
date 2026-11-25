@@ -76,5 +76,4 @@ final class PaymentMethod extends TenantOwnedModel
     {
         return $this->hasMany(PaymentLine::class, 'payment_method_id');
     }
-
 }

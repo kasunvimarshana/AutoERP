@@ -15,7 +15,6 @@ namespace Modules\VehicleRental\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Tenancy\TenantFeature;
-use Modules\Invoice\Models\Invoice;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Services\AgreementService;

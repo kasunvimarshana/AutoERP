@@ -15,8 +15,8 @@ namespace Modules\Vehicle\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Vehicle\Data\CreateVehicleOwnershipData;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 
 final class StoreVehicleOwnershipRequest extends TenantScopedRequest
 {

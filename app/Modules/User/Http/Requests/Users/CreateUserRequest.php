@@ -19,7 +19,10 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class CreateUserRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return UserPermission::USERS_CREATE; }
+    protected function requiredPermission(): ?string
+    {
+        return UserPermission::USERS_CREATE;
+    }
 
     public function rules(TenantUserCredentialProvisionerInterface $credentials): array
     {

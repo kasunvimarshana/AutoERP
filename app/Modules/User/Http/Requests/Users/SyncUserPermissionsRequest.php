@@ -17,7 +17,10 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class SyncUserPermissionsRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return UserPermission::USERS_ASSIGN_PERMISSIONS; }
+    protected function requiredPermission(): ?string
+    {
+        return UserPermission::USERS_ASSIGN_PERMISSIONS;
+    }
 
     public function rules(): array
     {

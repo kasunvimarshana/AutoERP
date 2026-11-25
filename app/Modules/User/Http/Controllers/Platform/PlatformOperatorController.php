@@ -93,5 +93,4 @@ final class PlatformOperatorController extends Controller
             (string) $request->validated('reason'),
         ));
     }
-
 }

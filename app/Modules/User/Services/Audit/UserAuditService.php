@@ -65,6 +65,7 @@ final class UserAuditService
         ] as $key) {
             unset($snapshot[$key]);
         }
+
         return $snapshot;
     }
 
@@ -76,6 +77,7 @@ final class UserAuditService
                 return $value;
             }
         }
+
         return (string) $subject->getKey();
     }
 }

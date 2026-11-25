@@ -13,7 +13,9 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RentalDashboardService;
+use Modules\VehicleRental\Services\RunningChartService;
 use Tests\TestCase;
 
 final class RentalDashboardTest extends TestCase
@@ -66,7 +68,7 @@ final class RentalDashboardTest extends TestCase
 
     public function test_dashboard_summary_with_running_charts_eager_loads_and_maps_correctly(): void
     {
-        $this->mock(\Modules\VehicleRental\Services\RentalAuthorization::class, function ($mock): void {
+        $this->mock(RentalAuthorization::class, function ($mock): void {
             $mock->shouldReceive('assert')->zeroOrMoreTimes();
             $mock->shouldReceive('assertUse')->zeroOrMoreTimes();
             $mock->shouldReceive('assertChart')->zeroOrMoreTimes();
@@ -74,7 +76,7 @@ final class RentalDashboardTest extends TestCase
         });
 
         $this->custodyFixture(function ($context, $use, $facts): void {
-            $charts = app(\Modules\VehicleRental\Services\RunningChartService::class);
+            $charts = app(RunningChartService::class);
             $chart = $charts->create($context, (int) $use->id, (int) $use->row_version, $facts);
 
             $service = app(RentalDashboardService::class);

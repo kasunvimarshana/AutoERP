@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
-use RuntimeException;
 use Modules\Customer\Models\Customer;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
@@ -32,7 +31,7 @@ use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Models\RentalReservationHistory;
-use Modules\VehicleRental\Services\OperationalTime;
+use RuntimeException;
 
 final class RentalReservationService
 {

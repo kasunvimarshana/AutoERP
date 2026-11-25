@@ -25,6 +25,7 @@ final class VehicleMakeResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'is_active' => (bool) $this->is_active,
+            'row_version' => (int) ($this->row_version ?? 1),
         ];
     }
 }

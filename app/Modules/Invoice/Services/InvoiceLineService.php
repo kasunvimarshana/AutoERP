@@ -65,7 +65,7 @@ final class InvoiceLineService
         foreach ($data->lines as $index => $line) {
             /** @var InvoiceLineData $line */
             $snapshot = $snapshots[$line->lineNumber];
-            $model = new InvoiceLine();
+            $model = new InvoiceLine;
             $model->forceFill([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,

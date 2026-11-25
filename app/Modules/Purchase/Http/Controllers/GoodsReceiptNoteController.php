@@ -13,9 +13,9 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Services\BatchNumberService;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;

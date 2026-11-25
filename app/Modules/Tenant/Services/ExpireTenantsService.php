@@ -31,7 +31,9 @@ use Modules\Tenant\Services\Events\TenantEventOutboxService;
 final class ExpireTenantsService
 {
     private const DEFAULT_LIMIT = 100;
+
     private const MAX_LIMIT = 500;
+
     private const EXPIRY_REASON = 'Subscription or trial expired.';
 
     public function __construct(

@@ -20,7 +20,7 @@ final class TenantSubscriptionPresenter
     public function __construct(private readonly TenantSubscriptionPolicy $policy) {}
 
     /** @param array<string, mixed>|DataRecord $subscription
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     public function present(array|DataRecord $subscription): array
     {

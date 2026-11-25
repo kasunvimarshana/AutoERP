@@ -52,6 +52,7 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
         }
 
         $defaultId = $defaults[0] ?? null;
+
         return $defaultId === null
             ? null
             : $this->resolveById($defaultId, $tenantId, $user->applicationId(), 'default_membership');
@@ -61,6 +62,7 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
     {
         $user = $this->currentUser->current();
         $tenantId = $this->currentTenant->currentTenantId();
+
         return $user !== null
             && $tenantId === $context->tenantId()
             && $context->isActive()
@@ -114,6 +116,7 @@ final class CurrentOrganizationUnitContextResolver implements CurrentOrganizatio
             return null;
         }
         $normalized = trim((string) $value);
+
         return $normalized === '' ? null : $normalized;
     }
 }

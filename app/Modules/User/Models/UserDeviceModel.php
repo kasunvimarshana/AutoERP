@@ -18,11 +18,13 @@ use Modules\Core\Models\TenantOwnedModel;
 final class UserDeviceModel extends TenantOwnedModel
 {
     protected $table = 'user_devices';
+
     protected $fillable = [
         'tenant_id', 'row_version', 'user_id',
         'device_token_hash', 'device_token_encrypted', 'platform', 'device_name',
         'last_active_at', 'revoked_at', 'registered_by_user_id', 'revoked_by_user_id',
     ];
+
     protected $hidden = ['device_token_hash', 'device_token_encrypted'];
 
     protected function casts(): array
@@ -35,5 +37,8 @@ final class UserDeviceModel extends TenantOwnedModel
         ]);
     }
 
-    public function user(): BelongsTo { return $this->belongsTo(UserModel::class, 'user_id'); }
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'user_id');
+    }
 }

@@ -13,8 +13,8 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Services\Storage;
 
 use InvalidArgumentException;
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Tenant\Services\Storage\TenantStorageCleanupService;
 use Modules\Tenant\Services\Storage\TenantStoragePathPolicy;
 use Psr\Log\LoggerInterface;

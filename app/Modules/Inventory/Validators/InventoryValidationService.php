@@ -218,6 +218,6 @@ final class InventoryValidationService
             throw new InvalidArgumentException('Inventory reference belongs to a different tenant.');
         }
 
-        throw (new ModelNotFoundException())->setModel($modelClass, [$id]);
+        throw (new ModelNotFoundException)->setModel($modelClass, [$id]);
     }
 }

@@ -17,7 +17,11 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class CreateRoleRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return UserPermission::ROLES_CREATE; }
+    protected function requiredPermission(): ?string
+    {
+        return UserPermission::ROLES_CREATE;
+    }
+
     public function rules(): array
     {
         return [

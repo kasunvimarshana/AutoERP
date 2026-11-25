@@ -15,9 +15,13 @@ namespace Modules\Configuration\Constants;
 final class ConfigurationValueType
 {
     public const STRING = 'string';
+
     public const INTEGER = 'integer';
+
     public const DECIMAL = 'decimal';
+
     public const BOOLEAN = 'boolean';
+
     public const JSON = 'json';
 
     /** @return list<string> */

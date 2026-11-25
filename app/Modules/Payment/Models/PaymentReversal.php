@@ -21,6 +21,7 @@ use Modules\Tenant\Models\TenantModel;
 final class PaymentReversal extends TenantOwnedModel
 {
     protected $table = 'payment_reversals';
+
     protected $guarded = ['id'];
 
     protected function casts(): array

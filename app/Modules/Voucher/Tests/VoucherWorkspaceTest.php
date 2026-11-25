@@ -67,7 +67,7 @@ final class VoucherWorkspaceTest extends TestCase
                 'requires_instrument_details' => false,
                 'is_active' => true,
             ]);
-            $payment = new Payment();
+            $payment = new Payment;
             $payment->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_number' => 'RV-2026-0001',
@@ -94,7 +94,7 @@ final class VoucherWorkspaceTest extends TestCase
                 'finance_posting_reference' => 'JV-RV-2026-0001',
             ]);
             $payment->save();
-            $line = new PaymentLine();
+            $line = new PaymentLine;
             $line->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_id' => $payment->getKey(),

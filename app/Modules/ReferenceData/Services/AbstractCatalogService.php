@@ -92,7 +92,7 @@ abstract class AbstractCatalogService
     {
         return DB::transaction(function () use ($data): Model {
             $class = $this->modelClass();
-            $model = new $class();
+            $model = new $class;
             $model->fill($this->normalizeCreate($data));
             $model->setAttribute('row_version', 1);
 
@@ -140,8 +140,7 @@ abstract class AbstractCatalogService
 
             $changes = array_filter(
                 $attributes,
-                static fn (mixed $value, string $attribute): bool =>
-                    $current->getAttribute($attribute) !== $value,
+                static fn (mixed $value, string $attribute): bool => $current->getAttribute($attribute) !== $value,
                 ARRAY_FILTER_USE_BOTH,
             );
 

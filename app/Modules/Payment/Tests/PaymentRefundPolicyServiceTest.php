@@ -94,7 +94,7 @@ final class PaymentRefundPolicyServiceTest extends TestCase
         PaymentType $type,
         PaymentDirection $direction,
     ): Payment {
-        $payment = new Payment();
+        $payment = new Payment;
         $payment->forceFill([
             'tenant_id' => $tenantId,
             'payment_number' => 'PAY-'.Str::upper(Str::random(8)),
@@ -120,7 +120,7 @@ final class PaymentRefundPolicyServiceTest extends TestCase
 
     private function unsavedRefund(int $tenantId, Payment $original, ?int $currencyId): Payment
     {
-        $refund = new Payment();
+        $refund = new Payment;
         $refund->forceFill([
             'tenant_id' => $tenantId,
             'payment_type' => PaymentType::Refund->value,

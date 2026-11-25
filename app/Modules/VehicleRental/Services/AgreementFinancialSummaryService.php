@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
@@ -28,6 +29,7 @@ use Modules\VehicleRental\Enums\BaseChargeSource;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\UsageChargeSource;
+use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Models\CustomerBaseCharge;
 use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
@@ -96,7 +98,7 @@ final class AgreementFinancialSummaryService
         $partyType = $isCustomer ? 'customer' : 'supplier';
         $partyId = $isCustomer ? $agreement->customer_id : $agreement->supplier_id;
 
-        $cycleInvoiceIds = \Modules\VehicleRental\Models\BillingCycle::query()
+        $cycleInvoiceIds = BillingCycle::query()
             ->where('tenant_id', $context->tenantId)
             ->where($isCustomer ? 'customer_agreement_id' : 'owner_agreement_id', $agreement->id)
             ->where(function ($q) {
@@ -207,7 +209,7 @@ final class AgreementFinancialSummaryService
         $payments = [];
         try {
             $payments = $this->rentalPaymentService->listAgreementPayments($context, $agreement->id, $kind);
-        } catch (\Illuminate\Auth\Access\AuthorizationException) {
+        } catch (AuthorizationException) {
             // Graceful fallback if user lacks payment view permission
         }
 

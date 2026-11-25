@@ -130,7 +130,6 @@ final class CreateTenantPlanService
         ];
     }
 
-
     private function changeNote(mixed $value): string
     {
         $note = is_scalar($value) ? trim((string) $value) : '';

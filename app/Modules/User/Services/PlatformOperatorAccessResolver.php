@@ -19,10 +19,7 @@ use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\User\Models\PlatformOperatorModel;
 use Modules\User\Models\PlatformOperatorPermissionModel;
 
-final class PlatformOperatorAccessResolver implements
-    PlatformOperatorCheckerInterface,
-    PlatformPermissionCheckerInterface,
-    PlatformPermissionDirectoryInterface
+final class PlatformOperatorAccessResolver implements PlatformOperatorCheckerInterface, PlatformPermissionCheckerInterface, PlatformPermissionDirectoryInterface
 {
     public function __construct(
         private readonly PlatformOperatorModel $operators,

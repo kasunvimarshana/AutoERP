@@ -17,8 +17,8 @@ use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Constants\TenantDomainOperationalStatus;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
 use Modules\Tenant\Constants\TenantStatus;
-use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 use Modules\Tenant\Constants\TenantSubscriptionStatus;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 
 final class ListTenantRequest extends QueryRequest
 {

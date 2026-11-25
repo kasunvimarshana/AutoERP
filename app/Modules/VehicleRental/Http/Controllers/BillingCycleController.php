@@ -19,6 +19,7 @@ use Modules\VehicleRental\Http\Requests\BillingCycleRequest;
 use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\TwoStageInvoicingService;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
@@ -220,7 +221,7 @@ final class BillingCycleController
         $filename = "billing-cycle-statement-{$data['header']['cycle_number']}.pdf";
 
         if ($format === 'pdf') {
-            return \Spatie\LaravelPdf\Facades\Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
+            return Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
                 ->format('A4')
                 ->orientation('portrait')
                 ->margins(8, 10, 8, 10)

@@ -28,8 +28,8 @@ use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\InventorySerialNumber;
 use Modules\Inventory\Models\InventoryStockBalance;
 use Modules\Inventory\Models\InventoryStockStateChange;
-use Modules\Inventory\Services\InventoryAvailabilityService;
 use Modules\Inventory\Services\HistoricalStockBalanceService;
+use Modules\Inventory\Services\InventoryAvailabilityService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class StockController extends InventoryQueryController

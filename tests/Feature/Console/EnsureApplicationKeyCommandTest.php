@@ -18,7 +18,9 @@ use Tests\TestCase;
 final class EnsureApplicationKeyCommandTest extends TestCase
 {
     private string $originalEnvironmentFile;
+
     private mixed $originalApplicationKey;
+
     private string $temporaryEnvironmentFile;
 
     protected function setUp(): void
@@ -137,8 +139,8 @@ final class EnsureApplicationKeyCommandTest extends TestCase
     public function test_it_rejects_multiple_application_key_entries(): void
     {
         config()->set('app.key', '');
-        $contents = "APP_KEY=base64:".base64_encode(str_repeat('a', 32))."\n"
-            ."APP_KEY=base64:".base64_encode(str_repeat('b', 32))."\n";
+        $contents = 'APP_KEY=base64:'.base64_encode(str_repeat('a', 32))."\n"
+            .'APP_KEY=base64:'.base64_encode(str_repeat('b', 32))."\n";
         $this->writeEnvironment($contents);
 
         $this->artisan('app:key:ensure')

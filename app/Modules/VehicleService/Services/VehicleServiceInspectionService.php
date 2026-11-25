@@ -34,8 +34,7 @@ final class VehicleServiceInspectionService
         VehicleServiceJob $job,
         VehicleServiceInspectionData $data,
         ?int $expectedVersion = null,
-    ): VehicleServiceInspection
-    {
+    ): VehicleServiceInspection {
         return DB::transaction(function () use ($job, $data, $expectedVersion): VehicleServiceInspection {
             $job = VehicleServiceJob::query()->with('inspection')->lockForUpdate()->findOrFail($job->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);

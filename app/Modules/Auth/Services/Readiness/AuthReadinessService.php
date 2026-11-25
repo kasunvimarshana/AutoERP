@@ -20,9 +20,9 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Auth\Services\AccessTokenRouter;
 use Modules\Auth\Services\PlatformAuthenticationService;
 use Modules\Auth\Services\PlatformAuthProfileBuilder;
+use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Auth\Services\TenantAuthenticationService;
 use Modules\Auth\Services\TenantAuthProfileBuilder;
-use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\PlatformPermissionDirectoryInterface;
 use Modules\User\Contracts\PlatformOperatorAuthenticationDirectoryInterface;
@@ -32,6 +32,7 @@ use Throwable;
 final readonly class AuthReadinessService
 {
     private const CACHE_PROBE_PREFIX = 'autoerp:auth-readiness:';
+
     private const KEY_FINGERPRINT_LENGTH = 12;
 
     public function __construct(

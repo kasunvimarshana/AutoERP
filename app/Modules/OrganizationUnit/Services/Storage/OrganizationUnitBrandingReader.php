@@ -12,10 +12,10 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Services\Storage;
 
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitBrandingReaderInterface;
 use Modules\OrganizationUnit\Data\OrganizationUnitBrandingProfile;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Tenant\Services\Storage\TenantStoragePathPolicy;
 
 final class OrganizationUnitBrandingReader implements OrganizationUnitBrandingReaderInterface

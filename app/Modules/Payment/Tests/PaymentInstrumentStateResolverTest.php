@@ -27,7 +27,7 @@ final class PaymentInstrumentStateResolverTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->resolver = new PaymentInstrumentStateResolver();
+        $this->resolver = new PaymentInstrumentStateResolver;
     }
 
     public function test_empty_lines_are_pending(): void

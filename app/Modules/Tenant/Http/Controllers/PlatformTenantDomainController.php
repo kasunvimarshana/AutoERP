@@ -15,8 +15,9 @@ namespace Modules\Tenant\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Core\Results\Result;
 use Modules\Core\DTOs\PagedResult;
+use Modules\Core\Results\Error;
+use Modules\Core\Results\Result;
 use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Http\Requests\CreateTenantDomainRequest;
 use Modules\Tenant\Http\Requests\ListTenantDomainRequest;
@@ -25,7 +26,6 @@ use Modules\Tenant\Http\Resources\TenantDomainResource;
 use Modules\Tenant\Http\Support\TenantApiResponder;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Domains\TenantDomainService;
-use Modules\Core\Results\Error;
 
 final class PlatformTenantDomainController extends Controller
 {

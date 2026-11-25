@@ -23,6 +23,7 @@ final class VehicleDocument extends TenantOwnedModel
     use SoftDeletes;
 
     protected $table = 'vehicle_documents';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -38,5 +39,8 @@ final class VehicleDocument extends TenantOwnedModel
         ]);
     }
 
-    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class, 'vehicle_id'); }
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class, 'vehicle_id');
+    }
 }

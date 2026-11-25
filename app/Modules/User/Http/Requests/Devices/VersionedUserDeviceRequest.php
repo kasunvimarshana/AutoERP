@@ -16,6 +16,13 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class VersionedUserDeviceRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return null; }
-    public function rules(): array { return ['expected_version' => ['required', 'integer', 'min:1']]; }
+    protected function requiredPermission(): ?string
+    {
+        return null;
+    }
+
+    public function rules(): array
+    {
+        return ['expected_version' => ['required', 'integer', 'min:1']];
+    }
 }

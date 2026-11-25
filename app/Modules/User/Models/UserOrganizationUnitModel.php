@@ -20,7 +20,7 @@ final class UserOrganizationUnitModel extends TenantOwnedModel
 {
     protected static function booted(): void
     {
-        static::saving(static function (self $model): void {
+        self::saving(static function (self $model): void {
             $isDefault = (bool) $model->getAttribute('is_default');
             $defaultMarker = $model->getAttribute('default_marker');
             $status = (string) $model->getAttribute('status');

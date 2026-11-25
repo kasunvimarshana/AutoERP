@@ -13,15 +13,15 @@ declare(strict_types=1);
 namespace Modules\Warehouse\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
 use Modules\Warehouse\Repositories\EloquentWarehouseLocationRepository;
 use Modules\Warehouse\Repositories\EloquentWarehouseRepository;
 use Modules\Warehouse\Repositories\WarehouseLocationRepositoryInterface;
 use Modules\Warehouse\Repositories\WarehouseRepositoryInterface;
-use Modules\Warehouse\Services\WarehouseAuthorizationService;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Warehouse\Services\TenantLimits\WarehouseLimitUsageContributor;
+use Modules\Warehouse\Services\WarehouseAuthorizationService;
 
 final class WarehouseServiceProvider extends ServiceProvider
 {

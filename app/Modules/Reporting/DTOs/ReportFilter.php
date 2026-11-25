@@ -15,7 +15,7 @@ namespace Modules\Reporting\DTOs;
 final readonly class ReportFilter
 {
     /**
-     * @param array<int, array{value: string, label: string}> $options
+     * @param  array<int, array{value: string, label: string}>  $options
      */
     public function __construct(
         public string $key,

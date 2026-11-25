@@ -24,7 +24,7 @@ final class TenantSubscriptionCommandInput
     public function __construct(private readonly ClockInterface $clock) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{
      *     plan_revision_id:int,
      *     contract_status:string,
@@ -59,7 +59,7 @@ final class TenantSubscriptionCommandInput
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{
      *     plan_revision_id:int,
      *     contract_status:string,
@@ -102,7 +102,7 @@ final class TenantSubscriptionCommandInput
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{starts_at:string,trial_ends_at:?string,ends_at:?string}
      */
     private function period(array $payload, string $contractStatus): array

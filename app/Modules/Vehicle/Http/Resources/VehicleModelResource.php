@@ -31,6 +31,7 @@ final class VehicleModelResource extends JsonResource
             'year_to' => $this->year_to,
             'description' => $this->description,
             'is_active' => (bool) $this->is_active,
+            'row_version' => (int) ($this->row_version ?? 1),
         ];
     }
 }

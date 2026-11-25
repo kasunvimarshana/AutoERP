@@ -28,7 +28,7 @@ final class RequireTenantPermissionMiddlewareTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Container::setInstance(new Container());
+        Container::setInstance(new Container);
     }
 
     protected function tearDown(): void
@@ -142,7 +142,7 @@ final class RequireTenantPermissionMiddlewareTest extends TestCase
             $user,
             $tenant,
             $permissions,
-            new ApiErrorResponseFactory(),
+            new ApiErrorResponseFactory,
         );
     }
 }

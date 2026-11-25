@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -14,9 +15,9 @@ namespace Modules\VehicleRental\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Str;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Constants\IncidentFields;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -107,6 +108,7 @@ final class RentalIncidentService
     public function find(AgreementContext $context, int $id): RentalIncident
     {
         $this->authorization->assertIncident($context, IncidentPermission::View);
+
         return RentalIncident::query()->forContext($context->tenantId, $context->organizationUnitId)
             ->with(['vehicleUse.customerAgreement', 'vehicleUse.ownerAgreement', 'vehicleUse.vehicle', 'runningChart', 'attachments'])
             ->findOrFail($id);
@@ -151,7 +153,7 @@ final class RentalIncidentService
                 ]);
             }
 
-            $incident = new RentalIncident();
+            $incident = new RentalIncident;
             $incident->forceFill([
                 'tenant_id' => $context->tenantId,
                 'organization_unit_id' => $context->organizationUnitId,
@@ -168,6 +170,7 @@ final class RentalIncidentService
                 'created_by' => $context->actorId,
             ])->save();
             $this->recordEvent($incident, $context, IncidentStatus::Recorded->value, null);
+
             return $this->load($incident);
         });
     }
@@ -197,6 +200,7 @@ final class RentalIncidentService
                 'reviewed_at' => now(),
             ])->save();
             $this->recordEvent($incident, $context, $action->value, $reason);
+
             return $this->load($incident);
         });
     }
@@ -211,7 +215,7 @@ final class RentalIncidentService
 
     private function recordEvent(RentalIncident $incident, AgreementContext $context, string $action, ?string $reason): void
     {
-        $event = new RentalIncidentEvent();
+        $event = new RentalIncidentEvent;
         $event->forceFill([
             'tenant_id' => $context->tenantId,
             'incident_id' => $incident->getKey(),

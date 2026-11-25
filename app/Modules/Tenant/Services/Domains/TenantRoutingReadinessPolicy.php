@@ -18,7 +18,9 @@ use Modules\Core\DTOs\DataRecord;
 final class TenantRoutingReadinessPolicy
 {
     public const MODE_VERIFIED_DOMAIN = 'verified_domain';
+
     public const MODE_LOCAL_FALLBACK = 'local_fallback';
+
     public const MODE_UNAVAILABLE = 'unavailable';
 
     public function __construct(
@@ -27,7 +29,7 @@ final class TenantRoutingReadinessPolicy
     ) {}
 
     /**
-     * @param array<string, mixed>|DataRecord|null $primaryDomain
+     * @param  array<string, mixed>|DataRecord|null  $primaryDomain
      * @return array{
      *     ready:bool,
      *     mode:string,

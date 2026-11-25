@@ -17,10 +17,12 @@ use Modules\Core\Models\CoreModel;
 final class AuthPlatformOperatorPasswordCredentialModel extends CoreModel
 {
     protected $table = 'auth_platform_operator_password_credentials';
+
     protected $fillable = [
         'platform_operator_id', 'password_hash', 'status', 'changed_at',
         'revoked_at', 'row_version',
     ];
+
     protected $hidden = ['password_hash'];
 
     protected function casts(): array

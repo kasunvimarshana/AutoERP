@@ -18,7 +18,9 @@ use Modules\Core\Models\TenantOwnedModel;
 final class TenantCurrentSubscriptionModel extends TenantOwnedModel
 {
     public $incrementing = false;
+
     protected $primaryKey = 'tenant_id';
+
     protected $table = 'tenant_current_subscriptions';
 
     protected $fillable = [

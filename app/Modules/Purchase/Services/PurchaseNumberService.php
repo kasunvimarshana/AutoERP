@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
-use RuntimeException;
 use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
+use RuntimeException;
 
 final class PurchaseNumberService
 {

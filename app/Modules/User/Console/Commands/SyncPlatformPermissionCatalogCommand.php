@@ -18,6 +18,7 @@ use Modules\User\Services\Platform\PlatformPermissionCatalogSynchronizer;
 final class SyncPlatformPermissionCatalogCommand extends Command
 {
     protected $signature = 'platform:permissions:sync';
+
     protected $description = 'Synchronize the authoritative platform permission catalogue.';
 
     public function handle(PlatformPermissionCatalogSynchronizer $synchronizer): int

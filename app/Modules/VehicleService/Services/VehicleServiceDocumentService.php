@@ -120,8 +120,7 @@ final class VehicleServiceDocumentService
         VehicleServiceJob $job,
         VehicleServiceDocument $document,
         ?int $expectedVersion = null,
-    ): void
-    {
+    ): void {
         DB::transaction(function () use ($job, $document, $expectedVersion): void {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $document = $job->documents()->findOrFail($document->getKey());

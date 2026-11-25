@@ -15,8 +15,11 @@ namespace Modules\Configuration\Constants;
 final class ConfigurationRevisionOperation
 {
     public const CREATED = 'created';
+
     public const UPDATED = 'updated';
+
     public const REMOVED = 'removed';
+
     public const ROLLED_BACK = 'rolled_back';
 
     /** @return list<string> */

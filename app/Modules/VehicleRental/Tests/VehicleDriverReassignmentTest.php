@@ -12,17 +12,17 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Modules\HR\Models\HrEmployee;
+use Modules\Core\Tenancy\TenantFeature;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\ReassignmentType;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\AgreementAdjustment;
+use Modules\VehicleRental\Models\AgreementAdjustmentHistory;
 use Modules\VehicleRental\Models\VehicleRentalReassignment;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\RentalAuthorization;
@@ -374,7 +374,7 @@ final class VehicleDriverReassignmentTest extends TestCase
 
     public function test_reassignments_index_http_endpoint_returns_audit_list_without_reason_validation_error(): void
     {
-        [$context, $customerData, $ownerData] = $this->loginFixture(null, [\Modules\Core\Tenancy\TenantFeature::VEHICLE_RENTAL]);
+        [$context, $customerData, $ownerData] = $this->loginFixture(null, [TenantFeature::VEHICLE_RENTAL]);
 
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customerData, $ownerData): void {
             $customerData['starts_on'] = '2026-09-01';
@@ -401,7 +401,7 @@ final class VehicleDriverReassignmentTest extends TestCase
                 'reason' => 'Handover',
             ]);
 
-            $reassignment = new VehicleRentalReassignment();
+            $reassignment = new VehicleRentalReassignment;
             $reassignment->tenant_id = $context->tenantId;
             $reassignment->reassignment_type = ReassignmentType::VehicleReplacement;
             $reassignment->customer_agreement_id = $customerAg->id;
@@ -479,7 +479,7 @@ final class VehicleDriverReassignmentTest extends TestCase
             // Verify AgreementAdjustment and AgreementAdjustmentHistory created
             $adj = AgreementAdjustment::query()->where('owner_agreement_id', $ownerAg->id)->first();
             $this->assertNotNull($adj);
-            $history = \Modules\VehicleRental\Models\AgreementAdjustmentHistory::query()->where('adjustment_id', $adj->id)->first();
+            $history = AgreementAdjustmentHistory::query()->where('adjustment_id', $adj->id)->first();
             $this->assertNotNull($history);
             $this->assertSame('draft', $history->from_status->value);
             $this->assertSame('authorized', $history->to_status->value);

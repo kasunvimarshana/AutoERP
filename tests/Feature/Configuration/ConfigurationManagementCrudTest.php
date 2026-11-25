@@ -402,7 +402,7 @@ final class ConfigurationManagementCrudTest extends TestCase
     }
 
     /**
-     * @param list<string> $permissions
+     * @param  list<string>  $permissions
      * @return array{tenant_id: int, organization_unit_id: int, user_id: int, role_id: int, token: string}
      */
     private function createAuthContext(

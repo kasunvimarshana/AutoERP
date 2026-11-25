@@ -15,7 +15,7 @@ namespace Modules\Tax\Data;
 final readonly class TaxPaymentWithholdingData
 {
     /**
-     * @param list<TaxPaymentWithholdingAllocationData> $allocations
+     * @param  list<TaxPaymentWithholdingAllocationData>  $allocations
      */
     public function __construct(
         public int $tenantId,

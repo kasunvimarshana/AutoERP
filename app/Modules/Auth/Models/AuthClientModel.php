@@ -17,11 +17,13 @@ use Modules\Core\Models\TenantOwnedModel;
 final class AuthClientModel extends TenantOwnedModel
 {
     protected $table = 'auth_clients';
+
     protected $fillable = [
         'tenant_id', 'client_key', 'client_name', 'client_secret_hash', 'status',
         'allowed_grant_types', 'allowed_scopes', 'redirect_uris', 'is_confidential',
         'is_first_party', 'secret_rotated_at', 'expires_at', 'row_version',
     ];
+
     protected $hidden = ['client_secret_hash'];
 
     protected function casts(): array

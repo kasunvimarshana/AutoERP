@@ -23,6 +23,7 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
     use HasExpectedVehicleServiceJobVersion;
 
     private const DEFAULT_DECIMAL_VALUE = '0.000000';
+
     private const DEFAULT_STATUS = 'assigned';
 
     public function rules(): array

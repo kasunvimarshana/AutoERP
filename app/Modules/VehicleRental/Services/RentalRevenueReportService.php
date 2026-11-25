@@ -14,6 +14,7 @@ namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -222,7 +223,7 @@ final class RentalRevenueReportService
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, CustomerAgreement>  $agreements
+     * @param  Collection<int, CustomerAgreement>  $agreements
      * @param  array<int, array<string, mixed>>  $agreementRows
      * @return array<int, array<string, mixed>>
      */

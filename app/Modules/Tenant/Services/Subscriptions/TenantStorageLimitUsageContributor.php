@@ -12,10 +12,9 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Subscriptions;
 
-use Modules\Core\Tenancy\TenantPlanLimit;
-
-use Modules\Tenant\Models\TenantDocumentModel;
 use Modules\Core\Contracts\TenantLimitUsageContributorInterface;
+use Modules\Core\Tenancy\TenantPlanLimit;
+use Modules\Tenant\Models\TenantDocumentModel;
 
 final class TenantStorageLimitUsageContributor implements TenantLimitUsageContributorInterface
 {

@@ -19,6 +19,7 @@ use Modules\Tenant\Constants\TenantDomainCheckStatus;
 use Modules\Tenant\Constants\TenantDomainOperationalStatus;
 use Modules\Tenant\Constants\TenantDomainOwnershipStatus;
 use Modules\Tenant\Constants\TenantDomainStatus;
+use Modules\Tenant\Models\TenantDomainModel;
 
 final class TenantDomainReadinessPolicy
 {
@@ -115,7 +116,7 @@ final class TenantDomainReadinessPolicy
         );
     }
 
-    /** @param Builder<\Modules\Tenant\Models\TenantDomainModel> $query */
+    /** @param Builder<TenantDomainModel> $query */
     public function applyReadyScope(Builder $query, string $table = 'tenant_domains'): Builder
     {
         return $query

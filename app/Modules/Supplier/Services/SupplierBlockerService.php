@@ -59,9 +59,9 @@ final class SupplierBlockerService
         }
 
         return DB::table($table)
-                ->where('tenant_id', $tenantId)
-                ->where($column, $id)
-                ->exists();
+            ->where('tenant_id', $tenantId)
+            ->where($column, $id)
+            ->exists();
     }
 
     private function partyReferenced(string $table, int $id, string $type, int $tenantId): bool
@@ -71,9 +71,9 @@ final class SupplierBlockerService
         }
 
         return DB::table($table)
-                ->where('tenant_id', $tenantId)
-                ->where('party_id', $id)
-                ->whereIn('party_type', [$type, Supplier::class])
-                ->exists();
+            ->where('tenant_id', $tenantId)
+            ->where('party_id', $id)
+            ->whereIn('party_type', [$type, Supplier::class])
+            ->exists();
     }
 }

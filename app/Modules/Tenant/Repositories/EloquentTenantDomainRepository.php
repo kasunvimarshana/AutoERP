@@ -12,14 +12,15 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
-use Modules\Core\Contracts\ClockInterface;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
+use Modules\Tenant\Constants\TenantDomainCheckStatus;
 use Modules\Tenant\Constants\TenantDomainOperationalStatus;
 use Modules\Tenant\Constants\TenantDomainOwnershipStatus;
 use Modules\Tenant\Constants\TenantDomainStatus;
@@ -438,7 +439,7 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
             ->update([
                 'revalidation_claim_token' => null,
                 'revalidation_claimed_at' => null,
-            'revalidation_claim_lease_expires_at' => null,
+                'revalidation_claim_lease_expires_at' => null,
                 'verification_error_code' => mb_substr(trim((string) $errorCode), 0, 100),
                 'verification_error_message' => mb_substr(trim((string) $errorMessage), 0, 500),
                 'row_version' => $expectedVersion + 1,
@@ -499,15 +500,15 @@ final class EloquentTenantDomainRepository implements TenantDomainRepositoryInte
                         'verification_failure_count' => DB::raw('verification_failure_count + 1'),
                         'ownership_status' => TenantDomainOwnershipStatus::FAILED,
                         'verified_at' => null,
-                        'routing_status' => \Modules\Tenant\Constants\TenantDomainCheckStatus::PENDING,
-                        'tls_status' => \Modules\Tenant\Constants\TenantDomainCheckStatus::PENDING,
-                        'reachability_status' => \Modules\Tenant\Constants\TenantDomainCheckStatus::PENDING,
+                        'routing_status' => TenantDomainCheckStatus::PENDING,
+                        'tls_status' => TenantDomainCheckStatus::PENDING,
+                        'reachability_status' => TenantDomainCheckStatus::PENDING,
                         'operational_status' => TenantDomainOperationalStatus::DISABLED,
                         'verification_error_code' => mb_substr(trim((string) $errorCode), 0, 100),
                         'verification_error_message' => mb_substr(trim((string) $errorMessage), 0, 500),
                         'revalidation_claim_token' => null,
                         'revalidation_claimed_at' => null,
-            'revalidation_claim_lease_expires_at' => null,
+                        'revalidation_claim_lease_expires_at' => null,
                         'row_version' => $expectedVersion + 1,
                         'updated_by' => $updatedBy,
                         'updated_at' => $attemptedAt,

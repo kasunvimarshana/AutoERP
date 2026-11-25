@@ -22,6 +22,7 @@ final class VehicleCategory extends TenantOwnedModel
     use SoftDeletes;
 
     protected $table = 'vehicle_categories';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -35,7 +36,18 @@ final class VehicleCategory extends TenantOwnedModel
         ]);
     }
 
-    public function parent(): BelongsTo { return $this->belongsTo(self::class, 'parent_id'); }
-    public function children(): HasMany { return $this->hasMany(self::class, 'parent_id'); }
-    public function vehicles(): HasMany { return $this->hasMany(Vehicle::class, 'vehicle_category_id'); }
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class, 'vehicle_category_id');
+    }
 }

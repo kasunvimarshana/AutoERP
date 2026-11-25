@@ -1,6 +1,6 @@
 # AutoERP Migration and Architecture Foundation Audit
 
-Audit date: 2026-06-28
+Audit date: 2026-11-26
 
 Scope: canonical create migrations and the architecture-foundation ownership milestone recovered from the verified Item Pricing baseline. This is a source-level audit; runtime database migration success is a separate release gate.
 
@@ -12,7 +12,7 @@ Scope: canonical create migrations and the architecture-foundation ownership mil
 - No duplicate migration timestamps or table creations remain.
 - Native database enum calls: 0. Governed values use bounded portable string columns and application/domain validation.
 - Explicit key names scanned: 2,010; longest identifier: 60 characters.
-- Production module graph: 29 modules, 183 direct edges, 0 cyclic components.
+- Production module graph: 32 backend modules (28 database-owning modules), 0 cyclic components.
 - The generic `Extension` module and duplicate `customer_vehicles` / `supplier_vehicles` persistence were removed.
 - `Idempotency` owns idempotency persistence. `PrivateObject` owns private storage capability and intentionally has no database table.
 
@@ -149,7 +149,7 @@ Tables (4): `countries`, `currencies`, `languages`, `timezones`.
 - **Migration Architecture Integrity:** `ModuleMigrationBaselineTest` and `HistoricalRetentionMigrationTest` 100% compliant (302 modular migrations, 5 root migrations, 307 total, 0 `Schema::table` patches, `restrictOnDelete` enforced on all status history tables).
 - **Frontend Test Suite:** 177 Vitest test files (745 tests passed, 0 failures) with React 19 testing library (Vitest 5.x).
 - **TypeScript Static Typing:** 0 errors across 922+ source files in strict compilation mode (`tsc --noEmit`).
-- **Code Style & Formatting:** 0 Pint violations (`vendor/bin/pint --test`) and 0 ESLint errors.
+- **Code Style & Formatting:** 0 Pint violations (`php vendor/bin/pint --test`) and 0 ESLint errors.
 
 ## Deployment note
 

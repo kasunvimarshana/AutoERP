@@ -13,16 +13,16 @@ declare(strict_types=1);
 namespace Modules\Auth\Services\Credentials;
 
 use Illuminate\Database\DatabaseManager;
+use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Auth\Enums\CredentialStatus;
 use Modules\Auth\Enums\IdentityStatus;
 use Modules\Auth\Enums\ProviderStatus;
 use Modules\Auth\Models\AuthIdentityModel;
-use Modules\Auth\Models\AuthProviderModel;
 use Modules\Auth\Models\AuthPlatformOperatorPasswordCredentialModel;
+use Modules\Auth\Models\AuthProviderModel;
 use Modules\Auth\Models\AuthUserPasswordCredentialModel;
 use Modules\Auth\Security\PasswordPolicy;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Contracts\TenantUserCredentialProvisionerInterface;
@@ -30,6 +30,7 @@ use Modules\User\Contracts\TenantUserCredentialProvisionerInterface;
 final readonly class PasswordCredentialService implements PlatformOperatorCredentialProvisionerInterface, TenantUserCredentialProvisionerInterface
 {
     private const INTERNAL_PROVIDER_NAME = 'Internal authentication';
+
     private const INTERNAL_PROVIDER_DRIVER = 'internal';
 
     public function __construct(
@@ -137,6 +138,7 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
                     }
                 }, 3);
             }
+
             return true;
         });
     }
@@ -165,7 +167,7 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
         $this->executionContext->runAsControlPlane(fn () => $this->database->transaction(function () use ($platformOperatorId, $plainPassword): void {
             $credential = AuthPlatformOperatorPasswordCredentialModel::query()
                 ->where('platform_operator_id', $platformOperatorId)->lockForUpdate()->first();
-            $credential ??= new AuthPlatformOperatorPasswordCredentialModel();
+            $credential ??= new AuthPlatformOperatorPasswordCredentialModel;
             $credential->forceFill([
                 'platform_operator_id' => $platformOperatorId,
                 'password_hash' => $this->hasher->hash($plainPassword),
@@ -206,6 +208,7 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
                     }
                 }, 3);
             }
+
             return true;
         });
     }
@@ -214,7 +217,7 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
     {
         $credential = AuthUserPasswordCredentialModel::query()
             ->where('user_id', $userId)->lockForUpdate()->first();
-        $credential ??= new AuthUserPasswordCredentialModel();
+        $credential ??= new AuthUserPasswordCredentialModel;
         $credential->forceFill([
             'tenant_id' => $tenantId,
             'user_id' => $userId,

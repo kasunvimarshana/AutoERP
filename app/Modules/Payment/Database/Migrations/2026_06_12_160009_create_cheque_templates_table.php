@@ -20,6 +20,7 @@ return new class extends Migration
     {
         Schema::create('cheque_templates', function (Blueprint $table) {
             $table->id();
+            $table->unsignedInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'cheque_templates_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('bank_name')->nullable();

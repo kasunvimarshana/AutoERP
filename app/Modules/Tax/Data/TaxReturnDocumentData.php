@@ -15,8 +15,8 @@ namespace Modules\Tax\Data;
 final readonly class TaxReturnDocumentData
 {
     /**
-     * @param list<TaxReturnLineData> $lines
-     * @param array<string, mixed> $noteMetadata
+     * @param  list<TaxReturnLineData>  $lines
+     * @param  array<string, mixed>  $noteMetadata
      */
     public function __construct(
         public int $tenantId,

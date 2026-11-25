@@ -301,7 +301,6 @@ final class ItemValidationService
         }
     }
 
-
     private function parseDate(string $value, string $message): CarbonImmutable
     {
         try {
@@ -599,8 +598,7 @@ final class ItemValidationService
         ?int $uomId,
         string $message,
         bool $allowPurchasePack = false,
-    ): void
-    {
+    ): void {
         if ($uomId === null) {
             return;
         }

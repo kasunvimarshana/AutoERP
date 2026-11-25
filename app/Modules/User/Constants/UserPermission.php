@@ -15,23 +15,39 @@ namespace Modules\User\Constants;
 final class UserPermission
 {
     public const USERS_VIEW = 'users.view';
+
     public const USERS_CREATE = 'users.create';
+
     public const USERS_UPDATE = 'users.update';
+
     public const USERS_DELETE = 'users.delete';
+
     public const USERS_ACTIVATE = 'users.activate';
+
     public const USERS_DEACTIVATE = 'users.deactivate';
+
     public const USERS_ASSIGN_ROLES = 'users.assign_roles';
+
     public const USERS_ASSIGN_PERMISSIONS = 'users.assign_permissions';
+
     public const USERS_MANAGE_ORGANIZATION_ACCESS = 'users.manage_organization_access';
+
     public const USER_DOCUMENTS_VIEW = 'users.documents.view';
+
     public const USER_DOCUMENTS_MANAGE = 'users.documents.manage';
+
     public const USER_DEVICES_VIEW = 'users.devices.view';
+
     public const USER_DEVICES_MANAGE = 'users.devices.manage';
 
     public const ROLES_VIEW = 'roles.view';
+
     public const ROLES_CREATE = 'roles.create';
+
     public const ROLES_UPDATE = 'roles.update';
+
     public const ROLES_DELETE = 'roles.delete';
+
     public const ROLES_ASSIGN_PERMISSIONS = 'roles.assign_permissions';
 
     public const PERMISSIONS_VIEW = 'permissions.view';

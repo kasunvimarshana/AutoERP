@@ -15,13 +15,21 @@ namespace Modules\Finance\DTOs;
 readonly class PostingLine
 {
     public string $accountName;
+
     public string $debit;
+
     public string $credit;
+
     public ?string $description;
+
     public ?string $profileKey;
+
     public ?string $dimensionCode;
+
     public ?string $sourceLineType;
+
     public ?int $sourceLineId;
+
     /** @var array<string, string|null> */
     public array $dimensions;
 

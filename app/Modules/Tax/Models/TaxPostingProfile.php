@@ -47,5 +47,4 @@ final class TaxPostingProfile extends TenantOwnedModel
     {
         return $this->belongsTo(Tax::class, 'tax_id');
     }
-
 }

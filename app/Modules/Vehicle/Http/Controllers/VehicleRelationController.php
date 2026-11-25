@@ -14,10 +14,8 @@ namespace Modules\Vehicle\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\Vehicle\Models\Vehicle;
-use Modules\Vehicle\Models\VehicleDocument;
-use Modules\Vehicle\Http\Requests\ListVehicleRequest;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Vehicle\Http\Requests\ListVehicleRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleAttributeRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleDocumentRequest;
 use Modules\Vehicle\Http\Requests\UpdateVehicleAttributeRequest;
@@ -25,6 +23,8 @@ use Modules\Vehicle\Http\Requests\UpdateVehicleDocumentRequest;
 use Modules\Vehicle\Http\Resources\VehicleAttributeResource;
 use Modules\Vehicle\Http\Resources\VehicleDocumentResource;
 use Modules\Vehicle\Http\Resources\VehicleStatusHistoryResource;
+use Modules\Vehicle\Models\Vehicle;
+use Modules\Vehicle\Models\VehicleDocument;
 use Modules\Vehicle\Services\VehicleAttributeService;
 use Modules\Vehicle\Services\VehicleAuthorizationService;
 use Modules\Vehicle\Services\VehicleDocumentService;
@@ -63,6 +63,7 @@ final class VehicleRelationController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::MANAGE_DOCUMENTS);
 
         $model = $this->vehicle($request, $vehicle);
+
         return new VehicleDocumentResource($this->documents->update($model, $this->relations->document($model, $document), $request->toData()));
     }
 
@@ -72,6 +73,7 @@ final class VehicleRelationController
 
         $model = $this->vehicle($request, $vehicle);
         $this->documents->delete($model, $this->relations->document($model, $document));
+
         return response()->json(null, 204);
     }
 
@@ -112,6 +114,7 @@ final class VehicleRelationController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::MANAGE_ATTRIBUTES);
 
         $model = $this->vehicle($request, $vehicle);
+
         return new VehicleAttributeResource($this->attributes->update($model, $this->relations->attribute($model, $attribute), $request->toData()));
     }
 
@@ -121,6 +124,7 @@ final class VehicleRelationController
 
         $model = $this->vehicle($request, $vehicle);
         $this->attributes->delete($model, $this->relations->attribute($model, $attribute));
+
         return response()->json(null, 204);
     }
 

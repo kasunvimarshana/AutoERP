@@ -41,6 +41,7 @@ use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\Payment\Services\PaymentSettlementService;
 use Modules\Payment\Services\PaymentUpdateService;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Symfony\Component\HttpFoundation\Response;
 
 final class PaymentController
@@ -267,7 +268,7 @@ final class PaymentController
         $filename = "payment-receipt-{$data['payment_number']}.pdf";
 
         if ($format === 'pdf') {
-            return \Spatie\LaravelPdf\Facades\Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
+            return Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
                 ->format('A4')
                 ->orientation('portrait')
                 ->margins(10, 12, 10, 12)

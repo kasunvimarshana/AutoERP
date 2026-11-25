@@ -18,6 +18,7 @@ use Modules\Auth\Services\AuthRetentionService;
 final class AuthRetentionPurgeCommand extends Command
 {
     protected $signature = 'auth:retention:purge';
+
     protected $description = 'Purge expired Auth operational records according to configured retention periods.';
 
     public function handle(AuthRetentionService $retention): int
@@ -26,6 +27,7 @@ final class AuthRetentionPurgeCommand extends Command
         foreach ($counts as $recordType => $count) {
             $this->line(sprintf('%s: %d', $recordType, $count));
         }
+
         return self::SUCCESS;
     }
 }

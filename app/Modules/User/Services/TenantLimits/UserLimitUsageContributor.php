@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\User\Services\TenantLimits;
 
-use Modules\Core\Tenancy\TenantPlanLimit;
 use Modules\Core\Contracts\TenantLimitUsageContributorInterface;
+use Modules\Core\Tenancy\TenantPlanLimit;
 use Modules\User\Models\UserModel;
 
 final class UserLimitUsageContributor implements TenantLimitUsageContributorInterface

@@ -6,7 +6,7 @@
  * Phone: +94713525253
  */
 
-import { businessDateTimeInputValue } from '@/shared/utils/businessDate';
+import { businessDateTimeInputValue, businessTimestampWithOffset } from '@/shared/utils/businessDate';
 import type {
     TenantCurrentSubscription,
     TenantPlanRevision,
@@ -57,11 +57,15 @@ export function normalizedReason(value: string): string | null {
 }
 
 export function toIsoOrNull(value: string): string | null {
-    return value === '' ? null : new Date(value).toISOString();
+    return value === '' ? null : toIso(value);
 }
 
 export function toIso(value: string): string {
-    return new Date(value).toISOString();
+    if (/(Z|[+-]\d{2}:\d{2})$/i.test(value)) {
+        return new Date(value).toISOString();
+    }
+
+    return new Date(businessTimestampWithOffset(value)).toISOString();
 }
 
 export function toLocalDateTime(value: string | null | undefined): string {

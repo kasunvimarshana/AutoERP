@@ -15,6 +15,7 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Modules\VehicleRental\Http\Requests\RentalBillingDocumentRequest;
 use Modules\VehicleRental\Services\RentalBillingDocumentService;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RentalBillingDocumentController
@@ -102,7 +103,7 @@ final class RentalBillingDocumentController
         $filename = "billing-statement-{$data['header']['cycle_number']}.pdf";
 
         if ($format === 'pdf') {
-            return \Spatie\LaravelPdf\Facades\Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
+            return Pdf::view($viewName, array_merge($data, ['mode' => 'pdf']))
                 ->format('A4')
                 ->orientation('portrait')
                 ->margins(8, 10, 8, 10)

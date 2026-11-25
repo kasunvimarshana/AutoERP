@@ -42,7 +42,7 @@ final class TenantOrganizationProvisioner implements TenantOrganizationProvision
                     ])->save();
                 }
             } else {
-                $type = new OrganizationUnitTypeModel();
+                $type = new OrganizationUnitTypeModel;
                 $type->forceFill([
                     'tenant_id' => $tenantId,
                     'name' => self::ROOT_TYPE_NAME,

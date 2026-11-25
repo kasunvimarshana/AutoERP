@@ -82,7 +82,6 @@ final class AuthTrustBoundaryTest extends TestCase
         }
     }
 
-
     public function test_public_tenant_auth_resolves_workspace_without_requiring_a_preexisting_session(): void
     {
         $routes = $this->source('app/Modules/Auth/Routes/api.php');

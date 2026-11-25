@@ -15,10 +15,15 @@ namespace Modules\Tenant\Constants;
 final class TenantPermission
 {
     public const PROFILE_VIEW = 'tenant.profile.view';
+
     public const PROFILE_MANAGE = 'tenant.profile.manage';
+
     public const DOMAINS_VIEW = 'tenant.domains.view';
+
     public const DOMAINS_MANAGE = 'tenant.domains.manage';
+
     public const DOCUMENTS_VIEW = 'tenant.documents.view';
+
     public const DOCUMENTS_MANAGE = 'tenant.documents.manage';
 
     /** @return array<string, string> */

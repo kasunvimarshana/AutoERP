@@ -55,6 +55,7 @@ final class OrganizationUnitController extends Controller
     {
         $this->authorize($request, OrganizationUnitPermission::VIEW);
         $result = $this->units->get($organizationUnit);
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitResource($result->valueOrFail());
@@ -64,6 +65,7 @@ final class OrganizationUnitController extends Controller
     {
         $this->authorize($request, OrganizationUnitPermission::CREATE);
         $result = $this->units->create($request->validated());
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : (new OrganizationUnitResource($result->valueOrFail()))->response()->setStatusCode(201);
@@ -73,6 +75,7 @@ final class OrganizationUnitController extends Controller
     {
         $this->authorize($request, OrganizationUnitPermission::UPDATE);
         $result = $this->units->update($organizationUnit, $request->validated());
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitResource($result->valueOrFail());
@@ -82,6 +85,7 @@ final class OrganizationUnitController extends Controller
     {
         $this->authorize($request, OrganizationUnitPermission::ACTIVATE);
         $result = $this->units->activate($organizationUnit, (int) $request->validated('expected_version'));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitResource($result->valueOrFail());
@@ -91,6 +95,7 @@ final class OrganizationUnitController extends Controller
     {
         $this->authorize($request, OrganizationUnitPermission::DEACTIVATE);
         $result = $this->units->deactivate($organizationUnit, (int) $request->validated('expected_version'));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitResource($result->valueOrFail());
@@ -100,6 +105,7 @@ final class OrganizationUnitController extends Controller
     {
         $this->authorize($request, OrganizationUnitPermission::RETIRE);
         $result = $this->units->retire($organizationUnit, (int) $request->validated('expected_version'));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitResource($result->valueOrFail());
@@ -115,6 +121,7 @@ final class OrganizationUnitController extends Controller
             (int) $request->validated('expected_version'),
             $file->getRealPath(),
         );
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitResource($result->valueOrFail());
@@ -124,6 +131,7 @@ final class OrganizationUnitController extends Controller
     {
         $this->authorize($request, OrganizationUnitPermission::UPDATE);
         $result = $this->units->removeLogo($organizationUnit, (int) $request->validated('expected_version'));
+
         return $result->isFailure()
             ? OrganizationUnitApiResponder::error($result->errorOrFail())
             : new OrganizationUnitResource($result->valueOrFail());

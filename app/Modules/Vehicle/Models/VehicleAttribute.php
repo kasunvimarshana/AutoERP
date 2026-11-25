@@ -19,6 +19,7 @@ use Modules\Vehicle\Enums\VehicleAttributeDataType;
 final class VehicleAttribute extends TenantOwnedModel
 {
     protected $table = 'vehicle_attributes';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -32,5 +33,8 @@ final class VehicleAttribute extends TenantOwnedModel
         ]);
     }
 
-    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class, 'vehicle_id'); }
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class, 'vehicle_id');
+    }
 }

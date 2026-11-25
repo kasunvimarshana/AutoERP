@@ -162,5 +162,4 @@ final class TenantController extends Controller
             ? TenantApiResponder::error($result->errorOrFail())
             : new TenantResource($result->valueOrFail());
     }
-
 }

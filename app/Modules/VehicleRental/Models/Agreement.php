@@ -14,9 +14,11 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\DriverMode;
@@ -57,7 +59,7 @@ abstract class Agreement extends TenantOwnedModel
 
     public function tenant(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Tenant\Models\TenantModel::class, 'tenant_id');
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function supersedesAgreement(): BelongsTo
@@ -65,7 +67,7 @@ abstract class Agreement extends TenantOwnedModel
         return $this->belongsTo(static::class, 'supersedes_agreement_id');
     }
 
-    public function successorAgreement(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function successorAgreement(): HasOne
     {
         return $this->hasOne(static::class, 'supersedes_agreement_id');
     }

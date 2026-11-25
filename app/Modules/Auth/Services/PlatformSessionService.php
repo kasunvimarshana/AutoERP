@@ -77,7 +77,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
         return $this->executionContext->runAsControlPlane(function () use ($publicId, $reason): array {
             $session = AuthPlatformSessionModel::query()->where('public_id', trim($publicId))->first();
             if (! $session instanceof AuthPlatformSessionModel) {
-                throw (new ModelNotFoundException())->setModel(AuthPlatformSessionModel::class, [$publicId]);
+                throw (new ModelNotFoundException)->setModel(AuthPlatformSessionModel::class, [$publicId]);
             }
             $this->tokens->revokeSession(
                 (int) $session->getKey(),
@@ -86,6 +86,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
             );
             $fresh = $session->fresh() ?? $session;
             $summary = $this->operators->summariesByIds([(int) $session->getAttribute('platform_operator_id')]);
+
             return $this->present($fresh, $summary[(int) $session->getAttribute('platform_operator_id')] ?? null);
         });
     }
@@ -93,7 +94,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
     public function revokeAllForOperator(int $operatorId, string $reason): int
     {
         if ($this->operators->summariesByIds([$operatorId]) === []) {
-            throw (new ModelNotFoundException())->setModel('platform_operator', [$operatorId]);
+            throw (new ModelNotFoundException)->setModel('platform_operator', [$operatorId]);
         }
 
         return $this->executionContext->runAsControlPlane(function () use ($operatorId, $reason): int {
@@ -106,6 +107,7 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
             foreach ($sessionIds as $sessionId) {
                 $this->tokens->revokeSession($sessionId, $operatorId, $reason);
             }
+
             return count($sessionIds);
         });
     }

@@ -14,10 +14,8 @@ namespace Modules\VehicleRental\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Validator;
-use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
-use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\OwnerAgreement;
 
 final class OwnerSourceService

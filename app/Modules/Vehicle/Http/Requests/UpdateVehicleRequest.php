@@ -98,6 +98,13 @@ final class UpdateVehicleRequest extends TenantScopedRequest
         );
     }
 
-    private function stringOrNull(string $key): ?string { return $this->filled($key) ? (string) $this->input($key) : null; }
-    private function integerOrNull(string $key): ?int { return $this->filled($key) ? (int) $this->input($key) : null; }
+    private function stringOrNull(string $key): ?string
+    {
+        return $this->filled($key) ? (string) $this->input($key) : null;
+    }
+
+    private function integerOrNull(string $key): ?int
+    {
+        return $this->filled($key) ? (int) $this->input($key) : null;
+    }
 }

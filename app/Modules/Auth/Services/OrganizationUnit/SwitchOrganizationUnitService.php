@@ -123,6 +123,7 @@ final readonly class SwitchOrganizationUnitService
             return null;
         }
         $value = (int) $value;
+
         return $value > 0 ? $value : null;
     }
 

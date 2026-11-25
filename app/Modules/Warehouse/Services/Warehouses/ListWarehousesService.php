@@ -13,9 +13,9 @@ declare(strict_types=1);
 namespace Modules\Warehouse\Services\Warehouses;
 
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
-use Modules\Core\DTOs\PagedResult;
 use Modules\Warehouse\Constants\WarehouseDefaults;
 use Modules\Warehouse\Constants\WarehouseErrorCode;
 use Modules\Warehouse\Models\WarehouseModel;

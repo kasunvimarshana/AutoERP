@@ -14,6 +14,7 @@ namespace Modules\Supplier\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Supplier\Http\Requests\ListSupplierRequest;
 use Modules\Supplier\Http\Requests\StoreSupplierCategoryRequest;
@@ -21,6 +22,7 @@ use Modules\Supplier\Http\Requests\UpdateSupplierCategoryRequest;
 use Modules\Supplier\Http\Resources\SupplierCategoryResource;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\Supplier\Services\SupplierCategoryService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class SupplierCategoryController
 {
@@ -60,13 +62,28 @@ final class SupplierCategoryController
     public function update(UpdateSupplierCategoryRequest $request, int $supplier_category): SupplierCategoryResource
     {
         $this->authorize($request);
-        $category = $this->categories->find(
-            $supplier_category,
-            $request->tenantId(),
-            $request->organizationUnitId(),
-        );
+        $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
 
-        return new SupplierCategoryResource($this->categories->update($category, $request->toData()));
+        $updated = DB::transaction(function () use ($request, $supplier_category, $expectedVersion) {
+            $category = $this->categories->find(
+                $supplier_category,
+                $request->tenantId(),
+                $request->organizationUnitId(),
+            );
+            $category = $category->newQuery()->lockForUpdate()->findOrFail($category->getKey());
+
+            if ($expectedVersion !== null && (int) $category->row_version !== $expectedVersion) {
+                throw new ConflictHttpException('Supplier category was changed by someone else. Reload before saving.');
+            }
+
+            $nextVersion = ((int) $category->row_version) + 1;
+            $saved = $this->categories->update($category, $request->toData());
+            $saved->forceFill(['row_version' => $nextVersion])->save();
+
+            return $saved;
+        });
+
+        return new SupplierCategoryResource($updated);
     }
 
     public function destroy(ListSupplierRequest $request, int $supplier_category): JsonResponse

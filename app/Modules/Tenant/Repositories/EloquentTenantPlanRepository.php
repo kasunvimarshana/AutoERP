@@ -12,16 +12,16 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
-use Modules\Core\Contracts\ClockInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
+use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Constants\TenantSubscriptionStatus;
 use Modules\Tenant\Models\TenantPlanModel;
 use Modules\Tenant\Models\TenantPlanRevisionModel;
-use Modules\ReferenceData\Contracts\CurrencyDirectoryInterface;
 
 final class EloquentTenantPlanRepository implements TenantPlanRepositoryInterface
 {

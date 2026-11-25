@@ -15,24 +15,43 @@ namespace Modules\Core\Authorization;
 final class PlatformPermission
 {
     public const TENANTS_VIEW = 'platform.tenants.view';
+
     public const TENANTS_CREATE = 'platform.tenants.create';
+
     public const TENANTS_UPDATE = 'platform.tenants.update';
+
     public const TENANTS_ONBOARD = 'platform.tenants.onboard';
+
     public const TENANTS_LIFECYCLE = 'platform.tenants.lifecycle';
+
     public const TENANT_DOMAINS_MANAGE = 'platform.tenant_domains.manage';
+
     public const TENANT_SUBSCRIPTIONS_MANAGE = 'platform.tenant_subscriptions.manage';
+
     public const PLANS_VIEW = 'platform.plans.view';
+
     public const PLANS_MANAGE = 'platform.plans.manage';
+
     public const CONFIGURATION_VIEW = 'platform.configuration.view';
+
     public const CONFIGURATION_MANAGE = 'platform.configuration.manage';
+
     public const SECRETS_MANAGE = 'platform.secrets.manage';
+
     public const AUDIT_VIEW = 'platform.audit.view';
+
     public const AUDIT_SENSITIVE_VIEW = 'platform.audit.sensitive.view';
+
     public const OPERATORS_VIEW = 'platform.operators.view';
+
     public const OPERATORS_MANAGE = 'platform.operators.manage';
+
     public const SESSIONS_VIEW = 'platform.sessions.view';
+
     public const SESSIONS_MANAGE = 'platform.sessions.manage';
+
     public const HEALTH_VIEW = 'platform.health.view';
+
     public const HEALTH_MANAGE = 'platform.health.manage';
 
     /** @return array<string, string> */

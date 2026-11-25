@@ -18,10 +18,10 @@ use Modules\Vehicle\Enums\VehicleTransmissionType;
 final readonly class UpdateVehicleData
 {
     /**
-     * @param array<string, mixed>|null $metadata
-     * @param list<VehicleDocumentData>|null $documents
-     * @param list<VehicleAttributeData>|null $attributes
-     * @param list<string> $provided
+     * @param  array<string, mixed>|null  $metadata
+     * @param  list<VehicleDocumentData>|null  $documents
+     * @param  list<VehicleAttributeData>|null  $attributes
+     * @param  list<string>  $provided
      */
     public function __construct(
         public int $rowVersion,

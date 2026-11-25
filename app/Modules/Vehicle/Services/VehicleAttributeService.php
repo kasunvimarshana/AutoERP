@@ -40,6 +40,7 @@ final class VehicleAttributeService
         $this->assertUniqueKey($vehicle, $data->attributeKey, (int) $attribute->getKey());
 
         $attribute->fill($this->attributes($vehicle, $data, false))->save();
+
         return $attribute->refresh();
     }
 
@@ -53,13 +54,19 @@ final class VehicleAttributeService
     public function replace(Vehicle $vehicle, array $attributes): void
     {
         $vehicle->attributes()->delete();
-        foreach ($attributes as $attribute) { $this->create($vehicle, $attribute); }
+        foreach ($attributes as $attribute) {
+            $this->create($vehicle, $attribute);
+        }
     }
 
     private function validate(VehicleAttributeData $data): void
     {
-        if (trim($data->attributeKey) === '') { throw new InvalidArgumentException('Vehicle attribute key is required.'); }
-        if ($data->sortOrder < 0) { throw new InvalidArgumentException('Vehicle attribute sort order cannot be negative.'); }
+        if (trim($data->attributeKey) === '') {
+            throw new InvalidArgumentException('Vehicle attribute key is required.');
+        }
+        if ($data->sortOrder < 0) {
+            throw new InvalidArgumentException('Vehicle attribute sort order cannot be negative.');
+        }
         $this->validateTypedValue($data);
     }
 
@@ -126,6 +133,7 @@ final class VehicleAttributeService
     {
         try {
             $this->math->normalize($value);
+
             return true;
         } catch (InvalidArgumentException) {
             return false;

@@ -31,8 +31,7 @@ final class PaymentFinanceIntegrationService
         int $paymentId,
         array $lines,
         ?string $postingProfileCode = null,
-    ): PaymentPostingRequest
-    {
+    ): PaymentPostingRequest {
         $payment = Payment::query()->findOrFail($paymentId);
 
         return new PaymentPostingRequest(

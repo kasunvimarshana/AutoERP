@@ -52,7 +52,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'journal_number'], 'finance_journals_tenant_number_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'finance_journals_tenant_org_ix');
             $table->index(['source_type', 'source_id'], 'finance_journals_source_ix');
-            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_journals_tenant_source_ix', );
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_journals_tenant_source_ix');
             $table->index('journal_date', 'finance_journals_date_ix');
             $table->index('status', 'finance_journals_status_ix');
             $table->unique('source_key', 'finance_journal_entries_source_key_uk');

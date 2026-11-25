@@ -23,6 +23,7 @@ final class UpsertChequeTemplateRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'bank_name' => ['nullable', 'string', 'max:255'],
             'template_name' => array_merge($required, ['string', 'max:255']),
             'page_width_mm' => array_merge($required, ['numeric', 'gt:0', 'max:1000']),

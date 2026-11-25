@@ -23,7 +23,7 @@ final class TenantApiResponder
     {
         $status = self::status($error->code);
 
-        return (new ApiErrorResponseFactory())->make(
+        return (new ApiErrorResponseFactory)->make(
             code: $error->code,
             message: $error->message,
             status: $status,

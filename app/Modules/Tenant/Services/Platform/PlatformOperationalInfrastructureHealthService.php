@@ -20,11 +20,17 @@ use Throwable;
 final class PlatformOperationalInfrastructureHealthService
 {
     private const MAILER_LOG = 'log';
+
     private const MAILER_ARRAY = 'array';
+
     private const NON_PRODUCTION_MAILERS = [self::MAILER_LOG, self::MAILER_ARRAY];
+
     private const QUEUE_SYNC = 'sync';
+
     private const QUEUE_DATABASE = 'database';
+
     private const JOBS_TABLE = 'jobs';
+
     private const FAILED_JOBS_TABLE = 'failed_jobs';
 
     public function __construct(private readonly Migrator $migrator) {}

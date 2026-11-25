@@ -30,10 +30,10 @@ use Modules\Tenant\Models\TenantEventOutboxModel;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Models\TenantStorageCleanupJobModel;
+use Modules\Tenant\Services\Domains\TenantDomainOperationalRetryService;
 use Modules\Tenant\Services\Events\TenantEventOutboxService;
 use Modules\Tenant\Services\Storage\TenantStorageCleanupService;
 use Modules\Tenant\Services\Storage\TenantStorageReconciliationService;
-use Modules\Tenant\Services\Domains\TenantDomainOperationalRetryService;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
 
 final class PlatformTenantHealthService
@@ -129,7 +129,7 @@ final class PlatformTenantHealthService
         return $this->executionContext->runAsControlPlane(function () use ($tenantId): array {
             $tenant = $this->tenants->newQuery()->whereKey($tenantId)->first();
             if (! $tenant instanceof TenantModel) {
-                throw (new ModelNotFoundException())->setModel(TenantModel::class, [$tenantId]);
+                throw (new ModelNotFoundException)->setModel(TenantModel::class, [$tenantId]);
             }
 
             $onboarding = $this->onboarding->newQuery()->with('steps')->where('tenant_id', $tenantId)->first();
@@ -233,7 +233,6 @@ final class PlatformTenantHealthService
         return $count;
     }
 
-
     /** @return array<string, mixed>|null */
     private function capacity(int $tenantId, ?TenantCurrentSubscriptionModel $current): ?array
     {
@@ -260,7 +259,6 @@ final class PlatformTenantHealthService
             'blockers' => $assessment['blockers'],
         ];
     }
-
 
     /** @return array<string, mixed> */
     private function infrastructureHealth(): array

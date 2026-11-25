@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\DTOs\DataRecord;
-use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Constants\OrganizationUnitErrorCode;
@@ -64,6 +63,7 @@ final class OrganizationUnitService
     {
         try {
             $record = $this->units->findById($id);
+
             return $record !== null && (int) $record->get('tenant_id') === $this->context->requireTenantId()
                 ? Result::success($record)
                 : $this->notFound();
@@ -321,6 +321,7 @@ final class OrganizationUnitService
     private function scopedRecord(int|string $id): ?DataRecord
     {
         $record = $this->units->findById($id);
+
         return $record !== null && (int) $record->get('tenant_id') === $this->context->requireTenantId()
             ? $record
             : null;
@@ -336,6 +337,7 @@ final class OrganizationUnitService
         if (! is_numeric($value) || (int) $value < 1) {
             throw new InvalidArgumentException($label.' is required.');
         }
+
         return (int) $value;
     }
 

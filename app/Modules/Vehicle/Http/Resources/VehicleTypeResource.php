@@ -26,6 +26,7 @@ final class VehicleTypeResource extends JsonResource
             'description' => $this->description,
             'is_active' => (bool) $this->is_active,
             'sort_order' => (int) $this->sort_order,
+            'row_version' => (int) ($this->row_version ?? 1),
         ];
     }
 }

@@ -15,6 +15,7 @@ namespace Modules\Sequence\Constants;
 final class SequencePermission
 {
     public const VIEW = 'sequences.view';
+
     public const MANAGE = 'sequences.manage';
 
     /** @return array<string, string> */

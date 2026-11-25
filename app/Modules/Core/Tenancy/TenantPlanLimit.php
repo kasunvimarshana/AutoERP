@@ -15,7 +15,9 @@ namespace Modules\Core\Tenancy;
 final class TenantPlanLimit
 {
     public const USERS = 'max_users';
+
     public const WAREHOUSES = 'max_warehouses';
+
     public const STORAGE_MEGABYTES = 'max_storage_mb';
 
     /** @return list<string> */

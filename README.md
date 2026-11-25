@@ -418,7 +418,7 @@ AutoERP organizes its business capabilities into **32 decoupled backend modules*
 | 12 | **`Customer`** | Master Data | `Customer`, `CustomerContact`, `CustomerCreditProfile` | Corporate debtors, billing addresses, credit limit enforcement, contact directory. |
 | 13 | **`Supplier`** | Master Data | `Supplier`, `SupplierContact`, `SupplierBankAccount` | Creditors, spare parts vendors, vehicle lessors, bank settlement profiles. |
 | 14 | **`Vehicle`** | Master Data | `Vehicle`, `VehicleMake`, `VehicleModel`, `VehicleOwnership` | Physical fleet assets, odometers, VIN, revenue licence tracking, fleet availability. |
-| 15 | **`Hr`** | Master Data | `Employee`, `Department`, `Designation`, `EmployeeRate` | Driver and technician master directory, licence tracking, commission rate rules. |
+| 15 | **`Hr`** | Master Data | `HrEmployee`, `HrDepartment`, `HrDesignation`, `HrEmployeeRate` | Driver and technician master directory, licence tracking, commission rate rules. |
 | 16 | **`Item`** | Master Data | `Item`, `ItemCategory`, `ItemBrand`, `ItemPrice` | Products, stock parts, repair labor lines, services, UOM assignments, base prices. |
 | 17 | **`UOM`** | Master Data | `Uom`, `UomConversion` | Units of measure (km, hours, days, pieces), conversion factors, validation. |
 | 18 | **`Warehouse`** | Master Data | `Warehouse`, `WarehouseLocation` | Physical parts warehouses, workshop bays, aisle/rack/bin storage hierarchies. |
@@ -434,7 +434,7 @@ AutoERP organizes its business capabilities into **32 decoupled backend modules*
 | 28 | **`Finance`** | Financial Core | `FinanceAccount`, `FinanceJournalEntry`, `FinancePostingProfile` | Double-entry GL, Chart of Accounts, fiscal accounting periods, semantic posting rules. |
 | 29 | **`Tax`** | Financial Core | `TaxProfile`, `TaxCategory`, `TaxRate` | VAT/NBT/WHT tax calculation profiles and line-level tax snapshots. |
 | 30 | **`Voucher`** | Financial Core | *None (Presentation composite)* | Read-only unified views over transactions, receipts, and disbursement vouchers. |
-| 31 | **`Payroll`** | Financial Core | `PayrollRun`, `PayrollRunLine`, `EmployeeSalaryStructure`, `EmployeeLoan` | Multi-cycle pay runs, statutory deductions, employee loans, retroactive adjustments, GL posting. |
+| 31 | **`Payroll`** | Financial Core | `PayrollPayRun`, `PayrollPayslip`, `PayrollSalaryStructure`, `PayrollEmployeeLoan` | Multi-cycle pay runs, statutory deductions, employee loans, retroactive adjustments, GL posting. |
 | 32 | **`Reporting`** | Business Intel | *None (Document engine)* | Printable HTML layouts, Spatie Laravel PDF exports, CSV/Excel data streams. |
 
 ---
@@ -859,7 +859,7 @@ AutoERP maintains a strict zero-regression quality gate. All checks must pass wi
 | **Frontend Unit Tests** | `npm test` | Runs 177 Vitest test files (745 tests) in JSDOM mode. |
 | **TypeScript Compilation** | `npm run typecheck` | Validates TypeScript types across `resources/js` with zero emissions (`tsc --noEmit`). |
 | **ESLint Quality Check** | `npm run lint` | Lints React 19 / TypeScript code (`eslint resources/js`). |
-| **PHP Code Style (Pint)** | `vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |
+| **PHP Code Style (Pint)** | `php vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |
 | **Migration Baseline Integrity**| `php artisan test --filter ModuleMigrationBaselineTest` | Verifies one-table-per-migration, timestamp ordering, and zero `Schema::table`. |
 | **Historical Retention Integrity**| `php artisan test --filter HistoricalRetentionMigrationTest`| Asserts status history tables enforce `restrictOnDelete` without cascading deletes. |
 
@@ -889,7 +889,7 @@ AutoERP provides specialized CLI commands for administrative and operational tas
 | `php artisan tenant:events:publish` | Publishes pending tenant lifecycle events from the durable outbox. |
 | `php artisan tenant:events:retry-dead` | Moves selected dead tenant outbox events back to the pending queue. |
 | `php artisan tenant:permissions:sync` | Synchronizes tenant permission catalogues and Super Admin roles from registered modules. |
-| `php artisan tenant:storage:cleanup` | Prunes orphaned private files and cleans up temporary attachments. |
+| `php artisan tenant:storage:cleanup` | Deletes queued tenant private-object files after a storage cleanup failure (`--limit=`). |
 | `php artisan customers:audit-phone-numbers` | Read-only audit of missing, duplicate, and invalid customer phone/WhatsApp numbers. |
 | `php artisan vehicle-service:import-legacy-history` | Safely parses and imports legacy FoxPro workshop service histories. |
 

@@ -17,6 +17,7 @@ use Modules\Core\Models\CoreModel;
 final class GlobalConfigurationValue extends CoreModel
 {
     protected $table = 'global_configuration_values';
+
     protected $fillable = ['key', 'definition_version', 'value', 'value_type', 'is_sensitive'];
 
     protected function casts(): array

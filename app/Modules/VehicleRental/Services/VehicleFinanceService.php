@@ -118,7 +118,7 @@ final class VehicleFinanceService
 
     public function cancel(VehicleFinanceAgreement $agreement, int $expectedVersion, ?int $userId, ?string $reason = null): VehicleFinanceAgreement
     {
-        return DB::transaction(function () use ($agreement, $expectedVersion, $userId, $reason): VehicleFinanceAgreement {
+        return DB::transaction(function () use ($agreement, $expectedVersion, $userId): VehicleFinanceAgreement {
             $agreement = VehicleFinanceAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
             $this->assertAgreementVersion($agreement, $expectedVersion);
 

@@ -12,18 +12,18 @@ declare(strict_types=1);
 
 namespace Modules\Item\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Database\Seeders\Concerns\ResolvesSeedContext;
+use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemBrand;
 use Modules\Item\Models\ItemBundle;
 use Modules\Item\Models\ItemCategory;
 use Modules\Item\Models\ItemPrice;
 use Modules\Item\Models\ItemUnit;
-use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Services\ItemPriceScopeKey;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
@@ -38,7 +38,6 @@ final class ItemSeeder extends Seeder
         if (! Schema::hasTable('items')) {
             return;
         }
-
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -300,5 +299,4 @@ final class ItemSeeder extends Seeder
             ->where('code', $code)
             ->first();
     }
-
 }

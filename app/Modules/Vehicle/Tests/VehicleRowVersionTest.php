@@ -28,6 +28,8 @@ use Modules\Vehicle\Services\VehicleCreationService;
 use Modules\Vehicle\Services\VehicleMakeService;
 use Modules\Vehicle\Services\VehicleModelService;
 use Tests\Support\CurrencyFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class VehicleRowVersionTest extends TestCase
@@ -93,7 +95,7 @@ final class VehicleRowVersionTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,
@@ -130,7 +132,7 @@ final class VehicleRowVersionTest extends TestCase
 
     private function actingAsTenantUser(int $tenantId): void
     {
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Vehicle',
             'last_name' => 'Row Version Tester',

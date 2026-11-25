@@ -23,13 +23,13 @@ use Modules\Core\DTOs\CurrentUserContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentOrganizationUnitContextResolutionException;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
+use Modules\Core\Support\SystemClock;
+use Modules\Core\Support\TenantExecutionContext;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Services\CurrentOrganizationUnitContextResolver;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
-use Modules\Core\Support\SystemClock;
-use Modules\Core\Support\TenantExecutionContext;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
@@ -55,10 +55,10 @@ final class ContextResolutionTest extends TestCase
             $this->createMock(TenantRepositoryInterface::class),
             $tenantDomains,
             $this->createMock(TenantUserAccessCheckerInterface::class),
-            new TenantDomainReadinessPolicy(),
-            new TenantSubscriptionPolicy(new SystemClock()),
+            new TenantDomainReadinessPolicy,
+            new TenantSubscriptionPolicy(new SystemClock),
             new PlatformHostPolicy($this->app),
-            new TenantExecutionContext(),
+            new TenantExecutionContext,
         );
 
         $request = Request::create('https://unknown.test/api/v1/test', 'GET');
@@ -86,10 +86,10 @@ final class ContextResolutionTest extends TestCase
             $this->createMock(TenantRepositoryInterface::class),
             $this->createMock(TenantDomainRepositoryInterface::class),
             $userAccess,
-            new TenantDomainReadinessPolicy(),
-            new TenantSubscriptionPolicy(new SystemClock()),
+            new TenantDomainReadinessPolicy,
+            new TenantSubscriptionPolicy(new SystemClock),
             new PlatformHostPolicy($this->app),
-            new TenantExecutionContext(),
+            new TenantExecutionContext,
         );
 
         $context = new CurrentTenantContext(
@@ -133,6 +133,7 @@ final class ContextResolutionTest extends TestCase
         $this->expectException(CurrentOrganizationUnitContextResolutionException::class);
         $resolver->resolve(Request::create('/'));
     }
+
     private function currentUserContext(int $userId, int $tenantId): CurrentUserContext
     {
         $user = $this->createMock(Authenticatable::class);
@@ -147,5 +148,4 @@ final class ContextResolutionTest extends TestCase
             ['tenant_id' => $tenantId],
         );
     }
-
 }

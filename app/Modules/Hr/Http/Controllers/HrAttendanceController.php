@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Hr\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Hr\DTOs\AttendanceAdjustmentData;
 use Modules\Hr\DTOs\AttendanceRegularizationData;
@@ -37,9 +38,9 @@ final class HrAttendanceController
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
-            'punch_type' => ['required', 'string'],
+            'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
             'punch_time' => ['nullable', 'date'],
-            'punch_source' => ['nullable', 'string'],
+            'punch_source' => ['nullable', 'string', Rule::enum(PunchSource::class)],
             'device_id' => ['nullable', 'string', 'max:64'],
             'ip_address' => ['nullable', 'string', 'max:45'],
             'latitude' => ['nullable', 'numeric'],
@@ -67,7 +68,7 @@ final class HrAttendanceController
 
     public function today(TenantScopedRequest $request, int $employee): JsonResponse
     {
-        $today = now()->toDateString();
+        $today = $request->workspaceToday();
 
         $record = HrAttendanceRecord::query()
             ->where('tenant_id', $request->tenantId())
@@ -127,7 +128,7 @@ final class HrAttendanceController
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
             'attendance_date' => ['required', 'date'],
-            'regularization_type' => ['required', 'string'],
+            'regularization_type' => ['required', 'string', Rule::enum(RegularizationType::class)],
             'proposed_clock_in' => ['nullable', 'date'],
             'proposed_clock_out' => ['nullable', 'date'],
             'reason_code' => ['required', 'string', 'max:32'],
@@ -157,6 +158,7 @@ final class HrAttendanceController
         $validated = $request->validate([
             'status' => ['nullable', 'string'],
             'employee_id' => ['nullable', 'integer'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
 
         $query = HrAttendanceRegularization::query()
@@ -171,7 +173,7 @@ final class HrAttendanceController
             $query->where('employee_id', $validated['employee_id']);
         }
 
-        return response()->json(['data' => $query->get()]);
+        return response()->json($query->paginate((int) ($validated['per_page'] ?? 25)));
     }
 
     public function actionRegularization(TenantScopedRequest $request, int $regularization): JsonResponse
@@ -199,7 +201,7 @@ final class HrAttendanceController
     public function directAdjust(TenantScopedRequest $request, int $record): JsonResponse
     {
         $validated = $request->validate([
-            'new_status' => ['required', 'string'],
+            'new_status' => ['required', 'string', Rule::enum(AttendanceStatus::class)],
             'new_worked_minutes' => ['required', 'integer', 'min:0'],
             'new_overtime_minutes' => ['required', 'integer', 'min:0'],
             'adjustment_reason' => ['required', 'string'],

@@ -303,6 +303,7 @@ final class FinanceConfigurationController
                     'resolved_account' => null,
                     'message' => 'Role is missing or inactive.',
                 ];
+
                 continue;
             }
 

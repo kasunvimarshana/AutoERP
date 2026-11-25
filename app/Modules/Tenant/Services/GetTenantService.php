@@ -20,9 +20,11 @@ use Modules\Tenant\Repositories\TenantRepositoryInterface;
 final class GetTenantService
 {
     public function __construct(private readonly TenantRepositoryInterface $tenants) {}
+
     public function execute(int|string $id): Result
     {
         $tenant = $this->tenants->findById($id);
+
         return $tenant === null
             ? Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'))
             : Result::success($tenant);

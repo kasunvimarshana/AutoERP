@@ -114,8 +114,13 @@ final class PaymentMethodService
 
     public function update(PaymentMethod $method, array $payload): PaymentMethod
     {
-        return DB::transaction(function () use ($method, $payload): PaymentMethod {
+        $expectedVersion = isset($payload['expected_version']) ? (int) $payload['expected_version'] : null;
+
+        return DB::transaction(function () use ($method, $payload, $expectedVersion): PaymentMethod {
             $locked = PaymentMethod::query()->lockForUpdate()->findOrFail($method->getKey());
+            if ($expectedVersion !== null && (int) $locked->row_version !== $expectedVersion) {
+                throw new ConflictHttpException('Payment method was changed by someone else. Reload before saving.');
+            }
             $attributes = $this->attributes($payload, (int) $locked->tenant_id, $locked->organization_unit_id);
             $this->assertUniqueCode($attributes['code'], $attributes['tenant_id'], $attributes['organization_unit_id'], (int) $locked->getKey());
             $locked->fill($attributes);

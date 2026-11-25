@@ -15,17 +15,29 @@ namespace Modules\UOM\Constants;
 final class UomPermission
 {
     public const UOMS_VIEW = 'uom.view';
+
     public const UOMS_CREATE = 'uom.create';
+
     public const UOMS_UPDATE = 'uom.update';
+
     public const UOMS_ACTIVATE = 'uom.activate';
+
     public const UOMS_DEACTIVATE = 'uom.deactivate';
+
     public const UOMS_DELETE = 'uom.delete';
+
     public const CONVERSIONS_VIEW = 'uom.conversions.view';
+
     public const CONVERSIONS_CREATE = 'uom.conversions.create';
+
     public const CONVERSIONS_UPDATE = 'uom.conversions.update';
+
     public const CONVERSIONS_ACTIVATE = 'uom.conversions.activate';
+
     public const CONVERSIONS_DEACTIVATE = 'uom.conversions.deactivate';
+
     public const CONVERSIONS_DELETE = 'uom.conversions.delete';
+
     public const CONVERSIONS_RUN = 'uom.conversions.run';
 
     /** @return array<string, string> */

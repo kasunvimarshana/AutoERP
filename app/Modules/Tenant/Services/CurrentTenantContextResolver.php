@@ -16,18 +16,19 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
-use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Contracts\TenantUserAccessCheckerInterface;
 use Modules\Core\DTOs\CurrentTenantContext;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Exceptions\CurrentTenantContextResolutionException;
 use Modules\Tenant\Constants\TenantStatus;
+use Modules\Tenant\Constants\TenantSubscriptionStatus;
+use Modules\Tenant\Exceptions\TenantSubscriptionDataException;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
-use Modules\Tenant\Exceptions\TenantSubscriptionDataException;
-use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 
 final class CurrentTenantContextResolver implements CurrentTenantContextResolverInterface
 {
@@ -106,6 +107,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
         $tenantId = $this->positiveInt($domain->get('tenant_id'));
         $tenant = $tenantId === null ? null : $this->findTenantById($tenantId);
+
         return $tenant === null ? null : $this->context($tenant, $applicationId, 'verified_host', $host);
     }
 
@@ -136,6 +138,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         if ($byId !== null && $byCode !== null && (int) $byId->id() !== (int) $byCode->id()) {
             throw new CurrentTenantContextResolutionException('Tenant selection headers resolve to different tenants.');
         }
+
         return $this->context($byId ?? $byCode, $applicationId, 'selection_header');
     }
 
@@ -146,6 +149,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
         $code = trim((string) config('tenant.resolution.local_fallback_tenant_code', ''));
         $tenant = $code === '' ? null : $this->findTenantByCode($code);
+
         return $tenant === null ? null : $this->context($tenant, $applicationId, 'local_fallback');
     }
 
@@ -166,6 +170,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             $primary = $this->domains->findPrimaryByTenant($tenantId);
             $domain = $primary === null ? null : (string) $primary->get('domain');
         }
+
         return new CurrentTenantContext($tenant, $tenantId, $code, $uuid, $domain, $status, $applicationId, $source);
     }
 
@@ -186,8 +191,8 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         if ($status === TenantSubscriptionPolicy::SCHEDULED) {
             throw new CurrentTenantContextResolutionException('The selected tenant subscription is not active yet.');
         }
-        if ($status !== \Modules\Tenant\Constants\TenantSubscriptionStatus::TRIAL
-            && $status !== \Modules\Tenant\Constants\TenantSubscriptionStatus::ACTIVE) {
+        if ($status !== TenantSubscriptionStatus::TRIAL
+            && $status !== TenantSubscriptionStatus::ACTIVE) {
             throw new CurrentTenantContextResolutionException('The selected tenant subscription is not active.');
         }
     }
@@ -213,6 +218,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return $id;
         }
         $user = $request->user();
+
         return $user instanceof Authenticatable ? $this->positiveInt($user->getAuthIdentifier()) : null;
     }
 
@@ -222,6 +228,7 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             return null;
         }
         $value = (int) $value;
+
         return $value > 0 ? $value : null;
     }
 }

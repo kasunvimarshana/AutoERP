@@ -67,12 +67,14 @@ final class CountryController extends Controller
     public function update(UpdateCountryRequest $request, int $country): CountryResource
     {
         $validated = $request->validated();
+
         return new CountryResource($this->catalog->update($country, (int) $validated['expected_version'], $validated));
     }
 
     public function setStatus(SetReferenceStatusRequest $request, int $country): CountryResource
     {
         $validated = $request->validated();
+
         return new CountryResource($this->catalog->setActive(
             $country,
             (int) $validated['expected_version'],

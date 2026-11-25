@@ -17,6 +17,7 @@ use Modules\Core\Models\TenantOwnedModel;
 final class TenantConfigurationValue extends TenantOwnedModel
 {
     protected $table = 'tenant_configuration_values';
+
     protected $fillable = ['tenant_id', 'key', 'definition_version', 'value', 'value_type', 'is_sensitive'];
 
     protected function casts(): array

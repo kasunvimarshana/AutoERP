@@ -25,7 +25,7 @@ final class TenantSubscriptionMutationPolicyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->policy = new TenantSubscriptionMutationPolicy();
+        $this->policy = new TenantSubscriptionMutationPolicy;
     }
 
     public function test_archived_tenants_are_read_only_for_every_subscription_command(): void

@@ -33,7 +33,7 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
         $jobModel = $this->job($request, $job);
 
         return VehicleServiceEmployeeAssignmentResource::collection(
-            $this->line($jobModel, $line)->employeeAssignments()->with('employee')->get(),
+            $this->line($jobModel, $line)->employeeAssignments()->with('employee')->paginate($request->perPage()),
         );
     }
 

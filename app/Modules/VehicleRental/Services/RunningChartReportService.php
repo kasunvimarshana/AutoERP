@@ -22,6 +22,7 @@ use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\DriverMode;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
+use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\OwnerAgreement;
@@ -43,7 +44,7 @@ final class RunningChartReportService
      */
     public function generate(AgreementContext $context, array $params): array
     {
-        $this->authorization->assertChart($context, \Modules\VehicleRental\Enums\RunningChartAction::Create, false);
+        $this->authorization->assertChart($context, RunningChartAction::Create, false);
 
         if (empty($params['agreement_id']) && empty($params['vehicle_use_id'])) {
             throw ValidationException::withMessages(['agreement_id' => ['Specify the rental agreement or vehicle use to generate the running chart sheet.']]);

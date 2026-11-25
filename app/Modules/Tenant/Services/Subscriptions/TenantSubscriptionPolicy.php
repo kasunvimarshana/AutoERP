@@ -22,7 +22,9 @@ use Throwable;
 final class TenantSubscriptionPolicy
 {
     public const MISSING = 'missing';
+
     public const SCHEDULED = 'scheduled';
+
     public const INVALID = 'invalid';
 
     public function __construct(private readonly ClockInterface $clock) {}

@@ -22,7 +22,7 @@ final class TenantExecutionContextTest extends TestCase
 {
     public function test_tenant_boundary_is_nested_only_for_the_same_tenant_and_is_always_restored(): void
     {
-        $context = new TenantExecutionContext();
+        $context = new TenantExecutionContext;
 
         self::assertNull($context->tenantId());
         self::assertFalse($context->isActive());
@@ -41,7 +41,7 @@ final class TenantExecutionContextTest extends TestCase
 
     public function test_nested_tenant_execution_cannot_switch_tenant(): void
     {
-        $context = new TenantExecutionContext();
+        $context = new TenantExecutionContext;
 
         $this->expectException(InvalidArgumentException::class);
         $context->runForTenant(10, fn (): mixed => $context->runForTenant(20, static fn (): null => null));
@@ -49,7 +49,7 @@ final class TenantExecutionContextTest extends TestCase
 
     public function test_context_is_restored_when_tenant_work_throws(): void
     {
-        $context = new TenantExecutionContext();
+        $context = new TenantExecutionContext;
 
         try {
             $context->runForTenant(10, static function (): never {
@@ -64,7 +64,7 @@ final class TenantExecutionContextTest extends TestCase
 
     public function test_control_plane_is_explicit_and_can_narrow_to_one_tenant(): void
     {
-        $context = new TenantExecutionContext();
+        $context = new TenantExecutionContext;
 
         $result = $context->runAsControlPlane(function () use ($context): int {
             self::assertTrue($context->isControlPlane());
@@ -85,7 +85,7 @@ final class TenantExecutionContextTest extends TestCase
 
     public function test_tenant_execution_cannot_broaden_into_control_plane(): void
     {
-        $context = new TenantExecutionContext();
+        $context = new TenantExecutionContext;
 
         $this->expectException(LogicException::class);
         $context->runForTenant(10, fn (): mixed => $context->runAsControlPlane(static fn (): null => null));

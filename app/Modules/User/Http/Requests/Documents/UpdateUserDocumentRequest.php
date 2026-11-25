@@ -18,10 +18,15 @@ use Modules\User\Http\Requests\AuthorizedUserRequest;
 
 final class UpdateUserDocumentRequest extends AuthorizedUserRequest
 {
-    protected function requiredPermission(): ?string { return null; }
+    protected function requiredPermission(): ?string
+    {
+        return null;
+    }
+
     public function rules(): array
     {
         $maxKilobytes = max(1, (int) config('user.storage.documents.max_size_kb', 10240));
+
         return [
             'expected_version' => ['required', 'integer', 'min:1'],
             'name' => ['sometimes', 'required', 'string', 'max:160'],

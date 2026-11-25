@@ -401,6 +401,7 @@ final class DetailedVehicleServiceReportService
     {
         if ($organizationUnitId === null || $organizationUnitId === '') {
             $query->whereNull($column);
+
             return;
         }
 

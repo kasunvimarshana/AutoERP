@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Services;
 
-use InvalidArgumentException;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Data\ConfigurationScopeContext;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;

@@ -23,7 +23,7 @@ final class DecimalMathTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->math = new DecimalMath();
+        $this->math = new DecimalMath;
     }
 
     public function test_it_performs_exact_base_ten_arithmetic_without_float_conversion(): void

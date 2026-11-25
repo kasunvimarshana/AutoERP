@@ -32,7 +32,9 @@ use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Reporting\Services\EmployeeCommissionReportService;
+use Modules\Reporting\Services\ReportCatalog;
 use Modules\Reporting\Services\ReportingAuthorizationService;
+use Modules\Reporting\Services\ReportQueryBuilder;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
 use Modules\User\Models\UserModel;
@@ -401,8 +403,8 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonPath('summary.supervisor_incentive', '0.000000');
 
         $genericRows = $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context): array {
-            $catalog = app(\Modules\Reporting\Services\ReportCatalog::class);
-            $queries = app(\Modules\Reporting\Services\ReportQueryBuilder::class);
+            $catalog = app(ReportCatalog::class);
+            $queries = app(ReportQueryBuilder::class);
             $definition = $catalog->get('vehicle-service.technician-work');
             $query = $queries->query(
                 $definition,

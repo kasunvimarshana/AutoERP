@@ -15,7 +15,9 @@ namespace Modules\Tenant\Constants;
 final class TenantCurrentSubscriptionState
 {
     public const ASSIGNED = 'assigned';
+
     public const CANCELLED = 'cancelled';
+
     public const EXPIRED = 'expired';
 
     /** @return list<string> */

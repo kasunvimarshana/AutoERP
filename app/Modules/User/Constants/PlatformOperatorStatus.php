@@ -15,6 +15,7 @@ namespace Modules\User\Constants;
 final class PlatformOperatorStatus
 {
     public const ACTIVE = 'active';
+
     public const INACTIVE = 'inactive';
 
     /** @return list<string> */

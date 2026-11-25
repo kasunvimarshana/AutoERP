@@ -25,6 +25,7 @@ final class OrganizationUnitResource extends JsonResource
         $values['lifecycle_status'] = ($values['retired_at'] ?? null) !== null
             ? 'retired'
             : ((bool) ($values['is_active'] ?? false) ? 'active' : 'inactive');
+
         return $values;
     }
 }

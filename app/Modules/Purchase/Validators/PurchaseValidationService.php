@@ -12,20 +12,20 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Validators;
 
-use InvalidArgumentException;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseOrderLine;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\TaxGroup;
-use Modules\Warehouse\Models\WarehouseModel;
-use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\UOM\Models\UnitOfMeasureModel;
+use Modules\Warehouse\Models\WarehouseLocationModel;
+use Modules\Warehouse\Models\WarehouseModel;
 
 final class PurchaseValidationService
 {
@@ -252,8 +252,7 @@ final class PurchaseValidationService
         ?int $organizationUnitId,
         ?string $field = null,
         string $label = 'reference',
-    ): void
-    {
+    ): void {
         if ($actualTenantId !== null && $actualTenantId !== $tenantId) {
             if ($field !== null) {
                 $this->invalidReference($field, $label);

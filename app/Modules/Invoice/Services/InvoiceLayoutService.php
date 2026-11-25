@@ -13,7 +13,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use DateTimeImmutable;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Configuration\Constants\ConfigurationScope;
@@ -47,14 +47,15 @@ final readonly class InvoiceLayoutService
         private ?InvoiceCustomBladeRenderer $bladeRenderer = null,
     ) {}
 
-    /** @return Collection<int, InvoiceLayout> */
+    /** @return LengthAwarePaginator<int, InvoiceLayout> */
     public function list(
         int $tenantId,
         ?string $search = null,
         ?string $paperSize = null,
         ?bool $isActive = null,
-    ): Collection {
-        return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $search, $paperSize, $isActive): Collection {
+        int $perPage = 20,
+    ): LengthAwarePaginator {
+        return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $search, $paperSize, $isActive, $perPage): LengthAwarePaginator {
             $count = InvoiceLayout::query()->where('tenant_id', $tenantId)->count();
             if ($count === 0) {
                 $this->provisioner->provision($tenantId);
@@ -82,7 +83,7 @@ final readonly class InvoiceLayoutService
                 });
             }
 
-            return $query->get();
+            return $query->paginate(min(100, max(1, $perPage)));
         });
     }
 

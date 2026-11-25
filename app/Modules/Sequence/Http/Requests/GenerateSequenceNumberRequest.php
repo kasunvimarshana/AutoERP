@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Sequence\Http\Requests;
 
-use Modules\Core\Http\Requests\TenantScopedRequest;
 use Illuminate\Support\Facades\Auth;
+use Modules\Core\Http\Requests\TenantScopedRequest;
 
 final class GenerateSequenceNumberRequest extends TenantScopedRequest
 {

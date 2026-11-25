@@ -17,10 +17,12 @@ use Modules\Core\Models\TenantOwnedModel;
 final class AuthUserPasswordCredentialModel extends TenantOwnedModel
 {
     protected $table = 'auth_user_password_credentials';
+
     protected $fillable = [
         'tenant_id', 'user_id', 'password_hash', 'status', 'changed_at',
         'revoked_at', 'row_version',
     ];
+
     protected $hidden = ['password_hash'];
 
     protected function casts(): array

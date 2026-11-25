@@ -26,7 +26,7 @@ final class InvoiceBalanceService
 
     public function createBalance(Invoice $invoice, string $invoiceTotal): InvoiceBalance
     {
-        $balance = new InvoiceBalance();
+        $balance = new InvoiceBalance;
         $balance->forceFill([
             'tenant_id' => $invoice->tenant_id,
             'organization_unit_id' => $invoice->organization_unit_id,

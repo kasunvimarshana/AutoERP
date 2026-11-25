@@ -15,10 +15,15 @@ namespace Tests\Feature\Sequence;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Sequence\Constants\SequencePermission;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserStatus;
 use Modules\User\Constants\UserSystemRole;
+use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class SequenceTenantIsolationTest extends TestCase
@@ -51,14 +56,14 @@ final class SequenceTenantIsolationTest extends TestCase
         // Tenant B cannot update Tenant A's sequence
         $this->withAuth($contextB)
             ->matchJson(['put'], "/api/v1/sequence/sequences/{$sequenceId}", [
-            'tenant_id' => $contextB['tenant_id'],
-            'organization_unit_id' => $contextB['organization_unit_id'],
-            'document_type' => 'invoice',
-            'prefix' => 'HACKED-',
-            'padding' => 6,
-            'next_number' => 1,
-            'period_type' => 'yearly',
-        ])->assertNotFound();
+                'tenant_id' => $contextB['tenant_id'],
+                'organization_unit_id' => $contextB['organization_unit_id'],
+                'document_type' => 'invoice',
+                'prefix' => 'HACKED-',
+                'padding' => 6,
+                'next_number' => 1,
+                'period_type' => 'yearly',
+            ])->assertNotFound();
 
         // Tenant B cannot delete Tenant A's sequence
         $this->withAuth($contextB)
@@ -169,14 +174,14 @@ final class SequenceTenantIsolationTest extends TestCase
             'activated_at' => $now,
             'created_at' => $now, 'updated_at' => $now,
         ]);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        ActiveTenantSubscriptionFixture::create($tenantId);
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId, 'name' => 'Main Branch', 'code' => 'MB-'.$code,
             'path' => '/mb-'.strtolower($code), 'is_active' => true, 'row_version' => 1,
             'created_at' => $now, 'updated_at' => $now,
         ]);
         $email = (string) ($overrides['email'] ?? strtolower($code).'@example.test');
-        $userId = \Tests\Support\TenantUserFixture::create([
+        $userId = TenantUserFixture::create([
             'tenant_id' => $tenantId, 'first_name' => 'Admin', 'email' => $email,
             'status' => UserStatus::ACTIVE, 'password' => 'secret-password',
         ]);
@@ -208,7 +213,7 @@ final class SequenceTenantIsolationTest extends TestCase
             'status' => 'active', 'is_default' => true, 'default_marker' => 'default',
             'row_version' => 1, 'created_at' => $now, 'updated_at' => $now,
         ]);
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
@@ -232,7 +237,7 @@ final class SequenceTenantIsolationTest extends TestCase
     }
 
     /** @param list<string> $methods @param array<string,mixed> $data */
-    private function matchJson(array $methods, string $uri, array $data = []): \Illuminate\Testing\TestResponse
+    private function matchJson(array $methods, string $uri, array $data = []): TestResponse
     {
         return $this->putJson($uri, $data);
     }

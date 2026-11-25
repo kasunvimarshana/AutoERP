@@ -28,7 +28,7 @@ final class RefreshTokenCookieTest extends TestCase
             'same_site' => 'strict',
         ]);
 
-        $cookieService = new TenantRefreshTokenCookie();
+        $cookieService = new TenantRefreshTokenCookie;
         $response = response()->json(['success' => true]);
         $expiresAt = new DateTimeImmutable('2026-06-26T13:30:00+00:00');
 
@@ -50,7 +50,7 @@ final class RefreshTokenCookieTest extends TestCase
 
     public function test_extract_supports_nested_and_root_payloads_without_empty_values(): void
     {
-        $cookieService = new TenantRefreshTokenCookie();
+        $cookieService = new TenantRefreshTokenCookie;
 
         self::assertSame('nested-token', $cookieService->extract([
             'tokens' => ['refresh_token' => ' nested-token '],
@@ -61,5 +61,4 @@ final class RefreshTokenCookieTest extends TestCase
         self::assertNull($cookieService->extract(['refresh_token' => '   ']));
         self::assertNull($cookieService->extract(null));
     }
-
 }

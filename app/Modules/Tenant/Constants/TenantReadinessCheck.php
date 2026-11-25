@@ -15,14 +15,23 @@ namespace Modules\Tenant\Constants;
 final class TenantReadinessCheck
 {
     public const ROOT_ORGANIZATION = 'root_organization';
+
     public const PERMISSION_CATALOGUE = 'permission_catalogue';
+
     public const SUPER_ADMIN_ACCESS = 'super_admin_access';
+
     public const AUTHENTICATION_PROVIDER = 'authentication_provider';
+
     public const ADMINISTRATOR_ACCOUNT_READY = 'administrator_account_ready';
+
     public const OPERATIONAL_ADMINISTRATOR = 'operational_administrator';
+
     public const BASE_CURRENCY = 'base_currency';
+
     public const ACTIVE_PLAN = 'active_plan';
+
     public const SUBSCRIPTION_VALID = 'subscription_valid';
+
     public const PRIMARY_DOMAIN_READY = 'primary_domain_ready';
 
     /** @return array<string, string> */

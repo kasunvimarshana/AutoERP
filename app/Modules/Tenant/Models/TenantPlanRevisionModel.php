@@ -14,8 +14,8 @@ namespace Modules\Tenant\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Modules\Core\Models\CoreModel;
 use LogicException;
+use Modules\Core\Models\CoreModel;
 
 final class TenantPlanRevisionModel extends CoreModel
 {
@@ -30,10 +30,10 @@ final class TenantPlanRevisionModel extends CoreModel
 
     protected static function booted(): void
     {
-        static::updating(static function (): never {
+        self::updating(static function (): never {
             throw new LogicException('Tenant plan revisions are immutable. Create a new revision instead.');
         });
-        static::deleting(static function (): never {
+        self::deleting(static function (): never {
             throw new LogicException('Tenant plan revisions cannot be deleted because subscriptions retain historical references.');
         });
     }

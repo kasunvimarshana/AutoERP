@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Hr\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Hr\DTOs\CompOffClaimData;
 use Modules\Hr\DTOs\LeavePolicyData;
@@ -98,7 +99,7 @@ final class HrLeaveController
             'annual_allocation_days' => ['required', 'numeric'],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date'],
-            'accrual_frequency' => ['nullable', 'string'],
+            'accrual_frequency' => ['nullable', 'string', Rule::enum(LeaveAccrualFrequency::class)],
             'max_carry_forward_days' => ['nullable', 'numeric'],
             'carry_forward_expiry_months' => ['nullable', 'integer', 'min:0'],
             'max_consecutive_days' => ['nullable', 'integer', 'min:1'],
@@ -133,9 +134,10 @@ final class HrLeaveController
         $validated = $request->validate([
             'employee_id' => ['nullable', 'integer'],
             'calendar_year' => ['nullable', 'integer'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
 
-        $year = $validated['calendar_year'] ?? now()->year;
+        $year = $validated['calendar_year'] ?? (int) substr($request->workspaceToday(), 0, 4);
 
         $query = HrLeaveBalance::query()
             ->where('tenant_id', $request->tenantId())
@@ -146,7 +148,7 @@ final class HrLeaveController
             $query->where('employee_id', $validated['employee_id']);
         }
 
-        return response()->json(['data' => $query->get()]);
+        return response()->json($query->paginate((int) ($validated['per_page'] ?? 25)));
     }
 
     public function requests(TenantScopedRequest $request): JsonResponse
@@ -185,7 +187,7 @@ final class HrLeaveController
             'end_date' => ['required', 'date'],
             'total_days' => ['required', 'numeric', 'min:0.5'],
             'reason' => ['required', 'string'],
-            'duration_type' => ['nullable', 'string'],
+            'duration_type' => ['nullable', 'string', Rule::enum(LeaveDurationType::class)],
             'attachment_document_id' => ['nullable', 'integer'],
         ]);
 

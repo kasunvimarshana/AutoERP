@@ -15,6 +15,7 @@ namespace Modules\Payment\Constants;
 final class PaymentAllocationFinanceMetadata
 {
     public const POSTING_REFERENCE = 'finance_posting_reference';
+
     public const REVERSAL_REFERENCE = 'finance_reversal_reference';
 
     public const FX_POSTING_REFERENCE = 'finance_fx_posting_reference';

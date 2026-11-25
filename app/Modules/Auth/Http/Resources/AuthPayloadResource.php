@@ -111,6 +111,7 @@ final class AuthPayloadResource extends JsonResource
                 $result[] = trim((string) $entry);
             }
         }
+
         return array_values(array_unique($result));
     }
 
@@ -126,6 +127,7 @@ final class AuthPayloadResource extends JsonResource
             }
             $sanitized[$key] = $this->sanitize($entry);
         }
+
         return $sanitized;
     }
 }

@@ -12,8 +12,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Repositories;
 
-use Modules\Core\Contracts\ClockInterface;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Tenant\Models\TenantDocumentModel;

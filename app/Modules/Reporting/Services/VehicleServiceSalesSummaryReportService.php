@@ -633,8 +633,7 @@ final class VehicleServiceSalesSummaryReportService
         $summary['combo']['items'] = $this->finalizeRankedItems($comboItems, true);
         $summary['combo']['item_count'] = count($summary['combo']['items']);
         $summary['by_job_type'] = array_values($jobTypes);
-        usort($summary['by_job_type'], fn (array $left, array $right): int =>
-            $this->math->compare($right['revenue'], $left['revenue']) ?: strcmp($left['label'], $right['label']));
+        usort($summary['by_job_type'], fn (array $left, array $right): int => $this->math->compare($right['revenue'], $left['revenue']) ?: strcmp($left['label'], $right['label']));
         ksort($weeks);
         $salesByWeek = array_values(array_map(static fn (array $week): array => [
             'week_start' => $week['week_start'],

@@ -67,12 +67,14 @@ final class TimezoneController extends Controller
     public function update(UpdateTimezoneRequest $request, int $timezone): TimezoneResource
     {
         $validated = $request->validated();
+
         return new TimezoneResource($this->catalog->update($timezone, (int) $validated['expected_version'], $validated));
     }
 
     public function setStatus(SetReferenceStatusRequest $request, int $timezone): TimezoneResource
     {
         $validated = $request->validated();
+
         return new TimezoneResource($this->catalog->setActive(
             $timezone,
             (int) $validated['expected_version'],

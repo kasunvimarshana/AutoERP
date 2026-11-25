@@ -21,7 +21,7 @@ final class TenantUserFixture
     /**
      * Create a credential-ready tenant user for integration tests.
      *
-     * @param array<string,mixed> $attributes
+     * @param  array<string,mixed>  $attributes
      */
     public static function create(array $attributes): int
     {

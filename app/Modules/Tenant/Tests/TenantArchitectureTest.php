@@ -15,10 +15,10 @@ namespace Modules\Tenant\Tests;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionLifecycleService;
 use Modules\Tenant\Services\TenantActorSnapshotFactory;
 use PHPUnit\Framework\TestCase;
-use ReflectionClass;
-use ReflectionNamedType;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use ReflectionClass;
+use ReflectionNamedType;
 use SplFileInfo;
 
 final class TenantArchitectureTest extends TestCase

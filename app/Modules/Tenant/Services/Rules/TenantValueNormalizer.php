@@ -34,6 +34,7 @@ final class TenantValueNormalizer implements TenantValueNormalizerInterface
         if ($value === '' || preg_match('/^[A-Z0-9][A-Z0-9_-]{1,49}$/', $value) !== 1) {
             throw new InvalidArgumentException('Tenant code must contain 2-50 uppercase letters, numbers, dashes, or underscores.');
         }
+
         return $value;
     }
 
@@ -43,6 +44,7 @@ final class TenantValueNormalizer implements TenantValueNormalizerInterface
         if ($value === '') {
             throw new InvalidArgumentException('Tenant name is required.');
         }
+
         return $value;
     }
 
@@ -52,6 +54,7 @@ final class TenantValueNormalizer implements TenantValueNormalizerInterface
         if ($value === '' || preg_match('/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/', $value) !== 1) {
             throw new InvalidArgumentException('Tenant slug must be a lowercase URL-safe value.');
         }
+
         return $value;
     }
 
@@ -138,12 +141,14 @@ final class TenantValueNormalizer implements TenantValueNormalizerInterface
         if (! in_array($value, ['month', 'quarter', 'year'], true)) {
             throw new InvalidArgumentException('Billing interval must be month, quarter, or year.');
         }
+
         return $value;
     }
 
     public function normalizeOptionalText(?string $value): ?string
     {
         $value = $value === null ? null : trim($value);
+
         return $value === '' ? null : $value;
     }
 

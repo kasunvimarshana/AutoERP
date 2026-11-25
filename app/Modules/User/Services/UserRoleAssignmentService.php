@@ -13,10 +13,11 @@ declare(strict_types=1);
 namespace Modules\User\Services;
 
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
-use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Results\Result;
 use Modules\User\Constants\UserGuard;
@@ -88,6 +89,7 @@ final class UserRoleAssignmentService extends AbstractUserCrudService
                             'row_version' => (int) $existing->getAttribute('row_version') + 1,
                             'updated_by_user_id' => $actorId,
                         ])->save();
+
                         continue;
                     }
                     UserRoleModel::query()->create([
@@ -107,6 +109,7 @@ final class UserRoleAssignmentService extends AbstractUserCrudService
                 $this->accessRevoker->revokeSessionsForUser($tenantId, (int) $user->getKey(), 'User roles changed.');
                 $this->access->forgetForUserTenant((int) $user->getKey(), $tenantId);
                 $this->audit->record('roles.synced', 'user', $user, ['role_ids' => $before], ['role_ids' => $after]);
+
                 return $user;
             }, 3);
 
@@ -142,10 +145,11 @@ final class UserRoleAssignmentService extends AbstractUserCrudService
         if ($lock) {
             $query->lockForUpdate();
         }
+
         return $query->orderBy('role_id')->pluck('role_id')->map(static fn (mixed $id): int => (int) $id)->all();
     }
 
-    private function lockedRoles(int $tenantId, array $roleIds): \Illuminate\Support\Collection
+    private function lockedRoles(int $tenantId, array $roleIds): Collection
     {
         if ($roleIds === []) {
             return collect();
@@ -155,6 +159,7 @@ final class UserRoleAssignmentService extends AbstractUserCrudService
         if ($roles->count() !== count($roleIds)) {
             throw new RuntimeException('One or more selected roles are unavailable in the current tenant.');
         }
+
         return $roles;
     }
 
@@ -202,6 +207,7 @@ final class UserRoleAssignmentService extends AbstractUserCrudService
             $result[(int) $id] = (int) $id;
         }
         ksort($result);
+
         return array_values($result);
     }
 
@@ -211,7 +217,7 @@ final class UserRoleAssignmentService extends AbstractUserCrudService
         if ($id === null) {
             throw new RuntimeException('A tenant context is required.');
         }
+
         return $id;
     }
-
 }

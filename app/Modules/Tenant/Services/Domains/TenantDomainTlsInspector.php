@@ -55,7 +55,7 @@ final class TenantDomainTlsInspector
                 throw new RuntimeException('TLS certificate expiry could not be read.');
             }
 
-            return (new DateTimeImmutable())->setTimestamp((int) $expiresAt);
+            return (new DateTimeImmutable)->setTimestamp((int) $expiresAt);
         } finally {
             fclose($socket);
         }

@@ -20,7 +20,7 @@ interface OrganizationUnitDirectoryInterface
     public function isActive(int $tenantId, int $organizationUnitId, bool $lockForUpdate = false): bool;
 
     /**
-     * @param list<int> $organizationUnitIds
+     * @param  list<int>  $organizationUnitIds
      * @return array<int,array{id:int,code:string,name:string,path:string}>
      */
     public function summaries(int $tenantId, array $organizationUnitIds): array;

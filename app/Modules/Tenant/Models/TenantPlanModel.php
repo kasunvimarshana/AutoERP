@@ -44,7 +44,6 @@ final class TenantPlanModel extends CoreModel
             ->ofMany('revision_number', 'max');
     }
 
-
     public function currentRevision(): HasOne
     {
         return $this->hasOne(TenantPlanRevisionModel::class, 'tenant_plan_id')

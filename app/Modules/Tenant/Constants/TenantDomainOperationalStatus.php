@@ -15,9 +15,13 @@ namespace Modules\Tenant\Constants;
 final class TenantDomainOperationalStatus
 {
     public const PENDING = 'pending';
+
     public const CHECKING = 'checking';
+
     public const READY = 'ready';
+
     public const FAILED = 'failed';
+
     public const DISABLED = 'disabled';
 
     /** @return list<string> */

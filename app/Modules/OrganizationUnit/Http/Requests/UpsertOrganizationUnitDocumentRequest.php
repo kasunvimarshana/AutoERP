@@ -19,6 +19,7 @@ final class UpsertOrganizationUnitDocumentRequest extends TenantScopedRequest
     public function rules(): array
     {
         $creating = $this->isMethod('post');
+
         return [
             'expected_version' => $creating ? ['prohibited'] : ['required', 'integer', 'min:1'],
             'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],

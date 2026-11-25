@@ -22,7 +22,7 @@ final class InvoiceAmountInWordsFormatterTest extends TestCase
     #[DataProvider('amounts')]
     public function test_it_formats_exact_invoice_totals(string $amount, ?string $currency, string $expected): void
     {
-        self::assertSame($expected, (new InvoiceAmountInWordsFormatter())->format($amount, $currency));
+        self::assertSame($expected, (new InvoiceAmountInWordsFormatter)->format($amount, $currency));
     }
 
     /** @return iterable<string, array{string, ?string, string}> */
@@ -45,6 +45,6 @@ final class InvoiceAmountInWordsFormatterTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invoice total must be a plain decimal value.');
 
-        (new InvoiceAmountInWordsFormatter())->format('1e3', 'LKR');
+        (new InvoiceAmountInWordsFormatter)->format('1e3', 'LKR');
     }
 }

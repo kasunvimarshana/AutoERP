@@ -22,6 +22,7 @@ use Modules\User\Contracts\TenantUserRegistrationInterface;
 final readonly class TenantAuthenticationProvisioner implements TenantAuthenticationProvisionerInterface
 {
     private const INTERNAL_PROVIDER_NAME = 'Internal authentication';
+
     private const INTERNAL_PROVIDER_DRIVER = 'internal';
 
     public function __construct(
@@ -118,5 +119,4 @@ final readonly class TenantAuthenticationProvisioner implements TenantAuthentica
 
         return $query->exists();
     }
-
 }

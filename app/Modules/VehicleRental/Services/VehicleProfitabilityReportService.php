@@ -21,11 +21,13 @@ use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\BillingCycleStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\RunningChartStatus;
+use Modules\VehicleRental\Models\BillingCycle;
 use Modules\VehicleRental\Models\CustomerBaseCharge;
 use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\OwnerAgreement;
@@ -144,10 +146,10 @@ final class VehicleProfitabilityReportService
 
             // Include BillingCycle revenue for customer agreements
             if (! empty($customerAgreementIds)) {
-                $cycles = \Modules\VehicleRental\Models\BillingCycle::query()
+                $cycles = BillingCycle::query()
                     ->forContext($context->tenantId, $context->organizationUnitId)
                     ->whereIn('customer_agreement_id', $customerAgreementIds)
-                    ->where('status', '!=', \Modules\VehicleRental\Enums\BillingCycleStatus::Cancelled)
+                    ->where('status', '!=', BillingCycleStatus::Cancelled)
                     ->where('period_from', '<=', $endDate)
                     ->where('period_until', '>=', $startDate)
                     ->get();
@@ -231,10 +233,10 @@ final class VehicleProfitabilityReportService
                     ->sum('amount');
 
                 // Include Owner BillingCycle disbursements
-                $ownerCycles = \Modules\VehicleRental\Models\BillingCycle::query()
+                $ownerCycles = BillingCycle::query()
                     ->forContext($context->tenantId, $context->organizationUnitId)
                     ->whereIn('owner_agreement_id', $ownerAgreementIds)
-                    ->where('status', '!=', \Modules\VehicleRental\Enums\BillingCycleStatus::Cancelled)
+                    ->where('status', '!=', BillingCycleStatus::Cancelled)
                     ->where('period_from', '<=', $endDate)
                     ->where('period_until', '>=', $startDate)
                     ->get();

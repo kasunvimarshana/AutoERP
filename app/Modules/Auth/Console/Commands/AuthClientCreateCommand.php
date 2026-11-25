@@ -14,12 +14,12 @@ namespace Modules\Auth\Console\Commands;
 
 use DateTimeImmutable;
 use Illuminate\Console\Command;
+use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Auth\Enums\ClientStatus;
 use Modules\Auth\Enums\GrantType;
 use Modules\Auth\Models\AuthClientModel;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Throwable;
 
@@ -119,6 +119,7 @@ final class AuthClientCreateCommand extends Command
             });
         } catch (Throwable $exception) {
             report($exception);
+
             return $this->commandFailure('The OAuth client could not be created. Verify uniqueness and tenant readiness.');
         }
 
@@ -165,6 +166,7 @@ final class AuthClientCreateCommand extends Command
         }
         try {
             $expiry = new DateTimeImmutable((string) $value);
+
             return $expiry > $clock->now() ? $expiry : null;
         } catch (Throwable) {
             return null;
@@ -174,6 +176,7 @@ final class AuthClientCreateCommand extends Command
     private function commandFailure(string $message): int
     {
         $this->error($message);
+
         return self::FAILURE;
     }
 }

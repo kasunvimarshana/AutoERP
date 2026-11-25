@@ -15,8 +15,8 @@ namespace Modules\Tax\Services;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Tax\Data\TaxPaymentWithholdingData;
 use Modules\Tax\Data\TaxableDocumentData;
+use Modules\Tax\Data\TaxPaymentWithholdingData;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxCalculationData;
 use Modules\Tax\DTOs\TaxCalculationLineData;
@@ -248,8 +248,8 @@ final class TaxDocumentIntegrationService
     }
 
     /**
-     * @param callable(): list<TaxDocumentSnapshot> $snapshot
-     * @param array<string, mixed> $attributes
+     * @param  callable(): list<TaxDocumentSnapshot>  $snapshot
+     * @param  array<string, mixed>  $attributes
      */
     private function postSource(
         string $sourceType,

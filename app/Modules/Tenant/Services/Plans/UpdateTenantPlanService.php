@@ -200,7 +200,6 @@ final class UpdateTenantPlanService
         return array_intersect(self::REVISION_FIELDS, array_keys($payload)) !== [];
     }
 
-
     private function changeNote(mixed $value): string
     {
         $note = is_scalar($value) ? trim((string) $value) : '';

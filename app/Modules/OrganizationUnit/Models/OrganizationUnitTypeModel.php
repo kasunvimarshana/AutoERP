@@ -12,9 +12,9 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Models;
 
-use Modules\Core\Exceptions\DomainException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Exceptions\DomainException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Support\OrganizationUnitNameKey;
 use Modules\Tenant\Models\TenantModel;
@@ -25,7 +25,7 @@ final class OrganizationUnitTypeModel extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::saving(function (self $type): void {
+        self::saving(function (self $type): void {
             $name = (string) $type->getAttribute('name');
             if ((string) $type->getAttribute('name_key') !== OrganizationUnitNameKey::from($name)) {
                 throw new DomainException('Organization-unit type name key must be derived from its normalized name.');
