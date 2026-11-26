@@ -21,7 +21,7 @@ export function SupplierSummaryCard({ supplier }: { supplier: Supplier }) {
         { label: 'Email', value: supplier.email },
         { label: 'Phone', value: supplier.phone ?? supplier.mobile },
         { label: 'Currency', value: readableRelation(supplier.default_currency) },
-        { label: 'Reference credit limit', value: <MoneyDisplay value={supplier.credit_limit} /> },
+        { label: 'Reference credit limit', value: <MoneyDisplay value={supplier.credit_limit} currency={supplier.default_currency?.code ?? undefined} /> },
         { label: 'Credit allowed', value: supplier.is_credit_allowed ? 'Yes' : 'No' },
         { label: 'Advance allowed', value: supplier.is_advance_allowed ? 'Yes' : 'No' },
         { label: 'Categories', value: supplier.categories?.map((category) => category.name).join(', ') || '-' },

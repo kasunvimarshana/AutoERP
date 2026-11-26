@@ -105,21 +105,23 @@ final class HrBiometricPushReceiverController
     {
         $tenantId = $this->extractTenantId($request, $tenant);
 
-        $query = HrBiometricDevice::withoutGlobalScopes()
-            ->where('serial_number', $sn)
-            ->where('is_enabled', true);
+        return $this->tenantContext->runAsControlPlane(function () use ($request, $sn, $tenantId): HrBiometricDevice|Response {
+            $query = HrBiometricDevice::query()
+                ->where('serial_number', $sn)
+                ->where('is_enabled', true);
 
-        if ($tenantId !== null) {
-            $query->where('tenant_id', $tenantId);
-        }
+            if ($tenantId !== null) {
+                $query->where('tenant_id', $tenantId);
+            }
 
-        return $this->resolvePushDeviceCandidate(
-            query: $query,
-            request: $request,
-            notFoundMessage: "ERROR: Unknown Device SN {$sn}\n",
-            ambiguousMessage: "ERROR: Ambiguous Device SN {$sn}; tenant or device token required\n",
-            plainTextResponse: true,
-        );
+            return $this->resolvePushDeviceCandidate(
+                query: $query,
+                request: $request,
+                notFoundMessage: "ERROR: Unknown Device SN {$sn}\n",
+                ambiguousMessage: "ERROR: Ambiguous Device SN {$sn}; tenant or device token required\n",
+                plainTextResponse: true,
+            );
+        });
     }
 
     private function extractTenantId(Request $request, ?int $tenant): ?int
@@ -227,30 +229,32 @@ final class HrBiometricPushReceiverController
             return response()->json(['error' => 'Device not recognized'], 404);
         }
 
-        $query = HrBiometricDevice::withoutGlobalScopes()
-            ->where('is_enabled', true);
+        $resolution = $this->tenantContext->runAsControlPlane(function () use ($request, $tenantId, $serialNumber, $clientIp): HrBiometricDevice|JsonResponse {
+            $query = HrBiometricDevice::query()
+                ->where('is_enabled', true);
 
-        if ($tenantId !== null) {
-            $query->where('tenant_id', $tenantId);
-        }
-
-        $query->where(function (Builder $sub) use ($serialNumber, $clientIp): void {
-            if ($serialNumber !== '') {
-                $sub->where('serial_number', $serialNumber);
-                if ($clientIp !== '') {
-                    $sub->orWhere('ip_address', $clientIp);
-                }
-            } else {
-                $sub->where('ip_address', $clientIp);
+            if ($tenantId !== null) {
+                $query->where('tenant_id', $tenantId);
             }
-        });
 
-        $resolution = $this->resolvePushDeviceCandidate(
-            query: $query,
-            request: $request,
-            notFoundMessage: 'Device not recognized',
-            ambiguousMessage: 'Ambiguous device identifier; tenant or device token required.',
-        );
+            $query->where(function (Builder $sub) use ($serialNumber, $clientIp): void {
+                if ($serialNumber !== '') {
+                    $sub->where('serial_number', $serialNumber);
+                    if ($clientIp !== '') {
+                        $sub->orWhere('ip_address', $clientIp);
+                    }
+                } else {
+                    $sub->where('ip_address', $clientIp);
+                }
+            });
+
+            return $this->resolvePushDeviceCandidate(
+                query: $query,
+                request: $request,
+                notFoundMessage: 'Device not recognized',
+                ambiguousMessage: 'Ambiguous device identifier; tenant or device token required.',
+            );
+        });
 
         if ($resolution instanceof JsonResponse) {
             return $resolution;
@@ -288,20 +292,22 @@ final class HrBiometricPushReceiverController
     {
         $tenantId = $this->extractTenantId($request, $tenant);
 
-        $query = HrBiometricDevice::withoutGlobalScopes()
-            ->where('device_code', $deviceCode)
-            ->where('is_enabled', true);
+        $resolution = $this->tenantContext->runAsControlPlane(function () use ($request, $tenantId, $deviceCode): HrBiometricDevice|JsonResponse {
+            $query = HrBiometricDevice::query()
+                ->where('device_code', $deviceCode)
+                ->where('is_enabled', true);
 
-        if ($tenantId !== null) {
-            $query->where('tenant_id', $tenantId);
-        }
+            if ($tenantId !== null) {
+                $query->where('tenant_id', $tenantId);
+            }
 
-        $resolution = $this->resolvePushDeviceCandidate(
-            query: $query,
-            request: $request,
-            notFoundMessage: 'Device not found or disabled.',
-            ambiguousMessage: 'Ambiguous device code; tenant or device token required.',
-        );
+            return $this->resolvePushDeviceCandidate(
+                query: $query,
+                request: $request,
+                notFoundMessage: 'Device not found or disabled.',
+                ambiguousMessage: 'Ambiguous device code; tenant or device token required.',
+            );
+        });
 
         if ($resolution instanceof JsonResponse) {
             return $resolution;

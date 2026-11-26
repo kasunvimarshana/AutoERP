@@ -15,10 +15,19 @@ namespace Modules\ReferenceData\Services;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Audit\Contracts\AuditRecorderInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\ReferenceData\Models\CurrencyModel;
 
 final class CurrencyCatalogService extends AbstractCatalogService
 {
+    public function __construct(
+        AuditRecorderInterface $audit,
+        private readonly TenantExecutionContextInterface $executionContext,
+    ) {
+        parent::__construct($audit);
+    }
+
     protected function modelClass(): string
     {
         return CurrencyModel::class;
@@ -60,17 +69,120 @@ final class CurrencyCatalogService extends AbstractCatalogService
             return;
         }
 
-        $isTenantBaseCurrency = DB::table('tenants')
-            ->where('base_currency_id', $model->getKey())
-            ->where('status', '!=', 'archived')
-            ->exists();
+        $currentTenantId = $this->executionContext->tenantId();
 
-        if ($isTenantBaseCurrency) {
-            throw ValidationException::withMessages([
-                'is_active' => [
-                    'This currency is the base currency of an active tenant and cannot be deactivated.',
-                ],
-            ]);
+        if ($currentTenantId !== null) {
+            $isTenantBaseCurrency = DB::table('tenants')
+                ->where('id', $currentTenantId)
+                ->where('base_currency_id', $model->getKey())
+                ->where('status', '!=', 'archived')
+                ->exists();
+
+            if ($isTenantBaseCurrency) {
+                throw ValidationException::withMessages([
+                    'is_active' => [
+                        'This currency is the base currency of an active tenant and cannot be deactivated.',
+                    ],
+                ]);
+            }
+
+            $hasOpenInvoices = DB::table('invoices')
+                ->where('tenant_id', $currentTenantId)
+                ->where('currency_id', $model->getKey())
+                ->where('balance_due', '>', 0)
+                ->whereNotIn('status', ['draft', 'reversed', 'cancelled', 'void'])
+                ->exists();
+
+            if ($hasOpenInvoices) {
+                throw ValidationException::withMessages([
+                    'is_active' => [
+                        'This currency is used by open unpaid invoices and cannot be deactivated.',
+                    ],
+                ]);
+            }
+
+            $isCustomerDefaultCurrency = DB::table('customers')
+                ->where('tenant_id', $currentTenantId)
+                ->where('default_currency_id', $model->getKey())
+                ->where('status', 'active')
+                ->exists();
+
+            if ($isCustomerDefaultCurrency) {
+                throw ValidationException::withMessages([
+                    'is_active' => [
+                        'This currency is assigned as default currency for active customers and cannot be deactivated.',
+                    ],
+                ]);
+            }
+
+            $isSupplierDefaultCurrency = DB::table('suppliers')
+                ->where('tenant_id', $currentTenantId)
+                ->where('default_currency_id', $model->getKey())
+                ->where('status', 'active')
+                ->exists();
+
+            if ($isSupplierDefaultCurrency) {
+                throw ValidationException::withMessages([
+                    'is_active' => [
+                        'This currency is assigned as default currency for active suppliers and cannot be deactivated.',
+                    ],
+                ]);
+            }
+        } else {
+            $this->executionContext->runAsControlPlane(function () use ($model): void {
+                $isTenantBaseCurrency = DB::table('tenants')
+                    ->where('base_currency_id', $model->getKey())
+                    ->where('status', '!=', 'archived')
+                    ->exists();
+
+                if ($isTenantBaseCurrency) {
+                    throw ValidationException::withMessages([
+                        'is_active' => [
+                            'This currency is the base currency of an active tenant and cannot be deactivated.',
+                        ],
+                    ]);
+                }
+
+                $hasOpenInvoices = DB::table('invoices')
+                    ->where('currency_id', $model->getKey())
+                    ->where('balance_due', '>', 0)
+                    ->whereNotIn('status', ['draft', 'reversed', 'cancelled', 'void'])
+                    ->exists();
+
+                if ($hasOpenInvoices) {
+                    throw ValidationException::withMessages([
+                        'is_active' => [
+                            'This currency is used by open unpaid invoices and cannot be deactivated.',
+                        ],
+                    ]);
+                }
+
+                $isCustomerDefaultCurrency = DB::table('customers')
+                    ->where('default_currency_id', $model->getKey())
+                    ->where('status', 'active')
+                    ->exists();
+
+                if ($isCustomerDefaultCurrency) {
+                    throw ValidationException::withMessages([
+                        'is_active' => [
+                            'This currency is assigned as default currency for active customers and cannot be deactivated.',
+                        ],
+                    ]);
+                }
+
+                $isSupplierDefaultCurrency = DB::table('suppliers')
+                    ->where('default_currency_id', $model->getKey())
+                    ->where('status', 'active')
+                    ->exists();
+
+                if ($isSupplierDefaultCurrency) {
+                    throw ValidationException::withMessages([
+                        'is_active' => [
+                            'This currency is assigned as default currency for active suppliers and cannot be deactivated.',
+                        ],
+                    ]);
+                }
+            });
         }
     }
 

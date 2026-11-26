@@ -37,6 +37,8 @@ use Modules\Idempotency\Services\IdempotencyService;
 use Modules\Payment\Contracts\PaymentMethodProviderInterface;
 use Modules\Payment\DTOs\PaymentMethodData;
 use Modules\Payment\Enums\PaymentMethodType;
+use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Tenant\Models\TenantModel;
 
 final class ExpensePostingService
 {
@@ -79,6 +81,26 @@ final class ExpensePostingService
             }
             if ($this->math->isNegative($data->exchangeRate) || $this->math->isZero($data->exchangeRate)) {
                 throw new InvalidArgumentException('Expense exchange rate must be greater than zero.');
+            }
+
+            $tenant = TenantModel::query()->findOrFail($data->tenantId);
+            $baseCurrencyId = $tenant->base_currency_id === null ? null : (int) $tenant->base_currency_id;
+
+            if ($data->currencyId === null) {
+                if ($this->math->compare($data->exchangeRate, '1.000000') !== 0) {
+                    throw new InvalidArgumentException('An expense without an explicit currency must use an exchange rate of 1.000000.');
+                }
+            } else {
+                $currency = CurrencyModel::query()->find($data->currencyId);
+                if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
+                    throw new InvalidArgumentException('Expense currency must be active.');
+                }
+
+                if ($baseCurrencyId !== null
+                    && $data->currencyId === $baseCurrencyId
+                    && $this->math->compare($data->exchangeRate, '1.000000') !== 0) {
+                    throw new InvalidArgumentException('Tenant base currency expenses must use an exchange rate of 1.000000.');
+                }
             }
 
             $type = ExpenseType::query()

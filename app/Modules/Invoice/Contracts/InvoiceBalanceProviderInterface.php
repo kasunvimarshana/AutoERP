@@ -38,13 +38,32 @@ interface InvoiceBalanceProviderInterface
 
     /**
      * @param  list<int>  $partyIds
-     * @return array<int, list<array{amount: string, currency_code: string|null}>>
+     * @return array<int, list<array{amount: string, currency_code: string|null, base_amount?: string}>>
      */
     public function getOutstandingTotalsForParties(
         int $tenantId,
         ?int $organizationUnitId,
         string $partyType,
         array $partyIds,
+    ): array;
+
+    /**
+     * @return array{
+     *     currency_code: string|null,
+     *     currency_id: int|null,
+     *     total_exposure: string,
+     *     total_base_exposure: string,
+     *     unconverted_currencies: list<string>,
+     * }
+     */
+    public function getPartyExposureInCurrency(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        int $partyId,
+        ?int $targetCurrencyId = null,
+        ?string $targetCurrencyCode = null,
+        ?string $targetExchangeRate = null,
     ): array;
 
     /**

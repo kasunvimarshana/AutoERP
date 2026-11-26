@@ -57,13 +57,7 @@ final class VehicleServicePaymentOptionService
             ->with(['creditProfile', 'defaultCurrency'])
             ->find($billToCustomerId);
         $creditProfile = $customer?->creditProfile;
-        $exposureByCurrency = $customer === null ? [] : ($this->invoiceBalances->getOutstandingTotalsForParties(
-            (int) $job->tenant_id,
-            $job->organization_unit_id === null ? null : (int) $job->organization_unit_id,
-            InvoicePartyType::Customer->value,
-            [$billToCustomerId],
-        )[$billToCustomerId] ?? []);
-        $assessment = $this->creditAssessment($customer, $exposureByCurrency);
+        $assessment = $this->creditAssessment($job, $customer);
 
         return [
             'job_version' => (int) $job->row_version,
@@ -74,7 +68,6 @@ final class VehicleServicePaymentOptionService
     }
 
     /**
-     * @param  list<array{amount: string, currency_code: string|null}>  $exposureByCurrency
      * @return array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string, open_exposure: string, remaining_credit: string, warning: string|null}
      */
     public function creditAssessmentForConfirmation(VehicleServiceJob $job): array
@@ -87,43 +80,69 @@ final class VehicleServicePaymentOptionService
                 ->lockForUpdate()
                 ->with(['creditProfile', 'defaultCurrency'])
                 ->first();
-            $exposureByCurrency = $customer === null ? [] : ($this->invoiceBalances->getOutstandingTotalsForParties(
-                (int) $job->tenant_id,
-                $job->organization_unit_id === null ? null : (int) $job->organization_unit_id,
-                InvoicePartyType::Customer->value,
-                [$billToCustomerId],
-            )[$billToCustomerId] ?? []);
 
-            return $this->creditAssessment($customer, $exposureByCurrency);
+            return $this->creditAssessment($job, $customer);
         }, 3);
     }
 
     /**
-     * @param  list<array{amount: string, currency_code: string|null}>  $exposureByCurrency
      * @return array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string, open_exposure: string, remaining_credit: string, warning: string|null}
      */
-    private function creditAssessment(?Customer $customer, array $exposureByCurrency): array
+    private function creditAssessment(VehicleServiceJob $job, ?Customer $customer): array
     {
         $profile = $customer?->creditProfile;
         $limit = (string) ($profile?->credit_limit ?? '0.000000');
-        $currencyCode = $customer?->defaultCurrency?->code;
-        $currencyExposure = array_values(array_filter(
-            $exposureByCurrency,
-            static fn (array $exposure): bool => $currencyCode === null || $exposure['currency_code'] === $currencyCode,
-        ));
-        $unmatchedCurrencies = array_values(array_filter(
-            $exposureByCurrency,
-            static fn (array $exposure): bool => $currencyCode !== null && $exposure['currency_code'] !== $currencyCode,
-        ));
-        $hasMixedCurrencies = count($unmatchedCurrencies) > 0 || count($currencyExposure) > 1;
-        $available = ! $hasMixedCurrencies && $profile !== null && (bool) $profile->is_active && (bool) $profile->credit_allowed;
-        $exposure = $available && $currencyExposure !== [] ? (string) $currencyExposure[0]['amount'] : '0.000000';
+
+        $targetCurrencyId = $customer?->defaultCurrency !== null
+            ? (int) $customer->defaultCurrency->getKey()
+            : null;
+        $targetCurrencyCode = $customer?->defaultCurrency?->code;
+
+        $targetExchangeRate = null;
+        $jobInvoice = $job->invoiceLinks()
+            ->where('status', 'active')
+            ->with('invoice')
+            ->first()
+            ?->invoice;
+
+        if ($jobInvoice !== null
+            && $this->math->compare((string) $jobInvoice->exchange_rate, '0.000000') > 0
+            && (
+                ($targetCurrencyId !== null && $jobInvoice->currency_id !== null && (int) $jobInvoice->currency_id === $targetCurrencyId)
+                || ($targetCurrencyCode !== null && $jobInvoice->currency_code_snapshot !== null && $jobInvoice->currency_code_snapshot === $targetCurrencyCode)
+            )) {
+            $targetExchangeRate = (string) $jobInvoice->exchange_rate;
+        }
+
+        $billToCustomerId = (int) ($job->bill_to_customer_id ?? $job->customer_id);
+        $exposureResult = $customer === null
+            ? [
+                'currency_code' => $targetCurrencyCode,
+                'currency_id' => $targetCurrencyId,
+                'total_exposure' => '0.000000',
+                'total_base_exposure' => '0.000000',
+                'unconverted_currencies' => [],
+            ]
+            : $this->invoiceBalances->getPartyExposureInCurrency(
+                (int) $job->tenant_id,
+                $job->organization_unit_id === null ? null : (int) $job->organization_unit_id,
+                InvoicePartyType::Customer->value,
+                $billToCustomerId,
+                $targetCurrencyId,
+                $targetCurrencyCode,
+                $targetExchangeRate,
+            );
+
+        $exposure = $exposureResult['total_exposure'];
+        $currencyCode = $exposureResult['currency_code'] ?? $targetCurrencyCode;
+        $unconverted = $exposureResult['unconverted_currencies'];
         $remaining = $this->math->sub($limit, $exposure);
         $overLimit = $this->math->compare($exposure, $limit) > 0;
+        $available = $unconverted === [] && $profile !== null && (bool) $profile->is_active && (bool) $profile->credit_allowed;
         $warning = null;
 
-        if ($hasMixedCurrencies) {
-            $warning = 'Credit limit cannot be checked because the open invoices do not use a single currency matching the customer credit-limit currency.';
+        if ($unconverted !== []) {
+            $warning = 'Credit limit cannot be assessed accurately because exchange rates are missing for currencies: '.implode(', ', $unconverted).'.';
         } elseif ($profile === null || ! (bool) $profile->is_active || ! (bool) $profile->credit_allowed) {
             $warning = 'Credit is not enabled for this customer.';
         } elseif ($overLimit && ! (bool) $profile->allow_over_credit) {
@@ -141,7 +160,7 @@ final class VehicleServicePaymentOptionService
         return [
             'available' => $available,
             'can_keep_on_credit' => $available && (! $overLimit || (bool) $profile->allow_over_credit),
-            'currency_code' => $currencyCode ?? ($currencyExposure[0]['currency_code'] ?? null),
+            'currency_code' => $currencyCode,
             'credit_limit' => $limit,
             'open_exposure' => $exposure,
             'remaining_credit' => $remaining,

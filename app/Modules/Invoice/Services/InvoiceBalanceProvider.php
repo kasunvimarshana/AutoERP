@@ -19,6 +19,8 @@ use Modules\Invoice\DTOs\InvoiceBalanceResult;
 use Modules\Invoice\Enums\InvoiceBalanceStatus;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
+use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Tenant\Models\TenantModel;
 
 final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
 {
@@ -110,21 +112,177 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             ? $query->whereNull('invoices.organization_unit_id')
             : $query->where('invoices.organization_unit_id', $organizationUnitId);
 
-        return $query
-            ->selectRaw('invoices.party_id, invoices.currency_code_snapshot, SUM(invoice_balances.remaining_amount) as total_due')
-            ->groupBy('invoices.party_id', 'invoices.currency_code_snapshot')
-            ->orderBy('invoices.currency_code_snapshot')
-            ->get()
-            ->groupBy(static fn (object $total): int => (int) $total->party_id)
-            ->mapWithKeys(fn ($totals, mixed $partyId): array => [
-                (int) $partyId => $totals->map(fn (object $total): array => [
-                    'amount' => $this->math->normalize((string) $total->total_due),
-                    'currency_code' => $total->currency_code_snapshot === null
-                        ? null
-                        : (string) $total->currency_code_snapshot,
-                ])->values()->all(),
+        $rows = $query
+            ->select([
+                'invoices.party_id',
+                'invoices.currency_code_snapshot',
+                'invoices.exchange_rate',
+                'invoice_balances.remaining_amount',
             ])
-            ->all();
+            ->orderBy('invoices.currency_code_snapshot')
+            ->get();
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $partyId = (int) $row->party_id;
+            $code = $row->currency_code_snapshot === null ? null : (string) $row->currency_code_snapshot;
+            $codeKey = $code ?? '__null__';
+            $remaining = (string) $row->remaining_amount;
+            $rate = (string) $row->exchange_rate;
+            if ($this->math->isZero($rate) || $this->math->isNegative($rate)) {
+                $rate = '1.000000';
+            }
+            $baseRemaining = $this->math->mul($remaining, $rate);
+
+            if (! isset($grouped[$partyId][$codeKey])) {
+                $grouped[$partyId][$codeKey] = [
+                    'amount' => '0.000000',
+                    'currency_code' => $code,
+                    'base_amount' => '0.000000',
+                ];
+            }
+
+            $grouped[$partyId][$codeKey]['amount'] = $this->math->add(
+                $grouped[$partyId][$codeKey]['amount'],
+                $remaining,
+            );
+            $grouped[$partyId][$codeKey]['base_amount'] = $this->math->add(
+                $grouped[$partyId][$codeKey]['base_amount'],
+                $baseRemaining,
+            );
+        }
+
+        $result = [];
+        foreach ($grouped as $partyId => $currencies) {
+            $result[$partyId] = array_values(array_map(fn (array $c): array => [
+                'amount' => $this->math->normalize($c['amount']),
+                'currency_code' => $c['currency_code'],
+                'base_amount' => $this->math->normalize($c['base_amount']),
+            ], $currencies));
+        }
+
+        return $result;
+    }
+
+    public function getPartyExposureInCurrency(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        int $partyId,
+        ?int $targetCurrencyId = null,
+        ?string $targetCurrencyCode = null,
+        ?string $targetExchangeRate = null,
+    ): array {
+        $tenant = TenantModel::query()->with('baseCurrency')->find($tenantId);
+        $baseCurrency = $tenant?->baseCurrency;
+        $baseCurrencyId = $tenant?->base_currency_id === null ? null : (int) $tenant->base_currency_id;
+        $baseCurrencyCode = $baseCurrency?->code;
+
+        if ($targetCurrencyId === null && $targetCurrencyCode === null) {
+            $targetCurrencyId = $baseCurrencyId;
+            $targetCurrencyCode = $baseCurrencyCode;
+            $targetExchangeRate = '1.000000';
+        } elseif ($targetCurrencyId !== null && $targetCurrencyCode === null) {
+            $targetCurrency = CurrencyModel::query()->find($targetCurrencyId);
+            $targetCurrencyCode = $targetCurrency?->code;
+        } elseif ($targetCurrencyCode !== null && $targetCurrencyId === null) {
+            $targetCurrency = CurrencyModel::query()->where('code', $targetCurrencyCode)->first();
+            $targetCurrencyId = $targetCurrency === null ? null : (int) $targetCurrency->getKey();
+        }
+
+        if ($targetCurrencyId !== null && $baseCurrencyId !== null && $targetCurrencyId === $baseCurrencyId) {
+            $targetExchangeRate = '1.000000';
+        } elseif ($targetCurrencyCode !== null && $baseCurrencyCode !== null && $targetCurrencyCode === $baseCurrencyCode) {
+            $targetExchangeRate = '1.000000';
+        } elseif ($targetExchangeRate !== null && $this->math->compare($targetExchangeRate, '0.000000') > 0) {
+            $targetExchangeRate = $this->math->normalize($targetExchangeRate);
+        } elseif ($targetCurrencyId !== null || $targetCurrencyCode !== null) {
+            $latestInvoiceRate = Invoice::query()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($query) use ($targetCurrencyId, $targetCurrencyCode): void {
+                    if ($targetCurrencyId !== null) {
+                        $query->where('currency_id', $targetCurrencyId);
+                    }
+                    if ($targetCurrencyCode !== null) {
+                        $query->orWhere('currency_code_snapshot', $targetCurrencyCode);
+                    }
+                })
+                ->where('exchange_rate', '>', '0')
+                ->latest('invoice_date')
+                ->latest('id')
+                ->value('exchange_rate');
+
+            $targetExchangeRate = $latestInvoiceRate === null ? null : $this->math->normalize((string) $latestInvoiceRate);
+        }
+
+        $query = Invoice::query()
+            ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
+            ->where('invoices.tenant_id', $tenantId)
+            ->where('invoices.party_type', $partyType)
+            ->where('invoices.party_id', $partyId)
+            ->where('invoice_balances.remaining_amount', '>', '0')
+            ->whereNotIn('invoices.status', [
+                InvoiceStatus::Draft->value,
+                InvoiceStatus::Reversed->value,
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ]);
+
+        $organizationUnitId === null
+            ? $query->whereNull('invoices.organization_unit_id')
+            : $query->where('invoices.organization_unit_id', $organizationUnitId);
+
+        $rows = $query->select([
+            'invoices.id',
+            'invoices.currency_id',
+            'invoices.currency_code_snapshot',
+            'invoices.exchange_rate',
+            'invoice_balances.remaining_amount',
+        ])->get();
+
+        $totalExposure = '0.000000';
+        $totalBaseExposure = '0.000000';
+        $unconvertedCurrencies = [];
+
+        foreach ($rows as $row) {
+            $remaining = $this->math->normalize((string) $row->remaining_amount);
+            $invRate = (string) $row->exchange_rate;
+            if ($this->math->isZero($invRate) || $this->math->isNegative($invRate)) {
+                $invRate = '1.000000';
+            }
+            $invRate = $this->math->normalize($invRate);
+            $baseAmount = $this->math->mul($remaining, $invRate);
+            $totalBaseExposure = $this->math->add($totalBaseExposure, $baseAmount);
+
+            $invCode = $row->currency_code_snapshot === null ? null : (string) $row->currency_code_snapshot;
+            $invCurrId = $row->currency_id === null ? null : (int) $row->currency_id;
+
+            $isDirectTarget = ($targetCurrencyCode !== null && $invCode === $targetCurrencyCode)
+                || ($targetCurrencyId !== null && $invCurrId === $targetCurrencyId);
+
+            if ($isDirectTarget) {
+                $targetAmount = $remaining;
+            } elseif (($targetCurrencyId !== null && $targetCurrencyId === $baseCurrencyId)
+                || ($targetCurrencyCode !== null && $baseCurrencyCode !== null && $targetCurrencyCode === $baseCurrencyCode)
+                || ($targetCurrencyId === null && $targetCurrencyCode === null)) {
+                $targetAmount = $baseAmount;
+            } elseif ($targetExchangeRate !== null && $this->math->compare($targetExchangeRate, '0.000000') > 0) {
+                $targetAmount = $this->math->div($baseAmount, $targetExchangeRate, 6);
+            } else {
+                $unconvertedCurrencies[] = $invCode ?? 'Unknown';
+                $targetAmount = '0.000000';
+            }
+
+            $totalExposure = $this->math->add($totalExposure, $targetAmount);
+        }
+
+        return [
+            'currency_code' => $targetCurrencyCode ?? $baseCurrencyCode,
+            'currency_id' => $targetCurrencyId ?? $baseCurrencyId,
+            'total_exposure' => $this->math->normalize($totalExposure),
+            'total_base_exposure' => $this->math->normalize($totalBaseExposure),
+            'unconverted_currencies' => array_values(array_unique($unconvertedCurrencies)),
+        ];
     }
 
     public function getPayableBalancesForParty(

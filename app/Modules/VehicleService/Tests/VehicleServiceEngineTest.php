@@ -20,6 +20,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Inventory\DTOs\StockBalanceData;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
@@ -29,9 +31,15 @@ use Modules\Inventory\Models\InventoryReservation;
 use Modules\Inventory\Services\BatchTrackingService;
 use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Inventory\Services\StockMovementService;
+use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceSourceLine;
+use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoicePrintService;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\DTOs\ItemPriceData;
@@ -2288,6 +2296,312 @@ final class VehicleServiceEngineTest extends TestCase
         );
 
         $this->assertFalse($inactiveOptions['credit_allowed']);
+    }
+
+    public function test_payment_options_handles_multi_currency_credit_assessment_without_error(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $customerId = (int) $context['customer_id'];
+        $usdCurrencyId = CurrencyFixture::create(['code' => 'USD', 'name' => 'US Dollar']);
+
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+
+        DB::table('customer_credit_profiles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'customer_id' => $customerId,
+            'credit_limit' => '100000.000000',
+            'credit_allowed' => true,
+            'allow_over_credit' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-05',
+            partyType: 'customer',
+            partyId: $customerId,
+            currencyId: $usdCurrencyId,
+            exchangeRate: '300.000000',
+            status: InvoiceStatus::Posted,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'USD prior invoice', quantity: '1.000000', unitPrice: '100.000000')],
+            postingPlan: app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-05', FinanceAccountRoleCode::Revenue, '100.000000'),
+        )));
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06',
+            partyType: 'customer',
+            partyId: $customerId,
+            exchangeRate: '1.000000',
+            status: InvoiceStatus::Posted,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'Base prior invoice', quantity: '1.000000', unitPrice: '20000.000000')],
+            postingPlan: app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-06', FinanceAccountRoleCode::Revenue, '20000.000000'),
+        )));
+
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '15000.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+        $invoice = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+
+        $options = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(VehicleServicePaymentOptionService::class)->options($this->refreshJob($job)),
+        );
+
+        $this->assertTrue($options['credit_allowed']);
+        $assessment = $options['credit_assessment'];
+        $this->assertTrue($assessment['available']);
+        $this->assertTrue($assessment['can_keep_on_credit']);
+        $this->assertSame('100000.000000', $assessment['credit_limit']);
+        $this->assertSame('65000.000000', $assessment['open_exposure']);
+        $this->assertSame('35000.000000', $assessment['remaining_credit']);
+        $this->assertNull($assessment['warning']);
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(VehicleServicePaymentIntegrationService::class)->keepInvoiceOnCredit(
+                $this->refreshJob($job),
+                (int) $invoice->getKey(),
+                $this->currentJobVersion($job),
+            ),
+        );
+
+        $link = DB::table('vehicle_service_invoice_links')
+            ->where('invoice_id', $invoice->getKey())
+            ->first();
+        $this->assertSame('credit', $link->settlement_mode);
+    }
+
+    public function test_payment_options_blocks_over_limit_with_multi_currency_when_over_credit_not_allowed(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $customerId = (int) $context['customer_id'];
+        $usdCurrencyId = CurrencyFixture::create(['code' => 'USD', 'name' => 'US Dollar']);
+
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+
+        DB::table('customer_credit_profiles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'customer_id' => $customerId,
+            'credit_limit' => '50000.000000',
+            'credit_allowed' => true,
+            'allow_over_credit' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-05',
+            partyType: 'customer',
+            partyId: $customerId,
+            currencyId: $usdCurrencyId,
+            exchangeRate: '300.000000',
+            status: InvoiceStatus::Posted,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'USD prior invoice', quantity: '1.000000', unitPrice: '100.000000')],
+            postingPlan: app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-05', FinanceAccountRoleCode::Revenue, '100.000000'),
+        )));
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06',
+            partyType: 'customer',
+            partyId: $customerId,
+            exchangeRate: '1.000000',
+            status: InvoiceStatus::Posted,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'Base prior invoice', quantity: '1.000000', unitPrice: '25000.000000')],
+            postingPlan: app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-06', FinanceAccountRoleCode::Revenue, '25000.000000'),
+        )));
+
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '10000.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+        $invoice = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+
+        $options = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(VehicleServicePaymentOptionService::class)->options($this->refreshJob($job)),
+        );
+
+        $assessment = $options['credit_assessment'];
+        $this->assertTrue($assessment['available']);
+        $this->assertFalse($assessment['can_keep_on_credit']);
+        $this->assertSame('50000.000000', $assessment['credit_limit']);
+        $this->assertSame('65000.000000', $assessment['open_exposure']);
+        $this->assertSame('This customer is over the credit limit. Collect a direct payment before proceeding.', $assessment['warning']);
+
+        $this->expectException(ValidationException::class);
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(VehicleServicePaymentIntegrationService::class)->keepInvoiceOnCredit(
+                $this->refreshJob($job),
+                (int) $invoice->getKey(),
+                $this->currentJobVersion($job),
+            ),
+        );
+    }
+
+    public function test_payment_options_allows_over_credit_when_profile_permits_multi_currency(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $customerId = (int) $context['customer_id'];
+        $usdCurrencyId = CurrencyFixture::create(['code' => 'USD', 'name' => 'US Dollar']);
+
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+
+        DB::table('customer_credit_profiles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'customer_id' => $customerId,
+            'credit_limit' => '50000.000000',
+            'credit_allowed' => true,
+            'allow_over_credit' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-05',
+            partyType: 'customer',
+            partyId: $customerId,
+            currencyId: $usdCurrencyId,
+            exchangeRate: '300.000000',
+            status: InvoiceStatus::Posted,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'USD prior invoice', quantity: '1.000000', unitPrice: '100.000000')],
+            postingPlan: app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-05', FinanceAccountRoleCode::Revenue, '100.000000'),
+        )));
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06',
+            partyType: 'customer',
+            partyId: $customerId,
+            exchangeRate: '1.000000',
+            status: InvoiceStatus::Posted,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'Base prior invoice', quantity: '1.000000', unitPrice: '25000.000000')],
+            postingPlan: app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-06', FinanceAccountRoleCode::Revenue, '25000.000000'),
+        )));
+
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '10000.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+        $invoice = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+
+        $options = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(VehicleServicePaymentOptionService::class)->options($this->refreshJob($job)),
+        );
+
+        $assessment = $options['credit_assessment'];
+        $this->assertTrue($assessment['available']);
+        $this->assertTrue($assessment['can_keep_on_credit']);
+        $this->assertSame('50000.000000', $assessment['credit_limit']);
+        $this->assertSame('65000.000000', $assessment['open_exposure']);
+        $this->assertSame('This customer is over the credit limit, but over-credit is allowed.', $assessment['warning']);
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(VehicleServicePaymentIntegrationService::class)->keepInvoiceOnCredit(
+                $this->refreshJob($job),
+                (int) $invoice->getKey(),
+                $this->currentJobVersion($job),
+            ),
+        );
+
+        $link = DB::table('vehicle_service_invoice_links')
+            ->where('invoice_id', $invoice->getKey())
+            ->first();
+        $this->assertSame('credit', $link->settlement_mode);
+    }
+
+    public function test_payment_options_blocks_credit_when_exchange_rates_are_missing(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $customerId = (int) $context['customer_id'];
+        $jpyCurrencyId = CurrencyFixture::create(['code' => 'JPY', 'name' => 'Japanese Yen']);
+        $eurCurrencyId = CurrencyFixture::create(['code' => 'EUR', 'name' => 'Euro']);
+
+        DB::table('customers')->where('id', $customerId)->update(['default_currency_id' => $eurCurrencyId]);
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+
+        DB::table('customer_credit_profiles')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'customer_id' => $customerId,
+            'credit_limit' => '50000.000000',
+            'credit_allowed' => true,
+            'allow_over_credit' => false,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Prior invoice in JPY - no EUR exchange rate is recorded for the tenant
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-05',
+            partyType: 'customer',
+            partyId: $customerId,
+            currencyId: $jpyCurrencyId,
+            exchangeRate: '2.500000',
+            status: InvoiceStatus::Posted,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'JPY prior invoice', quantity: '1.000000', unitPrice: '1000.000000')],
+            postingPlan: app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-05', FinanceAccountRoleCode::Revenue, '1000.000000'),
+        )));
+
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '10000.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+        $invoice = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+
+        $options = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(VehicleServicePaymentOptionService::class)->options($this->refreshJob($job)),
+        );
+
+        $assessment = $options['credit_assessment'];
+        $this->assertFalse($assessment['available']);
+        $this->assertFalse($assessment['can_keep_on_credit']);
+        $this->assertStringContainsString('Credit limit cannot be assessed accurately because exchange rates are missing', $assessment['warning']);
+
+        $this->expectException(ValidationException::class);
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(VehicleServicePaymentIntegrationService::class)->keepInvoiceOnCredit(
+                $this->refreshJob($job),
+                (int) $invoice->getKey(),
+                $this->currentJobVersion($job),
+            ),
+        );
     }
 
     public function test_inventory_issue_rejects_line_ids_from_another_job(): void

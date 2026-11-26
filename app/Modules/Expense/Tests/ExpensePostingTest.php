@@ -22,6 +22,7 @@ use Modules\Expense\Services\ExpensePostingService;
 use Modules\Expense\Services\ExpenseReversalService;
 use Modules\Finance\Services\FinanceStatementService;
 use Modules\Reporting\Services\ExpenseReportService;
+use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
@@ -216,6 +217,75 @@ final class ExpensePostingTest extends TestCase
                 paymentMethodId: $methodId,
                 expenseDate: now()->addDays(5)->toDateString(),
                 amount: '50.000000',
+                idempotencyKey: (string) Str::uuid(),
+            )),
+        );
+    }
+
+    public function test_base_currency_expense_rejects_non_unit_exchange_rate(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $baseCurrencyId = CurrencyFixture::create(['name' => 'Expense Base Currency']);
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $baseCurrencyId]);
+
+        $typeId = (int) DB::table('expense_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'EXP-FX-BASE',
+            'name' => 'Base Currency Rate Test Expense',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $methodId = $this->paymentMethod($tenantId);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tenant base currency expenses must use an exchange rate of 1.000000.');
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ExpensePostingService::class)->createAndPost(new CreateExpenseData(
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                expenseTypeId: $typeId,
+                paymentMethodId: $methodId,
+                expenseDate: '2026-06-01',
+                amount: '100.000000',
+                currencyId: $baseCurrencyId,
+                exchangeRate: '2.000000',
+                idempotencyKey: (string) Str::uuid(),
+            )),
+        );
+    }
+
+    public function test_expense_rejects_inactive_currency(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $inactiveCurrencyId = CurrencyFixture::create(['name' => 'Inactive Expense Currency', 'is_active' => false]);
+
+        $typeId = (int) DB::table('expense_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'EXP-INACTIVE-CURR',
+            'name' => 'Inactive Currency Test Expense',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $methodId = $this->paymentMethod($tenantId);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Expense currency must be active.');
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ExpensePostingService::class)->createAndPost(new CreateExpenseData(
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                expenseTypeId: $typeId,
+                paymentMethodId: $methodId,
+                expenseDate: '2026-06-01',
+                amount: '100.000000',
+                currencyId: $inactiveCurrencyId,
+                exchangeRate: '1.500000',
                 idempotencyKey: (string) Str::uuid(),
             )),
         );
