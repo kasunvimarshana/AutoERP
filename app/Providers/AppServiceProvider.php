@@ -12,7 +12,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use Illuminate\Database\Console\Migrations\RollbackCommand;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 
@@ -33,5 +35,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
         Model::preventLazyLoading(! app()->isProduction());
+
+        DB::prohibitDestructiveCommands($this->app->isProduction());
+        RollbackCommand::prohibit(false);
     }
 }

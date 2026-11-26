@@ -1,5 +1,9 @@
 # AutoERP Agent Core Axioms & Engineering Rules
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 ## 1. Prime Directive: Understand First, Verify Second, Change Third
 - Never act on assumptions or make changes blindly; fully understand requirements, system context, module ownership, and data consequences before modifying code.
 - If requirements are unclear or information is missing, ask for clarification instead of guessing (evidence over guessing).
