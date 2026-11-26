@@ -48,9 +48,9 @@ final class CashFlowReportService
             ->orderBy('finance_ledger_entries.entry_date')
             ->orderBy('finance_ledger_entries.id');
 
-        $organizationUnitId === null
-            ? $query->whereNull('finance_ledger_entries.organization_unit_id')
-            : $query->where('finance_ledger_entries.organization_unit_id', $organizationUnitId);
+        if ($organizationUnitId !== null) {
+            $query->where('finance_ledger_entries.organization_unit_id', $organizationUnitId);
+        }
         if ($dateFrom !== null) {
             $query->whereDate('finance_ledger_entries.entry_date', '>=', $dateFrom);
         }

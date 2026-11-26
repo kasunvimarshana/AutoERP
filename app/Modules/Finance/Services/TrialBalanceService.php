@@ -41,6 +41,7 @@ final class TrialBalanceService
             $query->orderBy('code')->get(),
             $dateFrom,
             $dateTo,
+            $organizationUnitId,
         );
 
         foreach ($accountBalances as $balance) {
@@ -58,8 +59,13 @@ final class TrialBalanceService
 
     private function scopeOrganization(Builder $query, ?int $organizationUnitId): Builder
     {
-        return $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
+        if ($organizationUnitId !== null) {
+            return $query->where(function (Builder $scope) use ($organizationUnitId): void {
+                $scope->whereNull('organization_unit_id')
+                    ->orWhere('organization_unit_id', $organizationUnitId);
+            });
+        }
+
+        return $query;
     }
 }

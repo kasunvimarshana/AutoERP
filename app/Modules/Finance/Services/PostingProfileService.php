@@ -99,6 +99,14 @@ final class PostingProfileService
                 if ($lineKey === '' || $accountRoleId < 1) {
                     throw new InvalidArgumentException('Posting profile rules require a line key and account role.');
                 }
+
+                $role = FinanceAccountRole::query()->find($accountRoleId);
+                if (! $role instanceof FinanceAccountRole || (int) $role->tenant_id !== $tenantId) {
+                    throw new InvalidArgumentException('Posting profile rule account role is invalid for this tenant.');
+                }
+                if (! (bool) $role->is_active) {
+                    throw new InvalidArgumentException('Posting profile rule cannot reference an inactive account role.');
+                }
                 if ($effectiveTo !== null && strcmp($effectiveTo, $effectiveFrom) < 0) {
                     throw new InvalidArgumentException('Posting profile rule effective-to date cannot be before effective-from date.');
                 }

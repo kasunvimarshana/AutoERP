@@ -233,7 +233,7 @@ final class BankReconciliationService
     private function assertBankAccount(int $tenantId, ?int $organizationUnitId, int $bankAccountId): FinanceAccount
     {
         $account = FinanceAccount::query()->findOrFail($bankAccountId);
-        if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
+        if ((int) $account->tenant_id !== $tenantId || ($account->organization_unit_id !== null && $account->organization_unit_id !== $organizationUnitId)) {
             throw new InvalidArgumentException('Bank account scope mismatch.');
         }
         if (! (bool) $account->is_active || ! (bool) $account->is_posting_account || ! (bool) $account->is_bank_account) {

@@ -177,9 +177,9 @@ final class AgingReportService
             ->orderBy('invoices.due_date')
             ->orderBy('invoices.invoice_number');
 
-        $organizationUnitId === null
-            ? $query->whereNull('invoice_balances.organization_unit_id')
-            : $query->where('invoice_balances.organization_unit_id', $organizationUnitId);
+        if ($organizationUnitId !== null) {
+            $query->where('invoice_balances.organization_unit_id', $organizationUnitId);
+        }
 
         foreach ($query->get() as $row) {
             if ($row->invoice_status === 'reversed') {

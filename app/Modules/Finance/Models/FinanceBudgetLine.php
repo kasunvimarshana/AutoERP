@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
@@ -22,6 +23,19 @@ final class FinanceBudgetLine extends TenantOwnedModel
     protected $table = 'finance_budget_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        $assertDraft = static function (self $line): void {
+            $budget = $line->budget;
+            if ($budget && (string) $budget->status !== 'draft') {
+                throw new LogicException('Lines of non-draft budgets cannot be modified or deleted.');
+            }
+        };
+
+        self::updating($assertDraft);
+        self::deleting($assertDraft);
+    }
 
     protected function casts(): array
     {

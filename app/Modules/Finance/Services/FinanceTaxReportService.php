@@ -59,9 +59,9 @@ final class FinanceTaxReportService
             ->orderBy('transaction_date')
             ->orderBy('id');
 
-        $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
+        if ($organizationUnitId !== null) {
+            $query->where('organization_unit_id', $organizationUnitId);
+        }
         if ($dateFrom !== null) {
             $query->whereDate('transaction_date', '>=', $dateFrom);
         }

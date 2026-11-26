@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
@@ -22,6 +23,30 @@ final class FinanceBankStatementLine extends TenantOwnedModel
     protected $table = 'finance_bank_statement_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(function (self $line): void {
+            if ($line->matched_ledger_entry_id !== null) {
+                throw new LogicException('Matched bank statement lines cannot be deleted.');
+            }
+
+            $reconciliation = $line->reconciliation;
+            if ($reconciliation && in_array((string) $reconciliation->status, ['completed', 'completed_with_unmatched'], true)) {
+                throw new LogicException('Statement lines belonging to completed bank reconciliations cannot be deleted.');
+            }
+        });
+
+        self::updating(function (self $line): void {
+            $reconciliation = $line->reconciliation;
+            if ($reconciliation && in_array((string) $reconciliation->status, ['completed', 'completed_with_unmatched'], true)) {
+                $allowed = ['updated_at'];
+                if (array_diff(array_keys($line->getDirty()), $allowed) !== []) {
+                    throw new LogicException('Statement lines belonging to completed bank reconciliations cannot be updated.');
+                }
+            }
+        });
+    }
 
     protected function casts(): array
     {

@@ -32,14 +32,18 @@ final class AccountBalanceService
     public function applyJournalLine(FinanceJournalEntry $journal, FinanceJournalLine $line): FinanceAccountBalance
     {
         $account = $line->account;
-        $balance = FinanceAccountBalance::query()->firstOrNew([
-            'tenant_id' => $journal->tenant_id,
-            'organization_unit_id' => $journal->organization_unit_id,
-            'account_id' => $line->account_id,
-        ]);
+        $balance = FinanceAccountBalance::query()
+            ->where('tenant_id', (int) $account->tenant_id)
+            ->where('account_id', (int) $line->account_id)
+            ->lockForUpdate()
+            ->first();
 
-        if (! $balance->exists) {
+        if (! $balance instanceof FinanceAccountBalance) {
+            $balance = new FinanceAccountBalance();
             $balance->forceFill([
+                'tenant_id' => (int) $account->tenant_id,
+                'account_id' => (int) $line->account_id,
+                'organization_unit_id' => $account->organization_unit_id,
                 'opening_debit' => self::ZERO_AMOUNT,
                 'opening_credit' => self::ZERO_AMOUNT,
                 'period_debit' => self::ZERO_AMOUNT,
@@ -96,8 +100,9 @@ final class AccountBalanceService
         FinanceAccount $account,
         ?string $dateFrom = null,
         ?string $dateTo = null,
+        ?int $organizationUnitId = null,
     ): AccountBalanceResult {
-        return $this->forAccounts(collect([$account]), $dateFrom, $dateTo)[0];
+        return $this->forAccounts(collect([$account]), $dateFrom, $dateTo, $organizationUnitId)[0];
     }
 
     /**
@@ -108,15 +113,23 @@ final class AccountBalanceService
         Collection $accounts,
         ?string $dateFrom = null,
         ?string $dateTo = null,
+        ?int $organizationUnitId = null,
     ): array {
         if ($accounts->isEmpty()) {
             return [];
         }
 
+        $tenantId = (int) $accounts->first()->tenant_id;
+
         $query = FinanceLedgerEntry::query()
+            ->where('tenant_id', $tenantId)
             ->whereIn('account_id', $accounts->pluck('id')->all())
             ->orderBy('entry_date')
             ->orderBy('id');
+
+        if ($organizationUnitId !== null) {
+            $query->where('organization_unit_id', $organizationUnitId);
+        }
 
         if ($dateTo !== null) {
             $query->whereDate('entry_date', '<=', $dateTo);

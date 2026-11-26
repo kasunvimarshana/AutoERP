@@ -50,7 +50,8 @@ final class FinanceConfigurationController
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get(['id', 'account_type_id', 'code', 'name']);
-        $accounts = $this->scopeOrganization(FinanceAccount::query()->where('tenant_id', $tenantId), $organizationUnitId)
+        $accounts = $this->scopeOrganizationWithTenantFallback(FinanceAccount::query()->where('tenant_id', $tenantId), $organizationUnitId)
+            ->orderByRaw('organization_unit_id IS NULL ASC')
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
         $profiles = $this->scopeOrganizationWithTenantFallback(
@@ -82,14 +83,16 @@ final class FinanceConfigurationController
             ->orderBy('account_role_id')
             ->orderByDesc('effective_from')
             ->get();
-        $dimensions = $this->scopeOrganization(FinanceDimension::query()->where('tenant_id', $tenantId), $organizationUnitId)
+        $dimensions = $this->scopeOrganizationWithTenantFallback(FinanceDimension::query()->where('tenant_id', $tenantId), $organizationUnitId)
             ->where('is_active', true)
+            ->orderByRaw('organization_unit_id IS NULL ASC')
             ->orderBy('dimension_type')
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'dimension_type']);
-        $bankAccounts = $this->scopeOrganization(FinanceAccount::query()->where('tenant_id', $tenantId), $organizationUnitId)
+        $bankAccounts = $this->scopeOrganizationWithTenantFallback(FinanceAccount::query()->where('tenant_id', $tenantId), $organizationUnitId)
             ->where('is_bank_account', true)
             ->where('is_active', true)
+            ->orderByRaw('organization_unit_id IS NULL ASC')
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
 

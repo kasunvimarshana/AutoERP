@@ -19,6 +19,7 @@ use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceBudget;
 use Modules\Finance\Models\FinanceBudgetLine;
+use Modules\Finance\Models\FinanceDimension;
 use Modules\Finance\Models\FinanceLedgerEntry;
 
 final class BudgetService
@@ -58,6 +59,10 @@ final class BudgetService
                 throw new InvalidArgumentException('Budget requires at least one line.');
             }
 
+            if ($budget !== null && (string) $budget->status !== 'draft') {
+                throw new InvalidArgumentException('Only draft budgets can be modified.');
+            }
+
             $budget ??= new FinanceBudget;
             $budget->forceFill([
                 'tenant_id' => $tenantId,
@@ -71,7 +76,7 @@ final class BudgetService
             $budget->lines()->delete();
             foreach ($lines as $line) {
                 $account = FinanceAccount::query()->findOrFail((int) $line['account_id']);
-                if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
+                if ((int) $account->tenant_id !== $tenantId || ($account->organization_unit_id !== null && $account->organization_unit_id !== $organizationUnitId)) {
                     throw new InvalidArgumentException('Budget account scope mismatch.');
                 }
                 $amount = $this->math->normalize((string) ($line['amount'] ?? '0.000000'));
@@ -79,12 +84,20 @@ final class BudgetService
                     throw new InvalidArgumentException('Budget line amount cannot be negative.');
                 }
 
+                $dimensionId = isset($line['dimension_id']) && $line['dimension_id'] !== null ? (int) $line['dimension_id'] : null;
+                if ($dimensionId !== null) {
+                    $dimension = FinanceDimension::query()->findOrFail($dimensionId);
+                    if ((int) $dimension->tenant_id !== $tenantId || ($dimension->organization_unit_id !== null && $dimension->organization_unit_id !== $organizationUnitId)) {
+                        throw new InvalidArgumentException('Budget dimension scope mismatch.');
+                    }
+                }
+
                 FinanceBudgetLine::query()->create([
                     'budget_id' => $budget->getKey(),
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'account_id' => $account->getKey(),
-                    'dimension_id' => $line['dimension_id'] ?? null,
+                    'dimension_id' => $dimensionId,
                     'budget_month' => $line['budget_month'] ?? null,
                     'amount' => $amount,
                 ]);

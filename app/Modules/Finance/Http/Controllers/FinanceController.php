@@ -50,7 +50,7 @@ final class FinanceController
 {
     public function accounts(ListFinanceRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(FinanceAccount::query(), $request)->with(['accountType', 'accountCategory', 'parent']);
+        $query = $this->scopeAccount(FinanceAccount::query(), $request)->with(['accountType', 'accountCategory', 'parent']);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(fn (Builder $scope): Builder => $scope
@@ -84,7 +84,7 @@ final class FinanceController
 
     public function showAccount(ListFinanceRequest $request, int $account): FinanceAccountResource
     {
-        return new FinanceAccountResource($this->scope(FinanceAccount::query(), $request)
+        return new FinanceAccountResource($this->scopeAccount(FinanceAccount::query(), $request)
             ->with(['accountType', 'accountCategory', 'parent', 'children', 'balances'])->findOrFail($account));
     }
 
@@ -209,19 +209,19 @@ final class FinanceController
 
     public function accountBalance(ListFinanceRequest $request, int $account, AccountBalanceService $service): JsonResponse
     {
-        $model = $this->scope(FinanceAccount::query(), $request)->findOrFail($account);
+        $model = $this->scopeAccount(FinanceAccount::query(), $request)->findOrFail($account);
         [$dateFrom, $dateTo] = $this->reportDates($request);
 
         return response()->json([
             'data' => (new AccountBalanceReportResource(
-                $service->forDateRange($model, $dateFrom, $dateTo),
+                $service->forDateRange($model, $dateFrom, $dateTo, $request->organizationUnitId()),
             ))->resolve($request),
         ]);
     }
 
     public function accountBalances(ListFinanceRequest $request, AccountBalanceService $service): AnonymousResourceCollection
     {
-        $query = $this->scope(FinanceAccount::query(), $request);
+        $query = $this->scopeAccount(FinanceAccount::query(), $request);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(fn (Builder $scope): Builder => $scope
@@ -230,7 +230,7 @@ final class FinanceController
         }
         [$dateFrom, $dateTo] = $this->reportDates($request);
         $paginator = $query->orderBy('code')->paginate($request->perPage());
-        $paginator->setCollection(collect($service->forAccounts($paginator->getCollection(), $dateFrom, $dateTo)));
+        $paginator->setCollection(collect($service->forAccounts($paginator->getCollection(), $dateFrom, $dateTo, $request->organizationUnitId())));
 
         return AccountBalanceReportResource::collection($paginator);
     }
@@ -280,19 +280,27 @@ final class FinanceController
 
     public function arAging(ListFinanceRequest $request, AgingReportService $service): JsonResponse
     {
+        $asOfDate = $request->filled('as_of_date')
+            ? (string) $request->input('as_of_date')
+            : ($request->filled('date_to') ? (string) $request->input('date_to') : null);
+
         return response()->json(['data' => $service->receivables(
             $request->tenantId(),
             $request->organizationUnitId(),
-            $request->filled('date_to') ? (string) $request->input('date_to') : null,
+            $asOfDate,
         )]);
     }
 
     public function apAging(ListFinanceRequest $request, AgingReportService $service): JsonResponse
     {
+        $asOfDate = $request->filled('as_of_date')
+            ? (string) $request->input('as_of_date')
+            : ($request->filled('date_to') ? (string) $request->input('date_to') : null);
+
         return response()->json(['data' => $service->payables(
             $request->tenantId(),
             $request->organizationUnitId(),
-            $request->filled('date_to') ? (string) $request->input('date_to') : null,
+            $asOfDate,
         )]);
     }
 
@@ -440,7 +448,7 @@ final class FinanceController
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'ledger_entry_id' => ['required', 'integer', 'min:1', 'exists:finance_ledger_entries,id'],
         ]);
-        $model = $this->scope(FinanceBankStatementLine::query(), $request)
+        $model = $this->scopeBankStatementLine(FinanceBankStatementLine::query(), $request)
             ->where('reconciliation_id', $reconciliation)
             ->findOrFail($line);
 
@@ -453,7 +461,7 @@ final class FinanceController
         int $line,
         BankReconciliationService $service,
     ): JsonResponse {
-        $model = $this->scope(FinanceBankStatementLine::query(), $request)
+        $model = $this->scopeBankStatementLine(FinanceBankStatementLine::query(), $request)
             ->where('reconciliation_id', $reconciliation)
             ->findOrFail($line);
 
@@ -549,6 +557,34 @@ final class FinanceController
         throw ValidationException::withMessages([
             $field => [$exception->getMessage()],
         ]);
+    }
+
+    private function scopeAccount(Builder $query, ListFinanceRequest $request): Builder
+    {
+        $query->where('tenant_id', $request->tenantId());
+
+        if ($request->organizationUnitId() !== null) {
+            return $query->where(function (Builder $scope) use ($request): void {
+                $scope->whereNull('organization_unit_id')
+                    ->orWhere('organization_unit_id', $request->organizationUnitId());
+            });
+        }
+
+        return $query;
+    }
+
+    private function scopeBankStatementLine(Builder $query, FinanceActionRequest $request): Builder
+    {
+        $query->where('tenant_id', $request->tenantId());
+
+        if ($request->organizationUnitId() !== null) {
+            return $query->where(function (Builder $scope) use ($request): void {
+                $scope->whereNull('organization_unit_id')
+                    ->orWhere('organization_unit_id', $request->organizationUnitId());
+            });
+        }
+
+        return $query;
     }
 
     private function scope(

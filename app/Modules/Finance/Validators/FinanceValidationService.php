@@ -18,6 +18,7 @@ use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\DTOs\CreateJournalEntryData;
 use Modules\Finance\DTOs\JournalLineData;
 use Modules\Finance\Enums\JournalStatus;
+use Modules\Finance\Enums\JournalType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
@@ -105,6 +106,12 @@ final class FinanceValidationService
                 (int) $account->tenant_id,
                 $account->organization_unit_id,
             );
+            if (! (bool) $account->is_active && $data->journalType !== JournalType::Reversal) {
+                throw new InvalidArgumentException('Journal line references an inactive account.');
+            }
+            if (! (bool) $account->is_posting_account && $data->journalType !== JournalType::Reversal) {
+                throw new InvalidArgumentException('Journal line references a non-posting account.');
+            }
 
             if ($line->dimensionId !== null) {
                 $dimension = FinanceDimension::query()->findOrFail($line->dimensionId);
@@ -138,6 +145,9 @@ final class FinanceValidationService
                 (int) $profile->tenant_id,
                 $profile->organization_unit_id,
             );
+            if (! (bool) $profile->is_active && $data->journalType !== JournalType::Reversal) {
+                throw new InvalidArgumentException('Posting profile is inactive.');
+            }
         }
 
         [$totalDebit, $totalCredit] = $this->journalTotals($data->lines);
@@ -261,6 +271,10 @@ final class FinanceValidationService
 
         $journal->loadMissing('lines');
         $this->assertPostedLedgerIntegrity($journal);
+
+        if ($journal->reversal_of_id !== null || $journal->journal_type === JournalType::Reversal) {
+            throw new InvalidArgumentException('Reversal journals cannot be reversed.');
+        }
 
         if ($journal->reversals()->exists()) {
             throw new InvalidArgumentException('Journal has already been reversed.');

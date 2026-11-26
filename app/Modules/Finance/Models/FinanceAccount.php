@@ -15,6 +15,7 @@ namespace Modules\Finance\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -27,6 +28,41 @@ final class FinanceAccount extends TenantOwnedModel
     protected $table = 'finance_accounts';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(function (self $account): void {
+            if ((bool) $account->is_system) {
+                throw new LogicException('System accounts cannot be deleted.');
+            }
+
+            if ($account->ledgerEntries()->exists()) {
+                throw new LogicException('Posted accounts cannot be deleted.');
+            }
+
+            if ($account->journalLines()->exists()) {
+                throw new LogicException('Accounts with journal lines cannot be deleted.');
+            }
+
+            if ($account->children()->exists()) {
+                throw new LogicException('Accounts with child accounts cannot be deleted.');
+            }
+
+            if (FinanceAccountAssignment::query()->where('account_id', $account->getKey())->where('is_active', true)->exists()) {
+                throw new LogicException('Accounts with active role assignments cannot be deleted.');
+            }
+        });
+
+        self::updating(function (self $account): void {
+            if ($account->isDirty('tenant_id') || $account->isDirty('organization_unit_id')) {
+                throw new LogicException('Finance account scope cannot be changed.');
+            }
+
+            if ($account->isDirty('normal_balance') && $account->ledgerEntries()->exists()) {
+                throw new LogicException('Posted accounts cannot change normal balance.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

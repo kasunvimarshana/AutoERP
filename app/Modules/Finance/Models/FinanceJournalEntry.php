@@ -120,6 +120,10 @@ final class FinanceJournalEntry extends TenantOwnedModel
             if ($status === JournalStatus::Reversed) {
                 throw new LogicException('Reversed journals are immutable.');
             }
+
+            if ($status === JournalStatus::Cancelled) {
+                throw new LogicException('Cancelled journals are immutable.');
+            }
         });
 
         self::deleting(function (self $journal): void {
@@ -127,8 +131,8 @@ final class FinanceJournalEntry extends TenantOwnedModel
                 ? $journal->status
                 : JournalStatus::from((string) $journal->status);
 
-            if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
-                throw new LogicException('Posted journals cannot be deleted.');
+            if ($status !== JournalStatus::Draft) {
+                throw new LogicException('Only draft journals can be deleted.');
             }
         });
     }

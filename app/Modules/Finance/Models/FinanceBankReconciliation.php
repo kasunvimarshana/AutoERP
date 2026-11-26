@@ -14,6 +14,7 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
@@ -23,6 +24,25 @@ final class FinanceBankReconciliation extends TenantOwnedModel
     protected $table = 'finance_bank_reconciliations';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::deleting(function (self $reconciliation): void {
+            if (in_array((string) $reconciliation->status, ['completed', 'completed_with_unmatched'], true)) {
+                throw new LogicException('Completed bank reconciliations cannot be deleted.');
+            }
+        });
+
+        self::updating(function (self $reconciliation): void {
+            $originalStatus = (string) $reconciliation->getOriginal('status');
+            if (in_array($originalStatus, ['completed', 'completed_with_unmatched'], true)) {
+                $allowed = ['updated_at'];
+                if (array_diff(array_keys($reconciliation->getDirty()), $allowed) !== []) {
+                    throw new LogicException('Completed bank reconciliations are immutable.');
+                }
+            }
+        });
+    }
 
     protected function casts(): array
     {

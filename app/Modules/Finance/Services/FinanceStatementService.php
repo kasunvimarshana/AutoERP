@@ -34,7 +34,7 @@ final class FinanceStatementService
         ?string $dateTo,
     ): array {
         $accounts = $this->accounts($tenantId, $organizationUnitId, StatementType::IncomeStatement);
-        $balances = $this->balances->forAccounts($accounts, $dateFrom, $dateTo);
+        $balances = $this->balances->forAccounts($accounts, $dateFrom, $dateTo, $organizationUnitId);
         $rows = [];
         $revenue = '0.000000';
         $expenses = '0.000000';
@@ -80,7 +80,7 @@ final class FinanceStatementService
         ?string $dateTo,
     ): array {
         $accounts = $this->accounts($tenantId, $organizationUnitId, StatementType::BalanceSheet);
-        $balances = $this->balances->forAccounts($accounts, null, $dateTo);
+        $balances = $this->balances->forAccounts($accounts, null, $dateTo, $organizationUnitId);
         $rows = [];
         $assets = '0.000000';
         $liabilities = '0.000000';
@@ -91,11 +91,15 @@ final class FinanceStatementService
             $typeCode = strtoupper((string) $account->accountType->code);
             $amount = $balance->balance;
 
-            if ($typeCode === 'ASSET') {
+            if ($typeCode === 'ASSET' || str_contains($typeCode, 'ASSET')) {
                 $assets = $this->math->add($assets, $amount);
-            } elseif ($typeCode === 'LIABILITY') {
+            } elseif ($typeCode === 'LIABILITY' || str_contains($typeCode, 'LIAB')) {
                 $liabilities = $this->math->add($liabilities, $amount);
-            } elseif ($typeCode === 'EQUITY') {
+            } elseif ($typeCode === 'EQUITY' || str_contains($typeCode, 'EQUITY')) {
+                $equity = $this->math->add($equity, $amount);
+            } elseif ($account->normal_balance === NormalBalance::Debit) {
+                $assets = $this->math->add($assets, $amount);
+            } else {
                 $equity = $this->math->add($equity, $amount);
             }
 
@@ -137,9 +141,12 @@ final class FinanceStatementService
             ->where('tenant_id', $tenantId)
             ->whereHas('accountType', fn ($scope) => $scope->where('statement_type', $statementType->value));
 
-        $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
+        if ($organizationUnitId !== null) {
+            $query->where(function ($scope) use ($organizationUnitId): void {
+                $scope->whereNull('organization_unit_id')
+                    ->orWhere('organization_unit_id', $organizationUnitId);
+            });
+        }
 
         return $query->orderBy('code')->get();
     }

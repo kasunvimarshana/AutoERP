@@ -19,22 +19,35 @@ use InvalidArgumentException;
 use LogicException;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateAccountData;
+use Modules\Finance\DTOs\CreateJournalEntryData;
 use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\FinancePostingRequest;
+use Modules\Finance\DTOs\JournalLineData;
 use Modules\Finance\DTOs\PostingSourceData;
+use Modules\Finance\Enums\JournalStatus;
+use Modules\Finance\Enums\JournalType;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
+use Modules\Finance\Models\FinanceBankReconciliation;
+use Modules\Finance\Models\FinanceBankStatementLine;
+use Modules\Finance\Models\FinanceDimension;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
+use Modules\Finance\Services\BudgetService;
+use Modules\Finance\Services\CashFlowReportService;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\FinanceStatementService;
+use Modules\Finance\Services\GeneralLedgerReportService;
+use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
 use Modules\Finance\Services\JournalReversalService;
+use Modules\Finance\Services\PostingProfileService;
 use Modules\Finance\Services\TrialBalanceService;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class FinanceHardeningTest extends TestCase
@@ -400,6 +413,597 @@ final class FinanceHardeningTest extends TestCase
             $this->assertSame('40.000000', $profitAndLoss['net_profit']);
             $this->assertSame('40.000000', $balanceSheet['current_earnings']);
             $this->assertSame('0.000000', $balanceSheet['difference']);
+        });
+    }
+
+    public function test_inactive_posting_profile_rejected_on_journal_creation(): void
+    {
+        [$tenantId, $cash, $capital] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $profile = $this->profile($tenantId, 'inactive_test', [
+                'cash' => $cash,
+                'capital' => $capital,
+            ]);
+            $profile->forceFill(['is_active' => false])->save();
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Posting profile is inactive.');
+
+            app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalDate: '2026-06-15',
+                journalType: JournalType::General,
+                organizationUnitId: null,
+                source: null,
+                description: 'Test inactive profile',
+                lines: [
+                    new JournalLineData((int) $cash->getKey(), 1, debit: '100.000000', credit: '0.000000'),
+                    new JournalLineData((int) $capital->getKey(), 2, debit: '0.000000', credit: '100.000000'),
+                ],
+                postingProfileId: (int) $profile->getKey(),
+            ));
+        });
+    }
+
+    public function test_reversal_succeeds_even_when_original_posting_profile_is_deactivated(): void
+    {
+        [$tenantId, $cash, $capital] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $profile = $this->profile($tenantId, 'temp_sales_profile', [
+                'cash' => $cash,
+                'capital' => $capital,
+            ]);
+
+            $journal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalNumber: 'JE-TEMP-01',
+                journalDate: '2026-06-15',
+                journalType: JournalType::General,
+                organizationUnitId: null,
+                source: null,
+                description: 'Original Sales Journal',
+                lines: [
+                    new JournalLineData((int) $cash->getKey(), 1, debit: '300.000000', credit: '0.000000'),
+                    new JournalLineData((int) $capital->getKey(), 2, debit: '0.000000', credit: '300.000000'),
+                ],
+                postingProfileId: $profile->getKey(),
+            ));
+            app(JournalPostingService::class)->post($journal);
+
+            // Now deactivate the profile
+            $profile->forceFill(['is_active' => false])->save();
+            $this->assertFalse((bool) $profile->refresh()->is_active);
+
+            // Reversing the historical journal must succeed despite the deactivated profile
+            $reversal = app(JournalReversalService::class)->reverse(
+                $journal->refresh(),
+                reversalDate: '2026-06-25',
+                reason: 'Customer cancelled transaction',
+            );
+
+            $this->assertSame(JournalType::Reversal, $reversal->journal_type);
+            $this->assertSame(JournalStatus::Posted, $reversal->status);
+            $this->assertSame('300.000000', (string) $reversal->total_debit);
+            $this->assertSame(JournalStatus::Reversed, $journal->refresh()->status);
+        });
+    }
+
+    public function test_reversal_journal_cannot_be_reversed(): void
+    {
+        [$tenantId, $cash, $capital] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $journal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalDate: '2026-06-15',
+                journalType: JournalType::General,
+                organizationUnitId: null,
+                source: null,
+                description: 'Original journal',
+                lines: [
+                    new JournalLineData((int) $cash->getKey(), 1, debit: '100.000000', credit: '0.000000'),
+                    new JournalLineData((int) $capital->getKey(), 2, debit: '0.000000', credit: '100.000000'),
+                ],
+            ));
+            $posted = app(JournalPostingService::class)->post($journal);
+            $reversal = app(JournalReversalService::class)->reverse($journal->refresh(), '2026-06-16', reason: 'Correction');
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Reversal journals cannot be reversed.');
+
+            app(JournalReversalService::class)->reverse($reversal, '2026-06-17', reason: 'Attempt reverse reversal');
+        });
+    }
+
+    public function test_cancelled_journal_lifecycle_immutability(): void
+    {
+        [$tenantId, $cash, $capital] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $journal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalDate: '2026-06-15',
+                journalType: JournalType::General,
+                organizationUnitId: null,
+                source: null,
+                description: 'Draft journal',
+                lines: [
+                    new JournalLineData((int) $cash->getKey(), 1, debit: '50.000000', credit: '0.000000'),
+                    new JournalLineData((int) $capital->getKey(), 2, debit: '0.000000', credit: '50.000000'),
+                ],
+            ));
+
+            $journal->status = JournalStatus::Cancelled;
+            $journal->save();
+
+            try {
+                $journal->description = 'Updated description';
+                $journal->save();
+                $this->fail('Expected LogicException on updating cancelled journal');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Cancelled journals are immutable', $e->getMessage());
+            }
+
+            try {
+                $journal->delete();
+                $this->fail('Expected LogicException on deleting cancelled journal');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Only draft journals can be deleted', $e->getMessage());
+            }
+        });
+    }
+
+    public function test_completed_bank_reconciliation_cannot_be_deleted(): void
+    {
+        [$tenantId, $cash] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash): void {
+            $cash->forceFill(['is_bank_account' => true])->save();
+
+            $recon = FinanceBankReconciliation::query()->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'bank_account_id' => $cash->getKey(),
+                'statement_reference' => 'STMT-999',
+                'statement_date' => '2026-06-30',
+                'status' => 'completed',
+                'opening_balance' => '0.000000',
+                'closing_balance' => '0.000000',
+            ]);
+
+            $this->expectException(LogicException::class);
+            $this->expectExceptionMessage('Completed bank reconciliations cannot be deleted.');
+
+            $recon->delete();
+        });
+    }
+
+    public function test_completed_bank_reconciliation_and_statement_lines_are_immutable(): void
+    {
+        [$tenantId, $cash] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash): void {
+            $cash->forceFill(['is_bank_account' => true])->save();
+
+            $recon = FinanceBankReconciliation::query()->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'bank_account_id' => $cash->getKey(),
+                'statement_reference' => 'STMT-IMMUTABLE-01',
+                'statement_date' => '2026-06-30',
+                'status' => 'draft',
+                'opening_balance' => '100.000000',
+                'closing_balance' => '100.000000',
+            ]);
+
+            $line = FinanceBankStatementLine::query()->create([
+                'reconciliation_id' => $recon->getKey(),
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'bank_account_id' => $cash->getKey(),
+                'statement_date' => '2026-06-30',
+                'reference' => 'REF-01',
+                'description' => 'Test deposit',
+                'debit' => '50.000000',
+                'credit' => '0.000000',
+                'status' => 'unmatched',
+            ]);
+
+            $recon->forceFill(['status' => 'completed'])->save();
+
+            try {
+                $recon->opening_balance = '999.000000';
+                $recon->save();
+                $this->fail('Expected LogicException on updating completed reconciliation');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Completed bank reconciliations are immutable', $e->getMessage());
+            }
+
+            try {
+                $line->description = 'Tampered description';
+                $line->save();
+                $this->fail('Expected LogicException on updating statement line in completed reconciliation');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Statement lines belonging to completed bank reconciliations cannot be updated', $e->getMessage());
+            }
+
+            try {
+                $line->delete();
+                $this->fail('Expected LogicException on deleting statement line in completed reconciliation');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Statement lines belonging to completed bank reconciliations cannot be deleted', $e->getMessage());
+            }
+        });
+    }
+
+    public function test_organization_unit_trial_balance_and_fallback_accounts(): void
+    {
+        [$tenantId, $cash, $capital] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $orgUnitId = OrganizationUnitFixture::create([
+                'tenant_id' => $tenantId,
+                'code' => 'OU_TEST_01',
+                'name' => 'Test Branch',
+            ]);
+
+            $journal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalNumber: 'JE-BRANCH-01',
+                journalDate: '2026-06-20',
+                journalType: JournalType::General,
+                organizationUnitId: $orgUnitId,
+                source: null,
+                description: 'Branch Journal',
+                lines: [
+                    new JournalLineData((int) $cash->getKey(), 1, debit: '200.000000', credit: '0.000000'),
+                    new JournalLineData((int) $capital->getKey(), 2, debit: '0.000000', credit: '200.000000'),
+                ],
+            ));
+            app(JournalPostingService::class)->post($journal);
+
+            $rootJournal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalNumber: 'JE-ROOT-01',
+                journalDate: '2026-06-21',
+                journalType: JournalType::General,
+                organizationUnitId: null,
+                source: null,
+                description: 'Root Journal',
+                lines: [
+                    new JournalLineData((int) $cash->getKey(), 1, debit: '500.000000', credit: '0.000000'),
+                    new JournalLineData((int) $capital->getKey(), 2, debit: '0.000000', credit: '500.000000'),
+                ],
+            ));
+            app(JournalPostingService::class)->post($rootJournal);
+
+            $tbService = app(TrialBalanceService::class);
+            $branchTb = $tbService->calculate($tenantId, $orgUnitId);
+
+            $this->assertTrue($branchTb->isBalanced);
+            $this->assertSame('200.000000', $branchTb->totalDebit);
+            $this->assertSame('200.000000', $branchTb->totalCredit);
+
+            $statementService = app(FinanceStatementService::class);
+            $branchBs = $statementService->balanceSheet($tenantId, $orgUnitId, '2026-06-30');
+            $this->assertSame('200.000000', $branchBs['total_assets']);
+        });
+    }
+
+    public function test_tenant_wide_reports_include_branch_accounts_and_entries(): void
+    {
+        [$tenantId, $cash] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash): void {
+            $branchId = OrganizationUnitFixture::create([
+                'tenant_id' => $tenantId,
+                'code' => 'OU_BRANCH_X',
+                'name' => 'Branch X',
+            ]);
+
+            $cash->forceFill(['is_cash_account' => true])->save();
+
+            $assetType = FinanceAccountType::query()->where('tenant_id', $tenantId)->where('code', 'ASSET')->firstOrFail();
+            $branchPettyCash = app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
+                tenantId: $tenantId,
+                accountTypeId: (int) $assetType->getKey(),
+                code: '1015-BX',
+                name: 'Branch X Petty Cash',
+                normalBalance: NormalBalance::Debit,
+                organizationUnitId: $branchId,
+                isCashAccount: true,
+            ));
+
+            // Branch posts transfer from tenant cash to branch petty cash
+            $journal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalNumber: 'JE-TRANSFER-01',
+                journalDate: '2026-06-10',
+                journalType: JournalType::General,
+                organizationUnitId: $branchId,
+                source: null,
+                description: 'Cash transfer to branch',
+                lines: [
+                    new JournalLineData((int) $branchPettyCash->getKey(), 1, debit: '150.000000', credit: '0.000000'),
+                    new JournalLineData((int) $cash->getKey(), 2, debit: '0.000000', credit: '150.000000'),
+                ],
+            ));
+            app(JournalPostingService::class)->post($journal);
+
+            // 1. Tenant-wide Trial Balance (organizationUnitId = null) must include branch account and be balanced
+            $tbService = app(TrialBalanceService::class);
+            $tenantTb = $tbService->calculate($tenantId, null);
+            $this->assertTrue($tenantTb->isBalanced, 'Tenant-wide trial balance must be balanced');
+            $this->assertSame('150.000000', $tenantTb->totalDebit);
+            $this->assertSame('150.000000', $tenantTb->totalCredit);
+            $accountIdsInTb = collect($tenantTb->accountBalances)->pluck('accountId')->all();
+            $this->assertContains((int) $branchPettyCash->getKey(), $accountIdsInTb);
+            $this->assertContains((int) $cash->getKey(), $accountIdsInTb);
+
+            // 2. Tenant-wide Cash Flow Report must include branch movements
+            $cashFlowService = app(CashFlowReportService::class);
+            $cashFlow = $cashFlowService->calculate($tenantId, null);
+            $this->assertSame('150.000000', $cashFlow['total_inflow']);
+            $this->assertSame('150.000000', $cashFlow['total_outflow']);
+
+            // 3. Tenant-wide General Ledger Report must include branch entries
+            $glService = app(GeneralLedgerReportService::class);
+            $gl = $glService->paginate($tenantId, null);
+            $this->assertSame(2, $gl->total());
+        });
+    }
+
+    public function test_budget_allows_tenant_fallback_accounts_and_validates_dimension_scope(): void
+    {
+        [$tenantId, $cash] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash): void {
+            $orgUnitId = OrganizationUnitFixture::create([
+                'tenant_id' => $tenantId,
+                'code' => 'OU_BUDGET_01',
+                'name' => 'Budget Branch',
+            ]);
+
+            $dimension = FinanceDimension::query()->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'code' => 'CC-01',
+                'name' => 'Cost Center 1',
+                'dimension_type' => 'cost_center',
+                'is_active' => true,
+            ]);
+
+            $service = app(BudgetService::class);
+            $budget = $service->save(
+                tenantId: $tenantId,
+                organizationUnitId: $orgUnitId,
+                budgetYear: 2026,
+                name: '2026 Branch Budget',
+                lines: [
+                    [
+                        'account_id' => $cash->getKey(),
+                        'dimension_id' => $dimension->getKey(),
+                        'budget_month' => 1,
+                        'amount' => '1000.000000',
+                    ],
+                ],
+            );
+
+            $this->assertSame('2026 Branch Budget', $budget->name);
+            $this->assertCount(1, $budget->lines);
+
+            $otherOrgUnitId = OrganizationUnitFixture::create([
+                'tenant_id' => $tenantId,
+                'code' => 'OU_OTHER_01',
+                'name' => 'Other Branch',
+            ]);
+            $otherDimension = FinanceDimension::query()->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $otherOrgUnitId,
+                'code' => 'CC-OTHER',
+                'name' => 'Other Branch Cost Center',
+                'dimension_type' => 'cost_center',
+                'is_active' => true,
+            ]);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Budget dimension scope mismatch.');
+
+            $service->save(
+                tenantId: $tenantId,
+                organizationUnitId: $orgUnitId,
+                budgetYear: 2026,
+                name: 'Invalid Dimension Budget',
+                lines: [
+                    [
+                        'account_id' => $cash->getKey(),
+                        'dimension_id' => $otherDimension->getKey(),
+                        'budget_month' => 1,
+                        'amount' => '500.000000',
+                    ],
+                ],
+            );
+        });
+    }
+
+    public function test_budget_lifecycle_immutability(): void
+    {
+        [$tenantId, $cash] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash): void {
+            $service = app(BudgetService::class);
+            $budget = $service->save(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                budgetYear: 2026,
+                name: 'Annual Operations Budget',
+                lines: [
+                    [
+                        'account_id' => $cash->getKey(),
+                        'budget_month' => 1,
+                        'amount' => '5000.000000',
+                    ],
+                ],
+                status: 'draft',
+            );
+
+            // Mark budget as approved
+            $budget->forceFill(['status' => 'approved'])->save();
+
+            try {
+                $service->save(
+                    tenantId: $tenantId,
+                    organizationUnitId: null,
+                    budgetYear: 2026,
+                    name: 'Modified Budget',
+                    lines: [
+                        [
+                            'account_id' => $cash->getKey(),
+                            'budget_month' => 1,
+                            'amount' => '2000.000000',
+                        ],
+                    ],
+                    budget: $budget,
+                );
+                $this->fail('Expected InvalidArgumentException on modifying approved budget');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('Only draft budgets can be modified', $e->getMessage());
+            }
+
+            try {
+                $budget->delete();
+                $this->fail('Expected LogicException on deleting approved budget');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Only draft budgets can be deleted', $e->getMessage());
+            }
+        });
+    }
+
+    public function test_posted_and_system_account_deletion_is_blocked(): void
+    {
+        [$tenantId, $cash] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash): void {
+            // Mark cash as system account
+            $cash->forceFill(['is_system' => true])->save();
+
+            try {
+                $cash->delete();
+                $this->fail('Expected LogicException on deleting system account');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('System accounts cannot be deleted', $e->getMessage());
+            }
+
+            $cash->forceFill(['is_system' => false])->save();
+
+            // Post a journal to cash
+            $journal = $this->directRequest($tenantId, '2026-06-10');
+            app(FinancePostingInterface::class)->post($journal);
+
+            $this->assertTrue($cash->ledgerEntries()->exists());
+
+            try {
+                $cash->delete();
+                $this->fail('Expected LogicException on deleting posted account');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Posted accounts cannot be deleted', $e->getMessage());
+            }
+        });
+    }
+
+    public function test_account_scope_and_normal_balance_mutation_is_blocked(): void
+    {
+        [$tenantId, $cash] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash): void {
+            try {
+                $cash->organization_unit_id = 99;
+                $cash->save();
+                $this->fail('Expected LogicException on changing organization_unit_id');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Finance account scope cannot be changed', $e->getMessage());
+            }
+
+            $cash->refresh();
+
+            // Post journal to cash
+            $journal = $this->directRequest($tenantId, '2026-06-10');
+            app(FinancePostingInterface::class)->post($journal);
+
+            try {
+                $cash->normal_balance = NormalBalance::Credit;
+                $cash->save();
+                $this->fail('Expected LogicException on changing normal_balance of posted account');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Posted accounts cannot change normal balance', $e->getMessage());
+            }
+        });
+    }
+
+    public function test_journal_creation_rejects_inactive_or_non_posting_accounts(): void
+    {
+        [$tenantId, $cash, $capital] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $capital->forceFill(['is_posting_account' => false])->save();
+
+            try {
+                app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                    tenantId: $tenantId,
+                    journalNumber: 'JE-NONPOST-01',
+                    journalDate: '2026-06-10',
+                    journalType: JournalType::General,
+                    organizationUnitId: null,
+                    source: null,
+                    description: 'Invalid non-posting line',
+                    lines: [
+                        new JournalLineData((int) $cash->getKey(), 1, debit: '100.000000'),
+                        new JournalLineData((int) $capital->getKey(), 2, credit: '100.000000'),
+                    ],
+                ));
+                $this->fail('Expected InvalidArgumentException on non-posting account in journal');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('Journal line references a non-posting account', $e->getMessage());
+            }
+
+            $capital->forceFill(['is_posting_account' => true, 'is_active' => false])->save();
+
+            try {
+                app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                    tenantId: $tenantId,
+                    journalNumber: 'JE-INACTIVE-01',
+                    journalDate: '2026-06-10',
+                    journalType: JournalType::General,
+                    organizationUnitId: null,
+                    source: null,
+                    description: 'Invalid inactive account in line',
+                    lines: [
+                        new JournalLineData((int) $cash->getKey(), 1, debit: '100.000000'),
+                        new JournalLineData((int) $capital->getKey(), 2, credit: '100.000000'),
+                    ],
+                ));
+                $this->fail('Expected InvalidArgumentException on inactive account in journal');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('Journal line references an inactive account', $e->getMessage());
+            }
+        });
+    }
+
+    public function test_posting_profile_rule_rejects_inactive_account_role(): void
+    {
+        [$tenantId] = $this->context();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $roleId = $this->accountRole($tenantId, 'inactive_role_code', 'Inactive Role');
+            DB::table('finance_account_roles')->where('id', $roleId)->update(['is_active' => false]);
+
+            $service = app(PostingProfileService::class);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Posting profile rule cannot reference an inactive account role.');
+
+            $service->save(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                code: 'inactive_role_profile',
+                name: 'Inactive Role Profile',
+                description: null,
+                isActive: true,
+                rules: [
+                    [
+                        'line_key' => 'debit_line',
+                        'account_role_id' => $roleId,
+                    ],
+                ],
+            );
         });
     }
 

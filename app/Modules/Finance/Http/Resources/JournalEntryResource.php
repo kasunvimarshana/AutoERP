@@ -15,6 +15,7 @@ namespace Modules\Finance\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Finance\Enums\JournalStatus;
+use Modules\Finance\Enums\JournalType;
 
 final class JournalEntryResource extends JsonResource
 {
@@ -53,6 +54,8 @@ final class JournalEntryResource extends JsonResource
             'can_cancel' => $status === JournalStatus::Draft,
             'can_reverse' => $status === JournalStatus::Posted
                 && $this->isFinanceOwned()
+                && $this->reversal_of_id === null
+                && ($this->journal_type instanceof JournalType ? $this->journal_type : JournalType::tryFrom((string) $this->journal_type)) !== JournalType::Reversal
                 && ($this->relationLoaded('reversals')
                     ? $this->reversals->isEmpty()
                     : ! $this->reversals()->exists()),

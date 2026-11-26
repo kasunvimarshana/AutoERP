@@ -57,8 +57,8 @@ final class GeneralLedgerReportService
 
     private function scopeOrganization(Builder $query, ?int $organizationUnitId): void
     {
-        $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
+        if ($organizationUnitId !== null) {
+            $query->where('organization_unit_id', $organizationUnitId);
+        }
     }
 }
