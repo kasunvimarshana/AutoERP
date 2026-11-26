@@ -79,9 +79,9 @@ final class CustomerLookupService
             name: (string) $customer->name,
             customerType: $customer->customer_type,
             status: $customer->status,
-            creditLimit: (string) ($profile?->credit_limit ?? '0.000000'),
-            creditAllowed: (bool) ($profile?->credit_allowed ?? false),
-            advanceAllowed: (bool) ($profile?->advance_allowed ?? false),
+            creditLimit: $profile?->credit_limit !== null ? (string) $profile->credit_limit : null,
+            creditAllowed: (bool) ($profile?->is_active && $profile->credit_allowed),
+            advanceAllowed: (bool) ($profile?->advance_allowed ?? true),
             isTaxExempt: (bool) $customer->is_tax_exempt,
         );
     }

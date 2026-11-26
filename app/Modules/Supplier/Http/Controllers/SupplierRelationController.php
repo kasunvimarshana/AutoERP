@@ -250,12 +250,14 @@ final class SupplierRelationController
         return $profile ? new SupplierCreditProfileResource($profile) : response()->json(['data' => null]);
     }
 
-    public function updateCreditProfile(UpdateSupplierCreditProfileRequest $request, int $supplier): SupplierCreditProfileResource
+    public function updateCreditProfile(UpdateSupplierCreditProfileRequest $request, int $supplier): JsonResponse
     {
-        return new SupplierCreditProfileResource($this->creditProfilesService->set(
+        $profile = $this->creditProfilesService->set(
             $this->supplier($request, $supplier),
             $request->toData(),
-        ));
+        );
+
+        return (new SupplierCreditProfileResource($profile))->response()->setStatusCode(200);
     }
 
     public function statusHistory(ListSupplierRequest $request, int $supplier): AnonymousResourceCollection

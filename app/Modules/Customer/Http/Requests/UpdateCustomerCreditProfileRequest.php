@@ -23,7 +23,7 @@ final class UpdateCustomerCreditProfileRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'row_version' => ['nullable', 'integer', 'min:1'],
-            'credit_limit' => ['required', 'decimal:0,6', 'gte:0'],
+            'credit_limit' => ['nullable', 'decimal:0,6', 'gte:0'],
             'credit_period_days' => ['nullable', 'integer', 'min:0'],
             'warning_threshold_percent' => ['required', 'decimal:0,6', 'between:0,100'],
             'credit_allowed' => ['required', 'boolean'],
@@ -37,7 +37,9 @@ final class UpdateCustomerCreditProfileRequest extends TenantScopedRequest
     public function toData(): CustomerCreditProfileData
     {
         return new CustomerCreditProfileData(
-            creditLimit: (string) $this->input('credit_limit'),
+            creditLimit: $this->has('credit_limit') && $this->input('credit_limit') !== null && $this->input('credit_limit') !== ''
+                ? (string) $this->input('credit_limit')
+                : null,
             creditPeriodDays: $this->filled('credit_period_days') ? (int) $this->input('credit_period_days') : null,
             warningThresholdPercent: (string) $this->input('warning_threshold_percent'),
             creditAllowed: $this->boolean('credit_allowed'),

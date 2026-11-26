@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'supplier_credit_profiles_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('supplier_id')->unique('supplier_credit_profiles_supp_uk');
-            $table->decimal('credit_limit', 20, 6)->default('0.000000');
+            $table->decimal('credit_limit', 20, 6)->nullable();
             $table->integer('credit_period_days')->nullable();
             $table->decimal('warning_threshold_percent', 20, 6)->default('80.000000');
             $table->boolean('allow_over_credit')->default(false);

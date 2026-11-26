@@ -214,12 +214,14 @@ final class CustomerRelationController
         return $profile ? new CustomerCreditProfileResource($profile) : response()->json(['data' => null]);
     }
 
-    public function updateCreditProfile(UpdateCustomerCreditProfileRequest $request, int $customer): CustomerCreditProfileResource
+    public function updateCreditProfile(UpdateCustomerCreditProfileRequest $request, int $customer): JsonResponse
     {
-        return new CustomerCreditProfileResource($this->creditProfilesService->set(
+        $profile = $this->creditProfilesService->set(
             $this->customer($request, $customer),
             $request->toData(),
-        ));
+        );
+
+        return (new CustomerCreditProfileResource($profile))->response()->setStatusCode(200);
     }
 
     public function statusHistory(ListCustomerRequest $request, int $customer): AnonymousResourceCollection

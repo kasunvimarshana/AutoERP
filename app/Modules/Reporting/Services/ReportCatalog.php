@@ -530,7 +530,7 @@ final class ReportCatalog
         return $this->masters($key, $title, $model, [
             $this->col('code', 'Code', sort: 'code'), $this->col('name', 'Name', sort: 'name'), $this->col('display_name', 'Display Name', sort: 'display_name'),
             $this->col('email', 'Email', sort: 'email'), $this->col('phone', 'Phone', sort: 'phone'), $this->col('status', 'Status', format: 'enum', sort: 'status'), $this->money('credit_limit', 'Credit Limit', false),
-        ], ['code', 'name', 'display_name', 'email', 'phone']);
+        ], ['code', 'name', 'display_name', 'email', 'phone'], relations: ['creditProfile']);
     }
 
     private function inventory(string $key, string $title, string $model, array $columns, array $search, array $relations = [], ?string $dateColumn = null): ReportDefinition

@@ -30,7 +30,7 @@ final class VehicleServicePaymentOptionService
         private readonly DecimalMath $math,
     ) {}
 
-    /** @return array{job_version: int, methods: list<array<string, mixed>>, credit_allowed: bool, credit_assessment: array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string, open_exposure: string, remaining_credit: string, warning: string|null}} */
+    /** @return array{job_version: int, methods: list<array<string, mixed>>, credit_allowed: bool, credit_assessment: array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string|null, open_exposure: string, remaining_credit: string|null, warning: string|null}} */
     public function options(VehicleServiceJob $job): array
     {
         $methods = $this->methods
@@ -68,7 +68,7 @@ final class VehicleServicePaymentOptionService
     }
 
     /**
-     * @return array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string, open_exposure: string, remaining_credit: string, warning: string|null}
+     * @return array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string|null, open_exposure: string, remaining_credit: string|null, warning: string|null}
      */
     public function creditAssessmentForConfirmation(VehicleServiceJob $job): array
     {
@@ -86,12 +86,14 @@ final class VehicleServicePaymentOptionService
     }
 
     /**
-     * @return array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string, open_exposure: string, remaining_credit: string, warning: string|null}
+     * @return array{available: bool, can_keep_on_credit: bool, currency_code: string|null, credit_limit: string|null, open_exposure: string, remaining_credit: string|null, warning: string|null}
      */
     private function creditAssessment(VehicleServiceJob $job, ?Customer $customer): array
     {
         $profile = $customer?->creditProfile;
-        $limit = (string) ($profile?->credit_limit ?? '0.000000');
+        $hasCreditPrivilege = $customer !== null && $profile !== null && (bool) $profile->is_active && (bool) $profile->credit_allowed;
+        $hasAssignedLimit = $profile?->credit_limit !== null && $profile->credit_limit !== '';
+        $limit = $hasAssignedLimit ? (string) $profile->credit_limit : null;
 
         $targetCurrencyId = $customer?->defaultCurrency !== null
             ? (int) $customer->defaultCurrency->getKey()
@@ -136,30 +138,35 @@ final class VehicleServicePaymentOptionService
         $exposure = $exposureResult['total_exposure'];
         $currencyCode = $exposureResult['currency_code'] ?? $targetCurrencyCode;
         $unconverted = $exposureResult['unconverted_currencies'];
-        $remaining = $this->math->sub($limit, $exposure);
-        $overLimit = $this->math->compare($exposure, $limit) > 0;
-        $available = $unconverted === [] && $profile !== null && (bool) $profile->is_active && (bool) $profile->credit_allowed;
+        $available = $unconverted === [] && $hasCreditPrivilege;
         $warning = null;
+        $overLimit = false;
+        $remaining = null;
 
         if ($unconverted !== []) {
             $warning = 'Credit limit cannot be assessed accurately because exchange rates are missing for currencies: '.implode(', ', $unconverted).'.';
-        } elseif ($profile === null || ! (bool) $profile->is_active || ! (bool) $profile->credit_allowed) {
+        } elseif (! $hasCreditPrivilege) {
             $warning = 'Credit is not enabled for this customer.';
-        } elseif ($overLimit && ! (bool) $profile->allow_over_credit) {
-            $warning = 'This customer is over the credit limit. Collect a direct payment before proceeding.';
-        } elseif ($overLimit) {
-            $warning = 'This customer is over the credit limit, but over-credit is allowed.';
-        } elseif ($this->math->compare($limit, '0.000000') > 0
-            && $this->math->compare(
-                $this->math->mul($exposure, '100.000000'),
-                $this->math->mul($limit, (string) ($profile->warning_threshold_percent ?? '80.000000')),
-            ) >= 0) {
-            $warning = 'This customer is approaching the credit limit.';
+        } elseif ($hasAssignedLimit) {
+            $remaining = $this->math->sub($limit, $exposure);
+            $overLimit = $this->math->compare($exposure, $limit) > 0;
+
+            if ($overLimit && ! (bool) $profile->allow_over_credit) {
+                $warning = 'This customer is over the credit limit. Collect a direct payment before proceeding.';
+            } elseif ($overLimit) {
+                $warning = 'This customer is over the credit limit, but over-credit is allowed.';
+            } elseif ($this->math->compare($limit, '0.000000') > 0
+                && $this->math->compare(
+                    $this->math->mul($exposure, '100.000000'),
+                    $this->math->mul($limit, (string) ($profile->warning_threshold_percent ?? '80.000000')),
+                ) >= 0) {
+                $warning = 'This customer is approaching the credit limit.';
+            }
         }
 
         return [
             'available' => $available,
-            'can_keep_on_credit' => $available && (! $overLimit || (bool) $profile->allow_over_credit),
+            'can_keep_on_credit' => $available && (! $overLimit || (bool) ($profile?->allow_over_credit ?? false)),
             'currency_code' => $currencyCode,
             'credit_limit' => $limit,
             'open_exposure' => $exposure,

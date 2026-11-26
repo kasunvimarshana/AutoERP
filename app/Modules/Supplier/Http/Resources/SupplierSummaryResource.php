@@ -22,6 +22,8 @@ final class SupplierSummaryResource extends JsonResource
 
     public function toArray(Request $request): array
     {
+        $creditProfile = $this->relationLoaded('creditProfile') ? $this->creditProfile : null;
+
         return [
             'id' => (int) $this->getKey(),
             'row_version' => (int) $this->row_version,

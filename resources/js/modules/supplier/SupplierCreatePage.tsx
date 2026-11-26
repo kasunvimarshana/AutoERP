@@ -55,7 +55,7 @@ const initialSupplier: SupplierPayload = {
     supplier_type: 'company',
     status: 'pending_approval',
     default_currency_id: null,
-    credit_limit: '0.000000',
+    credit_limit: null,
     is_credit_allowed: true,
     is_advance_allowed: true,
 };

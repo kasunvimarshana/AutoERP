@@ -27,7 +27,7 @@ final class SupplierResource extends JsonResource
             'vat_number' => $this->vat_number,
             'svat_number' => $this->svat_number,
             'business_registration_number' => $this->business_registration_number,
-            'credit_limit' => (string) $this->credit_limit,
+            'credit_limit' => $this->credit_limit !== null ? (string) $this->credit_limit : null,
             'notes' => $this->notes,
             'metadata' => $this->metadata,
             'approved_at' => $this->approved_at?->toISOString(),

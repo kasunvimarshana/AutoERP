@@ -24,7 +24,7 @@ final class SupplierQueryService
 {
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
-        $query = $this->baseQuery($tenantId, $organizationUnitId)->with(['defaultCurrency', 'categories']);
+        $query = $this->baseQuery($tenantId, $organizationUnitId)->with(['defaultCurrency', 'categories', 'creditProfile']);
         $this->applyCriteria($query, $criteria);
 
         $sort = in_array(($criteria['sort'] ?? null), ['supplier_number', 'code', 'name', 'status', 'created_at'], true)
@@ -104,9 +104,24 @@ final class SupplierQueryService
             });
         }
 
-        foreach (['status', 'supplier_type', 'is_credit_allowed'] as $filter) {
+        foreach (['status', 'supplier_type'] as $filter) {
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
+            }
+        }
+        if (array_key_exists('is_credit_allowed', $criteria) && $criteria['is_credit_allowed'] !== null && $criteria['is_credit_allowed'] !== '') {
+            $isCreditAllowed = (bool) $criteria['is_credit_allowed'];
+            if ($isCreditAllowed) {
+                $query->where('is_credit_allowed', true)
+                    ->where(function (Builder $builder): void {
+                        $builder->whereDoesntHave('creditProfile')
+                            ->orWhereHas('creditProfile', static fn (Builder $profile): Builder => $profile->where('is_active', true));
+                    });
+            } else {
+                $query->where(function (Builder $builder): void {
+                    $builder->where('is_credit_allowed', false)
+                        ->orWhereHas('creditProfile', static fn (Builder $profile): Builder => $profile->where('is_active', false));
+                });
             }
         }
         if (! empty($criteria['category_id'])) {

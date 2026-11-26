@@ -15,7 +15,6 @@ namespace Modules\Supplier\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Supplier\DTOs\CreateSupplierData;
-use Modules\Supplier\DTOs\SupplierCreditProfileData;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Validators\SupplierValidationService;
@@ -62,7 +61,9 @@ final class SupplierCreationService
                 'vat_number' => $data->vatNumber,
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
-                'credit_limit' => $this->math->normalize($data->creditProfile?->creditLimit ?? $data->creditLimit),
+                'credit_limit' => ($data->creditProfile?->creditLimit ?? $data->creditLimit) !== null
+                    ? $this->math->normalize($data->creditProfile?->creditLimit ?? $data->creditLimit)
+                    : null,
                 'is_credit_allowed' => $data->isCreditAllowed,
                 'is_advance_allowed' => $data->isAdvanceAllowed,
                 'notes' => $data->notes,
@@ -87,12 +88,9 @@ final class SupplierCreationService
             foreach ($data->itemMappings as $mapping) {
                 $this->itemMappings->create($supplier, $mapping);
             }
-            $this->creditProfiles->set(
-                $supplier,
-                $data->creditProfile ?? new SupplierCreditProfileData(
-                    creditLimit: $data->creditLimit,
-                ),
-            );
+            if ($data->creditProfile !== null) {
+                $this->creditProfiles->set($supplier, $data->creditProfile);
+            }
             $this->statuses->recordInitial($supplier, $data->createdBy);
 
             return $supplier->refresh()->load([

@@ -43,7 +43,7 @@ export function SupplierForm({ value, onChange, currency, onCurrencyChange, erro
                 <Input label="WhatsApp Number" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} hint="Instant mobile communication channel" />
                 <Input label="Website" type="url" value={value.website ?? ''} onChange={(event) => set('website', event.target.value || null)} />
                 <SupplierCurrencySelect value={currency} onChange={(next) => { onCurrencyChange(next); set('default_currency_id', next ? Number(next.id) : null); }} error={fieldError(error, 'default_currency_id') ?? fieldError(error, 'supplier.default_currency_id')} />
-                <Input label="Reference credit limit" value={value.credit_limit ?? '0.000000'} onChange={(event) => set('credit_limit', event.target.value)} error={fieldError(error, 'credit_limit') ?? fieldError(error, 'supplier.credit_limit')} hint="Credit ceiling allowed by this vendor" />
+                <Input label="Reference credit limit" value={value.credit_limit ?? ''} onChange={(event) => set('credit_limit', event.target.value === '' ? null : event.target.value)} error={fieldError(error, 'credit_limit') ?? fieldError(error, 'supplier.credit_limit')} hint="Credit ceiling allowed by this vendor (leave blank for unlimited)" />
             </div>
             <div className="mt-4 flex flex-wrap gap-6 text-sm">
                 <label><input className="mr-2" type="checkbox" checked={value.is_credit_allowed} onChange={(event) => set('is_credit_allowed', event.target.checked)} />Credit allowed</label>

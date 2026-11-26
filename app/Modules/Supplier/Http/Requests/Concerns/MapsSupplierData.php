@@ -49,7 +49,9 @@ trait MapsSupplierData
             vatNumber: $this->nullableString($supplier, 'vat_number'),
             svatNumber: $this->nullableString($supplier, 'svat_number'),
             businessRegistrationNumber: $this->nullableString($supplier, 'business_registration_number'),
-            creditLimit: (string) ($supplier['credit_limit'] ?? '0.000000'),
+            creditLimit: isset($supplier['credit_limit']) && $supplier['credit_limit'] !== null && $supplier['credit_limit'] !== ''
+                ? (string) $supplier['credit_limit']
+                : null,
             isCreditAllowed: (bool) ($supplier['is_credit_allowed'] ?? true),
             isAdvanceAllowed: (bool) ($supplier['is_advance_allowed'] ?? true),
             notes: $this->nullableString($supplier, 'notes'),
@@ -144,9 +146,13 @@ trait MapsSupplierData
     private function mapCreditProfile(array $row): SupplierCreditProfileData
     {
         return new SupplierCreditProfileData(
-            creditLimit: (string) ($row['credit_limit'] ?? '0.000000'),
+            creditLimit: isset($row['credit_limit']) && $row['credit_limit'] !== null && $row['credit_limit'] !== ''
+                ? (string) $row['credit_limit']
+                : null,
             creditPeriodDays: isset($row['credit_period_days']) ? (int) $row['credit_period_days'] : null,
             warningThresholdPercent: (string) ($row['warning_threshold_percent'] ?? '80.000000'),
+            isCreditAllowed: isset($row['is_credit_allowed']) ? (bool) $row['is_credit_allowed'] : null,
+            isAdvanceAllowed: isset($row['is_advance_allowed']) ? (bool) $row['is_advance_allowed'] : null,
             allowOverCredit: (bool) ($row['allow_over_credit'] ?? false),
             allowPartialPayment: (bool) ($row['allow_partial_payment'] ?? true),
             isActive: (bool) ($row['is_active'] ?? true),

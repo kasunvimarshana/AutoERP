@@ -190,6 +190,67 @@ final class CustomerEngineTest extends TestCase
         self::assertFalse($result->advanceAllowed);
     }
 
+    public function test_customer_creation_with_null_credit_limit_and_unlimited_credit(): void
+    {
+        $tenantId = $this->tenant();
+        $customer = $this->withTenantExecutionContext($tenantId, fn (): Customer => app(CustomerCreationService::class)->create(
+            $this->createData($tenantId, new CustomerCreditProfileData(
+                creditLimit: null,
+                creditAllowed: true,
+                advanceAllowed: true,
+            ), 'CUS-UNLIMITED'),
+        ));
+
+        $profile = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $customer->creditProfile()->firstOrFail(),
+        );
+
+        self::assertNull($profile->credit_limit);
+        self::assertTrue((bool) $profile->credit_allowed);
+        self::assertNull($customer->credit_limit);
+        self::assertTrue($customer->is_credit_allowed);
+
+        $result = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(CustomerLookupService::class)->result($customer->load('creditProfile')),
+        );
+        self::assertNull($result->creditLimit);
+        self::assertTrue($result->creditAllowed);
+    }
+
+    public function test_customer_without_credit_profile_has_null_limit_and_false_credit_allowed(): void
+    {
+        $tenantId = $this->tenant();
+        $customer = $this->withTenantExecutionContext($tenantId, fn (): Customer => app(CustomerCreationService::class)->create(
+            new CreateCustomerData(
+                tenantId: $tenantId,
+                code: 'CUS-NOPROFILE',
+                name: 'No Profile Customer',
+                customerType: CustomerType::Individual,
+                mobile: '0779998877',
+            ),
+        ));
+
+        self::assertNull($customer->credit_limit);
+        self::assertFalse($customer->is_credit_allowed);
+        self::assertTrue($customer->is_advance_allowed);
+
+        $result = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(CustomerLookupService::class)->result($customer),
+        );
+        self::assertNull($result->creditLimit);
+        self::assertFalse($result->creditAllowed);
+        self::assertTrue($result->advanceAllowed);
+
+        $allowedCustomers = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(CustomerLookupService::class)->customersAllowedForCredit($tenantId),
+        );
+        self::assertFalse($allowedCustomers->contains('id', $customer->getKey()));
+    }
+
     private function customer(
         int $tenantId,
         string $code = 'CUS-TEST',

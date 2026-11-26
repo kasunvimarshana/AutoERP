@@ -45,7 +45,7 @@ export interface Supplier extends SupplierSummary {
     vat_number?: string | null;
     svat_number?: string | null;
     business_registration_number?: string | null;
-    credit_limit: string;
+    credit_limit: string | null;
     notes?: string | null;
     metadata?: Record<string, unknown> | null;
     approved_at?: string | null;
@@ -76,7 +76,7 @@ export interface SupplierPayload {
     vat_number?: string | null;
     svat_number?: string | null;
     business_registration_number?: string | null;
-    credit_limit?: string;
+    credit_limit?: string | null;
     is_credit_allowed: boolean;
     is_advance_allowed: boolean;
     notes?: string | null;
@@ -187,9 +187,11 @@ export interface SupplierItemMappingPayload {
 
 export interface SupplierCreditProfile {
     id?: number;
-    credit_limit: string;
+    credit_limit?: string | null;
     credit_period_days?: number | null;
     warning_threshold_percent: string;
+    is_credit_allowed?: boolean;
+    is_advance_allowed?: boolean;
     allow_over_credit: boolean;
     allow_partial_payment: boolean;
     is_active: boolean;

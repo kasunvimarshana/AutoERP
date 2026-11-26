@@ -138,9 +138,9 @@ final class VehicleServiceCustomerLookupService
             phone: $customer->phone,
             mobile: $customer->mobile,
             currencyId: $customer->default_currency_id,
-            creditLimit: (string) ($creditProfile?->credit_limit ?? '0.000000'),
-            creditAllowed: (bool) ($creditProfile?->credit_allowed ?? false),
-            advanceAllowed: (bool) ($creditProfile?->advance_allowed ?? false),
+            creditLimit: $creditProfile?->credit_limit !== null ? (string) $creditProfile->credit_limit : null,
+            creditAllowed: (bool) ($creditProfile?->is_active && $creditProfile->credit_allowed),
+            advanceAllowed: (bool) ($creditProfile?->advance_allowed ?? true),
             organizationUnitId: $customer->organization_unit_id,
             organizationUnitName: $customer->organizationUnit?->name,
         );

@@ -637,8 +637,8 @@ export default function VehicleServicePaymentPreparePage() {
                                 {options.data?.credit_assessment?.available && (
                                     <DetailGrid items={[
                                         { label: 'Open invoice exposure', value: formatMoney(options.data.credit_assessment.open_exposure, options.data.credit_assessment.currency_code ?? 'LKR') },
-                                        { label: 'Credit limit', value: formatMoney(options.data.credit_assessment.credit_limit, options.data.credit_assessment.currency_code ?? 'LKR') },
-                                        { label: 'Remaining credit', value: formatMoney(options.data.credit_assessment.remaining_credit, options.data.credit_assessment.currency_code ?? 'LKR') },
+                                        { label: 'Credit limit', value: options.data.credit_assessment.credit_limit !== null ? formatMoney(options.data.credit_assessment.credit_limit, options.data.credit_assessment.currency_code ?? 'LKR') : 'No limit assigned (Unlimited)' },
+                                        { label: 'Remaining credit', value: options.data.credit_assessment.remaining_credit !== null ? formatMoney(options.data.credit_assessment.remaining_credit, options.data.credit_assessment.currency_code ?? 'LKR') : 'Unlimited' },
                                     ]} />
                                 )}
                                 {options.data?.credit_assessment?.warning && (

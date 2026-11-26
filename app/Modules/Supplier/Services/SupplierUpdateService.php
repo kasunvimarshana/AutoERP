@@ -78,7 +78,7 @@ final class SupplierUpdateService
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
                 'credit_limit' => $data->creditProfile !== null
-                    ? $this->math->normalize($data->creditProfile->creditLimit)
+                    ? ($data->creditProfile->creditLimit !== null ? $this->math->normalize($data->creditProfile->creditLimit) : null)
                     : ($data->creditLimit !== null ? $this->math->normalize($data->creditLimit) : null),
                 'is_credit_allowed' => $data->isCreditAllowed,
                 'is_advance_allowed' => $data->isAdvanceAllowed,
@@ -119,6 +119,20 @@ final class SupplierUpdateService
             }
             if ($data->creditProfile !== null) {
                 $this->creditProfiles->set($supplier, $data->creditProfile);
+            } else {
+                $profile = $supplier->creditProfile()->first();
+                if ($profile !== null) {
+                    $profileUpdates = [];
+                    if (in_array('credit_limit', $data->provided, true)) {
+                        $profileUpdates['credit_limit'] = $supplier->credit_limit;
+                    }
+                    if (in_array('is_credit_allowed', $data->provided, true) && ! (bool) $supplier->is_credit_allowed && $profile->allow_over_credit) {
+                        $profileUpdates['allow_over_credit'] = false;
+                    }
+                    if ($profileUpdates !== []) {
+                        $profile->forceFill($profileUpdates)->save();
+                    }
+                }
             }
 
             return $supplier->refresh()->load([

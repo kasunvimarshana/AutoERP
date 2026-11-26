@@ -77,7 +77,7 @@ final class CustomerCreditProfileService
 
     private function validate(CustomerCreditProfileData $data): void
     {
-        if ($this->math->isNegative($data->creditLimit)) {
+        if ($data->creditLimit !== null && $this->math->isNegative($data->creditLimit)) {
             throw new InvalidArgumentException('Customer credit profile limit cannot be negative.');
         }
         if ($data->creditPeriodDays !== null && $data->creditPeriodDays < 0) {
@@ -99,7 +99,7 @@ final class CustomerCreditProfileService
             'tenant_id' => $customer->tenant_id,
             'organization_unit_id' => $customer->organization_unit_id,
             'customer_id' => $customer->getKey(),
-            'credit_limit' => $this->math->normalize($data->creditLimit),
+            'credit_limit' => $data->creditLimit !== null ? $this->math->normalize($data->creditLimit) : null,
             'credit_period_days' => $data->creditPeriodDays,
             'warning_threshold_percent' => $this->math->normalize($data->warningThresholdPercent),
             'credit_allowed' => $data->creditAllowed,

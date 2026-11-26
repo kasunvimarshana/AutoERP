@@ -168,7 +168,7 @@ export type CustomerDocumentPayload = Omit<CustomerDocument, 'id'>;
 export interface CustomerCreditProfile {
     id?: number;
     row_version?: number | null;
-    credit_limit: string;
+    credit_limit: string | null;
     credit_period_days?: number | null;
     warning_threshold_percent: string;
     credit_allowed: boolean;

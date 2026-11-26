@@ -47,7 +47,7 @@ export const emptySupplierOneShotDraft: SupplierOneShotDraft = {
     categories: [],
     documents: [],
     itemMappings: [],
-    creditProfile: { credit_limit: '0.000000', credit_period_days: null, warning_threshold_percent: '80.000000', allow_over_credit: false, allow_partial_payment: true, is_active: true },
+    creditProfile: { credit_limit: null, credit_period_days: null, warning_threshold_percent: '80.000000', is_credit_allowed: true, is_advance_allowed: true, allow_over_credit: false, allow_partial_payment: true, is_active: true },
 };
 
 export function SupplierOneShotBuilder({ section, value, onChange, defaultCurrency = null }: {
@@ -99,7 +99,20 @@ function MappingDraft({ value, onChange }: Props) {
 function CreditDraft({ value, onChange }: Props) {
     const profile = value.creditProfile;
     const set = <K extends keyof SupplierCreditProfile>(key: K, next: SupplierCreditProfile[K]) => onChange({ ...value, creditProfile: { ...profile, [key]: next } });
-    return <div className="grid gap-4 sm:grid-cols-2"><DecimalInput label="Credit limit" value={profile.credit_limit} onChange={(event) => set('credit_limit', event.target.value)} /><Input label="Credit period days" type="number" min="0" value={profile.credit_period_days ?? ''} onChange={(event) => set('credit_period_days', event.target.value ? Number(event.target.value) : null)} /><DecimalInput label="Warning threshold percent" value={profile.warning_threshold_percent} onChange={(event) => set('warning_threshold_percent', event.target.value)} /><label className="self-end pb-2 text-sm"><input className="mr-2" type="checkbox" checked={profile.allow_over_credit} onChange={(event) => set('allow_over_credit', event.target.checked)} />Allow over credit</label></div>;
+    return (
+        <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+                <DecimalInput label="Credit limit" value={profile.credit_limit ?? ''} onChange={(event) => set('credit_limit', event.target.value === '' ? null : event.target.value)} hint="Leave empty for unassigned (unlimited) credit" />
+                <Input label="Credit period days" type="number" min="0" value={profile.credit_period_days ?? ''} onChange={(event) => set('credit_period_days', event.target.value ? Number(event.target.value) : null)} />
+                <DecimalInput label="Warning threshold percent" value={profile.warning_threshold_percent} onChange={(event) => set('warning_threshold_percent', event.target.value)} />
+            </div>
+            <div className="flex flex-wrap gap-6 text-sm">
+                <label><input className="mr-2" type="checkbox" checked={profile.is_credit_allowed ?? true} onChange={(event) => onChange({ ...value, creditProfile: { ...profile, is_credit_allowed: event.target.checked, ...(event.target.checked ? {} : { allow_over_credit: false }) } })} />Credit allowed</label>
+                <label><input className="mr-2" type="checkbox" checked={profile.is_advance_allowed ?? true} onChange={(event) => set('is_advance_allowed', event.target.checked)} />Advance allowed</label>
+                <label><input className="mr-2" type="checkbox" disabled={!(profile.is_credit_allowed ?? true)} checked={profile.allow_over_credit} onChange={(event) => set('allow_over_credit', event.target.checked)} />Allow over credit</label>
+            </div>
+        </div>
+    );
 }
 function Draft({ title, rows, remove, children }: { title: string; rows: string[]; remove: (index: number) => void; children: ReactNode }) { return <div><h3 className="mb-3 font-semibold text-slate-900">{title}</h3><div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4">{children}</div><div className="mt-5 space-y-2">{rows.map((row, index) => <div key={`${row}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"><span>{row}</span><button type="button" className="rounded px-2 py-1 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={() => remove(index)}>Remove</button></div>)}</div></div>; }
 function Count({ label, value }: { label: string; value: number }) { return <div className="rounded-lg border border-slate-200 p-4"><span className="text-sm text-slate-500">{label}</span><strong className="mt-1 block text-2xl">{value}</strong></div>; }

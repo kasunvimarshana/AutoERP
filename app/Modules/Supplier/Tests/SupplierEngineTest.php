@@ -31,6 +31,7 @@ use Modules\Supplier\DTOs\SupplierCreditProfileData;
 use Modules\Supplier\DTOs\SupplierDocumentData;
 use Modules\Supplier\DTOs\SupplierItemMappingData;
 use Modules\Supplier\DTOs\SupplierStatusChangeData;
+use Modules\Supplier\DTOs\UpdateSupplierData;
 use Modules\Supplier\Enums\SupplierAddressType;
 use Modules\Supplier\Enums\SupplierDocumentStatus;
 use Modules\Supplier\Enums\SupplierDocumentType;
@@ -47,6 +48,7 @@ use Modules\Supplier\Services\SupplierCreditProfileService;
 use Modules\Supplier\Services\SupplierItemMappingService;
 use Modules\Supplier\Services\SupplierLookupService;
 use Modules\Supplier\Services\SupplierStatusService;
+use Modules\Supplier\Services\SupplierUpdateService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\OrganizationUnitFixture;
@@ -352,6 +354,118 @@ final class SupplierEngineTest extends TestCase
         $this->assertDatabaseHas('supplier_categories', ['tenant_id' => $tenantId, 'code' => 'GENERAL']);
         $this->assertDatabaseHas('suppliers', ['tenant_id' => $tenantId, 'supplier_number' => 'SUP-000001']);
         $this->assertSame(1, DB::table('suppliers')->where('tenant_id', $tenantId)->count());
+    }
+
+    public function test_supplier_creation_with_null_credit_limit_and_optional_credit_profile(): void
+    {
+        [$tenantId] = $this->scopeContext();
+        $supplier = $this->createSupplier($tenantId, 'OPTIONAL-CREDIT', status: SupplierStatus::Active);
+
+        $this->runInTenant($tenantId, function () use ($tenantId, $supplier): void {
+            $this->assertNull($supplier->credit_limit);
+            $this->assertTrue((bool) $supplier->is_credit_allowed);
+            $this->assertFalse(DB::table('supplier_credit_profiles')->where('supplier_id', $supplier->getKey())->exists());
+
+            $result = app(SupplierLookupService::class)->result($supplier);
+            $this->assertNull($result->creditLimit);
+            $this->assertTrue($result->isCreditAllowed);
+
+            $allowed = app(SupplierLookupService::class)->suppliersAllowedForCredit($tenantId);
+            $this->assertTrue($allowed->contains('id', $supplier->getKey()));
+        });
+    }
+
+    public function test_supplier_credit_profile_set_synchronizes_master_credit_limit_and_flags(): void
+    {
+        [$tenantId] = $this->scopeContext();
+        $supplier = $this->createSupplier($tenantId, 'SYNC-CREDIT', status: SupplierStatus::Active);
+
+        $this->runInTenant($tenantId, function () use ($tenantId, $supplier): void {
+            app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+                creditLimit: null,
+                isCreditAllowed: false,
+                isAdvanceAllowed: true,
+                allowOverCredit: false,
+            ));
+
+            $fresh = $supplier->fresh();
+            $this->assertNull($fresh->credit_limit);
+            $this->assertFalse((bool) $fresh->is_credit_allowed);
+
+            $profile = DB::table('supplier_credit_profiles')->where('supplier_id', $supplier->getKey())->first();
+            $this->assertNotNull($profile);
+            $this->assertNull($profile->credit_limit);
+            $this->assertTrue((bool) $profile->is_active);
+
+            $allowed = app(SupplierLookupService::class)->suppliersAllowedForCredit($tenantId);
+            $this->assertFalse($allowed->contains('id', $supplier->getKey()));
+        });
+    }
+
+    public function test_over_credit_rejected_when_credit_is_disabled(): void
+    {
+        [$tenantId] = $this->scopeContext();
+        $supplier = $this->createSupplier($tenantId, 'OVERCREDIT-DENIED', status: SupplierStatus::Active);
+
+        $this->runInTenant($tenantId, function () use ($supplier): void {
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Over-credit approval cannot be enabled when credit is disabled.');
+
+            app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+                creditLimit: '50000.000000',
+                isCreditAllowed: false,
+                allowOverCredit: true,
+            ));
+        });
+    }
+
+    public function test_supplier_update_resets_allow_over_credit_when_credit_is_revoked(): void
+    {
+        [$tenantId] = $this->scopeContext();
+        $supplier = $this->createSupplier($tenantId, 'REVOKE-CREDIT', status: SupplierStatus::Active);
+
+        $this->runInTenant($tenantId, function () use ($supplier): void {
+            app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+                creditLimit: '50000.000000',
+                isCreditAllowed: true,
+                allowOverCredit: true,
+            ));
+
+            $profile = DB::table('supplier_credit_profiles')->where('supplier_id', $supplier->getKey())->first();
+            $this->assertTrue((bool) $profile->allow_over_credit);
+
+            // Update supplier master to revoke credit
+            $updated = app(SupplierUpdateService::class)->update($supplier->fresh(), new UpdateSupplierData(
+                rowVersion: (int) $supplier->fresh()->row_version,
+                isCreditAllowed: false,
+                provided: ['is_credit_allowed'],
+            ));
+
+            $this->assertFalse((bool) $updated->is_credit_allowed);
+            $freshProfile = DB::table('supplier_credit_profiles')->where('supplier_id', $supplier->getKey())->first();
+            $this->assertFalse((bool) $freshProfile->allow_over_credit);
+        });
+    }
+
+    public function test_supplier_accessors_without_preloaded_relations(): void
+    {
+        [$tenantId] = $this->scopeContext();
+        $supplier = $this->createSupplier($tenantId, 'ACCESSOR-TEST', status: SupplierStatus::Active);
+
+        $this->runInTenant($tenantId, function () use ($supplier): void {
+            app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+                creditLimit: '75000.000000',
+                isCreditAllowed: true,
+                isActive: false,
+            ));
+
+            // Load fresh supplier without relationships eager-loaded
+            $fresh = Supplier::query()->find($supplier->getKey());
+            $this->assertFalse($fresh->relationLoaded('creditProfile'));
+            // Profile is inactive, so is_credit_allowed accessor returns false
+            $this->assertFalse($fresh->is_credit_allowed);
+            $this->assertSame('75000.000000', $fresh->credit_limit);
+        });
     }
 
     private function createSupplier(

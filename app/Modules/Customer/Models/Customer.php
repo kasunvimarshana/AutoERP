@@ -117,6 +117,27 @@ final class Customer extends TenantOwnedModel
         return $this->hasMany(CustomerStatusHistory::class, 'customer_id');
     }
 
+    public function getCreditLimitAttribute(): ?string
+    {
+        $profile = $this->relationLoaded('creditProfile') ? $this->creditProfile : $this->creditProfile()->first();
+
+        return $profile?->credit_limit !== null ? (string) $profile->credit_limit : null;
+    }
+
+    public function getIsCreditAllowedAttribute(): bool
+    {
+        $profile = $this->relationLoaded('creditProfile') ? $this->creditProfile : $this->creditProfile()->first();
+
+        return (bool) ($profile?->is_active && $profile->credit_allowed);
+    }
+
+    public function getIsAdvanceAllowedAttribute(): bool
+    {
+        $profile = $this->relationLoaded('creditProfile') ? $this->creditProfile : $this->creditProfile()->first();
+
+        return (bool) ($profile?->advance_allowed ?? true);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', CustomerStatus::Active);

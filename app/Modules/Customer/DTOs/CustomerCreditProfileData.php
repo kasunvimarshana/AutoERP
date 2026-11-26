@@ -15,7 +15,7 @@ namespace Modules\Customer\DTOs;
 final readonly class CustomerCreditProfileData
 {
     public function __construct(
-        public string $creditLimit = '0.000000',
+        public ?string $creditLimit = null,
         public ?int $creditPeriodDays = null,
         public string $warningThresholdPercent = '80.000000',
         public bool $creditAllowed = true,

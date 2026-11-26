@@ -2298,6 +2298,34 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertFalse($inactiveOptions['credit_allowed']);
     }
 
+    public function test_payment_options_permits_unlimited_credit_when_credit_limit_is_null(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        DB::table('customer_credit_profiles')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => null,
+            'customer_id' => $context['customer_id'],
+            'credit_limit' => null,
+            'credit_allowed' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $options = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => app(VehicleServicePaymentOptionService::class)->options($job),
+        );
+
+        $this->assertTrue($options['credit_allowed']);
+        $this->assertTrue($options['credit_assessment']['available']);
+        $this->assertNull($options['credit_assessment']['credit_limit']);
+        $this->assertNull($options['credit_assessment']['remaining_credit']);
+        $this->assertTrue($options['credit_assessment']['can_keep_on_credit']);
+        $this->assertNull($options['credit_assessment']['warning']);
+    }
+
     public function test_payment_options_handles_multi_currency_credit_assessment_without_error(): void
     {
         $context = $this->context();

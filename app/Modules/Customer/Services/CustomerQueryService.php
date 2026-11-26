@@ -103,9 +103,18 @@ final class CustomerQueryService
         }
         if (array_key_exists('credit_allowed', $criteria) && $criteria['credit_allowed'] !== null && $criteria['credit_allowed'] !== '') {
             $creditAllowed = (bool) $criteria['credit_allowed'];
-            $query->whereHas('creditProfile', static fn (Builder $profile): Builder => $profile
-                ->where('credit_allowed', $creditAllowed)
-                ->where('is_active', true));
+            if ($creditAllowed) {
+                $query->whereHas('creditProfile', static fn (Builder $profile): Builder => $profile
+                    ->where('credit_allowed', true)
+                    ->where('is_active', true));
+            } else {
+                $query->where(function (Builder $builder): void {
+                    $builder->whereDoesntHave('creditProfile')
+                        ->orWhereHas('creditProfile', static fn (Builder $profile): Builder => $profile
+                            ->where('credit_allowed', false)
+                            ->orWhere('is_active', false));
+                });
+            }
         }
         if (! empty($criteria['category_id'])) {
             $query->whereHas('categories', fn (Builder $categories): Builder => $categories

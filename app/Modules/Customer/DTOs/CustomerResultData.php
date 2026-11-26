@@ -26,7 +26,7 @@ final readonly class CustomerResultData
         public string $name,
         public CustomerType $customerType,
         public CustomerStatus $status,
-        public string $creditLimit,
+        public ?string $creditLimit,
         public bool $creditAllowed,
         public bool $advanceAllowed,
         public bool $isTaxExempt,

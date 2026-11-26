@@ -44,8 +44,8 @@ final class CustomerSummaryResource extends JsonResource
                 ? $this->namedResource($this->defaultCurrency, true)
                 : null,
             'categories' => $this->whenLoaded('categories', fn () => CustomerCategoryResource::collection($this->categories)->resolve($request)),
-            'credit_allowed' => (bool) ($creditProfile?->credit_allowed ?? false),
-            'advance_allowed' => (bool) ($creditProfile?->advance_allowed ?? false),
+            'credit_allowed' => (bool) $this->is_credit_allowed,
+            'advance_allowed' => (bool) $this->is_advance_allowed,
             'current_vehicles' => $this->when(
                 $this->resource->getAttribute('current_vehicles') !== null,
                 fn (): array => (array) $this->resource->getAttribute('current_vehicles'),

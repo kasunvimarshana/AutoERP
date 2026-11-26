@@ -64,6 +64,10 @@ final class SupplierLookupService
         return $this->baseQuery($tenantId, $organizationUnitId)
             ->active()
             ->where('is_credit_allowed', true)
+            ->where(function (Builder $builder): void {
+                $builder->whereDoesntHave('creditProfile')
+                    ->orWhereHas('creditProfile', static fn (Builder $profile): Builder => $profile->where('is_active', true));
+            })
             ->get();
     }
 
@@ -90,6 +94,17 @@ final class SupplierLookupService
 
     public function result(Supplier $supplier): SupplierResultData
     {
+        $profile = $supplier->relationLoaded('creditProfile')
+            ? $supplier->creditProfile
+            : $supplier->creditProfile()->first();
+
+        $creditLimit = $supplier->credit_limit !== null
+            ? (string) $supplier->credit_limit
+            : ($profile?->credit_limit !== null ? (string) $profile->credit_limit : null);
+
+        $isCreditAllowed = (bool) $supplier->is_credit_allowed
+            && ($profile === null || (bool) $profile->is_active);
+
         return new SupplierResultData(
             supplierId: (int) $supplier->getKey(),
             tenantId: (int) $supplier->tenant_id,
@@ -99,14 +114,14 @@ final class SupplierLookupService
             name: (string) $supplier->name,
             supplierType: $supplier->supplier_type,
             status: $supplier->status,
-            creditLimit: (string) $supplier->credit_limit,
-            isCreditAllowed: (bool) $supplier->is_credit_allowed,
+            creditLimit: $creditLimit,
+            isCreditAllowed: $isCreditAllowed,
             isAdvanceAllowed: (bool) $supplier->is_advance_allowed,
         );
     }
 
     private function baseQuery(int $tenantId, ?int $organizationUnitId): Builder
     {
-        return Supplier::query()->forTenant($tenantId, $organizationUnitId);
+        return Supplier::query()->forTenant($tenantId, $organizationUnitId)->with('creditProfile');
     }
 }

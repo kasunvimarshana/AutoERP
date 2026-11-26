@@ -121,6 +121,34 @@ final class Supplier extends TenantOwnedModel
         return $this->hasMany(SupplierStatusHistory::class, 'supplier_id');
     }
 
+    public function getCreditLimitAttribute(): ?string
+    {
+        $limit = $this->castAttribute('credit_limit', $this->attributes['credit_limit'] ?? null);
+        if ($limit !== null) {
+            return (string) $limit;
+        }
+
+        $profile = $this->relationLoaded('creditProfile')
+            ? $this->creditProfile
+            : $this->creditProfile()->first();
+
+        return $profile?->credit_limit !== null ? (string) $profile->credit_limit : null;
+    }
+
+    public function getIsCreditAllowedAttribute(): bool
+    {
+        $baseAllowed = (bool) ($this->attributes['is_credit_allowed'] ?? false);
+        if (! $baseAllowed) {
+            return false;
+        }
+
+        $profile = $this->relationLoaded('creditProfile')
+            ? $this->creditProfile
+            : $this->creditProfile()->first();
+
+        return $profile === null || (bool) $profile->is_active;
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', SupplierStatus::Active);

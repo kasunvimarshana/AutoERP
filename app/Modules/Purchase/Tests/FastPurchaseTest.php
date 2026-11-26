@@ -51,6 +51,7 @@ use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\FastPurchaseService;
 use Modules\Purchase\Services\PurchaseAdjustmentAllocationLedger;
 use Modules\Purchase\Services\PurchasePricingService;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Tests\Support\FinancePostingFixture;
 use Tests\Support\TenantUserFixture;
@@ -108,6 +109,113 @@ final class FastPurchaseTest extends TestCase
             $this->assertSame(1, PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->count());
             $this->assertSame(2, FinanceJournalEntry::query()->count());
         });
+    }
+
+    public function test_credit_purchase_fails_when_supplier_credit_is_not_allowed(): void
+    {
+        $context = $this->context();
+        $this->withinTenant($context, function () use ($context): void {
+            Supplier::query()->where('id', $context['supplier_id'])->update(['is_credit_allowed' => false]);
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Supplier is not enabled for credit purchases.');
+
+        $this->createFastPurchase($this->payload($context, [
+            'supplier_reference' => 'FP-CREDIT-BLOCKED',
+        ]));
+    }
+
+    public function test_credit_purchase_fails_when_exceeding_credit_limit_without_over_credit_allowed(): void
+    {
+        $context = $this->context();
+        $this->withinTenant($context, function () use ($context): void {
+            Supplier::query()->where('id', $context['supplier_id'])->update(['credit_limit' => '100.000000']);
+            DB::table('supplier_credit_profiles')->insert([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => null,
+                'supplier_id' => $context['supplier_id'],
+                'credit_limit' => '100.000000',
+                'allow_over_credit' => false,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Credit purchase exceeds the supplier credit limit.');
+
+        $this->createFastPurchase($this->payload($context, [
+            'supplier_reference' => 'FP-CREDIT-LIMIT-EXCEEDED',
+        ]));
+    }
+
+    public function test_credit_purchase_succeeds_when_over_credit_is_allowed(): void
+    {
+        $context = $this->context();
+        $this->withinTenant($context, function () use ($context): void {
+            Supplier::query()->where('id', $context['supplier_id'])->update(['credit_limit' => '100.000000']);
+            DB::table('supplier_credit_profiles')->insert([
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => null,
+                'supplier_id' => $context['supplier_id'],
+                'credit_limit' => '100.000000',
+                'allow_over_credit' => true,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        $result = $this->createFastPurchase($this->payload($context, [
+            'supplier_reference' => 'FP-OVER-CREDIT-ALLOWED',
+        ]));
+
+        $this->assertSame('500.000000', $result['summary']['grand_total']);
+    }
+
+    public function test_credit_purchase_succeeds_when_credit_limit_is_null_unlimited(): void
+    {
+        $context = $this->context();
+        $this->withinTenant($context, function () use ($context): void {
+            Supplier::query()->where('id', $context['supplier_id'])->update([
+                'credit_limit' => null,
+                'is_credit_allowed' => true,
+            ]);
+            DB::table('supplier_credit_profiles')->where('supplier_id', $context['supplier_id'])->delete();
+        });
+
+        $result = $this->createFastPurchase($this->payload($context, [
+            'supplier_reference' => 'FP-UNLIMITED-CREDIT',
+        ]));
+
+        $this->assertSame('500.000000', $result['summary']['grand_total']);
+    }
+
+    public function test_credit_purchase_evaluates_multi_currency_against_supplier_limit(): void
+    {
+        $context = $this->context();
+        $this->withinTenant($context, function () use ($context): void {
+            // Base currency LKR. Supplier has 50,000 LKR limit.
+            Supplier::query()->where('id', $context['supplier_id'])->update([
+                'credit_limit' => '50000.000000',
+                'is_credit_allowed' => true,
+            ]);
+        });
+
+        $currency = CurrencyModel::query()->where('is_active', true)->first();
+
+        // Fast purchase in foreign currency with rate 300 LKR/unit.
+        // Purchase amount = 500 units = 150,000 LKR, which exceeds 50,000 LKR limit!
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Credit purchase exceeds the supplier credit limit.');
+
+        $this->createFastPurchase($this->payload($context, [
+            'supplier_reference' => 'FP-MULTI-CURR-EXCEEDED',
+            'currency_id' => $currency?->id,
+            'exchange_rate' => '300.000000',
+        ]));
     }
 
     public function test_invalid_payment_terms_are_rejected(): void

@@ -130,7 +130,9 @@ trait MapsCustomerData
     private function mapCreditProfile(array $row): CustomerCreditProfileData
     {
         return new CustomerCreditProfileData(
-            creditLimit: (string) ($row['credit_limit'] ?? '0.000000'),
+            creditLimit: isset($row['credit_limit']) && $row['credit_limit'] !== null && $row['credit_limit'] !== ''
+                ? (string) $row['credit_limit']
+                : null,
             creditPeriodDays: isset($row['credit_period_days']) ? (int) $row['credit_period_days'] : null,
             warningThresholdPercent: (string) ($row['warning_threshold_percent'] ?? '80.000000'),
             creditAllowed: (bool) ($row['credit_allowed'] ?? true),

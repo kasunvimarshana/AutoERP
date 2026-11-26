@@ -439,9 +439,9 @@ export interface VehicleServiceCreditAssessment {
     available: boolean;
     can_keep_on_credit: boolean;
     currency_code: string | null;
-    credit_limit: string;
+    credit_limit: string | null;
     open_exposure: string;
-    remaining_credit: string;
+    remaining_credit: string | null;
     warning: string | null;
 }
 

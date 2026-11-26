@@ -42,12 +42,20 @@ final class SupplierValidationService
         if ($data->supplierNumber !== null) {
             $this->assertNumberUnique($data->tenantId, $data->supplierNumber);
         }
-        $this->assertNonNegative($data->creditLimit, 'Supplier credit limit cannot be negative.');
+        if ($data->creditLimit !== null) {
+            $this->assertNonNegative($data->creditLimit, 'Supplier credit limit cannot be negative.');
+        }
         $this->assertOrganizationScope($data->tenantId, $data->organizationUnitId);
         $this->assertCurrencyActive($data->defaultCurrencyId);
         $this->assertTaxNumbers($data->taxRegistrationNumber, $data->vatNumber, $data->svatNumber, $data->businessRegistrationNumber);
         if ($data->creditProfile !== null) {
-            $this->assertNonNegative($data->creditProfile->creditLimit, 'Supplier credit profile limit cannot be negative.');
+            if ($data->creditProfile->creditLimit !== null) {
+                $this->assertNonNegative($data->creditProfile->creditLimit, 'Supplier credit profile limit cannot be negative.');
+            }
+            $effectiveCreditAllowed = $data->creditProfile->isCreditAllowed ?? $data->isCreditAllowed;
+            if (! $effectiveCreditAllowed && $data->creditProfile->allowOverCredit) {
+                throw new InvalidArgumentException('Over-credit approval cannot be enabled when credit is disabled.');
+            }
         }
     }
 
@@ -68,7 +76,13 @@ final class SupplierValidationService
         $this->assertCurrencyActive($data->defaultCurrencyId);
         $this->assertTaxNumbers($data->taxRegistrationNumber, $data->vatNumber, $data->svatNumber, $data->businessRegistrationNumber);
         if ($data->creditProfile !== null) {
-            $this->assertNonNegative($data->creditProfile->creditLimit, 'Supplier credit profile limit cannot be negative.');
+            if ($data->creditProfile->creditLimit !== null) {
+                $this->assertNonNegative($data->creditProfile->creditLimit, 'Supplier credit profile limit cannot be negative.');
+            }
+            $effectiveCreditAllowed = $data->creditProfile->isCreditAllowed ?? $data->isCreditAllowed;
+            if (! $effectiveCreditAllowed && $data->creditProfile->allowOverCredit) {
+                throw new InvalidArgumentException('Over-credit approval cannot be enabled when credit is disabled.');
+            }
         }
     }
 
@@ -272,9 +286,9 @@ final class SupplierValidationService
         }
     }
 
-    private function assertNonNegative(string $value, string $message): void
+    private function assertNonNegative(?string $value, string $message): void
     {
-        if ($this->math->isNegative($value)) {
+        if ($value !== null && $this->math->isNegative($value)) {
             throw new InvalidArgumentException($message);
         }
     }

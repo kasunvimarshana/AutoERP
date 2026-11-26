@@ -22,7 +22,7 @@ final class CustomerCreditProfileResource extends JsonResource
         return [
             'id' => (int) $this->getKey(),
             'row_version' => (int) $this->row_version,
-            'credit_limit' => (string) $this->credit_limit,
+            'credit_limit' => $this->credit_limit !== null ? (string) $this->credit_limit : null,
             'credit_period_days' => $this->credit_period_days,
             'warning_threshold_percent' => (string) $this->warning_threshold_percent,
             'credit_allowed' => (bool) $this->credit_allowed,

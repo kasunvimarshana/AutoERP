@@ -13,7 +13,6 @@ declare(strict_types=1);
 namespace Modules\Customer\Services;
 
 use Modules\Customer\DTOs\CreateCustomerData;
-use Modules\Customer\DTOs\CustomerCreditProfileData;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Validators\CustomerValidationService;
@@ -82,7 +81,9 @@ final class CustomerCreationService
             foreach ($data->documents as $document) {
                 $this->documents->create($customer, $document);
             }
-            $this->creditProfiles->set($customer, $data->creditProfile ?? new CustomerCreditProfileData);
+            if ($data->creditProfile !== null) {
+                $this->creditProfiles->set($customer, $data->creditProfile);
+            }
             $this->statuses->recordInitial($customer, $data->createdBy);
 
             return $customer->refresh()->load([

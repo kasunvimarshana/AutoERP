@@ -22,6 +22,9 @@ use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Services\DecimalMath;
 use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Idempotency\Services\IdempotencyService;
+use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
+use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\Invoice\Models\Invoice;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -69,6 +72,7 @@ final class FastPurchaseService
         private readonly FastPurchaseIdempotencyNormalizer $idempotencyNormalizer,
         private readonly FastPurchasePostingCoordinator $postingCoordinator,
         private readonly FastPurchaseResponseBuilder $responses,
+        private readonly InvoiceBalanceProviderInterface $invoiceBalances,
     ) {}
 
     /**
@@ -214,7 +218,15 @@ final class FastPurchaseService
         );
         $summary = $this->summaryWithAdjustments($this->summary($lines), $adjustments);
         $payment = $this->resolvePayment($payload, $recordPayment, $summary, $tenantId, $organizationUnitId, $lockRecords);
-        $this->validateCredit($supplier, $createInvoice, $summary['grand_total'], $payment['amount']);
+        $this->validateCredit(
+            supplier: $supplier,
+            createInvoice: $createInvoice,
+            grandTotal: $summary['grand_total'],
+            paidTotal: $payment['amount'],
+            currencyId: $currencyId,
+            exchangeRate: $exchangeRate,
+            organizationUnitId: $organizationUnitId,
+        );
 
         return [
             'tenant_id' => $tenantId,
@@ -718,10 +730,104 @@ final class FastPurchaseService
         return $hasNonStock ? 'mixed_credit_purchase' : 'credit_purchase';
     }
 
-    private function validateCredit(Supplier $supplier, bool $createInvoice, string $grandTotal, string $paidTotal): void
-    {
-        if ($createInvoice && $this->math->compare($paidTotal, $grandTotal) < 0 && ! (bool) $supplier->is_credit_allowed) {
+    private function validateCredit(
+        Supplier $supplier,
+        bool $createInvoice,
+        string $grandTotal,
+        string $paidTotal,
+        ?int $currencyId = null,
+        ?string $exchangeRate = null,
+        ?int $organizationUnitId = null,
+    ): void {
+        if (! $createInvoice || $this->math->compare($paidTotal, $grandTotal) >= 0) {
+            return;
+        }
+
+        $profile = $supplier->relationLoaded('creditProfile')
+            ? $supplier->creditProfile
+            : $supplier->creditProfile()->first();
+
+        $hasCreditPrivilege = (bool) $supplier->is_credit_allowed
+            && ($profile === null || (bool) $profile->is_active);
+
+        if (! $hasCreditPrivilege) {
             throw new InvalidArgumentException('Supplier is not enabled for credit purchases.');
+        }
+
+        $limit = $supplier->credit_limit !== null && $supplier->credit_limit !== ''
+            ? (string) $supplier->credit_limit
+            : ($profile?->credit_limit !== null && $profile->credit_limit !== '' ? (string) $profile->credit_limit : null);
+
+        if ($limit !== null) {
+            $newUnpaid = $this->math->sub($grandTotal, $paidTotal);
+
+            $targetCurrencyId = $supplier->default_currency_id !== null ? (int) $supplier->default_currency_id : null;
+            $targetCurrencyCode = $supplier->relationLoaded('defaultCurrency')
+                ? $supplier->defaultCurrency?->code
+                : ($targetCurrencyId !== null ? CurrencyModel::query()->whereKey($targetCurrencyId)->value('code') : null);
+
+            $targetExchangeRate = null;
+            if ($currencyId !== null
+                && $targetCurrencyId !== null
+                && $currencyId === $targetCurrencyId
+                && $exchangeRate !== null
+                && $this->math->compare($exchangeRate, '0.000000') > 0) {
+                $targetExchangeRate = $this->math->normalize($exchangeRate);
+            }
+
+            $exposureResult = $this->invoiceBalances->getPartyExposureInCurrency(
+                (int) $supplier->tenant_id,
+                $organizationUnitId,
+                InvoicePartyType::Supplier->value,
+                (int) $supplier->getKey(),
+                $targetCurrencyId,
+                $targetCurrencyCode,
+                $targetExchangeRate,
+            );
+
+            if (! empty($exposureResult['unconverted_currencies']) && ! (bool) ($profile?->allow_over_credit ?? false)) {
+                throw new InvalidArgumentException(
+                    'Credit limit cannot be assessed accurately because exchange rates are missing for currencies: '
+                    .implode(', ', $exposureResult['unconverted_currencies'])
+                );
+            }
+
+            $effectiveRate = ($exchangeRate !== null && $this->math->compare($exchangeRate, '0.000000') > 0)
+                ? $this->math->normalize($exchangeRate)
+                : '1.000000';
+            $newUnpaidBase = $this->math->mul($newUnpaid, $effectiveRate);
+
+            if ($targetCurrencyId === null || ($targetCurrencyId !== null && $targetCurrencyId === (int) $supplier->tenant?->base_currency_id)) {
+                $newUnpaidInLimitCurrency = $newUnpaidBase;
+            } elseif ($currencyId !== null && $currencyId === $targetCurrencyId) {
+                $newUnpaidInLimitCurrency = $newUnpaid;
+            } else {
+                $resolvedTargetRate = $targetExchangeRate;
+                if ($resolvedTargetRate === null && $targetCurrencyId !== null) {
+                    $resolvedTargetRate = Invoice::query()
+                        ->where('tenant_id', (int) $supplier->tenant_id)
+                        ->where('currency_id', $targetCurrencyId)
+                        ->where('exchange_rate', '>', '0')
+                        ->latest('invoice_date')
+                        ->latest('id')
+                        ->value('exchange_rate');
+                }
+                if ($resolvedTargetRate !== null && $this->math->compare((string) $resolvedTargetRate, '0.000000') > 0) {
+                    $newUnpaidInLimitCurrency = $this->math->div($newUnpaidBase, (string) $resolvedTargetRate, 6);
+                } else {
+                    $newUnpaidInLimitCurrency = $newUnpaidBase;
+                }
+            }
+
+            $currentExposure = $exposureResult['total_exposure'];
+            $projectedExposure = $this->math->add($currentExposure, $newUnpaidInLimitCurrency);
+
+            if ($this->math->compare($projectedExposure, $limit) > 0) {
+                $allowOverCredit = (bool) ($profile?->allow_over_credit ?? false);
+                if (! $allowOverCredit) {
+                    throw new InvalidArgumentException('Credit purchase exceeds the supplier credit limit.');
+                }
+            }
         }
     }
 
