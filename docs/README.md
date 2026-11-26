@@ -43,6 +43,7 @@ docs/
 │   └── vehicle_rental_user_guide.md           # Step-by-step visual workflow manual
 │
 ├── architecture/                              # High-level architecture papers & reviews
+│   ├── dual-timestamp-and-backdated-crud-a... # Universal dual-timestamp & backdated CRUD specification
 │   ├── financial-integrity-foundation.md      # Double-entry ledger and posting profile design
 │   ├── autoerp-saas-tenancy-and-pricing-...   # SaaS subscription tiers and tenancy review
 │   └── vehicle-service-promotions-...         # Service cards, offers, and promotion designs
