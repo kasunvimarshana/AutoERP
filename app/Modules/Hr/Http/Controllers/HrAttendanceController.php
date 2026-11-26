@@ -175,7 +175,8 @@ final class HrAttendanceController
         $query = HrAttendanceRegularization::query()
             ->where('tenant_id', $request->tenantId())
             ->with(['employee', 'attendanceRecord', 'actioner'])
-            ->orderBy('created_at', 'desc');
+            ->orderBy('attendance_date', 'desc')
+            ->orderBy('id', 'desc');
 
         if (! empty($validated['status'])) {
             $query->where('status', $validated['status']);

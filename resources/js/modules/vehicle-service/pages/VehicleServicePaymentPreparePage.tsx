@@ -446,6 +446,7 @@ export default function VehicleServicePaymentPreparePage() {
                             <Input
                                 label="Payment date"
                                 type="date"
+                                max={businessDateInputValue()}
                                 value={paymentDate}
                                 error={fieldError(error, 'payment_date')}
                                 disabled={submissionLocked}

@@ -19,6 +19,7 @@ import { Panel } from '@/shared/components/Panel';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Select } from '@/shared/components/Select';
 import { humanize } from '@/shared/utils/object';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { searchWarehouses } from '@/shared/api/referenceApi';
 import { useApi } from '@/shared/hooks/useApi';
@@ -282,11 +283,7 @@ function StockSummaryCard({ label, value, tone, active, onClick }: {
 }
 
 function localDateToday(): string {
-    const today = new Date();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-
-    return `${today.getFullYear()}-${month}-${day}`;
+    return businessDateInputValue();
 }
 
 function ItemIdentity({ row }: { row: StockBalance }) {

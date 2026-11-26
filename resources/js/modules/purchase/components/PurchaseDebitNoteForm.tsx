@@ -58,7 +58,7 @@ export function PurchaseDebitNoteForm() {
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} hint="Supplier receiving debit adjustment" />
                     <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} hint="Debit note transaction currency" required />
-                    <Input label="Date" type="date" value={debitNoteDate} error={errorFor('debit_note_date')} hint="General ledger posting date" onChange={(event) => setDebitNoteDate(event.target.value)} />
+                    <Input label="Date" type="date" max={todayDate()} value={debitNoteDate} error={errorFor('debit_note_date')} hint="General ledger posting date" onChange={(event) => setDebitNoteDate(event.target.value)} />
                     <DecimalInput label="Amount" value={amount} error={errorFor('amount')} hint="Total debit note amount" onChange={(event) => setAmount(event.target.value)} />
                 </div>
                 <div className="mt-4">

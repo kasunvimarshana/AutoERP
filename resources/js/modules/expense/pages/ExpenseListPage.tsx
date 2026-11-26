@@ -122,6 +122,7 @@ export default function ExpenseListPage() {
                 open={reverseTarget !== null}
                 title={reverseTarget ? `Reverse ${reverseTarget.expense_number}` : 'Reverse expense'}
                 defaultDate={businessDateInputValue()}
+                minDate={reverseTarget?.expense_date ?? undefined}
                 loading={reversing}
                 onCancel={() => !reversing && setReverseTarget(null)}
                 onConfirm={reverse}

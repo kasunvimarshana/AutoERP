@@ -276,7 +276,7 @@ export default function PurchaseInvoiceCreatePage() {
                     <SupplierLookupSelect value={supplier} onChange={(value) => void changeSupplier(value)} error={errorFor('supplier_id')} />
                     <CurrencyLookupSelect value={currency} onChange={(value) => void changeCurrency(value)} error={errorFor('currency_id')} />
                     <Input label="Invoice date" type="date" value={invoiceDate} error={errorFor('invoice_date')} onChange={(event) => { setInvoiceDate(event.target.value); setPreview(null); }} />
-                    <Input label="Due date" type="date" value={dueDate} error={errorFor('due_date')} onChange={(event) => { setDueDate(event.target.value); setPreview(null); }} />
+                    <Input label="Due date" type="date" min={invoiceDate || undefined} value={dueDate} error={errorFor('due_date')} onChange={(event) => { setDueDate(event.target.value); setPreview(null); }} />
                     <Input label="Invoice number" value={invoiceNumber} error={errorFor('invoice_number')} onChange={(event) => { setInvoiceNumber(event.target.value); setPreview(null); }} />
                     <DecimalInput label="Exchange rate" value={exchangeRate} error={errorFor('exchange_rate')} onChange={(event) => { setExchangeRate(event.target.value); setPreview(null); }} />
                 </div>

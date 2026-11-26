@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Modules\Hr\DTOs\AttendanceAdjustmentData;
 use Modules\Hr\DTOs\AttendanceRegularizationData;
 use Modules\Hr\DTOs\CompOffClaimData;
 use Modules\Hr\DTOs\CreateEmployeeData;
@@ -596,6 +597,20 @@ final class HrEngineTest extends TestCase
                 $this->fail('Expected updating finalized attendance record to throw LogicException');
             } catch (\LogicException $e) {
                 $this->assertStringContainsString('Finalized attendance records cannot be updated directly', $e->getMessage());
+            }
+
+            // Guardrail 1b: Direct adjust on finalized attendance record must be rejected
+            try {
+                $regularizationService->directAdjust($tenantId, new AttendanceAdjustmentData(
+                    attendanceRecordId: (int) $record->getKey(),
+                    newStatus: AttendanceStatus::Present,
+                    newWorkedMinutes: 500,
+                    newOvertimeMinutes: 20,
+                    adjustmentReason: 'Late override attempt',
+                ));
+                $this->fail('Expected directAdjust on finalized record to throw InvalidArgumentException');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('Cannot adjust a finalized attendance record', $e->getMessage());
             }
 
             // Guardrail 2: Attendance adjustments are immutable and cannot be updated or deleted

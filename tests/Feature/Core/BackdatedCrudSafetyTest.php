@@ -66,10 +66,21 @@ use Modules\Payment\Services\PaymentPostingService;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
+use Modules\Purchase\Enums\PurchaseOrderLineStatus;
+use Modules\Purchase\Enums\PurchaseOrderStatus;
+use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
+use Modules\Purchase\Models\PurchaseDebitNote;
+use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Models\PurchaseOrderLine;
+use Modules\Purchase\Models\PurchaseReturn;
+use Modules\Purchase\Models\PurchaseReturnLine;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseGoodsReceiptPostingCoordinator;
 use Modules\Purchase\Services\Tax\GoodsReceiptNoteTaxDocumentMapper;
+use Modules\Selling\Models\SaleReturn;
+use Modules\Selling\Models\SaleReturnLine;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -1041,6 +1052,231 @@ final class BackdatedCrudSafetyTest extends TestCase
                 $this->fail('Expected deleting line of invoiced service job to throw LogicException.');
             } catch (LogicException $e) {
                 $this->assertStringContainsString('Lines of invoiced or paid service jobs cannot be deleted', $e->getMessage());
+            }
+
+            // Mutating line of invoiced vehicle service job must throw LogicException
+            try {
+                $jobLine->unit_price = '999.000000';
+                $jobLine->save();
+                $this->fail('Expected mutating line of invoiced service job to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of completed or invoiced service jobs are immutable in place', $e->getMessage());
+            }
+
+            // Mutating invoiced vehicle service job must throw LogicException
+            try {
+                $job->job_date = '2026-06-01';
+                $job->save();
+                $this->fail('Expected mutating invoiced service job date to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Completed or invoiced service jobs are immutable in place', $e->getMessage());
+            }
+
+            // 7. Purchase Order Guardrail
+            $lifecycleItem = $this->createItem($tenantId, 'ITEM-PO-LIFECYCLE');
+            $serviceItemId = (int) $lifecycleItem->getKey();
+
+            $po = new PurchaseOrder;
+            $po->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'purchase_order_number' => 'PO-LIFECYCLE-001',
+                'purchase_order_date' => '2026-05-01',
+                'supplier_id' => 1,
+                'warehouse_id' => $warehouseId,
+                'status' => PurchaseOrderStatus::Approved,
+                'subtotal' => '500.000000',
+                'grand_total' => '500.000000',
+            ]);
+            $po->save();
+
+            try {
+                $po->subtotal = '600.000000';
+                $po->save();
+                $this->fail('Expected mutating approved purchase order subtotal to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Non-draft purchase orders are immutable in place', $e->getMessage());
+            }
+
+            $poLine = new PurchaseOrderLine;
+            $poLine->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'purchase_order_id' => $po->getKey(),
+                'line_number' => 1,
+                'item_id' => $serviceItemId,
+                'ordered_quantity' => '10.000000',
+                'remaining_quantity' => '10.000000',
+                'unit_price' => '50.000000',
+                'line_total' => '500.000000',
+                'status' => PurchaseOrderLineStatus::Open,
+            ]);
+            $poLine->save();
+
+            try {
+                $poLine->ordered_quantity = '20.000000';
+                $poLine->save();
+                $this->fail('Expected mutating approved PO line to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of non-draft purchase orders are immutable in place', $e->getMessage());
+            }
+
+            try {
+                $poLine->delete();
+                $this->fail('Expected deleting approved PO line to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of non-draft purchase orders cannot be deleted', $e->getMessage());
+            }
+
+            // 8. Purchase Return & Line Guardrail
+            $pr = new PurchaseReturn;
+            $pr->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'return_number' => 'PR-LIFECYCLE-001',
+                'return_date' => '2026-05-01',
+                'supplier_id' => 1,
+                'warehouse_id' => $warehouseId,
+                'status' => PurchaseReturnStatus::Posted,
+                'subtotal' => '200.000000',
+                'grand_total' => '200.000000',
+            ]);
+            $pr->save();
+
+            try {
+                $pr->subtotal = '300.000000';
+                $pr->save();
+                $this->fail('Expected mutating posted purchase return subtotal to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Non-draft purchase returns are immutable in place', $e->getMessage());
+            }
+
+            $prLine = new PurchaseReturnLine;
+            $prLine->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'purchase_return_id' => $pr->getKey(),
+                'line_number' => 1,
+                'item_id' => $serviceItemId,
+                'source_quantity' => '2.000000',
+                'returned_quantity' => '2.000000',
+                'remaining_quantity' => '0.000000',
+                'unit_price' => '100.000000',
+                'line_total' => '200.000000',
+            ]);
+            $prLine->save();
+
+            try {
+                $prLine->returned_quantity = '5.000000';
+                $prLine->save();
+                $this->fail('Expected mutating line of posted purchase return to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of non-draft purchase returns are immutable in place', $e->getMessage());
+            }
+
+            try {
+                $prLine->delete();
+                $this->fail('Expected deleting line of posted purchase return to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of non-draft purchase returns cannot be deleted', $e->getMessage());
+            }
+
+            // 9. Purchase Debit Note Guardrail
+            $dn = new PurchaseDebitNote;
+            $dn->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'debit_note_number' => 'DN-LIFECYCLE-001',
+                'debit_note_date' => '2026-05-01',
+                'supplier_id' => 1,
+                'status' => PurchaseDebitNoteStatus::Approved,
+                'amount' => '200.000000',
+                'remaining_amount' => '200.000000',
+            ]);
+            $dn->save();
+
+            try {
+                $dn->amount = '300.000000';
+                $dn->save();
+                $this->fail('Expected mutating approved debit note amount to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Non-draft purchase debit notes are immutable in place', $e->getMessage());
+            }
+
+            // 10. Sale Return Guardrail
+            $saleId = (int) DB::table('sales')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'sale_number' => 'SALE-LIFECYCLE-001',
+                'customer_id' => $serviceCustomerId,
+                'warehouse_id' => $warehouseId,
+                'sale_date' => '2026-05-01',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $saleLineId = (int) DB::table('sale_lines')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'sale_id' => $saleId,
+                'line_number' => 1,
+                'item_id' => $serviceItemId,
+                'uom_id' => (int) $lifecycleItem->base_uom_id,
+                'quantity' => '1.000000',
+                'base_quantity' => '1.000000',
+                'unit_price' => '100.000000',
+                'line_total' => '100.000000',
+                'description' => 'Test Line',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $saleReturn = new SaleReturn;
+            $saleReturn->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'sale_id' => $saleId,
+                'invoice_id' => $invoice->getKey(),
+                'return_number' => 'SR-LIFECYCLE-001',
+                'return_date' => '2026-05-01',
+                'reason' => 'Customer return',
+                'credit_amount' => '100.000000',
+                'posted_at' => now(),
+            ]);
+            $saleReturn->save();
+
+            try {
+                $saleReturn->return_date = '2026-06-01';
+                $saleReturn->save();
+                $this->fail('Expected mutating posted sale return date to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Posted sale returns are immutable in place', $e->getMessage());
+            }
+
+            $srLine = new SaleReturnLine;
+            $srLine->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $orgUnitId,
+                'sale_return_id' => $saleReturn->getKey(),
+                'sale_line_id' => $saleLineId,
+                'quantity' => '1.000000',
+                'credit_amount' => '100.000000',
+            ]);
+            $srLine->save();
+
+            try {
+                $srLine->credit_amount = '150.000000';
+                $srLine->save();
+                $this->fail('Expected mutating line of posted sale return to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of posted sale returns are immutable in place', $e->getMessage());
+            }
+
+            try {
+                $srLine->delete();
+                $this->fail('Expected deleting line of posted sale return to throw LogicException.');
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('Lines of posted sale returns cannot be deleted', $e->getMessage());
             }
         });
     }

@@ -34,6 +34,26 @@ final class PurchaseDebitNote extends TenantOwnedModel
             if ($document->isDirty('currency_id')) {
                 throw new LogicException('Purchase financial document currency cannot change after creation.');
             }
+
+            $rawOriginalStatus = $document->getRawOriginal('status');
+            $originalStatus = $rawOriginalStatus instanceof PurchaseDebitNoteStatus
+                ? $rawOriginalStatus
+                : ($rawOriginalStatus !== null ? PurchaseDebitNoteStatus::tryFrom((string) $rawOriginalStatus) : null);
+
+            if ($originalStatus !== null && $originalStatus !== PurchaseDebitNoteStatus::Draft) {
+                $immutable = [
+                    'debit_note_number',
+                    'debit_note_date',
+                    'supplier_id',
+                    'purchase_return_id',
+                    'amount',
+                    'tenant_id',
+                    'organization_unit_id',
+                ];
+                if ($document->isDirty($immutable)) {
+                    throw new LogicException('Non-draft purchase debit notes are immutable in place.');
+                }
+            }
         });
 
         self::deleting(static function (self $document): void {

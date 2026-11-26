@@ -82,7 +82,7 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
             </div>
             {canCreate && agreement.status === AgreementStatus.Active && isPositiveDecimal(summary.remaining_to_receive ?? '0') && <fieldset disabled={busy} className="space-y-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Input label="Deposit receipt date" type="date" value={date} onChange={event => setDate(event.target.value)} required error={error?.fields.payment_date?.[0]} />
+                    <Input label="Deposit receipt date" type="date" max={businessDateInputValue()} value={date} onChange={event => setDate(event.target.value)} required error={error?.fields.payment_date?.[0]} />
                     <Input label="Deposit exchange rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} required error={error?.fields.exchange_rate?.[0]} />
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

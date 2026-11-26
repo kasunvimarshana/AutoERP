@@ -195,7 +195,7 @@ export function LeaveRequestsTab({ canApply, canManage }: LeaveRequestsTabProps)
                             max={2100}
                             className="mt-1 w-28 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
                             value={calendarYear}
-                            onChange={(e) => setCalendarYear(Number(e.target.value) || new Date().getFullYear())}
+                            onChange={(e) => setCalendarYear(Number(e.target.value) || Number(businessDateInputValue().slice(0, 4)))}
                         />
                     </div>
                     <div>

@@ -136,7 +136,7 @@ export function PaymentRefundPanel({
                 </p>
             )}
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <Input label="Refund date" type="date" min={payment.payment_date ?? undefined} value={refundDate} disabled={busy} onChange={(event) => setRefundDate(event.target.value)} />
+                <Input label="Refund date" type="date" min={payment.payment_date ?? undefined} max={businessDateInputValue()} value={refundDate} disabled={busy} onChange={(event) => setRefundDate(event.target.value)} />
                 <DecimalInput label="Amount" value={amount} disabled={busy} onChange={(event) => setAmount(event.target.value)} />
                 <DecimalInput label="Exchange rate to base currency" value={exchangeRate} disabled={busy} onChange={(event) => setExchangeRate(event.target.value)} />
                 <Select

@@ -269,9 +269,9 @@ final class BiometricIntegrationTest extends TestCase
                 'code' => 'PU-'.Str::upper(Str::random(4)),
             ]);
 
-            $emp = $this->createEmployee($tenantId, $orgId, 'Dan Driver', 'EMP-0505');
+            $this->createEmployee($tenantId, $orgId, 'Dan Driver', 'EMP-0505');
 
-            $device = HrBiometricDevice::create([
+            HrBiometricDevice::create([
                 'tenant_id' => $tenantId,
                 'device_code' => 'ZK-CLOUD-01',
                 'name' => 'Warehouse Clock',
@@ -279,33 +279,33 @@ final class BiometricIntegrationTest extends TestCase
                 'serial_number' => 'ZK-SER-9999',
                 'auto_map_users' => true,
             ]);
-
-            // 1. Test GET handshake
-            $responseGet = $this->get('/api/v1/hr/biometric/push/zkteco/cdata?SN=ZK-SER-9999&options=all');
-            $responseGet->assertStatus(200);
-            $responseGet->assertSee('GET OPTION FROM: ZK-SER-9999');
-
-            // 2. Test POST ATTLOG push
-            $attlogPayload = "505\t2026-11-25 08:00:00\t0\t1\t0\t0\t0\n";
-            $responsePost = $this->call(
-                'POST',
-                '/api/v1/hr/biometric/push/zkteco/cdata?SN=ZK-SER-9999&table=ATTLOG',
-                [],
-                [],
-                [],
-                ['CONTENT_TYPE' => 'text/plain'],
-                $attlogPayload,
-            );
-
-            $responsePost->assertStatus(200);
-            $responsePost->assertSee('OK: 1');
-
-            // Assert punch was ingested
-            $raw = HrBiometricRawPunch::query()->where('tenant_id', $tenantId)->first();
-            self::assertNotNull($raw);
-            self::assertSame('505', $raw->biometric_user_id);
-            self::assertSame(RawPunchSyncStatus::Processed, $raw->sync_status);
         });
+
+        // 1. Test GET handshake (public webhook called without active tenant context)
+        $responseGet = $this->get('/api/v1/hr/biometric/push/zkteco/cdata?SN=ZK-SER-9999&options=all');
+        $responseGet->assertStatus(200);
+        $responseGet->assertSee('GET OPTION FROM: ZK-SER-9999');
+
+        // 2. Test POST ATTLOG push
+        $attlogPayload = "505\t2026-11-25 08:00:00\t0\t1\t0\t0\t0\n";
+        $responsePost = $this->call(
+            'POST',
+            '/api/v1/hr/biometric/push/zkteco/cdata?SN=ZK-SER-9999&table=ATTLOG',
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'text/plain'],
+            $attlogPayload,
+        );
+
+        $responsePost->assertStatus(200);
+        $responsePost->assertSee('OK: 1');
+
+        // Assert punch was ingested
+        $raw = $this->withTenantExecutionContext($tenantId, fn () => HrBiometricRawPunch::query()->first());
+        self::assertNotNull($raw);
+        self::assertSame('505', $raw->biometric_user_id);
+        self::assertSame(RawPunchSyncStatus::Processed, $raw->sync_status);
     }
 
     public function test_public_generic_webhook_endpoint(): void
@@ -318,9 +318,9 @@ final class BiometricIntegrationTest extends TestCase
                 'code' => 'IOT-'.Str::upper(Str::random(4)),
             ]);
 
-            $emp = $this->createEmployee($tenantId, $orgId, 'Eve Engineer', 'EMP-0606');
+            $this->createEmployee($tenantId, $orgId, 'Eve Engineer', 'EMP-0606');
 
-            $device = HrBiometricDevice::create([
+            HrBiometricDevice::create([
                 'tenant_id' => $tenantId,
                 'device_code' => 'IOT-GATEWAY-1',
                 'name' => 'Smart Facial Turnstile',
@@ -328,31 +328,31 @@ final class BiometricIntegrationTest extends TestCase
                 'auth_token' => 'secure-token-123',
                 'auto_map_users' => true,
             ]);
-
-            $payload = [
-                'punches' => [
-                    [
-                        'user_id' => '606',
-                        'punch_time' => '2026-11-25 08:15:00',
-                        'state' => 'check_in',
-                        'verify_method' => 'face',
-                    ],
-                ],
-            ];
-
-            $response = $this->withHeaders([
-                'Authorization' => 'Bearer secure-token-123',
-            ])->postJson('/api/v1/hr/biometric/push/webhook/IOT-GATEWAY-1', $payload);
-
-            $response->assertStatus(200);
-            $response->assertJsonPath('success', true);
-            $response->assertJsonPath('stats.processed', 1);
-
-            $raw = HrBiometricRawPunch::query()->where('tenant_id', $tenantId)->first();
-            self::assertNotNull($raw);
-            self::assertSame('606', $raw->biometric_user_id);
-            self::assertSame(RawPunchSyncStatus::Processed, $raw->sync_status);
         });
+
+        $payload = [
+            'punches' => [
+                [
+                    'user_id' => '606',
+                    'punch_time' => '2026-11-25 08:15:00',
+                    'state' => 'check_in',
+                    'verify_method' => 'face',
+                ],
+            ],
+        ];
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer secure-token-123',
+        ])->postJson('/api/v1/hr/biometric/push/webhook/IOT-GATEWAY-1', $payload);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('stats.processed', 1);
+
+        $raw = $this->withTenantExecutionContext($tenantId, fn () => HrBiometricRawPunch::query()->first());
+        self::assertNotNull($raw);
+        self::assertSame('606', $raw->biometric_user_id);
+        self::assertSame(RawPunchSyncStatus::Processed, $raw->sync_status);
     }
 
     private function createEmployee(int $tenantId, int $orgId, string $name, string $code): HrEmployee

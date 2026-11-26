@@ -18,7 +18,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Modal } from '@/shared/components/Modal';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { businessDateInputValue, formatBusinessDate } from '@/shared/utils/businessDate';
 import { GeofencesAndKiosksTab } from './components/attendance/GeofencesAndKiosksTab';
 import { EmployeeLookupSelect } from './components/EmployeeLookupSelect';
 import {
@@ -438,7 +438,7 @@ export default function AttendanceManagementPage() {
                             <div>
                                 <span className="text-xs uppercase tracking-wider text-gray-500">Today's Date</span>
                                 <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' })}
+                                    {formatBusinessDate(businessDateInputValue())}
                                 </div>
                             </div>
                         </div>

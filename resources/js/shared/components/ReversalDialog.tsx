@@ -25,6 +25,8 @@ interface ReversalDialogProps {
     title: string;
     loading?: boolean;
     defaultDate?: string;
+    minDate?: string;
+    maxDate?: string;
     onCancel: () => void;
     onConfirm: (facts: ReversalFacts) => void | Promise<void>;
 }
@@ -40,10 +42,12 @@ export function ReversalDialog(props: ReversalDialogProps) {
 
     return (
         <ReversalDialogContent
-            key={defaultDate}
+            key={`${defaultDate}-${props.minDate ?? ''}`}
             title={props.title}
             loading={props.loading}
             defaultDate={defaultDate}
+            minDate={props.minDate}
+            maxDate={props.maxDate}
             onCancel={props.onCancel}
             onConfirm={props.onConfirm}
         />
@@ -54,18 +58,29 @@ function ReversalDialogContent({
     title,
     loading = false,
     defaultDate,
+    minDate,
+    maxDate,
     onCancel,
     onConfirm,
 }: ReversalDialogContentProps) {
     const [reversalDate, setReversalDate] = useState(defaultDate);
     const [reason, setReason] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const effectiveMaxDate = maxDate ?? businessDateInputValue();
 
     async function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const normalizedReason = reason.trim();
         if (reversalDate === '') {
             setError('Select the reversal date.');
+            return;
+        }
+        if (minDate && reversalDate < minDate) {
+            setError(`Reversal date cannot be before ${minDate}.`);
+            return;
+        }
+        if (effectiveMaxDate && reversalDate > effectiveMaxDate) {
+            setError('Reversal date cannot be in the future.');
             return;
         }
         if (normalizedReason.length < MINIMUM_REASON_LENGTH) {
@@ -94,9 +109,12 @@ function ReversalDialogContent({
                     label="Reversal date"
                     type="date"
                     required
+                    min={minDate}
+                    max={effectiveMaxDate}
                     value={reversalDate}
                     onChange={(event) => setReversalDate(event.target.value)}
                     disabled={loading}
+                    hint={minDate ? `Cannot precede original document date (${minDate})` : undefined}
                 />
 
                 <Textarea

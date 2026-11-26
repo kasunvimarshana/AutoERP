@@ -363,8 +363,23 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
                             <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} />
                             <WarehouseLookupSelect value={warehouse} onChange={setWarehouse} error={errorFor('warehouse_id')} />
                             <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
-                            <Input label="Order date" type="date" value={header.purchase_order_date} error={errorFor('purchase_order_date')} onChange={(event) => setHeader({ ...header, purchase_order_date: event.target.value })} />
-                            <Input label="Expected delivery" type="date" value={header.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => setHeader({ ...header, expected_delivery_date: event.target.value })} />
+                            <Input
+                                label="Order date"
+                                type="date"
+                                value={header.purchase_order_date}
+                                error={errorFor('purchase_order_date')}
+                                hint={header.purchase_order_date < todayDate() ? 'Backdated order' : undefined}
+                                onChange={(event) => setHeader({ ...header, purchase_order_date: event.target.value })}
+                            />
+                            <Input
+                                label="Expected delivery"
+                                type="date"
+                                min={header.purchase_order_date || undefined}
+                                value={header.expected_delivery_date}
+                                error={errorFor('expected_delivery_date')}
+                                hint={header.purchase_order_date ? `Must be on or after order date (${header.purchase_order_date})` : undefined}
+                                onChange={(event) => setHeader({ ...header, expected_delivery_date: event.target.value })}
+                            />
                             <DecimalInput label="Exchange rate" value={header.exchange_rate} error={errorFor('exchange_rate')} onChange={(event) => { exchangeTouched.current = true; setExchangeRateSource('manual'); setHeader({ ...header, exchange_rate: event.target.value }); }} />
                             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
                                 <div>Currency: {currencySource ? currencySource.replaceAll('_', ' ') : 'Manual'}</div>

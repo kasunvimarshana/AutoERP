@@ -120,6 +120,28 @@ final class VehicleServiceJobLine extends TenantOwnedModel
 
     protected static function booted(): void
     {
+        self::updating(static function (self $line): void {
+            $job = $line->job()->first();
+            if ($job === null) {
+                return;
+            }
+            $status = $job->status instanceof VehicleServiceJobStatus
+                ? $job->status
+                : VehicleServiceJobStatus::tryFrom((string) $job->status);
+
+            if (in_array($status, [
+                VehicleServiceJobStatus::Completed,
+                VehicleServiceJobStatus::Invoiced,
+                VehicleServiceJobStatus::PartiallyPaid,
+                VehicleServiceJobStatus::Paid,
+            ], true)) {
+                $immutable = ['item_id', 'line_type', 'quantity', 'unit_price', 'total_price', 'tenant_id', 'organization_unit_id'];
+                if ($line->isDirty($immutable)) {
+                    throw new LogicException('Lines of completed or invoiced service jobs are immutable in place.');
+                }
+            }
+        });
+
         self::deleting(static function (self $line): void {
             $job = $line->job()->first();
             if ($job === null) {

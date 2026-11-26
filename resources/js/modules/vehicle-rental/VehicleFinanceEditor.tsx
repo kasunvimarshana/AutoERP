@@ -30,9 +30,9 @@ function computeMaturity(startStr: string, months: number): string {
     if (!startStr) return '';
     const [datePart, timePart = '00:00'] = startStr.split('T');
     const [y, m, d] = datePart.split('-').map(Number);
-    const date = new Date(y, m - 1 + (Number.isFinite(months) && months > 0 ? months : 12), d);
+    const date = new Date(Date.UTC(y, m - 1 + (Number.isFinite(months) && months > 0 ? months : 12), d));
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${timePart}`;
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${timePart}`;
 }
 
 export function VehicleFinanceEditor({

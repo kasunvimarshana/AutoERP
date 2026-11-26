@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { getInvoice, getInvoiceSignedPrintLink, getInvoiceWhatsAppShare } from '@/modules/invoice/invoiceApi';
 import type { Invoice } from '@/modules/invoice/invoiceTypes';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -130,6 +130,7 @@ export default function PaymentEntryPage() {
     const [paymentType, setPaymentType] = useState(PAYMENT_TYPE_CUSTOMER_RECEIPT);
     const [direction, setDirection] = useState(PAYMENT_DIRECTION_INBOUND);
     const [paymentDate, setPaymentDate] = useState(today());
+    const [notes, setNotes] = useState('');
     const [reference, setReference] = useState('');
     const [exchangeRate, setExchangeRate] = useState('1.000000');
     const [exchangeRateExpanded, setExchangeRateExpanded] = useState(false);
@@ -201,6 +202,7 @@ export default function PaymentEntryPage() {
             setPaymentType(p.payment_type ?? PAYMENT_TYPE_CUSTOMER_RECEIPT);
             setDirection(p.direction ?? PAYMENT_DIRECTION_INBOUND);
             setPaymentDate(p.payment_date ?? today());
+            setNotes(typeof p.notes === 'string' ? p.notes : '');
             setReference(p.reference_number ?? '');
             setExchangeRate(p.exchange_rate ?? BASE_EXCHANGE_RATE);
             setExchangeRateExpanded(!isPositiveDecimal(p.exchange_rate ?? '') || compareDecimalStrings(p.exchange_rate ?? ZERO_AMOUNT, BASE_EXCHANGE_RATE) !== 0);
@@ -450,6 +452,7 @@ export default function PaymentEntryPage() {
                     currency_id: editPayment.data.currency?.id ?? undefined,
                     exchange_rate: editPayment.data.currency?.id ? exchangeRate : undefined,
                     reference_number: reference.trim() || undefined,
+                    notes: notes.trim() || undefined,
                     expected_version: editPayment.data.row_version,
                     lines: payloadLines,
                     allocations: formattedAllocations.length > 0 ? formattedAllocations : undefined,
@@ -465,9 +468,9 @@ export default function PaymentEntryPage() {
                     currency_id: settlementInvoice.data?.currency?.id ?? undefined,
                     exchange_rate: settlementInvoice.data?.currency?.id ? exchangeRate : undefined,
                     reference_number: reference.trim() || undefined,
-                    notes: settlementInvoice.data
+                    notes: notes.trim() || (settlementInvoice.data
                         ? `Settlement initiated from invoice ${settlementInvoice.data.invoice_number ?? settlementInvoice.data.id}.`
-                        : undefined,
+                        : undefined),
                     lines: payloadLines,
                     allocations: formattedAllocations.length > 0 ? formattedAllocations : undefined,
                 });
@@ -525,7 +528,8 @@ export default function PaymentEntryPage() {
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="Payment date" type="date" value={paymentDate} disabled={sellingMode === 'credit'} onChange={(event) => setPaymentDate(event.target.value)} />
+                        <Input label="Payment date" type="date" max={today()} value={paymentDate} disabled={sellingMode === 'credit'} onChange={(event) => setPaymentDate(event.target.value)} hint={paymentDate < today() ? 'Backdated payment · Reason required in notes for cash receipts' : undefined} />
+                        <Input label="Payment notes / reason" value={notes} onChange={(event) => setNotes(event.target.value)} hint={paymentDate < today() ? 'Reason required when posting backdated cash receipts' : 'Optional notes'} error={fieldError(error, 'notes')} />
                         <fieldset>
                             <legend className="mb-1.5 text-sm font-medium text-slate-700">Payment type</legend>
                             <div className="flex flex-wrap gap-2">
@@ -684,8 +688,9 @@ export default function PaymentEntryPage() {
                             setParty(null);
                         }} />
                         <Select label="Direction" value={direction} options={directionOptions} disabled={invoiceId !== null || isEditMode} onChange={(event) => setDirection(event.target.value)} />
-                        <Input label="Payment date" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
+                        <Input label="Payment date" type="date" max={today()} value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} hint={paymentDate < today() ? 'Backdated payment · Reason is required for cash receipts' : undefined} />
                         <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />
+                        <Input label="Payment notes / reason" value={notes} onChange={(event) => setNotes(event.target.value)} hint={paymentDate < today() ? 'Reason required when posting backdated cash receipts' : 'Optional internal reference or reason'} error={fieldError(error, 'notes')} />
                         {settlementInvoice.data?.currency?.id ? <Input label={`Exchange rate · ${settlementInvoice.data.currency.code ?? 'currency'} to base`} inputMode="decimal" value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} required /> : null}
                         {invoiceId !== null || isEditMode ? (
                             <div>

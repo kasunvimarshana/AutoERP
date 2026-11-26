@@ -246,7 +246,16 @@ export function GoodsReceiptForm() {
             <Panel title="Source">
                 <div className="grid gap-4 md:grid-cols-3">
                     <PurchaseOrderLookupSelect eligibility="receivable" value={purchaseOrder} onChange={(value) => void changePurchaseOrder(value)} excludeIds={excludedPurchaseOrderIds} error={errorFor('purchase_order_id')} />
-                    <Input label="Received date" type="date" value={receivedDate} error={errorFor('received_date')} onChange={(event) => setReceivedDate(event.target.value)} />
+                    <Input
+                        label="Received date"
+                        type="date"
+                        min={sourceOrder?.purchase_order_date ?? undefined}
+                        max={todayDate()}
+                        value={receivedDate}
+                        error={errorFor('received_date')}
+                        hint={sourceOrder?.purchase_order_date ? `Cannot precede purchase order date (${sourceOrder.purchase_order_date})` : undefined}
+                        onChange={(event) => setReceivedDate(event.target.value)}
+                    />
                     <WarehouseLocationLookupSelect warehouseId={sourceOrder?.warehouse?.id ?? sourceOrder?.warehouse_id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                 </div>
                 {sourceOrder && (

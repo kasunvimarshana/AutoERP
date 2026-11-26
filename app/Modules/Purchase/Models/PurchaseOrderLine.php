@@ -13,10 +13,12 @@ declare(strict_types=1);
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Purchase\Enums\PurchaseOrderLineStatus;
+use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class PurchaseOrderLine extends TenantOwnedModel
@@ -24,6 +26,26 @@ final class PurchaseOrderLine extends TenantOwnedModel
     protected $table = 'purchase_order_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (PurchaseOrderLine $line): void {
+            $order = $line->order()->first();
+            if ($order !== null && $order->status !== PurchaseOrderStatus::Draft) {
+                $immutable = ['item_id', 'item_variant_id', 'ordered_quantity', 'unit_price', 'ordered_uom_id', 'base_uom_id', 'uom_conversion_factor', 'base_quantity', 'tenant_id', 'organization_unit_id'];
+                if ($line->isDirty($immutable)) {
+                    throw new LogicException('Lines of non-draft purchase orders are immutable in place.');
+                }
+            }
+        });
+
+        self::deleting(static function (PurchaseOrderLine $line): void {
+            $order = $line->order()->first();
+            if ($order !== null && $order->status !== PurchaseOrderStatus::Draft) {
+                throw new LogicException('Lines of non-draft purchase orders cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

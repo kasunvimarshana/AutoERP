@@ -38,6 +38,31 @@ final class PurchaseReturn extends TenantOwnedModel
             if ($document->isDirty('currency_id')) {
                 throw new LogicException('Purchase financial document currency cannot change after creation.');
             }
+
+            $rawOriginalStatus = $document->getRawOriginal('status');
+            $originalStatus = $rawOriginalStatus instanceof PurchaseReturnStatus
+                ? $rawOriginalStatus
+                : ($rawOriginalStatus !== null ? PurchaseReturnStatus::tryFrom((string) $rawOriginalStatus) : null);
+
+            if ($originalStatus !== null && $originalStatus !== PurchaseReturnStatus::Draft) {
+                $immutable = [
+                    'return_number',
+                    'return_date',
+                    'supplier_id',
+                    'purchase_order_id',
+                    'goods_receipt_note_id',
+                    'subtotal',
+                    'discount_total',
+                    'tax_total',
+                    'charge_total',
+                    'grand_total',
+                    'tenant_id',
+                    'organization_unit_id',
+                ];
+                if ($document->isDirty($immutable)) {
+                    throw new LogicException('Non-draft purchase returns are immutable in place.');
+                }
+            }
         });
 
         self::deleting(static function (self $document): void {

@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Selling\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -23,6 +24,24 @@ final class SaleReturnLine extends TenantOwnedModel
     protected $table = 'sale_return_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (SaleReturnLine $line): void {
+            if ($line->saleReturn && $line->saleReturn->posted_at !== null) {
+                $immutable = ['sale_return_id', 'sale_line_id', 'quantity', 'credit_amount', 'tenant_id', 'organization_unit_id'];
+                if ($line->isDirty($immutable)) {
+                    throw new LogicException('Lines of posted sale returns are immutable in place.');
+                }
+            }
+        });
+
+        self::deleting(static function (SaleReturnLine $line): void {
+            if ($line->saleReturn && $line->saleReturn->posted_at !== null) {
+                throw new LogicException('Lines of posted sale returns cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

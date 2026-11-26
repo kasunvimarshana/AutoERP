@@ -23,6 +23,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { listGoodsReceipts, postGoodsReceipt, reverseGoodsReceipt, type GoodsReceipt } from '../purchaseApi';
@@ -118,6 +119,8 @@ export default function GoodsReceiptListPage() {
             <ReversalDialog
                 open={reversalTarget !== null}
                 title="Reverse goods receipt"
+                defaultDate={reversalTarget?.received_date ?? businessDateInputValue()}
+                minDate={reversalTarget?.received_date ?? undefined}
                 loading={reversalTarget !== null && busyId === reversalTarget.id}
                 onCancel={() => setReversalTarget(null)}
                 onConfirm={reverse}

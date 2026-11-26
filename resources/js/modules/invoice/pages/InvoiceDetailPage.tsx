@@ -418,6 +418,7 @@ export default function InvoiceDetailPage() {
                 title="Reverse invoice"
                 loading={action === 'reverse'}
                 defaultDate={value.posting_plan?.posting_date ?? value.invoice_date}
+                minDate={value.invoice_date}
                 onCancel={() => setReversalOpen(false)}
                 onConfirm={reverse}
             />

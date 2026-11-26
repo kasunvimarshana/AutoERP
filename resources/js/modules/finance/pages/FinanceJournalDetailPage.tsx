@@ -145,12 +145,28 @@ export default function FinanceJournalDetailPage() {
 
         {canReverse && showReversal && <Panel title="Reverse journal" className="mt-5">
             <div className="grid gap-4 md:grid-cols-2">
-                <Input label="Reversal date" type="date" value={reversalDate} onChange={(event) => setReversalDate(event.target.value)} />
+                <Input
+                    label="Reversal date"
+                    type="date"
+                    min={journal.journal_date ? journal.journal_date.slice(0, 10) : undefined}
+                    max={businessDateInputValue()}
+                    value={reversalDate}
+                    hint={journal.journal_date ? `Cannot precede journal date (${journal.journal_date.slice(0, 10)})` : undefined}
+                    onChange={(event) => setReversalDate(event.target.value)}
+                />
                 <Textarea label="Reason" value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => setShowReversal(false)}>Keep journal</Button>
-                <Button type="button" variant="danger" loading={submitting} disabled={!reversalDate || !reversalReason.trim()} onClick={() => void reverse()}>Create reversal</Button>
+                <Button
+                    type="button"
+                    variant="danger"
+                    loading={submitting}
+                    disabled={!reversalDate || !reversalReason.trim() || (journal.journal_date && reversalDate < journal.journal_date.slice(0, 10)) || reversalDate > businessDateInputValue()}
+                    onClick={() => void reverse()}
+                >
+                    Create reversal
+                </Button>
             </div>
         </Panel>}
 

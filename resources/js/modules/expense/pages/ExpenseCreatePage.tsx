@@ -54,6 +54,7 @@ export default function ExpenseCreatePage() {
     const canSubmit = expenseTypeId !== ''
         && paymentMethodId !== ''
         && expenseDate !== ''
+        && expenseDate <= businessDateInputValue()
         && isPositiveDecimal(amount)
         && referenceValid
         && instrumentValid
@@ -105,8 +106,10 @@ export default function ExpenseCreatePage() {
                         <Input
                             label="Expense date"
                             type="date"
+                            max={businessDateInputValue()}
                             value={expenseDate}
                             onChange={(event) => setExpenseDate(event.target.value)}
+                            hint={expenseDate < businessDateInputValue() ? 'Backdated expense · Will post to historical ledger' : undefined}
                         />
                         <Input
                             label="Amount"

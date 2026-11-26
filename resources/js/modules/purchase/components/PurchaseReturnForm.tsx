@@ -213,7 +213,7 @@ export function PurchaseReturnForm() {
             <Panel title="Referenced source">
                 <div className="grid gap-4 md:grid-cols-4">
                     <GoodsReceiptLookupSelect eligibility="returnable" value={source} onChange={(value) => void changeSource(value)} excludeIds={excludedGoodsReceiptIds} error={errorFor('source_id')} />
-                    <Input label="Return date" type="date" value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
+                    <Input label="Return date" type="date" max={todayDate()} value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
                     <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><span className="font-medium">Warehouse</span><br />{warehouse?.name ?? '-'}</div>
                     <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><span className="font-medium">Supplier</span><br />{supplier?.name ?? '-'}</div>
                 </div>

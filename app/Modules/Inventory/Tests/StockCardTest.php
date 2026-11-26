@@ -14,6 +14,7 @@ namespace Modules\Inventory\Tests;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
@@ -195,5 +196,186 @@ class StockCardTest extends InventoryTestCase
         ], $tenantId, null));
 
         $this->assertSame('5.000000', $card['closing']);
+    }
+
+    public function test_backdated_movement_with_uom_revision_expresses_in_current_base_unit(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+        $oldUnitId = (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'BD-PCS-'.Str::upper(Str::random(3)),
+            'name' => 'Backdate Piece',
+            'symbol' => 'pc',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('items')->where('id', $item->id)->update(['base_uom_id' => $oldUnitId]);
+        $item->refresh();
+
+        // 1. UOM revision applied on 2026-06-10 (conversion factor 0.1, 10 pcs = 1 box)
+        $newUnitId = (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'BD-BOX-'.Str::upper(Str::random(3)),
+            'name' => 'Backdate Box',
+            'symbol' => 'box',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->travelTo(CarbonImmutable::parse('2026-06-10 09:00:00 UTC'));
+        $this->withTenantExecutionContext($tenantId, fn () => app(ItemBaseUomConversionService::class)->apply(
+            $item->fresh(),
+            $newUnitId,
+            '0.100000',
+            null,
+            'Pack size change',
+            null,
+        ));
+
+        // 2. On physical day 2026-06-20, record a receipt with BACKDATED movement_date = 2026-06-01
+        $this->travelTo(CarbonImmutable::parse('2026-06-20 14:00:00 UTC'));
+        $movements = app(StockMovementService::class);
+        $movement = $this->withTenantExecutionContext($tenantId, fn () => $movements->record(new StockMovementData(
+            tenantId: $tenantId,
+            movementDate: '2026-06-01',
+            movementType: InventoryMovementType::Receipt,
+            direction: InventoryDirection::In,
+            itemId: (int) $item->getKey(),
+            warehouseId: $warehouseId,
+            quantity: '20.000000',
+            unitCost: '1.000000',
+        )));
+        DB::table('inventory_movements')->where('id', $movement->getKey())->update([
+            'quantity' => '20.000000',
+            'base_uom_id' => $oldUnitId,
+        ]);
+
+        // 3. Stock card on June 20 must correctly convert the 20 pieces from June 1st into 2 boxes (20 * 0.1 = 2)
+        $card = $this->withTenantExecutionContext($tenantId, fn () => app(StockCardService::class)->build([
+            'item_id' => (int) $item->id,
+            'warehouse_id' => $warehouseId,
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+            'timezone' => 'UTC',
+        ], $tenantId, null));
+
+        $this->assertSame('2.000000', $card['closing']);
+        $this->assertSame('Backdate Box', $card['item']['uom']);
+    }
+
+    public function test_backdated_movement_with_multi_tier_cascading_uom_revisions(): void
+    {
+        [$tenantId, $warehouseId, $item] = $this->stockContext();
+
+        // Base unit: Piece
+        $pieceUnitId = (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'TIER-PC-'.Str::upper(Str::random(3)),
+            'name' => 'Tier Piece',
+            'symbol' => 'pc',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('items')->where('id', $item->id)->update(['base_uom_id' => $pieceUnitId]);
+        $item->refresh();
+
+        // 1. On 2026-06-05, movement of 100 pieces
+        $this->travelTo(CarbonImmutable::parse('2026-06-05 09:00:00 UTC'));
+        $movements = app(StockMovementService::class);
+        $this->withTenantExecutionContext($tenantId, fn () => $movements->record(new StockMovementData(
+            tenantId: $tenantId,
+            movementDate: '2026-06-05',
+            movementType: InventoryMovementType::Receipt,
+            direction: InventoryDirection::In,
+            itemId: (int) $item->getKey(),
+            warehouseId: $warehouseId,
+            quantity: '100.000000',
+            unitCost: '1.000000',
+        )));
+
+        // 2. On 2026-06-10, revision 1: Piece -> Box (factor 0.1, 10 pcs = 1 box)
+        $boxUnitId = (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'TIER-BOX-'.Str::upper(Str::random(3)),
+            'name' => 'Tier Box',
+            'symbol' => 'box',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->travelTo(CarbonImmutable::parse('2026-06-10 09:00:00 UTC'));
+        $this->withTenantExecutionContext($tenantId, fn () => app(ItemBaseUomConversionService::class)->apply(
+            $item->fresh(),
+            $boxUnitId,
+            '0.100000',
+            null,
+            'First revision: Piece to Box',
+            null,
+        ));
+
+        // 3. On 2026-06-15, movement of 5 boxes
+        $this->travelTo(CarbonImmutable::parse('2026-06-15 09:00:00 UTC'));
+        $this->withTenantExecutionContext($tenantId, fn () => $movements->record(new StockMovementData(
+            tenantId: $tenantId,
+            movementDate: '2026-06-15',
+            movementType: InventoryMovementType::Receipt,
+            direction: InventoryDirection::In,
+            itemId: (int) $item->getKey(),
+            warehouseId: $warehouseId,
+            quantity: '5.000000',
+            unitCost: '10.000000',
+        )));
+
+        // 4. On 2026-06-20, revision 2: Box -> Crate (factor 0.2, 5 boxes = 1 crate)
+        $crateUnitId = (int) DB::table('unit_of_measures')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'TIER-CRATE-'.Str::upper(Str::random(3)),
+            'name' => 'Tier Crate',
+            'symbol' => 'crate',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->travelTo(CarbonImmutable::parse('2026-06-20 09:00:00 UTC'));
+        $this->withTenantExecutionContext($tenantId, fn () => app(ItemBaseUomConversionService::class)->apply(
+            $item->fresh(),
+            $crateUnitId,
+            '0.200000',
+            null,
+            'Second revision: Box to Crate',
+            null,
+        ));
+
+        // 5. On physical date 2026-06-25, backdated receipt of 50 pieces on 2026-06-02
+        $this->travelTo(CarbonImmutable::parse('2026-06-25 09:00:00 UTC'));
+        $backdatedMov = $this->withTenantExecutionContext($tenantId, fn () => $movements->record(new StockMovementData(
+            tenantId: $tenantId,
+            movementDate: '2026-06-02',
+            movementType: InventoryMovementType::Receipt,
+            direction: InventoryDirection::In,
+            itemId: (int) $item->getKey(),
+            warehouseId: $warehouseId,
+            quantity: '50.000000',
+            unitCost: '1.000000',
+        )));
+        DB::table('inventory_movements')->where('id', $backdatedMov->getKey())->update([
+            'quantity' => '50.000000',
+            'base_uom_id' => $pieceUnitId,
+        ]);
+
+        // 6. Build stock card
+        // Calculation:
+        // Movement 1 (June 5): 100 pcs * 0.1 = 10 boxes * 0.2 = 2 crates
+        // Movement 2 (June 15): 5 boxes * 0.2 = 1 crate
+        // Movement 3 (June 2 backdated): 50 pcs * 0.1 = 5 boxes * 0.2 = 1 crate
+        // Total = 4 crates
+        $card = $this->withTenantExecutionContext($tenantId, fn () => app(StockCardService::class)->build([
+            'item_id' => (int) $item->id,
+            'warehouse_id' => $warehouseId,
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+            'timezone' => 'UTC',
+        ], $tenantId, null));
+
+        $this->assertSame('4.000000', $card['closing']);
+        $this->assertSame('Tier Crate', $card['item']['uom']);
     }
 }

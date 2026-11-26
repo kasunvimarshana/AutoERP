@@ -85,6 +85,7 @@ export function PaymentAllocationReversalPanel({
                     label="Reversal date"
                     type="date"
                     min={minimumReversalDate}
+                    max={businessDateInputValue()}
                     value={reversalDate}
                     disabled={busy}
                     onChange={(event) => setReversalDate(event.target.value)}

@@ -34,6 +34,15 @@ final class SaleReturn extends TenantOwnedModel
 
     protected static function booted(): void
     {
+        self::updating(static function (SaleReturn $saleReturn): void {
+            if ($saleReturn->getOriginal('posted_at') !== null) {
+                $immutable = ['return_number', 'return_date', 'sale_id', 'invoice_id', 'credit_amount', 'tenant_id', 'organization_unit_id'];
+                if ($saleReturn->isDirty($immutable)) {
+                    throw new LogicException('Posted sale returns are immutable in place.');
+                }
+            }
+        });
+
         self::deleting(static function (SaleReturn $saleReturn): void {
             if ($saleReturn->posted_at !== null) {
                 throw new LogicException('Posted sale returns cannot be deleted.');

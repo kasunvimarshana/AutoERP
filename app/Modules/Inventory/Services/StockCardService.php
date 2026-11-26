@@ -167,9 +167,11 @@ class StockCardService
     {
         $quantity = $this->math->normalize((string) $movement->quantity);
         $uomId = (int) $movement->base_uom_id;
+        $movementDate = $movement->movement_date?->toDateString() ?? $movement->created_at?->toDateString();
 
         foreach ($revisions as $revision) {
-            if ($revision->applied_at < $movement->posted_at || (int) $revision->old_base_uom_id !== $uomId) {
+            $appliedDate = $revision->applied_at?->toDateString();
+            if (($appliedDate !== null && $appliedDate < $movementDate) || (int) $revision->old_base_uom_id !== $uomId) {
                 continue;
             }
 

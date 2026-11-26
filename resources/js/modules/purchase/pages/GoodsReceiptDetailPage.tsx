@@ -150,6 +150,7 @@ export default function GoodsReceiptDetailPage() {
                 title="Reverse goods receipt"
                 loading={busy}
                 defaultDate={grn.received_date}
+                minDate={grn.received_date}
                 onCancel={() => setReversalOpen(false)}
                 onConfirm={reverse}
             />

@@ -37,6 +37,39 @@ final class PurchaseOrder extends TenantOwnedModel
 
     protected static function booted(): void
     {
+        self::updating(static function (PurchaseOrder $order): void {
+            $rawOriginalStatus = $order->getRawOriginal('status');
+            $originalStatus = $rawOriginalStatus instanceof PurchaseOrderStatus
+                ? $rawOriginalStatus
+                : ($rawOriginalStatus !== null ? PurchaseOrderStatus::tryFrom((string) $rawOriginalStatus) : null);
+
+            if ($originalStatus !== null && $originalStatus !== PurchaseOrderStatus::Draft) {
+                $immutableAttributes = [
+                    'purchase_order_number',
+                    'purchase_order_date',
+                    'supplier_id',
+                    'supplier_type',
+                    'warehouse_id',
+                    'warehouse_location_id',
+                    'currency_id',
+                    'exchange_rate',
+                    'subtotal',
+                    'discount_total',
+                    'tax_total',
+                    'charge_total',
+                    'adjustment_total',
+                    'header_increase_total',
+                    'header_decrease_total',
+                    'grand_total',
+                    'tenant_id',
+                    'organization_unit_id',
+                ];
+                if ($order->isDirty($immutableAttributes)) {
+                    throw new LogicException('Non-draft purchase orders are immutable in place.');
+                }
+            }
+        });
+
         self::deleting(static function (PurchaseOrder $order): void {
             $status = $order->status instanceof PurchaseOrderStatus
                 ? $order->status

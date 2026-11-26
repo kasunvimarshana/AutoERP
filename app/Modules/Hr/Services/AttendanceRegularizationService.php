@@ -167,6 +167,10 @@ final class AttendanceRegularizationService
             ->where('id', $data->attendanceRecordId)
             ->firstOrFail();
 
+        if ($record->lock_status === AttendanceLockStatus::Finalized) {
+            throw new InvalidArgumentException('Cannot adjust a finalized attendance record.');
+        }
+
         $prevStatus = $record->status;
         $prevWorked = (int) $record->total_worked_minutes;
         $prevOt = (int) $record->overtime_minutes;
