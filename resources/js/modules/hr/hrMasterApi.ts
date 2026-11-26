@@ -20,6 +20,7 @@ export interface HrMasterPayload {
     is_active: boolean;
     sort_order?: number;
     parent_id?: number | null;
+    expected_version?: number;
 }
 
 const hrMasterEndpoints: Record<HrMasterKind, string> = {

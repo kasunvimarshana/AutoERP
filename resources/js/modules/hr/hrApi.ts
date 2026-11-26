@@ -72,32 +72,200 @@ export const availabilityApi = {
 };
 export const listEmployeeStatusHistory = (employeeId: number, page: number, signal: AbortSignal) => apiClient.get<ApiCollection<EmployeeStatusHistory>>(path(employeeId, 'status-history'), { params: { page, per_page: 20 }, signal }).then((r) => r.data);
 
+type LaravelPaginator<T> = ApiCollection<T> & {
+    current_page?: number;
+    last_page?: number;
+    per_page?: number;
+    total?: number;
+    from?: number | null;
+    to?: number | null;
+};
+
+function normalizePaginated<T>(payload: LaravelPaginator<T>): ApiCollection<T> {
+    if (payload.meta) {
+        return payload;
+    }
+    if (typeof payload.current_page === 'number' && typeof payload.last_page === 'number') {
+        return {
+            data: payload.data,
+            meta: {
+                current_page: payload.current_page,
+                last_page: payload.last_page,
+                per_page: payload.per_page ?? payload.data.length,
+                total: payload.total ?? payload.data.length,
+                from: payload.from ?? (payload.data.length > 0 ? 1 : null),
+                to: payload.to ?? (payload.data.length > 0 ? payload.data.length : null),
+            },
+            links: payload.links,
+        };
+    }
+    return payload;
+}
+
 // --- Shifts & Rostering API ---
-export const listShifts = () => apiClient.get<ApiResource<import('./hrTypes').HrShift[]>>(endpoints.hrShifts).then((r) => r.data.data);
-export const createShift = (payload: import('./hrTypes').HrShiftPayload) => apiClient.post<ApiResource<import('./hrTypes').HrShift>>(endpoints.hrShifts, payload).then((r) => r.data.data);
-export const updateShift = (id: number, payload: Partial<import('./hrTypes').HrShiftPayload>) => apiClient.put<ApiResource<import('./hrTypes').HrShift>>(`${endpoints.hrShifts}/${id}`, payload).then((r) => r.data.data);
-export const deleteShift = (id: number) => apiClient.delete(`${endpoints.hrShifts}/${id}`);
+export const listShifts = (params?: { page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrShift>>(endpoints.hrShifts, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const getShift = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrShift>>(`${endpoints.hrShifts}/${id}`, { signal }).then((r) => r.data.data);
+
+export const createShift = (payload: import('./hrTypes').HrShiftPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShift>>(endpoints.hrShifts, payload).then((r) => r.data.data);
+
+export const updateShift = (id: number, payload: Partial<import('./hrTypes').HrShiftPayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrShift>>(`${endpoints.hrShifts}/${id}`, payload).then((r) => r.data.data);
+
+export const deleteShift = (id: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrShifts}/${id}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
+
+// --- Shift Breaks API ---
+export const listShiftBreaks = (shiftId: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrShiftBreak[]>>(`${endpoints.hrShifts}/${shiftId}/breaks`, { signal }).then((r) => r.data.data);
+
+export const createShiftBreak = (shiftId: number, payload: import('./hrTypes').HrShiftBreakPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShiftBreak>>(`${endpoints.hrShifts}/${shiftId}/breaks`, payload).then((r) => r.data.data);
+
+export const updateShiftBreak = (shiftId: number, breakId: number, payload: Partial<import('./hrTypes').HrShiftBreakPayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrShiftBreak>>(`${endpoints.hrShifts}/${shiftId}/breaks/${breakId}`, payload).then((r) => r.data.data);
+
+export const deleteShiftBreak = (shiftId: number, breakId: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrShifts}/${shiftId}/breaks/${breakId}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
 
 export const getRoster = (params: { start_date: string; end_date: string; employee_ids?: number[]; department_id?: number }) =>
     apiClient.get<ApiResource<Array<{ employee: { id: number; employee_number: string; display_name: string }; days: Record<string, { shift: import('./hrTypes').HrShift | null; is_working: boolean; is_rest_day: boolean; is_holiday: boolean; holiday_name?: string | null; source: string }> }>>>(endpoints.hrRoster, { params }).then((r) => r.data.data);
 
-export const assignShift = (payload: { employee_id: number; shift_id: number; assignment_type: string; day_of_week?: number; start_date?: string; end_date?: string; is_custom_timing?: boolean; custom_start_time?: string; custom_end_time?: string }) =>
+// --- Shift Assignments API ---
+export const listShiftAssignments = (params?: { employee_id?: number; shift_id?: number; is_cancelled?: boolean; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrShiftAssignment>>(endpoints.hrShiftAssignments, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const getShiftAssignment = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrShiftAssignment>>(`${endpoints.hrShiftAssignments}/${id}`, { signal }).then((r) => r.data.data);
+
+export const assignShift = (payload: import('./hrTypes').HrShiftAssignmentPayload) =>
     apiClient.post<ApiResource<import('./hrTypes').HrShiftAssignment>>(endpoints.hrShiftAssignments, payload).then((r) => r.data.data);
 
-export const cancelShiftAssignment = (id: number, reason: string) =>
-    apiClient.delete<ApiResource<import('./hrTypes').HrShiftAssignment>>(`${endpoints.hrShiftAssignments}/${id}`, { data: { reason } }).then((r) => r.data.data);
+export const updateShiftAssignment = (id: number, payload: Partial<import('./hrTypes').HrShiftAssignmentPayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrShiftAssignment>>(`${endpoints.hrShiftAssignments}/${id}`, payload).then((r) => r.data.data);
+
+export const cancelShiftAssignment = (id: number, reason: string, expectedVersion?: number) =>
+    apiClient.delete<ApiResource<import('./hrTypes').HrShiftAssignment>>(`${endpoints.hrShiftAssignments}/${id}`, {
+        data: expectedVersion !== undefined ? { reason, expected_version: expectedVersion } : { reason },
+    }).then((r) => r.data.data);
+
+// --- Shift Swaps API ---
+export const listShiftSwaps = (params?: { status?: import('./hrTypes').ShiftSwapStatus; employee_id?: number; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrShiftSwap>>(endpoints.hrShiftSwaps, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const getShiftSwap = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${id}`, { signal }).then((r) => r.data.data);
 
 export const requestShiftSwap = (payload: { requester_employee_id: number; target_employee_id: number; swap_date: string; target_swap_date: string; reason: string }) =>
     apiClient.post<ApiResource<import('./hrTypes').HrShiftSwap>>(endpoints.hrShiftSwaps, payload).then((r) => r.data.data);
 
-export const peerActionShiftSwap = (swapId: number, peerEmployeeId: number, accept: boolean) =>
-    apiClient.patch<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${swapId}/peer-action`, { peer_employee_id: peerEmployeeId, accept }).then((r) => r.data.data);
+export const peerActionShiftSwap = (swapId: number, peerEmployeeId: number, accept: boolean, expectedVersion?: number) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${swapId}/peer-action`, {
+        peer_employee_id: peerEmployeeId,
+        accept,
+        ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
+    }).then((r) => r.data.data);
 
-export const managerActionShiftSwap = (swapId: number, approve: boolean, notes?: string) =>
-    apiClient.patch<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${swapId}/manager-action`, { approve, notes }).then((r) => r.data.data);
+export const managerActionShiftSwap = (swapId: number, approve: boolean, notes?: string, expectedVersion?: number) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${swapId}/manager-action`, {
+        approve,
+        notes,
+        ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
+    }).then((r) => r.data.data);
 
-export const reallocateShiftCover = (payload: { absent_employee_id: number; cover_employee_id: number; shift_id: number; reallocation_date: string; reason_code?: string; notes?: string }) =>
-    apiClient.post(endpoints.hrShiftReallocations, payload).then((r) => r.data.data);
+export const cancelShiftSwap = (swapId: number, expectedVersion: number) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrShiftSwap>>(`${endpoints.hrShiftSwaps}/${swapId}/cancel`, {
+        expected_version: expectedVersion,
+    }).then((r) => r.data.data);
+
+// --- Shift Reallocations API ---
+export const listShiftReallocations = (params?: { reallocation_date?: string; absent_employee_id?: number; cover_employee_id?: number; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrShiftReallocation>>(endpoints.hrShiftReallocations, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const getShiftReallocation = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrShiftReallocation>>(`${endpoints.hrShiftReallocations}/${id}`, { signal }).then((r) => r.data.data);
+
+export const reallocateShiftCover = (payload: import('./hrTypes').HrShiftReallocationPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShiftReallocation>>(endpoints.hrShiftReallocations, payload).then((r) => r.data.data);
+
+export const reallocateCover = reallocateShiftCover;
+
+export const updateShiftReallocation = (id: number, payload: Partial<import('./hrTypes').HrShiftReallocationPayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrShiftReallocation>>(`${endpoints.hrShiftReallocations}/${id}`, payload).then((r) => r.data.data);
+
+export const cancelShiftReallocation = (id: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrShiftReallocations}/${id}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
+
+// --- Shift Rotations, Steps & Rotation Assignments API ---
+export const listShiftRotations = (params?: { status?: 'active' | 'inactive'; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrShiftRotation>>(endpoints.hrShiftRotations, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const getShiftRotation = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrShiftRotation>>(`${endpoints.hrShiftRotations}/${id}`, { signal }).then((r) => r.data.data);
+
+export const createShiftRotation = (payload: import('./hrTypes').HrShiftRotationPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShiftRotation>>(endpoints.hrShiftRotations, payload).then((r) => r.data.data);
+
+export const updateShiftRotation = (id: number, payload: Partial<import('./hrTypes').HrShiftRotationPayload> & { expected_version?: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrShiftRotation>>(`${endpoints.hrShiftRotations}/${id}`, payload).then((r) => r.data.data);
+
+export const deleteShiftRotation = (id: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrShiftRotations}/${id}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
+
+export const createRotationStep = (rotationId: number, payload: import('./hrTypes').HrShiftRotationStepPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShiftRotationStep>>(`${endpoints.hrShiftRotations}/${rotationId}/steps`, payload).then((r) => r.data.data);
+
+export const updateRotationStep = (rotationId: number, stepId: number, payload: Partial<import('./hrTypes').HrShiftRotationStepPayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrShiftRotationStep>>(`${endpoints.hrShiftRotations}/${rotationId}/steps/${stepId}`, payload).then((r) => r.data.data);
+
+export const deleteRotationStep = (rotationId: number, stepId: number) =>
+    apiClient.delete(`${endpoints.hrShiftRotations}/${rotationId}/steps/${stepId}`);
+
+export const listRotationAssignments = (params?: { employee_id?: number; shift_rotation_id?: number; is_active?: boolean; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrShiftRotationAssignment>>(endpoints.hrShiftRotationAssignments, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const getRotationAssignment = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrShiftRotationAssignment>>(`${endpoints.hrShiftRotationAssignments}/${id}`, { signal }).then((r) => r.data.data);
+
+export const assignRotation = (payload: { employee_id: number; shift_rotation_id: number; anchor_date: string; end_date?: string | null }) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrShiftRotationAssignment>>(endpoints.hrShiftRotationAssignments, payload).then((r) => r.data.data);
+
+export const updateRotationAssignment = (id: number, payload: { shift_rotation_id?: number; anchor_date?: string; end_date?: string | null; is_active?: boolean; expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrShiftRotationAssignment>>(`${endpoints.hrShiftRotationAssignments}/${id}`, payload).then((r) => r.data.data);
+
+export const cancelRotationAssignment = (id: number, expectedVersion?: number) =>
+    apiClient.delete<ApiResource<import('./hrTypes').HrShiftRotationAssignment>>(`${endpoints.hrShiftRotationAssignments}/${id}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined).then((r) => r.data.data);
+
+// --- Holiday Calendars & Holidays API ---
+export const listHolidayCalendars = (params?: { calendar_year?: number; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrHolidayCalendar>>(endpoints.hrHolidayCalendars, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const getHolidayCalendar = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<import('./hrTypes').HrHolidayCalendar>>(`${endpoints.hrHolidayCalendars}/${id}`, { signal }).then((r) => r.data.data);
+
+export const createHolidayCalendar = (payload: import('./hrTypes').HrHolidayCalendarPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrHolidayCalendar>>(endpoints.hrHolidayCalendars, payload).then((r) => r.data.data);
+
+export const updateHolidayCalendar = (id: number, payload: Partial<import('./hrTypes').HrHolidayCalendarPayload> & { expected_version?: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrHolidayCalendar>>(`${endpoints.hrHolidayCalendars}/${id}`, payload).then((r) => r.data.data);
+
+export const deleteHolidayCalendar = (id: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrHolidayCalendars}/${id}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
+
+export const listHolidays = (calendarId: number, params?: { page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrHoliday>>(`${endpoints.hrHolidayCalendars}/${calendarId}/holidays`, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const createHoliday = (calendarId: number, payload: import('./hrTypes').HrHolidayPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrHoliday>>(`${endpoints.hrHolidayCalendars}/${calendarId}/holidays`, payload).then((r) => r.data.data);
+
+export const updateHoliday = (holidayId: number, payload: Partial<import('./hrTypes').HrHolidayPayload> & { expected_version?: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrHoliday>>(`${endpoints.hrHolidays}/${holidayId}`, payload).then((r) => r.data.data);
+
+export const deleteHoliday = (holidayId: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrHolidays}/${holidayId}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
 
 // --- Attendance API ---
 export const punchAttendance = (payload: { employee_id: number; punch_type: string; punch_time?: string; punch_source?: string; notes?: string }) =>
@@ -107,53 +275,91 @@ export const getTodayAttendance = (employeeId: number) =>
     apiClient.get<ApiResource<{ date: string; record: import('./hrTypes').HrAttendanceRecord | null; punches: import('./hrTypes').HrAttendancePunch[] }>>(`${endpoints.hrAttendanceToday}/${employeeId}`).then((r) => r.data.data);
 
 export const listAttendanceRecords = (params: { start_date?: string; end_date?: string; employee_id?: number; department_id?: number; status?: string; page?: number; per_page?: number }) =>
-    apiClient.get<ApiCollection<import('./hrTypes').HrAttendanceRecord>>(endpoints.hrAttendanceRecords, { params }).then((r) => r.data);
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrAttendanceRecord>>(endpoints.hrAttendanceRecords, { params }).then((r) => normalizePaginated(r.data));
 
 export const requestAttendanceRegularization = (payload: { employee_id: number; attendance_date: string; regularization_type: string; reason_code: string; employee_notes: string; proposed_clock_in?: string; proposed_clock_out?: string; attendance_record_id?: number }) =>
     apiClient.post<ApiResource<import('./hrTypes').HrAttendanceRegularization>>(endpoints.hrAttendanceRegularize, payload).then((r) => r.data.data);
 
-export const listAttendanceRegularizations = (params?: { status?: string; employee_id?: number }) =>
-    apiClient.get<ApiResource<import('./hrTypes').HrAttendanceRegularization[]>>(endpoints.hrAttendanceRegularizations, { params }).then((r) => r.data.data);
+export const listAttendanceRegularizations = (params?: { status?: string; employee_id?: number; page?: number; per_page?: number }) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrAttendanceRegularization>>(endpoints.hrAttendanceRegularizations, { params }).then((r) => normalizePaginated(r.data));
 
-export const actionAttendanceRegularization = (id: number, approve: boolean, notes?: string) =>
-    apiClient.patch<ApiResource<import('./hrTypes').HrAttendanceRegularization>>(`${endpoints.hrAttendanceRegularizations}/${id}/action`, { approve, notes }).then((r) => r.data.data);
+export const actionAttendanceRegularization = (id: number, approve: boolean, notes?: string, expectedVersion?: number) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrAttendanceRegularization>>(`${endpoints.hrAttendanceRegularizations}/${id}/action`, {
+        approve,
+        notes,
+        ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
+    }).then((r) => r.data.data);
 
-export const directAdjustAttendanceRecord = (recordId: number, payload: { new_status: string; new_worked_minutes: number; new_overtime_minutes: number; adjustment_reason: string }) =>
+export const cancelAttendanceRegularization = (id: number, expectedVersion: number, notes?: string) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendanceRegularization>>(`${endpoints.hrAttendanceRegularizations}/${id}/cancel`, {
+        expected_version: expectedVersion,
+        ...(notes ? { notes } : {}),
+    }).then((r) => r.data.data);
+
+export const directAdjustAttendanceRecord = (recordId: number, payload: { new_status: string; new_worked_minutes: number; new_overtime_minutes: number; adjustment_reason: string; expected_version?: number }) =>
     apiClient.post<ApiResource<unknown>>(`${endpoints.hrAttendanceRecords}/${recordId}/direct-adjust`, payload).then((r) => r.data.data);
 
-// --- Leaves API ---
-export const listLeaveTypes = () =>
-    apiClient.get<ApiResource<import('./hrTypes').HrLeaveType[]>>(endpoints.hrLeaveTypes).then((r) => r.data.data);
+export const lockAttendancePeriod = (payload: { start_date: string; end_date: string }) =>
+    apiClient.post<ApiResource<{ locked_count: number }>>(endpoints.hrAttendanceLock, payload).then((r) => r.data.data);
 
-export const createLeaveType = (payload: Partial<import('./hrTypes').HrLeaveType>) =>
+// --- Leaves API ---
+export const listLeaveTypes = (params?: { status?: 'active' | 'inactive'; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrLeaveType>>(endpoints.hrLeaveTypes, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const createLeaveType = (payload: import('./hrTypes').HrLeaveTypePayload) =>
     apiClient.post<ApiResource<import('./hrTypes').HrLeaveType>>(endpoints.hrLeaveTypes, payload).then((r) => r.data.data);
 
-export const listLeavePolicies = () =>
-    apiClient.get<ApiResource<import('./hrTypes').HrLeavePolicy[]>>(endpoints.hrLeavePolicies).then((r) => r.data.data);
+export const updateLeaveType = (id: number, payload: Partial<import('./hrTypes').HrLeaveTypePayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrLeaveType>>(`${endpoints.hrLeaveTypes}/${id}`, payload).then((r) => r.data.data);
 
-export const createLeavePolicy = (payload: Partial<import('./hrTypes').HrLeavePolicy>) =>
+export const deleteLeaveType = (id: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrLeaveTypes}/${id}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
+
+export const listLeavePolicies = (params?: { leave_type_id?: number; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrLeavePolicy>>(endpoints.hrLeavePolicies, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const createLeavePolicy = (payload: import('./hrTypes').HrLeavePolicyPayload) =>
     apiClient.post<ApiResource<import('./hrTypes').HrLeavePolicy>>(endpoints.hrLeavePolicies, payload).then((r) => r.data.data);
 
-export const listLeaveBalances = (params?: { employee_id?: number; calendar_year?: number }) =>
-    apiClient.get<ApiResource<import('./hrTypes').HrLeaveBalance[]>>(endpoints.hrLeaveBalances, { params }).then((r) => r.data.data);
+export const updateLeavePolicy = (id: number, payload: Partial<import('./hrTypes').HrLeavePolicyPayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrLeavePolicy>>(`${endpoints.hrLeavePolicies}/${id}`, payload).then((r) => r.data.data);
 
-export const listLeaveRequests = (params?: { employee_id?: number; status?: string; leave_type_id?: number; page?: number; per_page?: number }) =>
-    apiClient.get<ApiCollection<import('./hrTypes').HrLeaveRequest>>(endpoints.hrLeaveRequests, { params }).then((r) => r.data);
+export const deleteLeavePolicy = (id: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrLeavePolicies}/${id}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined);
 
-export const applyLeave = (payload: { employee_id: number; leave_type_id: number; start_date: string; end_date: string; total_days: string; reason: string; duration_type?: string }) =>
+export const listLeaveBalances = (params?: { employee_id?: number; calendar_year?: number; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrLeaveBalance>>(endpoints.hrLeaveBalances, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const listLeaveRequests = (params?: { employee_id?: number; status?: string; leave_type_id?: number; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrLeaveRequest>>(endpoints.hrLeaveRequests, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const applyLeave = (payload: { employee_id: number; leave_type_id: number; start_date: string; end_date: string; total_days?: string; reason: string; duration_type?: string }) =>
     apiClient.post<ApiResource<import('./hrTypes').HrLeaveRequest>>(endpoints.hrLeaveRequests, payload).then((r) => r.data.data);
 
-export const actionLeaveRequest = (requestId: number, approve: boolean, notes?: string) =>
-    apiClient.patch<ApiResource<import('./hrTypes').HrLeaveRequest>>(`${endpoints.hrLeaveRequests}/${requestId}/action`, { approve, notes }).then((r) => r.data.data);
+export const actionLeaveRequest = (requestId: number, approve: boolean, notes?: string, expectedVersion?: number) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrLeaveRequest>>(`${endpoints.hrLeaveRequests}/${requestId}/action`, {
+        approve,
+        notes,
+        ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
+    }).then((r) => r.data.data);
 
-export const cancelLeaveRequest = (requestId: number, reason: string) =>
-    apiClient.post<ApiResource<import('./hrTypes').HrLeaveRequest>>(`${endpoints.hrLeaveRequests}/${requestId}/cancel`, { reason }).then((r) => r.data.data);
+export const cancelLeaveRequest = (requestId: number, reason: string, expectedVersion?: number) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrLeaveRequest>>(`${endpoints.hrLeaveRequests}/${requestId}/cancel`, {
+        reason,
+        ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
+    }).then((r) => r.data.data);
 
-export const claimCompOff = (payload: { employee_id: number; worked_date: string; reason: string; claimed_days?: string }) =>
+export const listCompOffClaims = (params?: { employee_id?: number; status?: string; page?: number; per_page?: number }, signal?: AbortSignal) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrCompOffClaim>>(endpoints.hrCompOffClaims, { params, signal }).then((r) => normalizePaginated(r.data));
+
+export const claimCompOff = (payload: { employee_id: number; worked_date: string; reason: string; claimed_days?: string; attendance_record_id?: number }) =>
     apiClient.post<ApiResource<import('./hrTypes').HrCompOffClaim>>(endpoints.hrCompOffClaim, payload).then((r) => r.data.data);
 
-export const actionCompOffClaim = (claimId: number, approve: boolean) =>
-    apiClient.patch<ApiResource<import('./hrTypes').HrCompOffClaim>>(`${endpoints.hrCompOffClaims}/${claimId}/action`, { approve }).then((r) => r.data.data);
+export const actionCompOffClaim = (claimId: number, approve: boolean, expectedVersion?: number) =>
+    apiClient.patch<ApiResource<import('./hrTypes').HrCompOffClaim>>(`${endpoints.hrCompOffClaims}/${claimId}/action`, {
+        approve,
+        ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
+    }).then((r) => r.data.data);
 
 // --- Biometric Hardware API ---
 export const listBiometricDevices = (params?: { status?: string; protocol?: string; search?: string; page?: number; per_page?: number }) =>
@@ -248,8 +454,8 @@ export const commitAttendanceImport = (payload: { file?: File; file_name?: strin
     }).then((r) => r.data.data);
 };
 
-export const listAttendanceAnomalies = (params?: { date?: string; employee_id?: number; anomaly_type?: string; page?: number }) =>
-    apiClient.get<ApiCollection<import('./hrTypes').HrAttendanceRecord>>(endpoints.hrAttendanceAnomalies, { params }).then((r) => r.data);
+export const listAttendanceAnomalies = (params?: { date?: string; employee_id?: number; anomaly_type?: string; page?: number; per_page?: number }) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrAttendanceRecord>>(endpoints.hrAttendanceAnomalies, { params }).then((r) => normalizePaginated(r.data));
 
 export const scanAttendanceAnomalies = (params?: { date?: string; employee_id?: number }) =>
     apiClient.post<ApiResource<{ total_scanned: number; anomalies_detected: number }>>(`${endpoints.hrAttendanceAnomalies}/scan`, params).then((r) => r.data.data);
@@ -257,20 +463,38 @@ export const scanAttendanceAnomalies = (params?: { date?: string; employee_id?: 
 export const quickResolveAttendanceAnomaly = (recordId: number, payload: { in_time?: string; out_time?: string; resolution_reason: string }) =>
     apiClient.post<ApiResource<import('./hrTypes').HrAttendanceRecord>>(`${endpoints.hrAttendanceAnomalies}/${recordId}/quick-resolve`, payload).then((r) => r.data.data);
 
-export const listEmployeeCredentials = (employeeId: number) =>
-    apiClient.get<ApiResource<import('./hrTypes').HrEmployeeAttendanceCredential[]>>(`${endpoints.hrEmployees}/${employeeId}/credentials`).then((r) => r.data.data);
+export const listEmployeeCredentials = (employeeId: number, params?: { page?: number; per_page?: number }) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrEmployeeAttendanceCredential>>(`${endpoints.hrEmployees}/${employeeId}/credentials`, { params }).then((r) => normalizePaginated(r.data));
 
 export const storeEmployeeCredential = (employeeId: number, payload: { credential_type: string; credential_value: string; label?: string; expires_at?: string }) =>
     apiClient.post<ApiResource<import('./hrTypes').HrEmployeeAttendanceCredential>>(`${endpoints.hrEmployees}/${employeeId}/credentials`, payload).then((r) => r.data.data);
 
-export const updateEmployeeCredentialStatus = (employeeId: number, credentialId: number, payload: { status: string; revocation_reason?: string }) =>
+export const updateEmployeeCredentialStatus = (employeeId: number, credentialId: number, payload: { status: string; revocation_reason?: string; expected_version?: number }) =>
     apiClient.patch<ApiResource<import('./hrTypes').HrEmployeeAttendanceCredential>>(`${endpoints.hrEmployees}/${employeeId}/credentials/${credentialId}/status`, payload).then((r) => r.data.data);
 
-export const deleteEmployeeCredential = (employeeId: number, credentialId: number) =>
-    apiClient.delete(`${endpoints.hrEmployees}/${employeeId}/credentials/${credentialId}`).then((r) => r.data);
+export const deleteEmployeeCredential = (employeeId: number, credentialId: number, expectedVersion?: number) =>
+    apiClient.delete(`${endpoints.hrEmployees}/${employeeId}/credentials/${credentialId}`, expectedVersion !== undefined ? { data: { expected_version: expectedVersion } } : undefined).then((r) => r.data);
 
-export const listAttendanceGeofences = () =>
-    apiClient.get<ApiResource<import('./hrTypes').HrAttendanceGeofence[]>>(endpoints.hrAttendanceGeofences).then((r) => r.data.data);
+export const listAttendanceGeofences = (params?: { page?: number; per_page?: number }) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrAttendanceGeofence>>(endpoints.hrAttendanceGeofences, { params }).then((r) => normalizePaginated(r.data));
 
-export const listAttendanceKiosks = () =>
-    apiClient.get<ApiResource<import('./hrTypes').HrAttendanceKiosk[]>>(endpoints.hrAttendanceKiosks).then((r) => r.data.data);
+export const createAttendanceGeofence = (payload: import('./hrTypes').HrAttendanceGeofencePayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendanceGeofence>>(endpoints.hrAttendanceGeofences, payload).then((r) => r.data.data);
+
+export const updateAttendanceGeofence = (id: number, payload: Partial<import('./hrTypes').HrAttendanceGeofencePayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrAttendanceGeofence>>(`${endpoints.hrAttendanceGeofences}/${id}`, payload).then((r) => r.data.data);
+
+export const deleteAttendanceGeofence = (id: number) =>
+    apiClient.delete(`${endpoints.hrAttendanceGeofences}/${id}`);
+
+export const listAttendanceKiosks = (params?: { page?: number; per_page?: number }) =>
+    apiClient.get<LaravelPaginator<import('./hrTypes').HrAttendanceKiosk>>(endpoints.hrAttendanceKiosks, { params }).then((r) => normalizePaginated(r.data));
+
+export const createAttendanceKiosk = (payload: import('./hrTypes').HrAttendanceKioskPayload) =>
+    apiClient.post<ApiResource<import('./hrTypes').HrAttendanceKiosk>>(endpoints.hrAttendanceKiosks, payload).then((r) => r.data.data);
+
+export const updateAttendanceKiosk = (id: number, payload: Partial<import('./hrTypes').HrAttendanceKioskPayload> & { expected_version: number }) =>
+    apiClient.put<ApiResource<import('./hrTypes').HrAttendanceKiosk>>(`${endpoints.hrAttendanceKiosks}/${id}`, payload).then((r) => r.data.data);
+
+export const deleteAttendanceKiosk = (id: number) =>
+    apiClient.delete(`${endpoints.hrAttendanceKiosks}/${id}`);

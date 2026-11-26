@@ -38,7 +38,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['id', 'tenant_id'], 'hr_leave_types_id_tenant_uk');
-            $table->unique(['tenant_id', 'code'], 'hr_leave_types_tenant_code_uk');
+            $table->unique(['tenant_id', 'code', 'deleted_at'], 'hr_leave_types_tenant_code_uk');
             $table->index(['tenant_id', 'status'], 'hr_leave_types_tenant_status_ix');
 
             $table->foreign(['organization_unit_id', 'tenant_id'], 'hr_leave_types_org_unit_tenant_fk')

@@ -354,6 +354,19 @@ final class HrEngineTest extends TestCase
             $this->assertSame('specific_date', $resolvedTue->resolutionSource);
 
             // 3. Shift Swap between A and B
+            $rosterService->assignShift($tenantId, new ShiftAssignmentData(
+                employeeId: (int) $empA->getKey(),
+                shiftId: (int) $dayShift->getKey(),
+                assignmentType: ShiftAssignmentType::SpecificDate,
+                startDate: '2026-11-04',
+            ));
+            $rosterService->assignShift($tenantId, new ShiftAssignmentData(
+                employeeId: (int) $empB->getKey(),
+                shiftId: (int) $nightShift->getKey(),
+                assignmentType: ShiftAssignmentType::SpecificDate,
+                startDate: '2026-11-05',
+            ));
+
             $swap = $rosterService->requestSwap($tenantId, new ShiftSwapData(
                 requesterEmployeeId: (int) $empA->getKey(),
                 targetEmployeeId: (int) $empB->getKey(),
@@ -669,7 +682,17 @@ final class HrEngineTest extends TestCase
             $this->assertSame('0.00', (string) $balance->used_days);
             $this->assertSame('14.00', (string) $balance->current_balance);
 
-            // 4. Comp-off claim and approval
+            // 4. Comp-off claim and approval (employee worked on a rest day)
+            HrAttendanceRecord::create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationId,
+                'employee_id' => $empId,
+                'attendance_date' => '2026-11-22',
+                'status' => AttendanceStatus::RestDay,
+                'total_worked_minutes' => 480,
+                'lock_status' => AttendanceLockStatus::Open,
+            ]);
+
             $claim = $leaveService->claimCompOff($tenantId, new CompOffClaimData(
                 employeeId: $empId,
                 workedDate: '2026-11-22',
@@ -810,8 +833,8 @@ final class HrEngineTest extends TestCase
             $leaveReq = $leaveService->applyLeave($tenantId, new LeaveRequestData(
                 employeeId: $empId,
                 leaveTypeId: (int) $leaveType->getKey(),
-                startDate: '2026-12-05',
-                endDate: '2026-12-05',
+                startDate: '2026-12-07',
+                endDate: '2026-12-07',
                 totalDays: '1.00',
                 reason: 'Holiday',
             ));
@@ -823,7 +846,7 @@ final class HrEngineTest extends TestCase
                     employeeId: $empId,
                     shiftId: (int) $morningShift->getKey(),
                     assignmentType: ShiftAssignmentType::SpecificDate,
-                    startDate: '2026-12-05',
+                    startDate: '2026-12-07',
                     assignedBy: $user,
                 ));
                 $this->fail('Expected InvalidArgumentException when assigning shift on approved leave date.');

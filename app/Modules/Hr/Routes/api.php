@@ -190,6 +190,27 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shifts.destroy');
 
+    Route::get('shifts/{shift}/breaks', [HrShiftController::class, 'indexBreaks'])
+        ->whereNumber('shift')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shifts.breaks.index');
+    Route::post('shifts/{shift}/breaks', [HrShiftController::class, 'storeBreak'])
+        ->whereNumber('shift')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shifts.breaks.store');
+    Route::get('shifts/{shift}/breaks/{shiftBreak}', [HrShiftController::class, 'showBreak'])
+        ->whereNumber(['shift', 'shiftBreak'])
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shifts.breaks.show');
+    Route::match(['put', 'patch'], 'shifts/{shift}/breaks/{shiftBreak}', [HrShiftController::class, 'updateBreak'])
+        ->whereNumber(['shift', 'shiftBreak'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shifts.breaks.update');
+    Route::delete('shifts/{shift}/breaks/{shiftBreak}', [HrShiftController::class, 'destroyBreak'])
+        ->whereNumber(['shift', 'shiftBreak'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shifts.breaks.destroy');
+
     Route::get('roster', [HrShiftController::class, 'roster'])
         ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
         ->name('roster.index');
@@ -199,6 +220,14 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
     Route::post('shift-assignments', [HrShiftController::class, 'assign'])
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-assignments.store');
+    Route::get('shift-assignments/{assignment}', [HrShiftController::class, 'showAssignment'])
+        ->whereNumber('assignment')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-assignments.show');
+    Route::match(['put', 'patch'], 'shift-assignments/{assignment}', [HrShiftController::class, 'updateAssignment'])
+        ->whereNumber('assignment')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-assignments.update');
     Route::delete('shift-assignments/{assignment}', [HrShiftController::class, 'cancelAssignment'])
         ->whereNumber('assignment')
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
@@ -210,6 +239,10 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
     Route::post('shift-swaps', [HrShiftController::class, 'requestSwap'])
         ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
         ->name('shift-swaps.store');
+    Route::get('shift-swaps/{swap}', [HrShiftController::class, 'showSwap'])
+        ->whereNumber('swap')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-swaps.show');
     Route::patch('shift-swaps/{swap}/peer-action', [HrShiftController::class, 'peerActionSwap'])
         ->whereNumber('swap')
         ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
@@ -218,12 +251,28 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->whereNumber('swap')
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-swaps.manager-action');
+    Route::patch('shift-swaps/{swap}/cancel', [HrShiftController::class, 'cancelSwap'])
+        ->whereNumber('swap')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-swaps.cancel');
     Route::get('shift-reallocations', [HrShiftController::class, 'reallocations'])
         ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
         ->name('shift-reallocations.index');
     Route::post('shift-reallocations', [HrShiftController::class, 'reallocateCover'])
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-reallocations.store');
+    Route::get('shift-reallocations/{reallocation}', [HrShiftController::class, 'showReallocation'])
+        ->whereNumber('reallocation')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-reallocations.show');
+    Route::match(['put', 'patch'], 'shift-reallocations/{reallocation}', [HrShiftController::class, 'updateReallocation'])
+        ->whereNumber('reallocation')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-reallocations.update');
+    Route::delete('shift-reallocations/{reallocation}', [HrShiftController::class, 'destroyReallocation'])
+        ->whereNumber('reallocation')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-reallocations.destroy');
 
     // Shift Rotations & Rotation Assignments
     Route::get('shift-rotations', [HrShiftController::class, 'indexRotations'])
@@ -248,6 +297,10 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->whereNumber('rotation')
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-rotations.steps.store');
+    Route::match(['put', 'patch'], 'shift-rotations/{rotation}/steps/{step}', [HrShiftController::class, 'updateRotationStep'])
+        ->whereNumber(['rotation', 'step'])
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotations.steps.update');
     Route::delete('shift-rotations/{rotation}/steps/{step}', [HrShiftController::class, 'destroyRotationStep'])
         ->whereNumber(['rotation', 'step'])
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
@@ -258,6 +311,14 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
     Route::post('shift-rotation-assignments', [HrShiftController::class, 'assignRotation'])
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
         ->name('shift-rotation-assignments.store');
+    Route::get('shift-rotation-assignments/{assignment}', [HrShiftController::class, 'showRotationAssignment'])
+        ->whereNumber('assignment')
+        ->middleware($requires(HrAuthorizationService::VIEW_SHIFTS))
+        ->name('shift-rotation-assignments.show');
+    Route::match(['put', 'patch'], 'shift-rotation-assignments/{assignment}', [HrShiftController::class, 'updateRotationAssignment'])
+        ->whereNumber('assignment')
+        ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
+        ->name('shift-rotation-assignments.update');
     Route::delete('shift-rotation-assignments/{assignment}', [HrShiftController::class, 'cancelRotationAssignment'])
         ->whereNumber('assignment')
         ->middleware($requires(HrAuthorizationService::MANAGE_SHIFTS))
@@ -412,6 +473,10 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->whereNumber('regularization')
         ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
         ->name('attendance.regularizations.action');
+    Route::post('attendance/regularizations/{regularization}/cancel', [HrAttendanceController::class, 'cancelRegularization'])
+        ->whereNumber('regularization')
+        ->middleware($requires(HrAuthorizationService::REGULARIZE_ATTENDANCE))
+        ->name('attendance.regularizations.cancel');
     Route::post('attendance/records/{record}/direct-adjust', [HrAttendanceController::class, 'directAdjust'])
         ->whereNumber('record')
         ->middleware($requires(HrAuthorizationService::MANAGE_ATTENDANCE))
@@ -548,10 +613,14 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
 // Public Biometric Hardware Push Receivers (Outside Session Guard)
 Route::prefix('api/v1/hr/biometric/push')->group(function (): void {
     Route::match(['get', 'post'], 'zkteco/cdata', [HrBiometricPushReceiverController::class, 'zkTecoCdata'])->name('api.v1.hr.biometric.push.zkteco.cdata');
+    Route::match(['get', 'post'], 'zkteco/{tenant}/cdata', [HrBiometricPushReceiverController::class, 'zkTecoCdata'])->whereNumber('tenant')->name('api.v1.hr.biometric.push.zkteco.tenant.cdata');
     Route::get('zkteco/getrequest', [HrBiometricPushReceiverController::class, 'zkTecoGetRequest'])->name('api.v1.hr.biometric.push.zkteco.getrequest');
+    Route::get('zkteco/{tenant}/getrequest', [HrBiometricPushReceiverController::class, 'zkTecoGetRequest'])->whereNumber('tenant')->name('api.v1.hr.biometric.push.zkteco.tenant.getrequest');
     Route::post('zkteco/devicecmd', [HrBiometricPushReceiverController::class, 'zkTecoDeviceCmd'])->name('api.v1.hr.biometric.push.zkteco.devicecmd');
     Route::post('hikvision', [HrBiometricPushReceiverController::class, 'hikvisionPush'])->name('api.v1.hr.biometric.push.hikvision');
+    Route::post('hikvision/{tenant}', [HrBiometricPushReceiverController::class, 'hikvisionPush'])->whereNumber('tenant')->name('api.v1.hr.biometric.push.hikvision.tenant');
     Route::post('webhook/{deviceCode}', [HrBiometricPushReceiverController::class, 'genericWebhook'])->name('api.v1.hr.biometric.push.webhook');
+    Route::post('webhook/{tenant}/{deviceCode}', [HrBiometricPushReceiverController::class, 'genericWebhookForTenant'])->whereNumber('tenant')->name('api.v1.hr.biometric.push.webhook.tenant');
 });
 
 // ZKTeco direct root path aliases (for legacy firmware with hardcoded /iclock paths)

@@ -7,9 +7,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { apiClient } from '@/shared/api/apiClient';
-import { endpoints } from '@/shared/api/endpoints';
-import type { ApiResource } from '@/shared/types/api';
+import { listShiftRotations } from '../hrApi';
 import type { HrShiftRotation } from '../hrTypes';
 
 export function HrShiftRotationSelect({
@@ -30,10 +28,9 @@ export function HrShiftRotationSelect({
 
     useEffect(() => {
         let isMounted = true;
-        apiClient
-            .get<ApiResource<HrShiftRotation[]>>(endpoints.hrShiftRotations)
-            .then((r) => {
-                if (isMounted) setRotations(r.data.data || []);
+        listShiftRotations({ per_page: 100 })
+            .then((res) => {
+                if (isMounted) setRotations(res.data || []);
             })
             .catch(() => {
                 if (isMounted) setRotations([]);

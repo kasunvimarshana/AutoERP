@@ -14,17 +14,21 @@ namespace Modules\Hr\Services;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Modules\Hr\DTOs\ResolvedShiftData;
 use Modules\Hr\DTOs\ShiftAssignmentData;
 use Modules\Hr\DTOs\ShiftData;
 use Modules\Hr\DTOs\ShiftReallocationData;
 use Modules\Hr\DTOs\ShiftSwapData;
+use Modules\Hr\Enums\EmployeeStatus;
 use Modules\Hr\Enums\LeaveRequestStatus;
 use Modules\Hr\Enums\ShiftAssignmentType;
+use Modules\Hr\Enums\ShiftStatus;
 use Modules\Hr\Enums\ShiftSwapStatus;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Models\HrHoliday;
+use Modules\Hr\Models\HrHolidayCalendar;
 use Modules\Hr\Models\HrLeaveRequest;
 use Modules\Hr\Models\HrShift;
 use Modules\Hr\Models\HrShiftAssignment;
@@ -90,15 +94,23 @@ final class ShiftRosterService
 
     public function assignShift(int $tenantId, ShiftAssignmentData $data): HrShiftAssignment
     {
-        HrEmployee::query()
+        $employee = HrEmployee::query()
             ->where('tenant_id', $tenantId)
             ->where('id', $data->employeeId)
             ->firstOrFail();
 
-        HrShift::query()
+        if ($employee->status !== EmployeeStatus::Active) {
+            throw new InvalidArgumentException('Cannot assign shift to an inactive employee.');
+        }
+
+        $shift = HrShift::query()
             ->where('tenant_id', $tenantId)
             ->where('id', $data->shiftId)
             ->firstOrFail();
+
+        if ($shift->status !== ShiftStatus::Active) {
+            throw new InvalidArgumentException('Cannot assign an inactive shift.');
+        }
 
         // 1. Validate Overlapping Active Shift Assignments
         if ($data->assignmentType === ShiftAssignmentType::SpecificDate && $data->startDate !== null) {
@@ -184,6 +196,10 @@ final class ShiftRosterService
 
     public function cancelAssignment(HrShiftAssignment $assignment, string $reason): HrShiftAssignment
     {
+        if ($assignment->is_cancelled) {
+            throw new InvalidArgumentException('Shift assignment is already cancelled.');
+        }
+
         $assignment->update([
             'row_version' => $assignment->row_version + 1,
             'is_cancelled' => true,
@@ -225,15 +241,62 @@ final class ShiftRosterService
         }
 
         $requesterShift = $this->resolveShift($tenantId, $data->requesterEmployeeId, $data->swapDate);
+        if ($requesterShift->shift === null) {
+            throw new InvalidArgumentException('Requester does not have a working shift on the requested swap date.');
+        }
+
         $targetShift = $this->resolveShift($tenantId, $data->targetEmployeeId, $data->targetSwapDate);
+        if ($targetShift->shift === null) {
+            throw new InvalidArgumentException('Target peer does not have a working shift on the target swap date.');
+        }
+
+        $activeSwapStatuses = [
+            ShiftSwapStatus::PendingPeer->value,
+            ShiftSwapStatus::PeerAccepted->value,
+            ShiftSwapStatus::ManagerApproved->value,
+        ];
+
+        $requesterHasDuplicate = HrShiftSwap::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', $activeSwapStatuses)
+            ->where(function ($q) use ($data): void {
+                $q->where(function ($sub) use ($data): void {
+                    $sub->where('requester_employee_id', $data->requesterEmployeeId)
+                        ->whereDate('swap_date', $data->swapDate);
+                })->orWhere(function ($sub) use ($data): void {
+                    $sub->where('target_employee_id', $data->requesterEmployeeId)
+                        ->whereDate('target_swap_date', $data->swapDate);
+                });
+            })
+            ->exists();
+        if ($requesterHasDuplicate) {
+            throw new InvalidArgumentException('Requester already has a pending or approved shift swap on this date.');
+        }
+
+        $targetHasDuplicate = HrShiftSwap::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', $activeSwapStatuses)
+            ->where(function ($q) use ($data): void {
+                $q->where(function ($sub) use ($data): void {
+                    $sub->where('requester_employee_id', $data->targetEmployeeId)
+                        ->whereDate('swap_date', $data->targetSwapDate);
+                })->orWhere(function ($sub) use ($data): void {
+                    $sub->where('target_employee_id', $data->targetEmployeeId)
+                        ->whereDate('target_swap_date', $data->targetSwapDate);
+                });
+            })
+            ->exists();
+        if ($targetHasDuplicate) {
+            throw new InvalidArgumentException('Target peer already has a pending or approved shift swap on this date.');
+        }
 
         return HrShiftSwap::create([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $data->organizationUnitId,
             'requester_employee_id' => $data->requesterEmployeeId,
             'target_employee_id' => $data->targetEmployeeId,
-            'requester_shift_id' => $data->requesterShiftId ?? $requesterShift->shift?->getKey(),
-            'target_shift_id' => $data->targetShiftId ?? $targetShift->shift?->getKey(),
+            'requester_shift_id' => $data->requesterShiftId ?? $requesterShift->shift->getKey(),
+            'target_shift_id' => $data->targetShiftId ?? $targetShift->shift->getKey(),
             'swap_date' => $data->swapDate,
             'target_swap_date' => $data->targetSwapDate,
             'reason' => $data->reason,
@@ -277,15 +340,58 @@ final class ShiftRosterService
         return $swap->refresh();
     }
 
+    public function cancelSwap(HrShiftSwap $swap): HrShiftSwap
+    {
+        if (! in_array($swap->status, [ShiftSwapStatus::PendingPeer, ShiftSwapStatus::PeerAccepted], true)) {
+            throw new InvalidArgumentException('Only pending or peer-accepted shift swaps can be cancelled.');
+        }
+
+        $swap->update([
+            'row_version' => $swap->row_version + 1,
+            'status' => ShiftSwapStatus::Cancelled,
+        ]);
+
+        return $swap->refresh();
+    }
+
     public function reallocateCover(int $tenantId, ShiftReallocationData $data): HrShiftReallocation
     {
         if ($data->absentEmployeeId === $data->coverEmployeeId) {
             throw new InvalidArgumentException('Absent employee and cover employee cannot be the same.');
         }
 
-        HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->absentEmployeeId)->firstOrFail();
-        HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->coverEmployeeId)->firstOrFail();
-        HrShift::query()->where('tenant_id', $tenantId)->where('id', $data->shiftId)->firstOrFail();
+        $absentEmployee = HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->absentEmployeeId)->firstOrFail();
+        if ($absentEmployee->status !== EmployeeStatus::Active) {
+            throw new InvalidArgumentException('Absent employee must be active.');
+        }
+
+        $coverEmployee = HrEmployee::query()->where('tenant_id', $tenantId)->where('id', $data->coverEmployeeId)->firstOrFail();
+        if ($coverEmployee->status !== EmployeeStatus::Active) {
+            throw new InvalidArgumentException('Cover employee must be active.');
+        }
+
+        $shift = HrShift::query()->where('tenant_id', $tenantId)->where('id', $data->shiftId)->firstOrFail();
+        if ($shift->status !== ShiftStatus::Active) {
+            throw new InvalidArgumentException('Cannot reallocate an inactive shift.');
+        }
+
+        $duplicateAbsent = HrShiftReallocation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('absent_employee_id', $data->absentEmployeeId)
+            ->whereDate('reallocation_date', $data->reallocationDate)
+            ->exists();
+        if ($duplicateAbsent) {
+            throw new InvalidArgumentException('Absent employee already has a shift reallocation on this date.');
+        }
+
+        $duplicateCover = HrShiftReallocation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('cover_employee_id', $data->coverEmployeeId)
+            ->whereDate('reallocation_date', $data->reallocationDate)
+            ->exists();
+        if ($duplicateCover) {
+            throw new InvalidArgumentException('Cover employee already has a shift reallocation on this date.');
+        }
 
         $coverOnLeave = HrLeaveRequest::query()
             ->where('tenant_id', $tenantId)
@@ -354,10 +460,18 @@ final class ShiftRosterService
             ->where('id', $employeeId)
             ->firstOrFail();
 
-        HrShiftRotation::query()
+        if ($employee->status !== EmployeeStatus::Active) {
+            throw new InvalidArgumentException('Cannot assign rotation to an inactive employee.');
+        }
+
+        $rotation = HrShiftRotation::query()
             ->where('tenant_id', $tenantId)
             ->where('id', $rotationId)
             ->firstOrFail();
+
+        if ($rotation->status !== 'active') {
+            throw new InvalidArgumentException('Cannot assign an inactive shift rotation.');
+        }
 
         $hasOverlap = HrShiftRotationAssignment::query()
             ->where('tenant_id', $tenantId)
@@ -401,6 +515,31 @@ final class ShiftRosterService
             return $this->buildResolvedShift($reallocation->shift, $civilDate, 'reallocation');
         }
 
+        // 1b. Check if employee was reallocated away (absent) on this date
+        $absentReallocation = HrShiftReallocation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('absent_employee_id', $employeeId)
+            ->whereDate('reallocation_date', $civilDate)
+            ->exists();
+
+        if ($absentReallocation) {
+            return new ResolvedShiftData(
+                shift: null,
+                shiftDate: $civilDate,
+                isWorkingDay: false,
+                isRestDay: false,
+                isHoliday: false,
+                holidayName: null,
+                startTime: null,
+                endTime: null,
+                isOvernight: false,
+                scheduledMinutes: 0,
+                graceInMinutes: 0,
+                graceOutMinutes: 0,
+                resolutionSource: 'reallocation_absent',
+            );
+        }
+
         // 2. Check Approved Shift Swap
         $swapAsRequester = HrShiftSwap::query()
             ->where('tenant_id', $tenantId)
@@ -440,7 +579,37 @@ final class ShiftRosterService
             return $this->buildResolvedShift($specificDate->shift, $civilDate, 'specific_date', $specificDate);
         }
 
-        // 4. Check Date-Range Assignment
+        // 4. Check Public Holiday (before date-range, rotation, and recurring schedules)
+        $employeeOrgUnitId = HrEmployee::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId)
+            ->value('organization_unit_id');
+
+        $holiday = $this->resolveHolidayForEmployee(
+            $tenantId,
+            $employeeOrgUnitId !== null ? (int) $employeeOrgUnitId : null,
+            $civilDate,
+        );
+
+        if ($holiday !== null) {
+            return new ResolvedShiftData(
+                shift: null,
+                shiftDate: $civilDate,
+                isWorkingDay: false,
+                isRestDay: false,
+                isHoliday: true,
+                holidayName: $holiday->name,
+                startTime: null,
+                endTime: null,
+                isOvernight: false,
+                scheduledMinutes: 0,
+                graceInMinutes: 0,
+                graceOutMinutes: 0,
+                resolutionSource: 'holiday',
+            );
+        }
+
+        // 5. Check Date-Range Assignment
         $dateRange = HrShiftAssignment::query()
             ->where('tenant_id', $tenantId)
             ->where('employee_id', $employeeId)
@@ -455,7 +624,7 @@ final class ShiftRosterService
             return $this->buildResolvedShift($dateRange->shift, $civilDate, 'date_range', $dateRange);
         }
 
-        // 4b. Check Shift Rotation Assignment
+        // 5b. Check Shift Rotation Assignment (only active rotations)
         $rotationAssignment = HrShiftRotationAssignment::query()
             ->where('tenant_id', $tenantId)
             ->where('employee_id', $employeeId)
@@ -465,10 +634,11 @@ final class ShiftRosterService
                 $q->whereNull('end_date')
                     ->orWhereDate('end_date', '>=', $civilDate);
             })
+            ->whereHas('rotation', static fn ($q) => $q->where('status', 'active'))
             ->with(['rotation.steps.shift'])
             ->first();
 
-        if ($rotationAssignment !== null && $rotationAssignment->rotation !== null) {
+        if ($rotationAssignment !== null && $rotationAssignment->rotation !== null && $rotationAssignment->rotation->status === 'active') {
             $anchor = CarbonImmutable::parse($rotationAssignment->anchor_date);
             $dayDiff = $anchor->diffInDays($date);
             $cycleDays = max(1, (int) $rotationAssignment->rotation->cycle_days);
@@ -499,7 +669,7 @@ final class ShiftRosterService
             }
         }
 
-        // 5. Check Recurring Weekly Assignment (1=Mon ... 7=Sun)
+        // 6. Check Recurring Weekly Assignment (1=Mon ... 7=Sun)
         $dayOfWeek = (int) $date->dayOfWeekIso;
         $recurring = HrShiftAssignment::query()
             ->where('tenant_id', $tenantId)
@@ -512,30 +682,6 @@ final class ShiftRosterService
 
         if ($recurring !== null && $recurring->shift !== null) {
             return $this->buildResolvedShift($recurring->shift, $civilDate, 'recurring', $recurring);
-        }
-
-        // 6. Check Public Holiday
-        $holiday = HrHoliday::query()
-            ->where('tenant_id', $tenantId)
-            ->whereDate('holiday_date', $civilDate)
-            ->first();
-
-        if ($holiday !== null) {
-            return new ResolvedShiftData(
-                shift: null,
-                shiftDate: $civilDate,
-                isWorkingDay: false,
-                isRestDay: false,
-                isHoliday: true,
-                holidayName: $holiday->name,
-                startTime: null,
-                endTime: null,
-                isOvernight: false,
-                scheduledMinutes: 0,
-                graceInMinutes: 0,
-                graceOutMinutes: 0,
-                resolutionSource: 'holiday',
-            );
         }
 
         // 7. Default Rest Day
@@ -568,14 +714,24 @@ final class ShiftRosterService
             return [];
         }
 
-        $reallocations = HrShiftReallocation::query()
+        $allReallocations = HrShiftReallocation::query()
             ->where('tenant_id', $tenantId)
-            ->whereIn('cover_employee_id', $employeeIds)
+            ->where(static function ($q) use ($employeeIds): void {
+                $q->whereIn('cover_employee_id', $employeeIds)
+                    ->orWhereIn('absent_employee_id', $employeeIds);
+            })
             ->whereDate('reallocation_date', '>=', $startDate)
             ->whereDate('reallocation_date', '<=', $endDate)
             ->with('shift')
-            ->get()
+            ->get();
+
+        $reallocations = $allReallocations
+            ->filter(static fn (HrShiftReallocation $item): bool => in_array((int) $item->cover_employee_id, $employeeIds, true))
             ->groupBy(static fn (HrShiftReallocation $item): string => $item->cover_employee_id.'|'.CarbonImmutable::parse($item->reallocation_date)->toDateString());
+
+        $absentReallocations = $allReallocations
+            ->filter(static fn (HrShiftReallocation $item): bool => in_array((int) $item->absent_employee_id, $employeeIds, true))
+            ->groupBy(static fn (HrShiftReallocation $item): string => $item->absent_employee_id.'|'.CarbonImmutable::parse($item->reallocation_date)->toDateString());
 
         $swapsAsRequester = HrShiftSwap::query()
             ->where('tenant_id', $tenantId)
@@ -614,16 +770,34 @@ final class ShiftRosterService
                 $q->whereNull('end_date')
                     ->orWhereDate('end_date', '>=', $startDate);
             })
+            ->whereHas('rotation', static fn ($q) => $q->where('status', 'active'))
             ->with(['rotation.steps.shift'])
             ->get()
             ->groupBy('employee_id');
 
-        $holidaysByDate = HrHoliday::query()
+        $employeeOrgUnits = HrEmployee::query()
             ->where('tenant_id', $tenantId)
-            ->whereDate('holiday_date', '>=', $startDate)
-            ->whereDate('holiday_date', '<=', $endDate)
-            ->get()
-            ->keyBy(static fn (HrHoliday $holiday): string => CarbonImmutable::parse($holiday->holiday_date)->toDateString());
+            ->whereIn('id', $employeeIds)
+            ->pluck('organization_unit_id', 'id');
+
+        $startYear = CarbonImmutable::parse($startDate)->year;
+        $endYear = CarbonImmutable::parse($endDate)->year;
+        $years = range(min($startYear, $endYear), max($startYear, $endYear));
+
+        $calendars = HrHolidayCalendar::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('calendar_year', $years)
+            ->get();
+
+        $holidaysByCalendarAndDate = $calendars->isEmpty()
+            ? collect()
+            : HrHoliday::query()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('calendar_id', $calendars->pluck('id')->all())
+                ->whereDate('holiday_date', '>=', $startDate)
+                ->whereDate('holiday_date', '<=', $endDate)
+                ->get()
+                ->keyBy(static fn (HrHoliday $holiday): string => $holiday->calendar_id.'|'.CarbonImmutable::parse($holiday->holiday_date)->toDateString());
 
         $period = CarbonPeriod::create($startDate, $endDate);
         $dates = [];
@@ -636,16 +810,38 @@ final class ShiftRosterService
         foreach ($employeeIds as $employeeId) {
             $empAssignments = $assignments->get($employeeId, collect());
             $empRotations = $rotationAssignments->get($employeeId, collect());
+            $empOrgUnitId = $employeeOrgUnits->get($employeeId);
+            $empOrgUnitIdInt = $empOrgUnitId !== null ? (int) $empOrgUnitId : null;
             $empDays = [];
 
             foreach ($dates as $civilDate) {
                 $key = $employeeId.'|'.$civilDate;
                 $date = CarbonImmutable::parse($civilDate);
 
-                // 1. Shift Reallocation
+                // 1. Shift Reallocation (Cover or Absent)
                 $reallocation = $reallocations->get($key)?->first();
                 if ($reallocation !== null && $reallocation->shift !== null) {
                     $empDays[$civilDate] = $this->buildResolvedShift($reallocation->shift, $civilDate, 'reallocation');
+
+                    continue;
+                }
+
+                if ($absentReallocations->has($key)) {
+                    $empDays[$civilDate] = new ResolvedShiftData(
+                        shift: null,
+                        shiftDate: $civilDate,
+                        isWorkingDay: false,
+                        isRestDay: false,
+                        isHoliday: false,
+                        holidayName: null,
+                        startTime: null,
+                        endTime: null,
+                        isOvernight: false,
+                        scheduledMinutes: 0,
+                        graceInMinutes: 0,
+                        graceOutMinutes: 0,
+                        resolutionSource: 'reallocation_absent',
+                    );
 
                     continue;
                 }
@@ -675,7 +871,30 @@ final class ShiftRosterService
                     continue;
                 }
 
-                // 4. Date-Range Assignment
+                // 4. Public Holiday (scoped to employee org-unit calendar or default calendar)
+                $calendarId = $this->resolveCalendarIdForYear($calendars, $empOrgUnitIdInt, $date->year);
+                $holiday = $calendarId !== null ? $holidaysByCalendarAndDate->get($calendarId.'|'.$civilDate) : null;
+                if ($holiday !== null) {
+                    $empDays[$civilDate] = new ResolvedShiftData(
+                        shift: null,
+                        shiftDate: $civilDate,
+                        isWorkingDay: false,
+                        isRestDay: false,
+                        isHoliday: true,
+                        holidayName: $holiday->name,
+                        startTime: null,
+                        endTime: null,
+                        isOvernight: false,
+                        scheduledMinutes: 0,
+                        graceInMinutes: 0,
+                        graceOutMinutes: 0,
+                        resolutionSource: 'holiday',
+                    );
+
+                    continue;
+                }
+
+                // 5. Date-Range Assignment
                 $dateRange = $empAssignments->first(static fn (HrShiftAssignment $a): bool => $a->assignment_type === ShiftAssignmentType::DateRange
                     && $a->start_date !== null
                     && $a->end_date !== null
@@ -687,8 +906,10 @@ final class ShiftRosterService
                     continue;
                 }
 
-                // 4b. Shift Rotation Assignment
-                $rotationAssignment = $empRotations->first(static fn (HrShiftRotationAssignment $r): bool => CarbonImmutable::parse($r->anchor_date)->toDateString() <= $civilDate
+                // 5b. Shift Rotation Assignment (only active rotations)
+                $rotationAssignment = $empRotations->first(static fn (HrShiftRotationAssignment $r): bool => $r->rotation !== null
+                    && $r->rotation->status === 'active'
+                    && CarbonImmutable::parse($r->anchor_date)->toDateString() <= $civilDate
                     && ($r->end_date === null || CarbonImmutable::parse($r->end_date)->toDateString() >= $civilDate));
                 if ($rotationAssignment !== null && $rotationAssignment->rotation !== null) {
                     $anchor = CarbonImmutable::parse($rotationAssignment->anchor_date);
@@ -724,34 +945,12 @@ final class ShiftRosterService
                     }
                 }
 
-                // 5. Recurring Weekly Assignment (1=Mon ... 7=Sun)
+                // 6. Recurring Weekly Assignment (1=Mon ... 7=Sun)
                 $dayOfWeek = (int) $date->dayOfWeekIso;
                 $recurring = $empAssignments->first(static fn (HrShiftAssignment $a): bool => $a->assignment_type === ShiftAssignmentType::Recurring
                     && (int) $a->day_of_week === $dayOfWeek);
                 if ($recurring !== null && $recurring->shift !== null) {
                     $empDays[$civilDate] = $this->buildResolvedShift($recurring->shift, $civilDate, 'recurring', $recurring);
-
-                    continue;
-                }
-
-                // 6. Public Holiday
-                $holiday = $holidaysByDate->get($civilDate);
-                if ($holiday !== null) {
-                    $empDays[$civilDate] = new ResolvedShiftData(
-                        shift: null,
-                        shiftDate: $civilDate,
-                        isWorkingDay: false,
-                        isRestDay: false,
-                        isHoliday: true,
-                        holidayName: $holiday->name,
-                        startTime: null,
-                        endTime: null,
-                        isOvernight: false,
-                        scheduledMinutes: 0,
-                        graceInMinutes: 0,
-                        graceOutMinutes: 0,
-                        resolutionSource: 'holiday',
-                    );
 
                     continue;
                 }
@@ -817,5 +1016,54 @@ final class ShiftRosterService
             graceOutMinutes: (int) $shift->grace_out_minutes,
             resolutionSource: $source,
         );
+    }
+
+    private function resolveHolidayForEmployee(int $tenantId, ?int $orgUnitId, string $civilDate): ?HrHoliday
+    {
+        $year = CarbonImmutable::parse($civilDate)->year;
+        $calendars = HrHolidayCalendar::query()
+            ->where('tenant_id', $tenantId)
+            ->where('calendar_year', $year)
+            ->get();
+
+        $calendarId = $this->resolveCalendarIdForYear($calendars, $orgUnitId, $year);
+        if ($calendarId === null) {
+            return null;
+        }
+
+        return HrHoliday::query()
+            ->where('tenant_id', $tenantId)
+            ->where('calendar_id', $calendarId)
+            ->whereDate('holiday_date', $civilDate)
+            ->first();
+    }
+
+    /**
+     * @param  Collection<int, HrHolidayCalendar>  $calendars
+     */
+    private function resolveCalendarIdForYear(Collection $calendars, ?int $orgUnitId, int $year): ?int
+    {
+        $yearCalendars = $calendars->where('calendar_year', $year);
+        if ($yearCalendars->isEmpty()) {
+            return null;
+        }
+
+        if ($orgUnitId !== null) {
+            $orgCalendar = $yearCalendars
+                ->where('organization_unit_id', $orgUnitId)
+                ->sortByDesc('is_default')
+                ->first();
+
+            if ($orgCalendar !== null) {
+                return (int) $orgCalendar->id;
+            }
+        }
+
+        $defaultCalendar = $yearCalendars
+            ->where('is_default', true)
+            ->sortBy(static fn (HrHolidayCalendar $c): int => $c->organization_unit_id === null ? 0 : 1)
+            ->first();
+
+        return $defaultCalendar !== null ? (int) $defaultCalendar->id : null;
     }
 }

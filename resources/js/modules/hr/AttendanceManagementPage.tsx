@@ -10,14 +10,20 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button } from '@/shared/components/Button';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { Modal } from '@/shared/components/Modal';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { GeofencesAndKiosksTab } from './components/attendance/GeofencesAndKiosksTab';
 import { EmployeeLookupSelect } from './components/EmployeeLookupSelect';
 import {
     actionAttendanceRegularization,
+    cancelAttendanceRegularization,
     commitAttendanceImport,
     directAdjustAttendanceRecord,
     getKioskQrToken,
@@ -25,6 +31,7 @@ import {
     listAttendanceKiosks,
     listAttendanceRecords,
     listAttendanceRegularizations,
+    lockAttendancePeriod,
     previewAttendanceImport,
     punchAttendance,
     quickResolveAttendanceAnomaly,
@@ -40,13 +47,15 @@ import type {
     HrAttendanceRegularization,
 } from './hrTypes';
 
-type ActiveTab = 'records' | 'regularizations' | 'anomalies' | 'kiosk' | 'import';
+type ActiveTab = 'records' | 'regularizations' | 'anomalies' | 'kiosk' | 'geofences' | 'import';
 
 export default function AttendanceManagementPage() {
     const auth = useAuth();
     const canView = hasPermission(auth, hrPermissions.attendanceView);
     const canManage = hasPermission(auth, hrPermissions.attendanceManage);
     const canPunch = hasPermission(auth, hrPermissions.attendancePunch);
+    const canRegularize = hasPermission(auth, hrPermissions.attendanceRegularize);
+    const { confirm, confirmDialog } = useConfirmDialog();
 
     const [activeTab, setActiveTab] = useState<ActiveTab>('records');
 
@@ -62,11 +71,17 @@ export default function AttendanceManagementPage() {
     const [kiosks, setKiosks] = useState<HrAttendanceKiosk[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [modalError, setModalError] = useState<ApiError | null>(null);
+    const [lockSuccessMessage, setLockSuccessMessage] = useState<string | null>(null);
 
     // Modals
     const [showRegularizeModal, setShowRegularizeModal] = useState(false);
     const [showAdjustModal, setShowAdjustModal] = useState(false);
     const [showQuickResolveModal, setShowQuickResolveModal] = useState(false);
+    const [showLockModal, setShowLockModal] = useState(false);
+    const [lockStartDate, setLockStartDate] = useState(() => businessDateInputValue(new Date(), undefined, -7));
+    const [lockEndDate, setLockEndDate] = useState(() => businessDateInputValue());
+    const [lockSubmitting, setLockSubmitting] = useState(false);
     const [selectedRecordForAdjust, setSelectedRecordForAdjust] = useState<HrAttendanceRecord | null>(null);
     const [selectedRecordForQuickResolve, setSelectedRecordForQuickResolve] = useState<HrAttendanceRecord | null>(null);
 
@@ -116,7 +131,7 @@ export default function AttendanceManagementPage() {
 
     const fetchRegularizations = useCallback(() => {
         listAttendanceRegularizations({ status: 'pending' })
-            .then((data) => setRegularizations(data))
+            .then((res) => setRegularizations(res.data))
             .catch(() => {});
     }, []);
 
@@ -127,8 +142,9 @@ export default function AttendanceManagementPage() {
     }, []);
 
     const fetchKiosks = useCallback(() => {
-        listAttendanceKiosks()
-            .then((data) => {
+        listAttendanceKiosks({ per_page: 100 })
+            .then((res) => {
+                const data = res.data;
                 setKiosks(data);
                 if (data.length > 0) {
                     setSelectedKioskId((prev) => (prev === null ? data[0].id : prev));
@@ -150,7 +166,7 @@ export default function AttendanceManagementPage() {
 
     // Dynamic Kiosk Timer
     useEffect(() => {
-        if (activeTab !== 'kiosk' || !selectedKioskId) return;
+        if (activeTab !== 'kiosk' || !selectedKioskId || !canManage) return;
 
         const refreshQr = () => {
             getKioskQrToken(selectedKioskId)
@@ -165,7 +181,7 @@ export default function AttendanceManagementPage() {
         const interval = setInterval(refreshQr, 10000);
 
         return () => clearInterval(interval);
-    }, [activeTab, selectedKioskId]);
+    }, [activeTab, selectedKioskId, canManage]);
 
     if (!canView) return <AccessDeniedPage />;
 
@@ -189,6 +205,7 @@ export default function AttendanceManagementPage() {
     const handleRegularizeSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedEmployee) return;
+        setModalError(null);
         try {
             await requestAttendanceRegularization({
                 employee_id: selectedEmployee.id,
@@ -204,42 +221,64 @@ export default function AttendanceManagementPage() {
             fetchRegularizations();
             fetchAnomalies();
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Regularization request failed');
+            setModalError(toApiError(err));
         }
     };
 
-    const handleActionRegularization = async (id: number, approve: boolean) => {
+    const handleActionRegularization = async (reg: HrAttendanceRegularization, approve: boolean) => {
+        setError(null);
         try {
-            await actionAttendanceRegularization(id, approve);
+            await actionAttendanceRegularization(reg.id, approve, undefined, reg.row_version);
             fetchRegularizations();
             fetchRecords();
             fetchAnomalies();
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to action regularization');
+            setError(toApiError(err).message);
+        }
+    };
+
+    const handleCancelRegularization = async (reg: HrAttendanceRegularization) => {
+        const confirmed = await confirm({
+            title: 'Cancel Regularization',
+            message: `Withdraw pending regularization request for ${reg.attendance_date}?`,
+            confirmLabel: 'Withdraw Request',
+            danger: true,
+        });
+        if (!confirmed) return;
+        setError(null);
+        try {
+            await cancelAttendanceRegularization(reg.id, reg.row_version);
+            fetchRegularizations();
+            fetchRecords();
+        } catch (err: unknown) {
+            setError(toApiError(err).message);
         }
     };
 
     const handleDirectAdjustSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRecordForAdjust) return;
+        setModalError(null);
         try {
             await directAdjustAttendanceRecord(selectedRecordForAdjust.id, {
                 new_status: adjustStatus,
                 new_worked_minutes: Number(adjustWorkedMinutes),
                 new_overtime_minutes: Number(adjustOtMinutes),
                 adjustment_reason: adjustReason,
+                expected_version: selectedRecordForAdjust.row_version,
             });
             setShowAdjustModal(false);
             fetchRecords();
             fetchAnomalies();
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Direct adjustment failed');
+            setModalError(toApiError(err));
         }
     };
 
     const handleQuickResolveSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRecordForQuickResolve) return;
+        setModalError(null);
         try {
             await quickResolveAttendanceAnomaly(selectedRecordForQuickResolve.id, {
                 in_time: quickInTime || undefined,
@@ -251,7 +290,28 @@ export default function AttendanceManagementPage() {
             fetchRecords();
             fetchAnomalies();
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Quick resolution failed');
+            setModalError(toApiError(err));
+        }
+    };
+
+    const handleLockPeriodSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!canManage || lockSubmitting) return;
+        setLockSubmitting(true);
+        setModalError(null);
+        setLockSuccessMessage(null);
+        try {
+            const res = await lockAttendancePeriod({
+                start_date: lockStartDate,
+                end_date: lockEndDate,
+            });
+            setShowLockModal(false);
+            setLockSuccessMessage(`Finalized ${res.locked_count} attendance record(s) from ${lockStartDate} to ${lockEndDate}.`);
+            fetchRecords();
+        } catch (err: unknown) {
+            setModalError(toApiError(err));
+        } finally {
+            setLockSubmitting(false);
         }
     };
 
@@ -319,13 +379,34 @@ export default function AttendanceManagementPage() {
                 actions={
                     <div className="flex gap-2">
                         {canManage && (
-                            <Button variant="secondary" onClick={handleScanAnomalies}>
-                                Scan Missing Punches
+                            <>
+                                <Button variant="secondary" onClick={handleScanAnomalies}>
+                                    Scan Missing Punches
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setModalError(null);
+                                        setLockStartDate(startDate);
+                                        setLockEndDate(endDate);
+                                        setShowLockModal(true);
+                                    }}
+                                >
+                                    Lock Period
+                                </Button>
+                            </>
+                        )}
+                        {canRegularize && (
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    setModalError(null);
+                                    setShowRegularizeModal(true);
+                                }}
+                            >
+                                Request Regularization
                             </Button>
                         )}
-                        <Button variant="primary" onClick={() => setShowRegularizeModal(true)}>
-                            Request Regularization
-                        </Button>
                     </div>
                 }
             />
@@ -333,6 +414,12 @@ export default function AttendanceManagementPage() {
             {error && (
                 <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300">
                     {error}
+                </div>
+            )}
+
+            {lockSuccessMessage && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                    {lockSuccessMessage}
                 </div>
             )}
 
@@ -401,6 +488,12 @@ export default function AttendanceManagementPage() {
                     Dynamic QR Kiosk
                 </button>
                 <button
+                    className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === 'geofences' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                    onClick={() => setActiveTab('geofences')}
+                >
+                    Geofences & Kiosks
+                </button>
+                <button
                     className={`border-b-2 px-4 py-2 text-sm font-medium ${activeTab === 'import' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
                     onClick={() => setActiveTab('import')}
                 >
@@ -466,7 +559,7 @@ export default function AttendanceManagementPage() {
                                                     {r.attendance_date}
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-800 dark:text-gray-200">
-                                                    {r.employee?.display_name ?? `EMP #${r.employee_id}`}
+                                                    {r.employee?.display_name ?? 'Unknown employee'}
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                                                     {r.shift?.name ?? 'Unassigned'}
@@ -496,6 +589,7 @@ export default function AttendanceManagementPage() {
                                                         <Button
                                                             variant="primary"
                                                             onClick={() => {
+                                                                setModalError(null);
                                                                 setSelectedRecordForQuickResolve(r);
                                                                 setQuickInTime(r.first_punch_in ? r.first_punch_in.slice(0, 19) : `${r.attendance_date} 08:00:00`);
                                                                 setQuickOutTime(r.last_punch_out ? r.last_punch_out.slice(0, 19) : `${r.attendance_date} 17:00:00`);
@@ -510,6 +604,7 @@ export default function AttendanceManagementPage() {
                                                         <Button
                                                             variant="secondary"
                                                             onClick={() => {
+                                                                setModalError(null);
                                                                 setSelectedRecordForAdjust(r);
                                                                 setAdjustStatus(r.status);
                                                                 setAdjustWorkedMinutes(r.total_worked_minutes);
@@ -574,7 +669,7 @@ export default function AttendanceManagementPage() {
                                                 {a.attendance_date}
                                             </td>
                                             <td className="px-4 py-3 text-gray-800 dark:text-gray-200">
-                                                {a.employee?.display_name ?? `EMP #${a.employee_id}`}
+                                                {a.employee?.display_name ?? 'Unknown employee'}
                                             </td>
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                                                 {a.shift?.name ?? 'Standard Shift'}
@@ -589,18 +684,21 @@ export default function AttendanceManagementPage() {
                                                 {a.last_punch_out ? a.last_punch_out.slice(11, 16) : '(MISSING)'}
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                <Button
-                                                    variant="primary"
-                                                    onClick={() => {
-                                                        setSelectedRecordForQuickResolve(a);
-                                                        setQuickInTime(a.first_punch_in ? a.first_punch_in.slice(0, 19) : `${a.attendance_date} 08:00:00`);
-                                                        setQuickOutTime(a.last_punch_out ? a.last_punch_out.slice(0, 19) : `${a.attendance_date} 17:00:00`);
-                                                        setQuickReason('Quick-resolved via Anomaly Desk');
-                                                        setShowQuickResolveModal(true);
-                                                    }}
-                                                >
-                                                    Resolve Anomaly
-                                                </Button>
+                                                {canManage && (
+                                                    <Button
+                                                        variant="primary"
+                                                        onClick={() => {
+                                                            setModalError(null);
+                                                            setSelectedRecordForQuickResolve(a);
+                                                            setQuickInTime(a.first_punch_in ? a.first_punch_in.slice(0, 19) : `${a.attendance_date} 08:00:00`);
+                                                            setQuickOutTime(a.last_punch_out ? a.last_punch_out.slice(0, 19) : `${a.attendance_date} 17:00:00`);
+                                                            setQuickReason('Quick-resolved via Anomaly Desk');
+                                                            setShowQuickResolveModal(true);
+                                                        }}
+                                                    >
+                                                        Resolve Anomaly
+                                                    </Button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))
@@ -640,7 +738,7 @@ export default function AttendanceManagementPage() {
                                                 {reg.attendance_date}
                                             </td>
                                             <td className="px-4 py-3 text-gray-800 dark:text-gray-200">
-                                                {reg.employee?.display_name ?? `EMP #${reg.employee_id}`}
+                                                {reg.employee?.display_name ?? 'Unknown employee'}
                                             </td>
                                             <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                                                 <div className="font-medium">{reg.reason_code}</div>
@@ -656,13 +754,18 @@ export default function AttendanceManagementPage() {
                                             <td className="px-4 py-3 text-right space-x-2">
                                                 {canManage && reg.status === 'pending' && (
                                                     <>
-                                                        <Button variant="primary" onClick={() => handleActionRegularization(reg.id, true)}>
+                                                        <Button variant="primary" onClick={() => handleActionRegularization(reg, true)}>
                                                             Approve
                                                         </Button>
-                                                        <Button variant="danger" onClick={() => handleActionRegularization(reg.id, false)}>
+                                                        <Button variant="danger" onClick={() => handleActionRegularization(reg, false)}>
                                                             Reject
                                                         </Button>
                                                     </>
+                                                )}
+                                                {(canRegularize || canManage) && reg.status === 'pending' && (
+                                                    <Button variant="secondary" onClick={() => handleCancelRegularization(reg)}>
+                                                        Withdraw
+                                                    </Button>
                                                 )}
                                             </td>
                                         </tr>
@@ -725,6 +828,11 @@ export default function AttendanceManagementPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* TAB 4b: Geofences & Kiosks */}
+            {activeTab === 'geofences' && (
+                <GeofencesAndKiosksTab canManage={canManage} onKiosksChanged={fetchKiosks} />
             )}
 
             {/* TAB 5: Batch File Import */}
@@ -844,217 +952,271 @@ export default function AttendanceManagementPage() {
             )}
 
             {/* Modal: Quick Resolve Missing Punch */}
-            {showQuickResolveModal && selectedRecordForQuickResolve && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
-                        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
-                            Quick Resolve Missing Punch
-                        </h3>
-                        <p className="mb-4 text-xs text-gray-500">
-                            Employee: {selectedRecordForQuickResolve.employee?.display_name ?? `ID #${selectedRecordForQuickResolve.employee_id}`} | Date: {selectedRecordForQuickResolve.attendance_date}
+            <Modal
+                open={showQuickResolveModal && selectedRecordForQuickResolve !== null}
+                title="Quick Resolve Missing Punch"
+                onClose={() => setShowQuickResolveModal(false)}
+            >
+                {selectedRecordForQuickResolve && (
+                    <form onSubmit={handleQuickResolveSubmit} className="space-y-4">
+                        <ErrorAlert error={modalError} inline />
+                        <p className="text-xs text-gray-500">
+                            Employee: {selectedRecordForQuickResolve.employee?.display_name ?? 'Unknown employee'} | Date: {selectedRecordForQuickResolve.attendance_date}
                         </p>
-                        <form onSubmit={handleQuickResolveSubmit} className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    First Clock In Timestamp
-                                </label>
-                                <input
-                                    type="text"
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    value={quickInTime}
-                                    onChange={(e) => setQuickInTime(e.target.value)}
-                                    placeholder="YYYY-MM-DD HH:MM:SS"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Last Clock Out Timestamp
-                                </label>
-                                <input
-                                    type="text"
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    value={quickOutTime}
-                                    onChange={(e) => setQuickOutTime(e.target.value)}
-                                    placeholder="YYYY-MM-DD HH:MM:SS"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Resolution Reason (Audit Trail)
-                                </label>
-                                <input
-                                    type="text"
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    value={quickReason}
-                                    onChange={(e) => setQuickReason(e.target.value)}
-                                    placeholder="e.g. Card tap failure confirmed by shift lead"
-                                    required
-                                />
-                            </div>
-                            <div className="mt-6 flex justify-end gap-2">
-                                <Button variant="secondary" onClick={() => setShowQuickResolveModal(false)}>
-                                    Cancel
-                                </Button>
-                                <Button variant="primary" type="submit" disabled={!quickReason}>
-                                    Apply Quick Fix
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                First Clock In Timestamp
+                            </label>
+                            <input
+                                type="text"
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={quickInTime}
+                                onChange={(e) => setQuickInTime(e.target.value)}
+                                placeholder="YYYY-MM-DD HH:MM:SS"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Last Clock Out Timestamp
+                            </label>
+                            <input
+                                type="text"
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={quickOutTime}
+                                onChange={(e) => setQuickOutTime(e.target.value)}
+                                placeholder="YYYY-MM-DD HH:MM:SS"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Resolution Reason (Audit Trail)
+                            </label>
+                            <input
+                                type="text"
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={quickReason}
+                                onChange={(e) => setQuickReason(e.target.value)}
+                                placeholder="e.g. Card tap failure confirmed by shift lead"
+                                required
+                            />
+                        </div>
+                        <div className="mt-6 flex justify-end gap-2">
+                            <Button variant="secondary" type="button" onClick={() => setShowQuickResolveModal(false)}>
+                                Cancel
+                            </Button>
+                            <Button variant="primary" type="submit" disabled={!quickReason}>
+                                Apply Quick Fix
+                            </Button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
 
             {/* Modal: Request Regularization */}
-            {showRegularizeModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Submit Attendance Regularization</h3>
-                        <form onSubmit={handleRegularizeSubmit} className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Attendance Date</label>
-                                <input
-                                    type="date"
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    value={regDate}
-                                    onChange={(e) => setRegDate(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Regularization Type</label>
-                                <select
-                                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    value={regType}
-                                    onChange={(e) => setRegType(e.target.value as HrAttendanceRegularization['regularization_type'])}
-                                >
-                                    <option value="missing_in">Missing In Punch</option>
-                                    <option value="missing_out">Missing Out Punch</option>
-                                    <option value="both_missing">Both Punches Missing</option>
-                                    <option value="incorrect_time">Incorrect Time Clocked</option>
-                                    <option value="forgot_to_punch">Forgot to Punch</option>
-                                    <option value="on_duty">Official On-Duty / Client Visit</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Proposed In Time</label>
-                                    <input
-                                        type="time"
-                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                        value={regInTime}
-                                        onChange={(e) => setRegInTime(e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Proposed Out Time</label>
-                                    <input
-                                        type="time"
-                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                        value={regOutTime}
-                                        onChange={(e) => setRegOutTime(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reason</label>
-                                <input
-                                    type="text"
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    value={regReason}
-                                    onChange={(e) => setRegReason(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Detailed Notes</label>
-                                <textarea
-                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    rows={3}
-                                    value={regNotes}
-                                    onChange={(e) => setRegNotes(e.target.value)}
-                                    placeholder="Explain why punch regularization is needed..."
-                                    required
-                                />
-                            </div>
-                            <div className="mt-6 flex justify-end gap-2">
-                                <Button variant="secondary" onClick={() => setShowRegularizeModal(false)}>
-                                    Cancel
-                                </Button>
-                                <Button variant="primary" type="submit" disabled={!selectedEmployee || !regNotes}>
-                                    Submit Request
-                                </Button>
-                            </div>
-                        </form>
+            <Modal
+                open={showRegularizeModal}
+                title="Submit Attendance Regularization"
+                onClose={() => setShowRegularizeModal(false)}
+            >
+                <form onSubmit={handleRegularizeSubmit} className="space-y-4">
+                    <ErrorAlert error={modalError} inline />
+                    <EmployeeLookupSelect
+                        label="Employee"
+                        value={selectedEmployee}
+                        onChange={setSelectedEmployee}
+                    />
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Attendance Date</label>
+                        <input
+                            type="date"
+                            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                            value={regDate}
+                            onChange={(e) => setRegDate(e.target.value)}
+                            required
+                        />
                     </div>
-                </div>
-            )}
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Regularization Type</label>
+                        <select
+                            className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                            value={regType}
+                            onChange={(e) => setRegType(e.target.value as HrAttendanceRegularization['regularization_type'])}
+                        >
+                            <option value="missing_in">Missing In Punch</option>
+                            <option value="missing_out">Missing Out Punch</option>
+                            <option value="both_missing">Both Punches Missing</option>
+                            <option value="incorrect_time">Incorrect Time Clocked</option>
+                            <option value="forgot_to_punch">Forgot to Punch</option>
+                            <option value="on_duty">Official On-Duty / Client Visit</option>
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Proposed In Time</label>
+                            <input
+                                type="time"
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={regInTime}
+                                onChange={(e) => setRegInTime(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Proposed Out Time</label>
+                            <input
+                                type="time"
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={regOutTime}
+                                onChange={(e) => setRegOutTime(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reason</label>
+                        <input
+                            type="text"
+                            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                            value={regReason}
+                            onChange={(e) => setRegReason(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Detailed Notes</label>
+                        <textarea
+                            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                            rows={3}
+                            value={regNotes}
+                            onChange={(e) => setRegNotes(e.target.value)}
+                            placeholder="Explain why punch regularization is needed..."
+                            required
+                        />
+                    </div>
+                    <div className="mt-6 flex justify-end gap-2">
+                        <Button variant="secondary" type="button" onClick={() => setShowRegularizeModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="primary" type="submit" disabled={!selectedEmployee || !regNotes}>
+                            Submit Request
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Modal: Direct Adjust Attendance */}
-            {showAdjustModal && selectedRecordForAdjust && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
-                        <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Direct Manager Adjustment</h3>
-                        <form onSubmit={handleDirectAdjustSubmit} className="space-y-4">
+            <Modal
+                open={showAdjustModal && selectedRecordForAdjust !== null}
+                title="Direct Manager Adjustment"
+                onClose={() => setShowAdjustModal(false)}
+            >
+                {selectedRecordForAdjust && (
+                    <form onSubmit={handleDirectAdjustSubmit} className="space-y-4">
+                        <ErrorAlert error={modalError} inline />
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                            <select
+                                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={adjustStatus}
+                                onChange={(e) => setAdjustStatus(e.target.value)}
+                            >
+                                <option value="present">Present</option>
+                                <option value="late">Late</option>
+                                <option value="half_day">Half Day</option>
+                                <option value="absent">Absent</option>
+                                <option value="on_leave">On Leave</option>
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                                <select
-                                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    value={adjustStatus}
-                                    onChange={(e) => setAdjustStatus(e.target.value)}
-                                >
-                                    <option value="present">Present</option>
-                                    <option value="late">Late</option>
-                                    <option value="half_day">Half Day</option>
-                                    <option value="absent">Absent</option>
-                                    <option value="on_leave">On Leave</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Worked Minutes</label>
-                                    <input
-                                        type="number"
-                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                        value={adjustWorkedMinutes}
-                                        onChange={(e) => setAdjustWorkedMinutes(Number(e.target.value))}
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Overtime Minutes</label>
-                                    <input
-                                        type="number"
-                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                        value={adjustOtMinutes}
-                                        onChange={(e) => setAdjustOtMinutes(Number(e.target.value))}
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Mandatory Audit Reason</label>
-                                <textarea
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Worked Minutes</label>
+                                <input
+                                    type="number"
                                     className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                                    rows={2}
-                                    value={adjustReason}
-                                    onChange={(e) => setAdjustReason(e.target.value)}
-                                    placeholder="Explain why this record is being adjusted directly..."
+                                    value={adjustWorkedMinutes}
+                                    onChange={(e) => setAdjustWorkedMinutes(Number(e.target.value))}
                                     required
                                 />
                             </div>
-
-                            <div className="mt-6 flex justify-end gap-2">
-                                <Button variant="secondary" onClick={() => setShowAdjustModal(false)}>
-                                    Cancel
-                                </Button>
-                                <Button variant="primary" type="submit" disabled={!adjustReason}>
-                                    Save Adjustment
-                                </Button>
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Overtime Minutes</label>
+                                <input
+                                    type="number"
+                                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                    value={adjustOtMinutes}
+                                    onChange={(e) => setAdjustOtMinutes(Number(e.target.value))}
+                                    required
+                                />
                             </div>
-                        </form>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Mandatory Audit Reason</label>
+                            <textarea
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                rows={2}
+                                value={adjustReason}
+                                onChange={(e) => setAdjustReason(e.target.value)}
+                                placeholder="Explain why this record is being adjusted directly..."
+                                required
+                            />
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-2">
+                            <Button variant="secondary" type="button" onClick={() => setShowAdjustModal(false)}>
+                                Cancel
+                            </Button>
+                            <Button variant="primary" type="submit" disabled={!adjustReason}>
+                                Save Adjustment
+                            </Button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+
+            {/* Modal: Lock Attendance Period */}
+            <Modal
+                open={showLockModal}
+                title="Lock Attendance Period"
+                onClose={() => setShowLockModal(false)}
+                closeDisabled={lockSubmitting}
+            >
+                <form onSubmit={handleLockPeriodSubmit} className="space-y-4">
+                    <ErrorAlert error={modalError} inline />
+                    <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
+                        Finalizing an attendance period locks all open records in the selected date range. Finalized records cannot be edited or regularized.
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
+                            <input
+                                type="date"
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={lockStartDate}
+                                onChange={(e) => setLockStartDate(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">End Date</label>
+                            <input
+                                type="date"
+                                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                                value={lockEndDate}
+                                onChange={(e) => setLockEndDate(e.target.value)}
+                                required
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
+                    <div className="mt-6 flex justify-end gap-2">
+                        <Button variant="secondary" type="button" onClick={() => setShowLockModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="danger" type="submit" disabled={lockSubmitting}>
+                            {lockSubmitting ? 'Finalizing...' : 'Finalize & Lock Period'}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {confirmDialog}
         </div>
     );
 }

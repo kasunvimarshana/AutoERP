@@ -212,7 +212,7 @@ final class HrLeaveController
     {
         $tenantId = $request->tenantId();
         $validated = $request->validate([
-            'leave_type_id' => ['required', 'integer', Rule::exists('hr_leave_types', 'id')->where('tenant_id', $tenantId)],
+            'leave_type_id' => ['required', 'integer', Rule::exists('hr_leave_types', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'name' => ['required', 'string', 'max:100'],
             'annual_allocation_days' => ['required', 'numeric', 'min:0'],
             'effective_from' => ['required', 'date'],
@@ -268,7 +268,7 @@ final class HrLeaveController
 
         $validated = $request->validate([
             'expected_version' => ['sometimes', 'integer', 'min:1'],
-            'leave_type_id' => ['sometimes', 'required', 'integer', Rule::exists('hr_leave_types', 'id')->where('tenant_id', $tenantId)],
+            'leave_type_id' => ['sometimes', 'required', 'integer', Rule::exists('hr_leave_types', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'name' => ['sometimes', 'required', 'string', 'max:100'],
             'annual_allocation_days' => ['sometimes', 'required', 'numeric', 'min:0'],
             'effective_from' => ['sometimes', 'required', 'date'],
@@ -392,7 +392,8 @@ final class HrLeaveController
         $query = HrLeaveRequest::query()
             ->where('tenant_id', $request->tenantId())
             ->with(['employee', 'leaveType', 'approver'])
-            ->orderBy('created_at', 'desc');
+            ->orderByDesc('start_date')
+            ->orderByDesc('id');
 
         if (! empty($validated['employee_id'])) {
             $query->where('employee_id', (int) $validated['employee_id']);
@@ -423,10 +424,10 @@ final class HrLeaveController
         $tenantId = $request->tenantId();
         $validated = $request->validate([
             'employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')->where('tenant_id', $tenantId)],
-            'leave_type_id' => ['required', 'integer', Rule::exists('hr_leave_types', 'id')->where('tenant_id', $tenantId)],
+            'leave_type_id' => ['required', 'integer', Rule::exists('hr_leave_types', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'total_days' => ['required', 'numeric', 'min:0.5'],
+            'total_days' => ['nullable', 'numeric', 'min:0.25'],
             'reason' => ['required', 'string'],
             'duration_type' => ['nullable', 'string', Rule::enum(LeaveDurationType::class)],
             'attachment_document_id' => ['nullable', 'integer', Rule::exists('hr_employee_documents', 'id')->where('tenant_id', $tenantId)],
@@ -437,7 +438,7 @@ final class HrLeaveController
             leaveTypeId: (int) $validated['leave_type_id'],
             startDate: $validated['start_date'],
             endDate: $validated['end_date'],
-            totalDays: (string) $validated['total_days'],
+            totalDays: (string) ($validated['total_days'] ?? '0.00'),
             reason: $validated['reason'],
             durationType: isset($validated['duration_type']) ? LeaveDurationType::from($validated['duration_type']) : LeaveDurationType::FullDay,
             attachmentDocumentId: isset($validated['attachment_document_id']) ? (int) $validated['attachment_document_id'] : null,
@@ -530,7 +531,8 @@ final class HrLeaveController
         $query = HrCompOffClaim::query()
             ->where('tenant_id', $request->tenantId())
             ->with(['employee'])
-            ->orderBy('created_at', 'desc');
+            ->orderByDesc('worked_date')
+            ->orderByDesc('id');
 
         if (! empty($validated['employee_id'])) {
             $query->where('employee_id', (int) $validated['employee_id']);

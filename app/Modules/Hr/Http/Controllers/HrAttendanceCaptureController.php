@@ -14,13 +14,16 @@ namespace Modules\Hr\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
+use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Hr\Enums\CaptureMethod;
 use Modules\Hr\Enums\PunchType;
 use Modules\Hr\Models\HrAttendanceKiosk;
+use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Services\Capture\AttendanceCaptureService;
 use Modules\Hr\Services\Capture\BatchAttendanceImportService;
 use Modules\Hr\Services\Capture\DynamicQrSecurityService;
+use Modules\Hr\Services\HrAuthorizationService;
 
 final class HrAttendanceCaptureController
 {
@@ -28,6 +31,7 @@ final class HrAttendanceCaptureController
         private readonly AttendanceCaptureService $captureService,
         private readonly BatchAttendanceImportService $importService,
         private readonly DynamicQrSecurityService $qrSecurityService,
+        private readonly PermissionCheckerInterface $permissions,
     ) {}
 
     public function capture(TenantScopedRequest $request): JsonResponse
@@ -39,6 +43,11 @@ final class HrAttendanceCaptureController
 
         $method = CaptureMethod::from($validated['capture_method']);
         $payload = $validated['payload'];
+        if (isset($payload['employee_id']) && is_numeric($payload['employee_id'])) {
+            if ($forbidden = $this->authorizeEmployeeCapture($request, (int) $payload['employee_id'])) {
+                return $forbidden;
+            }
+        }
         $payload['ip_address'] ??= $request->ip();
         $payload['organization_unit_id'] ??= $request->organizationUnitId();
 
@@ -54,6 +63,10 @@ final class HrAttendanceCaptureController
             'punch_type' => ['required', 'string', Rule::enum(PunchType::class)],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if ($forbidden = $this->authorizeEmployeeCapture($request, (int) $validated['employee_id'])) {
+            return $forbidden;
+        }
 
         $punch = $this->captureService->recordWebPunch(
             tenantId: $request->tenantId(),
@@ -79,6 +92,10 @@ final class HrAttendanceCaptureController
             'geofence_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if ($forbidden = $this->authorizeEmployeeCapture($request, (int) $validated['employee_id'])) {
+            return $forbidden;
+        }
 
         $punch = $this->captureService->recordMobilePunch(
             tenantId: $request->tenantId(),
@@ -179,6 +196,10 @@ final class HrAttendanceCaptureController
             'device_uuid' => ['nullable', 'string', 'max:128'],
         ]);
 
+        if ($forbidden = $this->authorizeEmployeeCapture($request, (int) $validated['employee_id'])) {
+            return $forbidden;
+        }
+
         $punch = $this->captureService->recordKioskQrPunch(
             tenantId: $request->tenantId(),
             employeeId: (int) $validated['employee_id'],
@@ -240,5 +261,29 @@ final class HrAttendanceCaptureController
         );
 
         return response()->json(['data' => $result], 201);
+    }
+
+    private function authorizeEmployeeCapture(TenantScopedRequest $request, int $employeeId): ?JsonResponse
+    {
+        $tenantId = $request->tenantId();
+        $currentUserId = (int) $request->currentUserId();
+
+        if ($this->permissions->allows($currentUserId, $tenantId, HrAuthorizationService::MANAGE_ATTENDANCE)) {
+            return null;
+        }
+
+        $ownsEmployee = HrEmployee::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $employeeId)
+            ->where('user_id', $currentUserId)
+            ->exists();
+
+        if (! $ownsEmployee) {
+            return response()->json([
+                'message' => 'You can only record attendance punches for your own employee profile.',
+            ], 403);
+        }
+
+        return null;
     }
 }

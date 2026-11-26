@@ -333,6 +333,7 @@ final class AttendanceCaptureAndAnomalyTest extends TestCase
 
             $orgId = OrganizationUnitFixture::create(['tenant_id' => $tenantId, 'name' => 'HQ Branch', 'code' => 'HQ-07']);
             $employee = $this->createEmployee($tenantId, $orgId, 'Nuwan Bandara', 'EMP-7707');
+            $employee->update(['user_id' => $userId]);
             $shift = $this->createShift($tenantId, $orgId);
             $this->assignShift($tenantId, $orgId, $employee->id, $shift->id);
 

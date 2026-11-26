@@ -14,5 +14,5 @@ namespace Modules\Hr\DTOs;
 
 final readonly class HrDesignationData
 {
-    public function __construct(public int $tenantId, public string $code, public string $name, public ?int $organizationUnitId = null, public ?string $description = null, public bool $isActive = true, public int $sortOrder = 0) {}
+    public function __construct(public int $tenantId, public string $code, public string $name, public ?int $organizationUnitId = null, public ?string $description = null, public bool $isActive = true, public int $sortOrder = 0, public ?int $expectedVersion = null) {}
 }

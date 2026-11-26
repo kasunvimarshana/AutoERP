@@ -27,8 +27,8 @@ export function HrLeaveTypeSelect({
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        listLeaveTypes()
-            .then((data) => setTypes(data))
+        listLeaveTypes({ per_page: 100 })
+            .then((res) => setTypes(res.data))
             .catch(() => setTypes([]))
             .finally(() => setLoading(false));
     }, []);

@@ -10,7 +10,7 @@ import type { NamedResource } from '@/shared/types/common';
 
 export type EmployeeStatus = 'active' | 'inactive' | 'on_leave' | 'suspended' | 'terminated' | 'pending_approval';
 export type EmployeeAvailabilityStatus = 'available' | 'assigned' | 'on_leave' | 'unavailable' | 'suspended' | 'inactive';
-export interface HrMaster extends NamedResource { tenant_id: number; organization_unit_id?: number | null; description?: string | null; is_active: boolean; sort_order?: number | null; }
+export interface HrMaster extends NamedResource { tenant_id: number; organization_unit_id?: number | null; row_version?: number; description?: string | null; is_active: boolean; sort_order?: number | null; }
 export interface HrDepartment extends HrMaster { parent_id?: number | null; parent?: HrDepartment | null; }
 export type HrDesignation = HrMaster;
 export type HrEmploymentType = HrMaster;
@@ -59,6 +59,28 @@ export interface EmployeeWithRelationsPayload extends EmployeeRelationsPayload {
 
 // --- Shifts & Rostering Types ---
 export type ShiftStatus = 'active' | 'inactive';
+export type ShiftAssignmentType = 'recurring' | 'date_range' | 'specific_date';
+export type ShiftSwapStatus = 'pending_peer' | 'peer_accepted' | 'peer_rejected' | 'manager_approved' | 'manager_rejected' | 'cancelled';
+export type ShiftReallocationReason = 'sick_cover' | 'emergency_cover' | 'surge_demand' | 'operational_need';
+export type ShiftBreakType = 'meal' | 'rest' | 'prayer' | 'other';
+
+export interface HrShiftBreak {
+    id: number;
+    row_version: number;
+    tenant_id?: number;
+    organization_unit_id?: number | null;
+    shift_id: number;
+    name: string;
+    break_type: string;
+    start_time?: string | null;
+    end_time?: string | null;
+    duration_minutes: number;
+    is_paid: boolean;
+    is_mandatory: boolean;
+}
+
+export type HrShiftBreakPayload = Omit<HrShiftBreak, 'id' | 'row_version' | 'tenant_id' | 'organization_unit_id' | 'shift_id'>;
+
 export interface HrShift {
     id: number; row_version: number; tenant_id: number; organization_unit_id?: number | null;
     code: string; name: string; color: string; start_time: string; end_time: string;
@@ -66,25 +88,66 @@ export interface HrShift {
     half_day_threshold_minutes: number; full_day_threshold_minutes: number;
     is_break_paid: boolean; auto_deduct_break: boolean; auto_deduct_break_minutes: number;
     auto_deduct_threshold_minutes: number; is_flexible: boolean; status: ShiftStatus; notes?: string | null;
+    breaks?: HrShiftBreak[];
 }
-export type HrShiftPayload = Omit<HrShift, 'id' | 'row_version' | 'tenant_id'>;
+export type HrShiftPayload = Omit<HrShift, 'id' | 'row_version' | 'tenant_id' | 'breaks'>;
 
 export interface HrShiftAssignment {
     id: number; row_version: number; employee_id: number; shift_id: number;
-    assignment_type: 'recurring' | 'date_range' | 'specific_date';
+    assignment_type: ShiftAssignmentType;
     day_of_week?: number | null; start_date?: string | null; end_date?: string | null;
     is_custom_timing: boolean; custom_start_time?: string | null; custom_end_time?: string | null;
     is_cancelled: boolean; cancellation_reason?: string | null;
     shift?: HrShift; employee?: EmployeeSummary;
 }
 
+export interface HrShiftAssignmentPayload {
+    employee_id: number;
+    shift_id: number;
+    assignment_type: ShiftAssignmentType;
+    day_of_week?: number | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    is_custom_timing?: boolean;
+    custom_start_time?: string | null;
+    custom_end_time?: string | null;
+}
+
 export interface HrShiftSwap {
     id: number; row_version: number; requester_employee_id: number; target_employee_id: number;
     requester_shift_id?: number | null; target_shift_id?: number | null;
     swap_date: string; target_swap_date: string; reason: string;
-    status: 'pending_peer' | 'peer_accepted' | 'peer_rejected' | 'manager_approved' | 'manager_rejected' | 'cancelled';
+    status: ShiftSwapStatus;
+    manager_action_notes?: string | null;
+    peer_responded_at?: string | null;
+    manager_actioned_at?: string | null;
     requester_employee?: EmployeeSummary; target_employee?: EmployeeSummary;
     requester_shift?: HrShift; target_shift?: HrShift;
+}
+
+export interface HrShiftReallocation {
+    id: number;
+    row_version: number;
+    tenant_id?: number;
+    organization_unit_id?: number | null;
+    absent_employee_id: number;
+    cover_employee_id: number;
+    shift_id: number;
+    reallocation_date: string;
+    reason_code: ShiftReallocationReason;
+    notes?: string | null;
+    absent_employee?: EmployeeSummary;
+    cover_employee?: EmployeeSummary;
+    shift?: HrShift;
+}
+
+export interface HrShiftReallocationPayload {
+    absent_employee_id: number;
+    cover_employee_id: number;
+    shift_id: number;
+    reallocation_date: string;
+    reason_code?: ShiftReallocationReason;
+    notes?: string | null;
 }
 
 // --- Attendance Types ---
@@ -129,11 +192,30 @@ export interface HrAttendanceGeofence {
     ip_whitelist?: string | null; is_active: boolean; notes?: string | null;
 }
 
+export interface HrAttendanceGeofencePayload {
+    name: string;
+    code: string;
+    latitude: number | string;
+    longitude: number | string;
+    radius_meters: number;
+    ip_whitelist?: string | null;
+    is_active?: boolean;
+    notes?: string | null;
+}
+
 export interface HrAttendanceKiosk {
     id: number; row_version: number; kiosk_code: string; name: string;
     secret_key?: string; rotation_seconds: number; geofence_id?: number | null;
     is_active: boolean; last_heartbeat_at?: string | null;
     geofence?: HrAttendanceGeofence | null;
+}
+
+export interface HrAttendanceKioskPayload {
+    kiosk_code: string;
+    name: string;
+    rotation_seconds?: number;
+    geofence_id?: number | null;
+    is_active?: boolean;
 }
 
 export interface BatchImportPreview {
@@ -164,22 +246,57 @@ export interface HrAttendanceRegularization {
     employee?: EmployeeSummary; attendance_record?: HrAttendanceRecord;
 }
 
-// --- Leave Types ---
+// --- Leave Types & Policies ---
+export type LeaveTypeStatus = 'active' | 'inactive';
+export type LeaveAccrualFrequency = 'annual_upfront' | 'monthly_prorated' | 'quarterly' | 'no_accrual';
+export type LeaveDurationType = 'full_day' | 'half_day_morning' | 'half_day_afternoon' | 'custom_hours';
+export type LeaveRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type CompOffClaimStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'used';
+
 export interface HrLeaveType {
     id: number; row_version: number; code: string; name: string; color: string;
     is_paid: boolean; requires_attachment: boolean; attachment_mandatory_after_days: number;
     allow_half_day: boolean; allow_hourly: boolean; is_compensatory: boolean;
-    sandwich_rule_applied: boolean; status: 'active' | 'inactive';
+    sandwich_rule_applied: boolean; status: LeaveTypeStatus;
+}
+
+export interface HrLeaveTypePayload {
+    code: string;
+    name: string;
+    color?: string;
+    is_paid?: boolean;
+    requires_attachment?: boolean;
+    attachment_mandatory_after_days?: number;
+    allow_half_day?: boolean;
+    allow_hourly?: boolean;
+    is_compensatory?: boolean;
+    sandwich_rule_applied?: boolean;
+    status?: LeaveTypeStatus;
 }
 
 export interface HrLeavePolicy {
     id: number; row_version: number; leave_type_id: number; department_id?: number | null;
     employment_type_id?: number | null; name: string; annual_allocation_days: string;
-    accrual_frequency: 'annual_upfront' | 'monthly_prorated' | 'quarterly' | 'no_accrual';
+    accrual_frequency: LeaveAccrualFrequency;
     max_carry_forward_days: string; carry_forward_expiry_months: number;
     max_consecutive_days: number; probation_restricted: boolean;
     effective_from: string; effective_to?: string | null;
-    leave_type?: HrLeaveType; department?: HrDepartment;
+    leave_type?: HrLeaveType; department?: HrDepartment | null; employment_type?: HrEmploymentType | null;
+}
+
+export interface HrLeavePolicyPayload {
+    leave_type_id: number;
+    name: string;
+    annual_allocation_days: string | number;
+    effective_from: string;
+    effective_to?: string | null;
+    accrual_frequency?: LeaveAccrualFrequency;
+    max_carry_forward_days?: string | number;
+    carry_forward_expiry_months?: number;
+    max_consecutive_days?: number;
+    probation_restricted?: boolean;
+    department_id?: number | null;
+    employment_type_id?: number | null;
 }
 
 export interface HrLeaveBalance {
@@ -191,21 +308,23 @@ export interface HrLeaveBalance {
 
 export interface HrLeaveRequest {
     id: number; row_version: number; employee_id: number; leave_type_id: number;
-    start_date: string; end_date: string; duration_type: 'full_day' | 'half_day_morning' | 'half_day_afternoon' | 'custom_hours';
+    start_date: string; end_date: string; duration_type: LeaveDurationType;
     total_days: string; reason: string; attachment_document_id?: number | null;
-    status: 'pending' | 'approved' | 'rejected' | 'cancelled'; approved_at?: string | null; action_notes?: string | null;
+    status: LeaveRequestStatus; approved_at?: string | null; action_notes?: string | null;
     leave_type?: HrLeaveType; employee?: EmployeeSummary;
 }
 
 export interface HrCompOffClaim {
     id: number; row_version: number; employee_id: number; worked_date: string;
-    claimed_days: string; reason: string; status: 'pending' | 'approved' | 'rejected' | 'expired' | 'used';
+    attendance_record_id?: number | null;
+    claimed_days: string; reason: string; status: CompOffClaimStatus;
     expiry_date?: string | null; employee?: EmployeeSummary;
 }
 
 // --- Shift Rotations ---
 export interface HrShiftRotationStep {
     id: number;
+    row_version: number;
     shift_rotation_id: number;
     day_sequence: number;
     shift_id: number | null;
@@ -213,14 +332,87 @@ export interface HrShiftRotationStep {
     notes?: string | null;
 }
 
+export interface HrShiftRotationStepPayload {
+    day_sequence: number;
+    shift_id?: number | null;
+    notes?: string | null;
+}
+
 export interface HrShiftRotation {
     id: number;
+    row_version: number;
     code: string;
     name: string;
     description?: string | null;
     cycle_days: number;
     status: 'active' | 'inactive';
     steps?: HrShiftRotationStep[];
+}
+
+export interface HrShiftRotationPayload {
+    code: string;
+    name: string;
+    description?: string | null;
+    cycle_days: number;
+    status?: 'active' | 'inactive';
+}
+
+export interface HrShiftRotationAssignment {
+    id: number;
+    row_version: number;
+    tenant_id?: number;
+    organization_unit_id?: number | null;
+    employee_id: number;
+    shift_rotation_id: number;
+    anchor_date: string;
+    end_date?: string | null;
+    is_active: boolean;
+    employee?: EmployeeSummary;
+    rotation?: HrShiftRotation;
+}
+
+// --- Holiday Calendars & Holidays ---
+export interface HrHoliday {
+    id: number;
+    row_version: number;
+    tenant_id?: number;
+    organization_unit_id?: number | null;
+    calendar_id: number;
+    name: string;
+    holiday_date: string;
+    is_mandatory: boolean;
+    is_comp_off_eligible: boolean;
+    overtime_multiplier: string;
+    description?: string | null;
+}
+
+export interface HrHolidayPayload {
+    name: string;
+    holiday_date: string;
+    is_mandatory?: boolean;
+    is_comp_off_eligible?: boolean;
+    overtime_multiplier?: string | number;
+    description?: string | null;
+}
+
+export interface HrHolidayCalendar {
+    id: number;
+    row_version: number;
+    tenant_id?: number;
+    organization_unit_id?: number | null;
+    code: string;
+    name: string;
+    calendar_year: number;
+    is_default: boolean;
+    holidays_count?: number;
+    holidays?: HrHoliday[];
+}
+
+export interface HrHolidayCalendarPayload {
+    code: string;
+    name: string;
+    calendar_year: number;
+    is_default?: boolean;
 }
 
 // --- Biometric Hardware Integration Types ---

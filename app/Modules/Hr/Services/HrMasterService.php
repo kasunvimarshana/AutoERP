@@ -15,8 +15,13 @@ namespace Modules\Hr\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Modules\Hr\Models\HrDepartment;
+use Modules\Hr\Models\HrEmploymentType;
+use Modules\Hr\Models\HrLeavePolicy;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 abstract class HrMasterService
 {
@@ -42,9 +47,24 @@ abstract class HrMasterService
         }
         $this->validateData($data);
         $this->assertCodeUnique($data->tenantId, $data->code, (int) $model->getKey());
-        $model->fill($this->attributes($data))->save();
 
-        return $model->refresh();
+        return DB::transaction(function () use ($model, $data): Model {
+            $locked = $this->modelClass::query()
+                ->whereKey($model->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $expectedVersion = property_exists($data, 'expectedVersion') ? $data->expectedVersion : null;
+            if ($expectedVersion !== null && (int) $locked->row_version !== (int) $expectedVersion) {
+                throw new ConflictHttpException("{$this->label} was changed by someone else. Reload before saving.");
+            }
+
+            $attributes = $this->attributes($data);
+            $attributes['row_version'] = ((int) $locked->row_version) + 1;
+            $locked->fill($attributes)->save();
+
+            return $locked->refresh();
+        });
     }
 
     public function delete(Model $model): void
@@ -54,6 +74,19 @@ abstract class HrMasterService
         }
         if (method_exists($model, 'assignments') && $model->assignments()->exists()) {
             throw new InvalidArgumentException("{$this->label} cannot be deleted while employees reference it.");
+        }
+        if ($model instanceof HrDepartment) {
+            if ($model->children()->exists()) {
+                throw new InvalidArgumentException("{$this->label} cannot be deleted while child departments reference it.");
+            }
+            if (HrLeavePolicy::query()->where('tenant_id', $model->tenant_id)->where('department_id', $model->getKey())->exists()) {
+                throw new InvalidArgumentException("{$this->label} cannot be deleted while leave policies reference it.");
+            }
+        }
+        if ($model instanceof HrEmploymentType) {
+            if (HrLeavePolicy::query()->where('tenant_id', $model->tenant_id)->where('employment_type_id', $model->getKey())->exists()) {
+                throw new InvalidArgumentException("{$this->label} cannot be deleted while leave policies reference it.");
+            }
         }
         $model->delete();
     }

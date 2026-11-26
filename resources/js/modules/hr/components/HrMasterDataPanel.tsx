@@ -107,7 +107,7 @@ export function HrMasterDataPanel({ kind }: { kind: HrMasterKind }) {
                 parent_id: kind === 'departments' ? parent?.id ?? null : undefined,
             };
             if (editing) {
-                await updateHrMaster(kind, editing.id, payload);
+                await updateHrMaster(kind, editing.id, { ...payload, expected_version: editing.row_version });
             } else {
                 await createHrMaster(kind, payload);
             }

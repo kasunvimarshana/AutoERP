@@ -164,6 +164,10 @@ final class AttendanceCalculationEngine
             }
         }
 
+        $shiftBreaks = $shift !== null
+            ? ($shift->relationLoaded('breaks') ? $shift->breaks : $shift->breaks()->get())
+            : collect();
+
         $firstIn = null;
         $lastOut = null;
         $breakMinutes = 0;
@@ -183,7 +187,13 @@ final class AttendanceCalculationEngine
                 $duration = (int) $activeBreakStart->diffInMinutes($time);
                 $breakMinutes += $duration;
 
-                $isPaid = $shift?->is_break_paid ?? false;
+                $matchedBreak = $p->punch_type === PunchType::MealIn
+                    ? $shiftBreaks->firstWhere('break_type', 'meal')
+                    : $shiftBreaks->first(static fn ($b): bool => $b->break_type !== 'meal');
+                $isPaid = $matchedBreak !== null
+                    ? (bool) $matchedBreak->is_paid
+                    : ($shift?->is_break_paid ?? false);
+
                 if (! $isPaid) {
                     $unpaidBreakMinutes += $duration;
                 }
@@ -202,9 +212,18 @@ final class AttendanceCalculationEngine
             $elapsedMinutes = (int) $firstIn->diffInMinutes($lastOut);
             $totalWorkedMinutes = max(0, $elapsedMinutes - $unpaidBreakMinutes);
 
-            // Auto deduct break if applicable and no break was punched
-            if ($breakMinutes === 0 && ($shift?->auto_deduct_break ?? false)) {
-                if ($totalWorkedMinutes >= (int) $shift->auto_deduct_threshold_minutes) {
+            // Auto deduct mandatory configured shift breaks or legacy auto_deduct_break when no break was punched
+            if ($breakMinutes === 0 && $shift !== null) {
+                $mandatoryBreaks = $shiftBreaks->where('is_mandatory', true);
+                if ($mandatoryBreaks->isNotEmpty()) {
+                    $mandatoryTotal = (int) $mandatoryBreaks->sum('duration_minutes');
+                    $mandatoryUnpaid = (int) $mandatoryBreaks->where('is_paid', false)->sum('duration_minutes');
+                    if ($totalWorkedMinutes >= (int) $shift->auto_deduct_threshold_minutes && $totalWorkedMinutes > $mandatoryTotal) {
+                        $totalWorkedMinutes = max(0, $totalWorkedMinutes - $mandatoryUnpaid);
+                        $unpaidBreakMinutes += $mandatoryUnpaid;
+                        $breakMinutes += $mandatoryTotal;
+                    }
+                } elseif ($shift->auto_deduct_break && $totalWorkedMinutes >= (int) $shift->auto_deduct_threshold_minutes) {
                     $deduction = (int) $shift->auto_deduct_break_minutes;
                     $totalWorkedMinutes = max(0, $totalWorkedMinutes - $deduction);
                     $unpaidBreakMinutes += $deduction;

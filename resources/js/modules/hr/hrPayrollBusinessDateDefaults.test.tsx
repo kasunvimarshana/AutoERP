@@ -30,6 +30,7 @@ const hrApiMocks = vi.hoisted(() => ({
     listAttendanceKiosks: vi.fn(),
     listAttendanceRecords: vi.fn(),
     listAttendanceRegularizations: vi.fn(),
+    listCompOffClaims: vi.fn(),
     listLeaveBalances: vi.fn(),
     listLeaveRequests: vi.fn(),
     previewAttendanceImport: vi.fn(),
@@ -95,12 +96,13 @@ describe('HR & Payroll business date defaults near UTC midnight', () => {
         configureBusinessTimeZone('Asia/Colombo');
 
         hrApiMocks.listAttendanceRecords.mockResolvedValue({ data: [] });
-        hrApiMocks.listAttendanceRegularizations.mockResolvedValue([]);
+        hrApiMocks.listAttendanceRegularizations.mockResolvedValue({ data: [] });
         hrApiMocks.listAttendanceAnomalies.mockResolvedValue({ data: [] });
-        hrApiMocks.listAttendanceKiosks.mockResolvedValue([]);
+        hrApiMocks.listAttendanceKiosks.mockResolvedValue({ data: [] });
         hrApiMocks.listLeaveRequests.mockResolvedValue({ data: [] });
-        hrApiMocks.listLeaveBalances.mockResolvedValue([]);
+        hrApiMocks.listLeaveBalances.mockResolvedValue({ data: [] });
         hrApiMocks.getRoster.mockResolvedValue([]);
+        hrApiMocks.listCompOffClaims.mockResolvedValue({ data: [] });
         payrollApiMocks.listLoans.mockResolvedValue([
             {
                 id: 42,
@@ -165,7 +167,15 @@ describe('HR & Payroll business date defaults near UTC midnight', () => {
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-            fireEvent.click(screen.getByRole('button', { name: 'Claim Comp-Off' }));
+            fireEvent.click(screen.getByRole('tab', { name: 'Comp-Off Claims' }));
+        });
+
+        await waitFor(() => {
+            expect(hrApiMocks.listCompOffClaims).toHaveBeenCalled();
+        });
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: '+ Claim Comp-Off' }));
         });
 
         const compOffDateInputs = Array.from(document.querySelectorAll('input[type="date"]'))

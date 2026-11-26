@@ -112,7 +112,7 @@ export default function EmployeeDetailPage() {
                             {tab.openedTabs.has('licenses') && <div hidden={tab.activeTab !== 'licenses'}><EmployeeLicenseTab employeeId={id} canManage={canUpdate} /></div>}
                             {tab.openedTabs.has('rates') && <div hidden={tab.activeTab !== 'rates'}><EmployeeRateTab employeeId={id} /></div>}
                             {tab.openedTabs.has('availability') && <div hidden={tab.activeTab !== 'availability'}><EmployeeAvailabilityTab employeeId={id} /></div>}
-                            {tab.openedTabs.has('credentials') && <div hidden={tab.activeTab !== 'credentials'}><EmployeeCredentialTab employeeId={id} /></div>}
+                            {tab.openedTabs.has('credentials') && <div hidden={tab.activeTab !== 'credentials'}><EmployeeCredentialTab employeeId={id} canManage={canUpdate} /></div>}
                             {tab.openedTabs.has('history') && <div hidden={tab.activeTab !== 'history'}><EmployeeStatusHistoryTab employeeId={id} /></div>}
                         </Suspense>
                     </div>

@@ -113,13 +113,32 @@ final class HrAttendanceCredentialController
 
     public function destroy(TenantScopedRequest $request, int $employee, int $credential): JsonResponse
     {
-        $cred = HrEmployeeAttendanceCredential::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('employee_id', $employee)
-            ->where('id', $credential)
-            ->firstOrFail();
+        $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
+        ]);
 
-        $cred->delete();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
+
+        $deleted = DB::transaction(function () use ($request, $employee, $credential, $expectedVersion): bool {
+            $cred = HrEmployeeAttendanceCredential::query()
+                ->where('tenant_id', $request->tenantId())
+                ->where('employee_id', $employee)
+                ->where('id', $credential)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $cred->row_version !== $expectedVersion) {
+                return false;
+            }
+
+            $cred->delete();
+
+            return true;
+        });
+
+        if (! $deleted) {
+            return response()->json(['message' => 'Credential was changed by someone else. Reload before deleting.'], 409);
+        }
 
         return response()->json(null, 204);
     }

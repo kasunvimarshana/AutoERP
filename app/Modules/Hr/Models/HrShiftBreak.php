@@ -27,6 +27,7 @@ final class HrShiftBreak extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'shift_id' => 'integer',

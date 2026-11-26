@@ -380,6 +380,7 @@ final class HrEndToEndAuditTest extends TestCase
             $this->actingAs(UserModel::query()->findOrFail($userId));
             $orgId = OrganizationUnitFixture::create(['tenant_id' => $tenantId, 'name' => 'HQ', 'code' => 'HQ-AUD']);
             $employee = $this->createEmployee($tenantId, $orgId, 'Audit Tester', 'EMP-AUD1');
+            $employee->update(['user_id' => $userId]);
 
             // 1. Capture adapters must throw 422 (InvalidArgumentException), not 500 Undefined array key
             $this->postJson('/api/v1/hr/attendance/capture', [

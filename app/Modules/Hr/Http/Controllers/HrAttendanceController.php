@@ -13,7 +13,10 @@ declare(strict_types=1);
 namespace Modules\Hr\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
+use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Hr\DTOs\AttendanceAdjustmentData;
 use Modules\Hr\DTOs\AttendanceRegularizationData;
@@ -25,14 +28,17 @@ use Modules\Hr\Enums\RegularizationStatus;
 use Modules\Hr\Enums\RegularizationType;
 use Modules\Hr\Models\HrAttendanceRecord;
 use Modules\Hr\Models\HrAttendanceRegularization;
+use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Services\AttendanceCalculationEngine;
 use Modules\Hr\Services\AttendanceRegularizationService;
+use Modules\Hr\Services\HrAuthorizationService;
 
 final class HrAttendanceController
 {
     public function __construct(
         private readonly AttendanceCalculationEngine $calculationEngine,
         private readonly AttendanceRegularizationService $regularizationService,
+        private readonly PermissionCheckerInterface $permissions,
     ) {}
 
     public function punch(TenantScopedRequest $request): JsonResponse
@@ -184,28 +190,103 @@ final class HrAttendanceController
     public function actionRegularization(TenantScopedRequest $request, int $regularization): JsonResponse
     {
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'approve' => ['required', 'boolean'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $regularizationModel = HrAttendanceRegularization::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('id', $regularization)
-            ->firstOrFail();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $actioned = $this->regularizationService->actionRegularization(
-            $regularizationModel,
-            (int) $request->currentUserId(),
-            (bool) $validated['approve'],
-            $validated['notes'] ?? null,
-        );
+        try {
+            $actioned = DB::transaction(function () use ($request, $regularization, $validated, $expectedVersion): ?HrAttendanceRegularization {
+                $regularizationModel = HrAttendanceRegularization::query()
+                    ->where('tenant_id', $request->tenantId())
+                    ->where('id', $regularization)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($expectedVersion !== null && (int) $regularizationModel->row_version !== $expectedVersion) {
+                    return null;
+                }
+
+                return $this->regularizationService->actionRegularization(
+                    $regularizationModel,
+                    (int) $request->currentUserId(),
+                    (bool) $validated['approve'],
+                    $validated['notes'] ?? null,
+                );
+            });
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        if ($actioned === null) {
+            return response()->json(['message' => 'Regularization request was changed by someone else. Reload before saving.'], 409);
+        }
 
         return response()->json(['data' => $actioned]);
+    }
+
+    public function cancelRegularization(TenantScopedRequest $request, int $regularization): JsonResponse
+    {
+        $validated = $request->validate([
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $tenantId = $request->tenantId();
+        $currentUserId = (int) $request->currentUserId();
+        $expectedVersion = (int) $validated['expected_version'];
+        $canManage = $this->permissions->allows($currentUserId, $tenantId, HrAuthorizationService::MANAGE_ATTENDANCE);
+
+        try {
+            $result = DB::transaction(function () use ($tenantId, $regularization, $expectedVersion, $currentUserId, $canManage, $validated): HrAttendanceRegularization|string {
+                $regularizationModel = HrAttendanceRegularization::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('id', $regularization)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if (! $canManage) {
+                    $ownsEmployee = HrEmployee::query()
+                        ->where('tenant_id', $tenantId)
+                        ->where('id', $regularizationModel->employee_id)
+                        ->where('user_id', $currentUserId)
+                        ->exists();
+
+                    if (! $ownsEmployee) {
+                        return 'forbidden';
+                    }
+                }
+
+                if ((int) $regularizationModel->row_version !== $expectedVersion) {
+                    return 'conflict';
+                }
+
+                return $this->regularizationService->cancelRegularization(
+                    $regularizationModel,
+                    $validated['notes'] ?? null,
+                );
+            });
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        if ($result === 'forbidden') {
+            return response()->json(['message' => 'You can only cancel your own attendance regularization requests.'], 403);
+        }
+
+        if ($result === 'conflict') {
+            return response()->json(['message' => 'Regularization request was changed by someone else. Reload before cancelling.'], 409);
+        }
+
+        return response()->json(['data' => $result]);
     }
 
     public function directAdjust(TenantScopedRequest $request, int $record): JsonResponse
     {
         $validated = $request->validate([
+            'expected_version' => ['sometimes', 'integer', 'min:1'],
             'new_status' => ['required', 'string', Rule::enum(AttendanceStatus::class)],
             'new_worked_minutes' => ['required', 'integer', 'min:0'],
             'new_overtime_minutes' => ['required', 'integer', 'min:0'],
@@ -213,17 +294,36 @@ final class HrAttendanceController
             'regularization_id' => ['nullable', 'integer'],
         ]);
 
-        $data = new AttendanceAdjustmentData(
-            attendanceRecordId: $record,
-            newStatus: AttendanceStatus::from($validated['new_status']),
-            newWorkedMinutes: (int) $validated['new_worked_minutes'],
-            newOvertimeMinutes: (int) $validated['new_overtime_minutes'],
-            adjustmentReason: $validated['adjustment_reason'],
-            adjustedBy: $request->currentUserId(),
-            regularizationId: isset($validated['regularization_id']) ? (int) $validated['regularization_id'] : null,
-        );
+        $tenantId = $request->tenantId();
+        $expectedVersion = isset($validated['expected_version']) ? (int) $validated['expected_version'] : null;
 
-        $adjustment = $this->regularizationService->directAdjust($request->tenantId(), $data);
+        $adjustment = DB::transaction(function () use ($tenantId, $record, $validated, $request, $expectedVersion) {
+            $recordModel = HrAttendanceRecord::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $record)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($expectedVersion !== null && (int) $recordModel->row_version !== $expectedVersion) {
+                return null;
+            }
+
+            $data = new AttendanceAdjustmentData(
+                attendanceRecordId: $record,
+                newStatus: AttendanceStatus::from($validated['new_status']),
+                newWorkedMinutes: (int) $validated['new_worked_minutes'],
+                newOvertimeMinutes: (int) $validated['new_overtime_minutes'],
+                adjustmentReason: $validated['adjustment_reason'],
+                adjustedBy: $request->currentUserId(),
+                regularizationId: isset($validated['regularization_id']) ? (int) $validated['regularization_id'] : null,
+            );
+
+            return $this->regularizationService->directAdjust($tenantId, $data);
+        });
+
+        if ($adjustment === null) {
+            return response()->json(['message' => 'Attendance record was changed by someone else. Reload before saving.'], 409);
+        }
 
         return response()->json(['data' => $adjustment], 201);
     }

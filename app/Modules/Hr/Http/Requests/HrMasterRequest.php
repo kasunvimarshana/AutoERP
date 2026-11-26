@@ -26,12 +26,15 @@ final class HrMasterRequest extends TenantScopedRequest
     {
         $write = in_array($this->method(), ['POST', 'PUT', 'PATCH'], true);
 
-        return ['tenant_id' => ['required', 'integer', 'min:1'], 'organization_unit_id' => ['nullable', 'integer', 'min:1'], 'parent_id' => ['nullable', 'integer', 'min:1'], 'code' => [$write ? 'required' : 'nullable', 'string', 'max:80'], 'name' => [$write ? 'required' : 'nullable', 'string', 'max:150'], 'description' => ['nullable', 'string'], 'is_active' => ['nullable', 'boolean'], 'sort_order' => ['nullable', 'integer', 'min:0'], 'search' => ['nullable', 'string', 'max:255'], 'page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', 'between:1,100']];
+        return ['tenant_id' => ['required', 'integer', 'min:1'], 'organization_unit_id' => ['nullable', 'integer', 'min:1'], 'parent_id' => ['nullable', 'integer', 'min:1'], 'code' => [$write ? 'required' : 'nullable', 'string', 'max:80'], 'name' => [$write ? 'required' : 'nullable', 'string', 'max:150'], 'description' => ['nullable', 'string'], 'is_active' => ['nullable', 'boolean'], 'sort_order' => ['nullable', 'integer', 'min:0'], 'expected_version' => ['sometimes', 'integer', 'min:1'], 'row_version' => ['sometimes', 'integer', 'min:1'], 'search' => ['nullable', 'string', 'max:255'], 'page' => ['nullable', 'integer', 'min:1'], 'per_page' => ['nullable', 'integer', 'between:1,100']];
     }
 
     public function toData(string $type): object
     {
-        $args = ['tenantId' => $this->tenantId(), 'code' => (string) $this->input('code'), 'name' => (string) $this->input('name'), 'organizationUnitId' => $this->organizationUnitId(), 'description' => $this->filled('description') ? (string) $this->input('description') : null, 'isActive' => (bool) $this->input('is_active', true)];
+        $expectedVersion = $this->filled('expected_version')
+            ? (int) $this->input('expected_version')
+            : ($this->filled('row_version') ? (int) $this->input('row_version') : null);
+        $args = ['tenantId' => $this->tenantId(), 'code' => (string) $this->input('code'), 'name' => (string) $this->input('name'), 'organizationUnitId' => $this->organizationUnitId(), 'description' => $this->filled('description') ? (string) $this->input('description') : null, 'isActive' => (bool) $this->input('is_active', true), 'expectedVersion' => $expectedVersion];
 
         return match ($type) {
             HrDepartmentData::class => new HrDepartmentData(...$args, parentId: $this->filled('parent_id') ? (int) $this->input('parent_id') : null, sortOrder: (int) $this->input('sort_order', 0)), HrDesignationData::class => new HrDesignationData(...$args, sortOrder: (int) $this->input('sort_order', 0)), HrEmploymentTypeData::class => new HrEmploymentTypeData(...$args, sortOrder: (int) $this->input('sort_order', 0)), HrSkillData::class => new HrSkillData(...$args), HrCertificationData::class => new HrCertificationData(...$args), HrLicenseData::class => new HrLicenseData(...$args)

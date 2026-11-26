@@ -101,6 +101,10 @@ final class AttendanceRegularizationService
         $prevOt = (int) $record->overtime_minutes;
 
         if ($approve) {
+            if ($record->lock_status === AttendanceLockStatus::Finalized) {
+                throw new InvalidArgumentException('Cannot approve regularization for a finalized attendance period.');
+            }
+
             // Ingest proposed punches as system-resolved audit punches
             if ($regularization->proposed_clock_in !== null) {
                 $this->calculationEngine->recordPunch($tenantId, new PunchData(
@@ -190,6 +194,22 @@ final class AttendanceRegularizationService
             'new_overtime_minutes' => $data->newOvertimeMinutes,
             'adjustment_reason' => $data->adjustmentReason,
         ]);
+    }
+
+    public function cancelRegularization(HrAttendanceRegularization $regularization, ?string $notes = null): HrAttendanceRegularization
+    {
+        if ($regularization->status !== RegularizationStatus::Pending) {
+            throw new InvalidArgumentException('Only pending regularizations can be cancelled.');
+        }
+
+        $regularization->update([
+            'row_version' => ((int) $regularization->row_version) + 1,
+            'status' => RegularizationStatus::Cancelled,
+            'actioned_at' => now(),
+            'action_notes' => $notes,
+        ]);
+
+        return $regularization->refresh();
     }
 
     public function lockRecords(int $tenantId, string $startDate, string $endDate): int

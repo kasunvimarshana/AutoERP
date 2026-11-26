@@ -27,8 +27,8 @@ export function HrShiftSelect({
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        listShifts()
-            .then((data) => setShifts(data))
+        listShifts({ per_page: 100 })
+            .then((res) => setShifts(res.data))
             .catch(() => setShifts([]))
             .finally(() => setLoading(false));
     }, []);
