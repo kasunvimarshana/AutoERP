@@ -84,7 +84,7 @@ final class PaymentRefundPolicyService
 
     public function reservedUnpostedAmount(Payment $payment): string
     {
-        $amount = (string) $payment->refunds()
+        $amount = $this->math->sum($payment->refunds()
             ->whereHas('refundPayment', function (Builder $query): void {
                 $query
                     ->whereNotIn('document_status', [
@@ -93,7 +93,9 @@ final class PaymentRefundPolicyService
                     ])
                     ->where('posting_status', '!=', PaymentPostingStatus::Posted->value);
             })
-            ->sum('amount');
+            ->select('amount')
+            ->cursor()
+            ->map(static fn ($refund): string => (string) $refund->amount));
 
         return $this->math->normalize($amount);
     }

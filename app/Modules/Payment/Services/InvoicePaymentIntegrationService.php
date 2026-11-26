@@ -22,8 +22,17 @@ final class InvoicePaymentIntegrationService
     /**
      * @param  list<PaymentAllocationData>  $allocations
      */
-    public function allocatePaymentToInvoices(Payment $payment, array $allocations): Payment
-    {
-        return $this->allocations->allocate($payment, $allocations);
+    public function allocatePaymentToInvoices(
+        Payment $payment,
+        array $allocations,
+        ?int $expectedVersion = null,
+        ?int $actorId = null,
+    ): Payment {
+        return $this->allocations->allocate(
+            $payment,
+            $allocations,
+            $expectedVersion ?? (int) $payment->row_version,
+            $actorId,
+        );
     }
 }

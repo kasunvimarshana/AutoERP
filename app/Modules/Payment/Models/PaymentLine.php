@@ -25,8 +25,39 @@ final class PaymentLine extends TenantOwnedModel
 
     protected static function booted(): void
     {
+        self::updating(static function (PaymentLine $line): void {
+            $payment = $line->relationLoaded('payment') ? $line->payment : $line->payment()->first();
+            $status = $payment?->document_status instanceof PaymentDocumentStatus
+                ? $payment->document_status
+                : ($payment?->document_status !== null ? PaymentDocumentStatus::tryFrom((string) $payment->document_status) : null);
+
+            if ($payment && $status !== null && $status !== PaymentDocumentStatus::Draft) {
+                $immutableAttributes = [
+                    'payment_id',
+                    'tenant_id',
+                    'organization_unit_id',
+                    'line_number',
+                    'payment_method_id',
+                    'payment_method_code_snapshot',
+                    'payment_method_name_snapshot',
+                    'payment_method_type_snapshot',
+                    'requires_reference_snapshot',
+                    'requires_instrument_details_snapshot',
+                    'amount',
+                ];
+                if ($line->isDirty($immutableAttributes)) {
+                    throw new LogicException('Financial attributes of non-draft payment lines are immutable in place.');
+                }
+            }
+        });
+
         self::deleting(static function (PaymentLine $line): void {
-            if ($line->payment && $line->payment->document_status !== PaymentDocumentStatus::Draft) {
+            $payment = $line->relationLoaded('payment') ? $line->payment : $line->payment()->first();
+            $status = $payment?->document_status instanceof PaymentDocumentStatus
+                ? $payment->document_status
+                : ($payment?->document_status !== null ? PaymentDocumentStatus::tryFrom((string) $payment->document_status) : null);
+
+            if ($payment && $status !== null && $status !== PaymentDocumentStatus::Draft) {
                 throw new LogicException('Lines of non-draft payments cannot be deleted.');
             }
         });

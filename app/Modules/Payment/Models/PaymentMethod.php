@@ -60,6 +60,12 @@ final class PaymentMethod extends TenantOwnedModel
                     : 'org:'.$tenantId.':'.$organizationUnitId;
             }
         });
+
+        self::deleting(static function (PaymentMethod $method): void {
+            if ($method->lines()->exists()) {
+                throw new \LogicException('Payment methods with recorded payment transactions cannot be deleted. Deactivate the payment method instead.');
+            }
+        });
     }
 
     public function tenant(): BelongsTo

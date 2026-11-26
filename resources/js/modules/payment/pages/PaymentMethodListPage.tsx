@@ -13,6 +13,7 @@ import { hasPaymentPermission, paymentPermissions } from '../paymentPermissions'
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
+import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -31,6 +32,7 @@ export default function PaymentMethodListPage() {
     const [busyId, setBusyId] = useState<number | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const debounced = useDebounce(search);
+    const { confirm, confirmDialog } = useConfirmDialog();
     const result = useApi((signal) => listPaymentMethods({ search: debounced || undefined, include_overrides: true, page, per_page: 25 }, signal), [debounced, page]);
     const canCreate = hasPaymentPermission(auth, paymentPermissions.methodsCreate);
     const canUpdate = hasPaymentPermission(auth, paymentPermissions.methodsUpdate);
@@ -38,8 +40,17 @@ export default function PaymentMethodListPage() {
 
     async function run(row: PaymentMethod, action: 'activate' | 'deactivate' | 'delete') {
         if (busyId) return;
-        setBusyId(row.id);
         setActionError(null);
+        if (action === 'delete') {
+            const confirmed = await confirm({
+                title: 'Delete Payment Method',
+                message: `Are you sure you want to delete payment method "${row.name}" (${row.code})? This action cannot be undone.`,
+                confirmLabel: 'Delete',
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
+        setBusyId(row.id);
         try {
             if (action === 'activate') await activatePaymentMethod(row.id);
             if (action === 'deactivate') await deactivatePaymentMethod(row.id);
@@ -71,5 +82,6 @@ export default function PaymentMethodListPage() {
         <ErrorAlert error={actionError ?? result.error} />
         {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No payment methods found." />}
         <Pagination meta={result.data?.meta} onPageChange={setPage} />
+        {confirmDialog}
     </>;
 }

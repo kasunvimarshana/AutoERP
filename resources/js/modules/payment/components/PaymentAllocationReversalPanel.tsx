@@ -75,10 +75,13 @@ export function PaymentAllocationReversalPanel({
                     label="Allocation"
                     value={allocationId}
                     disabled={busy}
-                    options={active.map((allocation) => ({
-                        value: String(allocation.id),
-                        label: `${allocation.invoice?.invoice_number ?? allocation.invoice?.name ?? `Invoice ${allocation.invoice_id}`} · ${allocation.allocated_amount}`,
-                    }))}
+                    options={[
+                        { value: '', label: 'Select allocation...' },
+                        ...active.map((allocation) => ({
+                            value: String(allocation.id),
+                            label: `${allocation.invoice?.invoice_number ?? allocation.invoice?.name ?? `Invoice ${allocation.invoice_id}`} · ${allocation.allocated_amount}`,
+                        })),
+                    ]}
                     onChange={(event) => setAllocationId(event.target.value)}
                 />
                 <Input

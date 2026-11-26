@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\ChequePrintStatus;
@@ -24,6 +25,17 @@ final class ChequePrintLog extends TenantOwnedModel
     protected $table = 'cheque_print_logs';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): never {
+            throw new LogicException('Cheque print audit logs are strictly immutable.');
+        });
+
+        self::deleting(static function (): never {
+            throw new LogicException('Cheque print audit logs cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

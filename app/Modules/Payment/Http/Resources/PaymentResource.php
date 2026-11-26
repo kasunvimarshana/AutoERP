@@ -108,8 +108,27 @@ final class PaymentResource extends JsonResource
             ])->values()->all()),
             'allocations' => $this->whenLoaded('allocations'),
             'unapplied_balance' => $this->whenLoaded('unappliedBalance'),
-            'refunds' => $this->whenLoaded('refunds'),
-            'reversals' => $this->whenLoaded('reversals'),
+            'refunds' => $this->whenLoaded('refunds', fn () => $this->refunds->map(fn ($r): array => [
+                'id' => (int) $r->id,
+                'refund_number' => $r->refund_number,
+                'refund_date' => $r->refund_date?->toDateString(),
+                'amount' => (string) $r->amount,
+                'reason' => $r->reason,
+                'refund_payment_id' => $r->refund_payment_id,
+                'refund_payment_number' => $r->refundPayment?->payment_number,
+                'refund_payment_status' => $r->refundPayment?->document_status instanceof \BackedEnum
+                    ? $r->refundPayment->document_status->value
+                    : (string) $r->refundPayment?->document_status,
+            ])->values()->all()),
+            'reversals' => $this->whenLoaded('reversals', fn () => $this->reversals->map(fn ($rev): array => [
+                'id' => (int) $rev->id,
+                'reversal_number' => $rev->reversal_number,
+                'reversal_date' => $rev->reversal_date?->toDateString(),
+                'original_amount' => (string) $rev->original_amount,
+                'reversed_amount' => (string) $rev->reversed_amount,
+                'finance_reversal_reference' => $rev->finance_reversal_reference,
+                'reason' => $rev->reason,
+            ])->values()->all()),
             'lifecycle_events' => $this->whenLoaded('lifecycleEvents'),
         ];
     }

@@ -48,6 +48,8 @@ final class PaymentReceiptTest extends TestCase
             self::assertSame($payment->payment_number, $receiptData['payment_number']);
             self::assertSame('15000.000000', $receiptData['total_amount']);
             self::assertNotEmpty($receiptData['amount_in_words']);
+            self::assertStringNotContainsString('Only Only', $receiptData['amount_in_words']);
+            self::assertStringEndsWith('Only', $receiptData['amount_in_words']);
             self::assertSame('Test Customer', $receiptData['party']['name']);
             self::assertCount(1, $receiptData['lines']);
             self::assertSame('Cash', $receiptData['lines'][0]['method_name']);

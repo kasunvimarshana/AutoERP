@@ -44,7 +44,10 @@ final class PaymentCapabilityService
         $posted = $document === PaymentDocumentStatus::Approved && $posting === PaymentPostingStatus::Posted;
         $hasPostingReference = trim((string) $payment->finance_posting_reference) !== '';
         $terminal = in_array($document, [PaymentDocumentStatus::Voided, PaymentDocumentStatus::Reversed], true);
-        $isRefund = $payment->payment_type === PaymentType::Refund;
+        $paymentType = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::from((string) $payment->payment_type);
+        $isRefund = $paymentType === PaymentType::Refund;
         $hasActiveAllocations = $payment->relationLoaded('allocations')
             ? $payment->allocations->contains(fn ($row): bool => $this->stateValue($row->status) === AllocationStatus::Active->value)
             : $payment->allocations()->where('status', AllocationStatus::Active->value)->exists();
@@ -54,9 +57,6 @@ final class PaymentCapabilityService
                 ->where('posting_status', PaymentPostingStatus::Posted->value))
             ->exists();
         $availableUnapplied = $this->refundPolicy->availableUnappliedAmount($payment);
-        $paymentType = $payment->payment_type instanceof PaymentType
-            ? $payment->payment_type
-            : PaymentType::from((string) $payment->payment_type);
         $hasChequeLine = $payment->relationLoaded('lines')
             ? $payment->lines->contains(fn ($line): bool => (string) $line->payment_method_type_snapshot === PaymentMethodType::Cheque->value)
             : $payment->lines()->where('payment_method_type_snapshot', PaymentMethodType::Cheque->value)->exists();

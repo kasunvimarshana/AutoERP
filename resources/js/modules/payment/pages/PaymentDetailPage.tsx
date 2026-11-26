@@ -180,6 +180,7 @@ export default function PaymentDetailPage() {
                 {canPrintCheque && <LinkButton to={`/payments/${id}/lines/${chequeLine.id}/cheque-print`}>Print cheque</LinkButton>}
                 <Button variant="secondary" onClick={() => window.open(getPaymentReceiptUrl(id, 'print'), '_blank')}>Print receipt</Button>
                 <Button variant="secondary" onClick={() => window.open(getPaymentReceiptUrl(id, 'html'), '_blank')}>View receipt</Button>
+                <Button variant="secondary" onClick={() => window.open(getPaymentReceiptUrl(id, 'pdf'), '_blank')}>PDF receipt</Button>
             </div>}
         />
         <Panel className="p-0">
@@ -220,18 +221,18 @@ export default function PaymentDetailPage() {
                 </div>}
                 {tabState.activeTab === 'unapplied' && (unapplied.loading ? <LoadingState /> : unapplied.error ? <ErrorAlert error={unapplied.error} /> : <RecordTable rows={unapplied.data ? [unapplied.data] : []} fields={['balance_type', 'original_amount', 'allocated_amount', 'refunded_amount', 'remaining_amount', 'allocation_status', 'status']} rowKey={() => 'unapplied-balance'} />)}
                 {tabState.activeTab === 'refunds' && <div className="space-y-5">
-                    <RecordTable rows={(value.refunds ?? []) as Record<string, unknown>[]} fields={['refund_number', 'refund_date', 'amount', 'refund_payment', 'reason', 'status']} rowKey={(row, index) => String(row.id ?? row.refund_number ?? `refund-${index}`)} />
+                    <RecordTable rows={(value.refunds ?? []) as Record<string, unknown>[]} fields={['refund_number', 'refund_date', 'amount', 'refund_payment_number', 'refund_payment_status', 'reason']} rowKey={(row, index) => String(row.id ?? row.refund_number ?? `refund-${index}`)} />
                     <PaymentRefundPanel payment={value} enabled={canRefund} onChanged={refreshPaymentState} />
                 </div>}
                 {tabState.activeTab === 'reversals' && <div className="space-y-5">
-                    <RecordTable rows={(value.reversals ?? []) as Record<string, unknown>[]} fields={['reversal_number', 'reversal_date', 'original_amount', 'reversed_amount', 'reason', 'status']} rowKey={(row, index) => String(row.id ?? row.reversal_number ?? `reversal-${index}`)} />
+                    <RecordTable rows={(value.reversals ?? []) as Record<string, unknown>[]} fields={['reversal_number', 'reversal_date', 'original_amount', 'reversed_amount', 'finance_reversal_reference', 'reason']} rowKey={(row, index) => String(row.id ?? row.reversal_number ?? `reversal-${index}`)} />
                     {canReverse && <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
                         <Input label="Reversal date" type="date" value={reversalDate} onChange={(event) => setReversalDate(event.target.value)} />
                         <Input label="Reason *" value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} />
                         <Button variant="danger" loading={busy} disabled={!reversalValid} onClick={() => void submitReversal()}>Reverse</Button>
                     </div>}
                 </div>}
-                {tabState.activeTab === 'history' && <RecordTable rows={(value.lifecycle_events ?? []) as Record<string, unknown>[]} fields={['occurred_at', 'event_type', 'from_document_status', 'to_document_status', 'reason']} rowKey={(row, index) => String(row.id ?? row.occurred_at ?? `lifecycle-${index}`)} />}
+                {tabState.activeTab === 'history' && <RecordTable rows={(value.lifecycle_events ?? []) as Record<string, unknown>[]} fields={['occurred_at', 'dimension', 'from_state', 'to_state', 'reason']} rowKey={(row, index) => String(row.id ?? row.occurred_at ?? `lifecycle-${index}`)} />}
             </div>
         </Panel>
         <ConfirmDialog

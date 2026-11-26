@@ -51,6 +51,18 @@ final class ChequeTemplate extends TenantOwnedModel
         ]);
     }
 
+    protected static function booted(): void
+    {
+        self::deleting(static function (ChequeTemplate $template): void {
+            if ($template->is_default) {
+                throw new \LogicException('The default cheque template cannot be deleted.');
+            }
+            if ($template->printLogs()->exists()) {
+                throw new \LogicException('Cheque templates with print history cannot be deleted. Deactivate the template instead.');
+            }
+        });
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(TenantModel::class, 'tenant_id');

@@ -14,6 +14,7 @@ namespace Modules\Payment\Services;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Models\Payment;
@@ -36,7 +37,10 @@ final class PaymentReceiptService
             'unappliedBalance',
         ]);
 
-        $isInbound = $payment->direction === PaymentDirection::Inbound || $payment->direction->value === PaymentDirection::Inbound->value;
+        $direction = $payment->direction instanceof PaymentDirection
+            ? $payment->direction
+            : PaymentDirection::tryFrom((string) $payment->direction);
+        $isInbound = $direction === PaymentDirection::Inbound;
         $title = $isInbound ? 'OFFICIAL PAYMENT RECEIPT' : 'DISBURSEMENT VOUCHER';
         $partyRole = $isInbound ? 'Received From' : 'Paid To';
 
@@ -142,14 +146,19 @@ final class PaymentReceiptService
             $agreementRefs = array_values(array_unique(array_filter($invoiceSources)));
         }
         if (empty($agreementRefs) && ! empty($payment->source_id)) {
-            $ref = DB::table('customer_agreements')
-                ->where('tenant_id', $payment->tenant_id)
-                ->where('id', $payment->source_id)
-                ->value('reference')
-                ?? DB::table('owner_agreements')
+            $ref = null;
+            if (Schema::hasTable('vehicle_rental_customer_agreements')) {
+                $ref = DB::table('vehicle_rental_customer_agreements')
                     ->where('tenant_id', $payment->tenant_id)
                     ->where('id', $payment->source_id)
                     ->value('reference');
+            }
+            if (! $ref && Schema::hasTable('vehicle_rental_owner_agreements')) {
+                $ref = DB::table('vehicle_rental_owner_agreements')
+                    ->where('tenant_id', $payment->tenant_id)
+                    ->where('id', $payment->source_id)
+                    ->value('reference');
+            }
             if ($ref) {
                 $agreementRefs[] = $ref;
             }
@@ -160,7 +169,7 @@ final class PaymentReceiptService
         $unapplied = (string) ($payment->unapplied_amount ?? $payment->unappliedBalance?->unapplied_amount ?? '0.000000');
         $wordsText = '';
         try {
-            $wordsText = ucwords($this->words->convert((string) $payment->total_amount)).' Only';
+            $wordsText = $this->words->convert((string) $payment->total_amount);
         } catch (\Throwable) {
             $wordsText = '';
         }
@@ -171,13 +180,24 @@ final class PaymentReceiptService
         $partyEmail = $payment->party_email_snapshot ?? '';
 
         if (! $partyName && $payment->party_id && $payment->party_type) {
-            $table = $payment->party_type === 'customer' ? 'customers' : ($payment->party_type === 'supplier' ? 'suppliers' : null);
-            if ($table) {
-                $p = DB::table($table)->where('id', $payment->party_id)->first();
+            $partyTypeStr = strtolower(trim((string) $payment->party_type));
+            $table = str_contains($partyTypeStr, 'customer')
+                ? 'customers'
+                : (str_contains($partyTypeStr, 'supplier') || str_contains($partyTypeStr, 'vendor')
+                    ? 'suppliers'
+                    : (str_contains($partyTypeStr, 'employee')
+                        ? (Schema::hasTable('hr_employees') ? 'hr_employees' : (Schema::hasTable('employees') ? 'employees' : null))
+                        : null));
+
+            if ($table && Schema::hasTable($table)) {
+                $p = DB::table($table)
+                    ->where('tenant_id', $payment->tenant_id)
+                    ->where('id', $payment->party_id)
+                    ->first();
                 if ($p) {
-                    $partyName = $p->name ?? null;
-                    $partyCode = $p->customer_number ?? $p->supplier_number ?? $p->code ?? '';
-                    $partyPhone = $p->phone ?? '';
+                    $partyName = $p->display_name ?? $p->name ?? null;
+                    $partyCode = $p->customer_number ?? $p->supplier_number ?? $p->employee_number ?? $p->code ?? '';
+                    $partyPhone = $p->phone ?? $p->mobile ?? '';
                     $partyEmail = $p->email ?? '';
                 }
             }

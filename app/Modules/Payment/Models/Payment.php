@@ -92,6 +92,16 @@ final class Payment extends TenantOwnedModel
                     'total_amount',
                     'tenant_id',
                     'organization_unit_id',
+                    'party_number_snapshot',
+                    'party_code_snapshot',
+                    'party_name_snapshot',
+                    'party_email_snapshot',
+                    'party_phone_snapshot',
+                    'currency_code_snapshot',
+                    'currency_name_snapshot',
+                    'currency_symbol_snapshot',
+                    'source_type',
+                    'source_id',
                 ];
                 if ($payment->isDirty($immutableAttributes)) {
                     throw new LogicException('Historical posted payment financial attributes are immutable in place. Use governed reversal or adjustment.');

@@ -17,6 +17,7 @@ use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\AllocationStatus;
+use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Tenant\Models\TenantModel;
 
 final class PaymentAllocation extends TenantOwnedModel
@@ -28,20 +29,67 @@ final class PaymentAllocation extends TenantOwnedModel
     protected static function booted(): void
     {
         self::updating(static function (PaymentAllocation $allocation): void {
-            $immutableAttributes = [
-                'invoice_id',
-                'payment_id',
-                'allocation_date',
-                'allocated_amount',
-                'tenant_id',
-            ];
-            if ($allocation->isDirty($immutableAttributes)) {
-                throw new LogicException('Payment allocation amounts and targets are immutable. Reverse the allocation instead.');
+            $originalStatus = $allocation->getOriginal('status');
+            $originalStatusEnum = $originalStatus instanceof AllocationStatus
+                ? $originalStatus
+                : ($originalStatus !== null ? AllocationStatus::tryFrom((string) $originalStatus) : null);
+
+            if ($originalStatusEnum === AllocationStatus::Active || $originalStatusEnum === AllocationStatus::Reversed) {
+                $immutableAttributes = [
+                    'invoice_id',
+                    'payment_id',
+                    'allocation_date',
+                    'allocated_amount',
+                    'tenant_id',
+                    'organization_unit_id',
+                    'invoice_number_snapshot',
+                    'invoice_date_snapshot',
+                    'invoice_currency_code_snapshot',
+                    'invoice_exchange_rate_snapshot',
+                    'invoice_total',
+                    'invoice_balance_before',
+                    'invoice_balance_after',
+                    'previously_allocated_amount',
+                    'allocation_method',
+                ];
+                if ($allocation->isDirty($immutableAttributes)) {
+                    throw new LogicException('Payment allocation amounts and targets are immutable. Reverse the allocation instead.');
+                }
+            } else {
+                $immutablePendingAttributes = [
+                    'invoice_id',
+                    'payment_id',
+                    'allocation_date',
+                    'allocated_amount',
+                    'tenant_id',
+                    'organization_unit_id',
+                    'invoice_number_snapshot',
+                    'invoice_currency_code_snapshot',
+                    'invoice_exchange_rate_snapshot',
+                    'allocation_method',
+                ];
+                if ($allocation->isDirty($immutablePendingAttributes)) {
+                    throw new LogicException('Payment allocation amounts and targets are immutable. Reverse the allocation instead.');
+                }
             }
         });
 
-        self::deleting(static function (): never {
-            throw new LogicException('Payment allocations cannot be deleted. Use governed reversal to undo an allocation.');
+        self::deleting(static function (PaymentAllocation $allocation): void {
+            $payment = $allocation->relationLoaded('payment') ? $allocation->payment : $allocation->payment()->first();
+            $status = $payment?->document_status instanceof PaymentDocumentStatus
+                ? $payment->document_status
+                : ($payment?->document_status !== null ? PaymentDocumentStatus::tryFrom((string) $payment->document_status) : null);
+
+            $allocationStatus = $allocation->status instanceof AllocationStatus
+                ? $allocation->status
+                : ($allocation->status !== null ? AllocationStatus::tryFrom((string) $allocation->status) : null);
+
+            if ($payment && $status !== null && $status !== PaymentDocumentStatus::Draft) {
+                throw new LogicException('Allocations of non-draft payments cannot be deleted. Use governed reversal to undo an allocation.');
+            }
+            if ($allocationStatus !== null && $allocationStatus !== AllocationStatus::Pending) {
+                throw new LogicException('Non-pending payment allocations cannot be deleted. Use governed reversal to undo an allocation.');
+            }
         });
     }
 

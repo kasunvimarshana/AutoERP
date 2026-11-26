@@ -88,6 +88,7 @@ function PaymentMethodEditor({ id, initialValue, loadError }: {
                 requires_instrument_details: Boolean(form.requires_instrument_details),
                 is_active: form.is_active !== false,
                 sort_order: Number(form.sort_order ?? 0),
+                ...(initialValue?.row_version !== undefined ? { expected_version: initialValue.row_version } : {}),
             };
             if (id !== null) await updatePaymentMethod(id, payload);
             else await createPaymentMethod(payload);

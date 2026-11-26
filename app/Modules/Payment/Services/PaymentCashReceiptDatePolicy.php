@@ -65,7 +65,10 @@ final class PaymentCashReceiptDatePolicy
         if ($paymentDate < $today && ! $this->permissions->allows($postedBy, (int) $payment->tenant_id, PaymentPermission::PAYMENTS_BACKDATE_CASH)) {
             throw new AuthorizationException('Backdated cash receipts require the backdate-cash permission.');
         }
-        $isServiceReceipt = $payment->payment_type === PaymentType::ServiceReceipt;
+        $paymentType = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::tryFrom((string) $payment->payment_type);
+        $isServiceReceipt = $paymentType === PaymentType::ServiceReceipt;
         $reason = $isServiceReceipt
             ? ($payment->metadata['backdate_reason'] ?? null)
             : $payment->notes;

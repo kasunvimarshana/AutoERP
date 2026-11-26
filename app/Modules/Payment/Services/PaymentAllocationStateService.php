@@ -30,7 +30,10 @@ final class PaymentAllocationStateService
 
     public function assertAllocatable(Payment $payment): void
     {
-        if ($payment->payment_type === PaymentType::Refund) {
+        $type = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::tryFrom((string) $payment->payment_type);
+        if ($type === PaymentType::Refund) {
             throw new InvalidArgumentException('Refund payments cannot be allocated to invoices.');
         }
 
