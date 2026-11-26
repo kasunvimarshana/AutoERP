@@ -21,6 +21,8 @@ use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Services\ChequePrintService;
 use Modules\Payment\Services\ChequeTemplateService;
 use Modules\Payment\Services\PaymentAuthorizationService;
+use Spatie\LaravelPdf\Facades\Pdf;
+use Symfony\Component\HttpFoundation\Response;
 
 final class ChequePrintController
 {
@@ -42,6 +44,48 @@ final class ChequePrintController
         );
 
         return response()->json(['data' => $prints->preview($row, $paymentLine, $template)]);
+    }
+
+    public function export(
+        ChequePrintRequest $request,
+        int $payment,
+        int $line,
+        string $format,
+        ChequeTemplateService $templates,
+        ChequePrintService $prints,
+    ): Response {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::CHEQUES_PREVIEW);
+        [$row, $paymentLine] = $this->paymentLine($request, $payment, $line);
+        $template = $templates->resolveActive(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $request->filled('cheque_template_id') ? (int) $request->input('cheque_template_id') : null,
+        );
+
+        $previewData = $prints->preview($row, $paymentLine, $template);
+        $viewName = 'payment.cheque-print';
+        $chequeNumber = $previewData['line']['cheque_number'] ?? 'preview';
+        $filename = "cheque-{$previewData['payment']['payment_number']}-{$chequeNumber}.pdf";
+
+        if ($format === 'pdf') {
+            return Pdf::view($viewName, array_merge($previewData, ['mode' => 'pdf']))
+                ->paperSize(
+                    (float) $template->page_width_mm,
+                    (float) $template->page_height_mm,
+                    'mm'
+                )
+                ->margins(0, 0, 0, 0)
+                ->name($filename)
+                ->download()
+                ->toResponse($request);
+        }
+
+        return response()->view(
+            $viewName,
+            array_merge($previewData, ['mode' => $format === 'print' ? 'print' : 'html']),
+            200,
+            ['Content-Type' => 'text/html; charset=UTF-8'],
+        );
     }
 
     public function markPrinted(

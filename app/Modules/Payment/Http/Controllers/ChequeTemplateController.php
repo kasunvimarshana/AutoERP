@@ -14,14 +14,12 @@ namespace Modules\Payment\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 use Modules\Payment\Constants\PaymentPermission;
 use Modules\Payment\Http\Requests\ListChequeTemplateRequest;
 use Modules\Payment\Http\Requests\UpsertChequeTemplateRequest;
 use Modules\Payment\Http\Resources\ChequeTemplateResource;
 use Modules\Payment\Services\ChequeTemplateService;
 use Modules\Payment\Services\PaymentAuthorizationService;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class ChequeTemplateController
 {
@@ -33,10 +31,22 @@ final class ChequeTemplateController
     ): AnonymousResourceCollection {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::TEMPLATES_VIEW);
 
-        return ChequeTemplateResource::collection($service->list(
+        $isActive = $request->filled('is_active') ? $request->boolean('is_active') : null;
+
+        if ($request->boolean('all')) {
+            return ChequeTemplateResource::collection($service->list(
+                $request->tenantId(),
+                $request->organizationUnitId(),
+                $isActive,
+            ));
+        }
+
+        return ChequeTemplateResource::collection($service->paginate(
             $request->tenantId(),
             $request->organizationUnitId(),
-            $request->filled('is_active') ? $request->boolean('is_active') : null,
+            $isActive,
+            $request->filled('search') ? (string) $request->input('search') : null,
+            $request->perPage(),
         ));
     }
 
@@ -75,22 +85,10 @@ final class ChequeTemplateController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::TEMPLATES_UPDATE);
         $expectedVersion = $request->filled('expected_version') ? (int) $request->input('expected_version') : null;
 
-        $updated = DB::transaction(function () use ($request, $id, $service, $expectedVersion) {
-            $template = $service->find($id, $request->tenantId(), $request->organizationUnitId());
-            $template = $template->newQuery()->lockForUpdate()->findOrFail($template->getKey());
+        $template = $service->find($id, $request->tenantId(), $request->organizationUnitId());
+        $saved = $service->update($template, $request->validated(), $expectedVersion);
 
-            if ($expectedVersion !== null && (int) $template->row_version !== $expectedVersion) {
-                throw new ConflictHttpException('Cheque template was changed by someone else. Reload before saving.');
-            }
-
-            $nextVersion = ((int) $template->row_version) + 1;
-            $saved = $service->update($template, $request->validated());
-            $saved->forceFill(['row_version' => $nextVersion])->save();
-
-            return $saved;
-        });
-
-        return new ChequeTemplateResource($updated);
+        return new ChequeTemplateResource($saved);
     }
 
     public function destroy(

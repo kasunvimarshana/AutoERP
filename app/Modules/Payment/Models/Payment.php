@@ -110,6 +110,10 @@ final class Payment extends TenantOwnedModel
         });
 
         self::deleting(static function (Payment $payment): void {
+            if ($payment->chequePrintLogs()->exists()) {
+                throw new LogicException('Payments with printed cheques cannot be deleted.');
+            }
+
             $status = $payment->document_status instanceof PaymentDocumentStatus
                 ? $payment->document_status
                 : PaymentDocumentStatus::from((string) $payment->document_status);

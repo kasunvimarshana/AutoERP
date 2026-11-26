@@ -12,14 +12,45 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use LogicException;
 use Modules\Payment\Models\ChequeTemplate;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class ChequeTemplateService
 {
+    /**
+     * @return LengthAwarePaginator<ChequeTemplate>
+     */
+    public function paginate(
+        int $tenantId,
+        ?int $organizationUnitId,
+        ?bool $isActive = null,
+        ?string $search = null,
+        int $perPage = 20,
+    ): LengthAwarePaginator {
+        $query = $this->scope(ChequeTemplate::query(), $tenantId, $organizationUnitId);
+        if ($isActive !== null) {
+            $query->where('is_active', $isActive);
+        }
+        if ($search !== null && trim($search) !== '') {
+            $term = '%'.trim($search).'%';
+            $query->where(function (Builder $builder) use ($term): void {
+                $builder->where('template_name', 'like', $term)
+                    ->orWhere('bank_name', 'like', $term);
+            });
+        }
+
+        return $query->orderByDesc('is_default')
+            ->orderBy('bank_name')
+            ->orderBy('template_name')
+            ->paginate(max(1, min(100, $perPage)));
+    }
+
     /** @return Collection<int, ChequeTemplate> */
     public function list(int $tenantId, ?int $organizationUnitId, ?bool $isActive = null): Collection
     {
@@ -42,6 +73,7 @@ final class ChequeTemplateService
             $attributes = $this->attributes($payload);
             $attributes['tenant_id'] = $tenantId;
             $attributes['organization_unit_id'] = $organizationUnitId;
+            $attributes['row_version'] = 1;
             $attributes['is_default'] = (bool) ($attributes['is_default'] ?? false);
             $attributes['is_active'] = (bool) ($attributes['is_active'] ?? true);
             if ($attributes['is_default'] && ! $attributes['is_active']) {
@@ -56,10 +88,15 @@ final class ChequeTemplateService
         });
     }
 
-    public function update(ChequeTemplate $template, array $payload): ChequeTemplate
+    public function update(ChequeTemplate $template, array $payload, ?int $expectedVersion = null): ChequeTemplate
     {
-        return DB::transaction(function () use ($template, $payload): ChequeTemplate {
+        return DB::transaction(function () use ($template, $payload, $expectedVersion): ChequeTemplate {
             $template = ChequeTemplate::query()->lockForUpdate()->findOrFail($template->getKey());
+
+            if ($expectedVersion !== null && (int) $template->row_version !== $expectedVersion) {
+                throw new ConflictHttpException('Cheque template was changed by someone else. Reload before saving.');
+            }
+
             $attributes = $this->attributes($payload);
             if (array_key_exists('is_default', $attributes)) {
                 $attributes['is_default'] = (bool) $attributes['is_default'];
@@ -81,6 +118,7 @@ final class ChequeTemplateService
                 $this->clearDefault((int) $template->tenant_id, $template->organization_unit_id, (int) $template->getKey());
             }
 
+            $attributes['row_version'] = ((int) $template->row_version) + 1;
             $template->fill($attributes)->save();
 
             return $template->refresh();
@@ -90,10 +128,10 @@ final class ChequeTemplateService
     public function delete(ChequeTemplate $template): void
     {
         if ((bool) $template->is_default) {
-            throw new InvalidArgumentException('Select another default cheque template before deleting this template.');
+            throw new LogicException('The default cheque template cannot be deleted. Select another default cheque template first.');
         }
         if ($template->printLogs()->exists()) {
-            throw new InvalidArgumentException('Templates with cheque print history cannot be deleted; deactivate the template instead.');
+            throw new LogicException('Cheque templates with print history cannot be deleted. Deactivate the template instead.');
         }
 
         $template->delete();
@@ -143,7 +181,7 @@ final class ChequeTemplateService
 
     private function attributes(array $payload): array
     {
-        unset($payload['tenant_id'], $payload['organization_unit_id']);
+        unset($payload['id'], $payload['tenant_id'], $payload['organization_unit_id'], $payload['expected_version']);
 
         return $payload;
     }

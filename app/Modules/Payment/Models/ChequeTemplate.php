@@ -32,6 +32,7 @@ final class ChequeTemplate extends TenantOwnedModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
+            'row_version' => 'integer',
             'page_width_mm' => 'decimal:3',
             'page_height_mm' => 'decimal:3',
             'date_x_mm' => 'decimal:3',
@@ -76,5 +77,10 @@ final class ChequeTemplate extends TenantOwnedModel
     public function printLogs(): HasMany
     {
         return $this->hasMany(ChequePrintLog::class, 'cheque_template_id');
+    }
+
+    public function canDelete(): bool
+    {
+        return ! $this->is_default && ! $this->printLogs()->exists();
     }
 }
