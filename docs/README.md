@@ -1,5 +1,9 @@
 # AutoERP Documentation Suite & Architecture Index
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 Welcome to the **AutoERP Documentation Suite**. This directory contains the authoritative technical specifications, architectural designs, user manuals, quality assurance protocols, database standards, and shared project memory for the AutoERP platform.
 
 ---
@@ -7,11 +11,12 @@ Welcome to the **AutoERP Documentation Suite**. This directory contains the auth
 ## 1. Primary Entry Points & Canonical References
 
 | Resource | Path | Description |
-|---|---|---|
+| --- | --- | --- |
 | **Repository Root Overview** | [`README.md`](file:///d:/project-new/AutoERP/README.md) | Ground-up platform architecture, technology stack, setup guide, and module catalog. |
 | **Project Knowledge Base & Technical Guide** | [`project_knowledgebase.md`](file:///d:/project-new/AutoERP/docs/project_knowledgebase.md) | Central technical knowledge base, developer onboarding handbook, module encyclopedia, and architecture manual. |
 | **Enterprise Knowledge Base** | [`knowledgebase.md`](file:///d:/project-new/AutoERP/docs/knowledgebase.md) | Canonical technical specification, developer onboarding handbook, and domain encyclopedia. |
 | **Core Engineering Axioms** | [`AGENTS.md`](file:///d:/project-new/AutoERP/AGENTS.md) / [`RULES.md`](file:///d:/project-new/AutoERP/RULES.md) | The 12 non-negotiable architectural axioms governing backend, frontend, database, concurrency, and UI/UX. |
+| **Permanent Project Rules** | [`DURABLE_RULES.md`](file:///d:/project-new/AutoERP/DURABLE_RULES.md) | Architectural invariants, database migration standards, and Markdown documentation rules. |
 | **Audit Authority Protocol** | [`AUDIT_AUTHORITY.md`](file:///d:/project-new/AutoERP/docs/AUDIT_AUTHORITY.md) | Authoritative precedence hierarchy for reconciling code, tests, append-only change logs, and business evidence. |
 | **Vehicle Rental Technical Guide** | [`modules/vehicle_rental_complete_guide.md`](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md) | Complete end-to-end technical specification for commercial fleet leasing, running charts, billing, and settlements. |
 | **Vehicle Rental Operator Manual** | [`user-guides/vehicle_rental_user_guide.md`](file:///d:/project-new/AutoERP/docs/user-guides/vehicle_rental_user_guide.md) | Comprehensive, beginner-friendly operator handbook for daily dispatchers, billing clerks, cashiers, and managers. |
@@ -28,6 +33,7 @@ docs/
 ├── knowledgebase.md                           # Canonical system specification & developer guide
 ├── AGENTS.md                                  # The 12 Core Engineering Axioms & Rules
 ├── RULES.md                                   # Synchronized copy of the 12 Core Axioms
+├── DURABLE_RULES.md                           # Permanent project rules and migration standards
 ├── AUDIT_AUTHORITY.md                         # Precedence hierarchy and evidence governance
 │
 ├── modules/                                   # Domain-specific technical manuals
@@ -78,7 +84,7 @@ docs/
 The AutoERP codebase is continuously verified across strict automated regression gates:
 
 | Quality Gate | Tool / Command | Verified Baseline Status |
-|---|---|---|
+| --- | --- | --- |
 | **Backend Test Suite** | `php artisan test` | **1,433 tests passed** (15,106 assertions, 0 failures) |
 | **Frontend Test Suite** | `npm test` | **177 test files passed** (745 tests passed, 0 failures) |
 | **TypeScript Static Check** | `npm run typecheck` | **0 errors** (strict compiler mode) |
@@ -110,12 +116,14 @@ All development, bug fixes, refactoring, and AI-agent interactions must adhere s
 ## 5. Developer Quickstart & Command Cheatsheet
 
 ### Running Local Development
+
 ```bash
 # Start backend server, queue worker, log tail, and Vite HMR simultaneously
 composer dev
 ```
 
 ### Running Automated Test Gates
+
 ```bash
 # Backend unit, feature, and modular tests (SQLite :memory:)
 php artisan test
@@ -143,4 +151,3 @@ npm run lint
 - **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
 - **Phone:** [+94713525253](tel:+94713525253)
 - **Repository:** [kasunvimarshana/AutoERP](https://github.com/kasunvimarshana/AutoERP)
-

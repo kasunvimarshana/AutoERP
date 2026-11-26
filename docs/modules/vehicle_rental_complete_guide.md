@@ -1,5 +1,9 @@
 # AutoERP Vehicle Rental Module: Complete Technical & Operational Guide
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 **Status:** Canonical Master Technical Specification, Architecture Manual & Developer Guide
 **Module Directory (Backend):** [`app/Modules/VehicleRental`](file:///d:/project-new/AutoERP/app/Modules/VehicleRental)  
 **Frontend Directory:** [`resources/js/modules/vehicle-rental`](file:///d:/project-new/AutoERP/resources/js/modules/vehicle-rental)  

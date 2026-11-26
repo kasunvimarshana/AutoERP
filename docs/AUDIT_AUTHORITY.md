@@ -1,5 +1,9 @@
 # AutoERP Audit Authority
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 This document defines how audit reports, video-derived knowledge, change records, tests, and current code should be interpreted.
 
 ## Authoritative order
@@ -65,4 +69,3 @@ These remain explicit release or decision gates until evidence is supplied.
 - **Email:** [kasunvmail@gmail.com](mailto:kasunvmail@gmail.com)
 - **Phone:** [+94713525253](tel:+94713525253)
 - **Repository:** [kasunvimarshana/AutoERP](https://github.com/kasunvimarshana/AutoERP)
-

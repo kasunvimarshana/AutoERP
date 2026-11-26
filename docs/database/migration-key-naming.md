@@ -1,5 +1,9 @@
 # Migration key naming convention
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 All explicitly named database keys and constraints must use this format:
 
 ```text
@@ -9,7 +13,7 @@ All explicitly named database keys and constraints must use this format:
 Supported suffixes:
 
 | Key type | Suffix |
-|---|---|
+| --- | --- |
 | Foreign key | `_fk` |
 | Unique key | `_uk` |
 | Normal index | `_ix` |

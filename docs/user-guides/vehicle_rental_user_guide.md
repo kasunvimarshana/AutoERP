@@ -1,5 +1,9 @@
 # AutoERP Vehicle Rental: End-User Guide & Operator Handbook
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 > [!NOTE]
 > **Audience:** This handbook is designed for daily business operators—including **Fleet Officers, Dispatchers, Billing Clerks, Cashiers, AP Clerks, and Operations Managers**. For architectural specifications, database schemas, and developer onboarding, refer to the canonical [Vehicle Rental Complete Guide](file:///d:/project-new/AutoERP/docs/modules/vehicle_rental_complete_guide.md).
 

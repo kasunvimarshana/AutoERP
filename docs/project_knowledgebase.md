@@ -1,5 +1,9 @@
 # AutoERP Project Knowledge Base & Canonical Technical Guide
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 **Document Status:** Single Authoritative System Specification, Enterprise Architecture Reference, and Developer Onboarding Guide for AutoERP.  
 **System Architecture:** Modular Monolith (Laravel 12 Backend + React 19 / TypeScript 6 SPA Frontend)  
 **Standard Civil Timezone:** Dynamically Configured Workspace Timezone (`localization.timezone` scoped by tenant/organization unit, with fallback to application `APP_TIMEZONE`)  

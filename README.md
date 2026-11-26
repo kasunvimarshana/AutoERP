@@ -1,5 +1,9 @@
 # AutoERP — Enterprise Modular Monolith ERP
 
+- **Author:** Kasun Vimarshana
+- **Email:** <kasunvmail@gmail.com>
+- **Phone:** +94713525253
+
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
 [![Laravel](https://img.shields.io/badge/Laravel-12.x-FF2D20?style=flat-square&logo=laravel&logoColor=white)](https://laravel.com/)
 [![React](https://img.shields.io/badge/React-19.x-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
@@ -58,27 +62,29 @@
 
 ## 1. Executive System Overview
 
-AutoERP is designed to solve the operational and financial complexities of equipment and vehicle rental operators, automotive repair facilities, and distribution businesses. 
+AutoERP is designed to solve the operational and financial complexities of equipment and vehicle rental operators, automotive repair facilities, and distribution businesses.
 
 Unlike conventional generic ERPs that treat rental or workshop activities as standard stock items, AutoERP models physical assets as first-class operational entities subject to:
+
 - **Custody Lifecycles & State Tracking:** Strict chain of custody across planned reservations, active handovers, maintenance blocks, and return inspections.
 - **Dual-Sided Commercial Contracts:** Independent management of client revenues (corporate lessee contracts) and vehicle owner costs (lessor supplier contracts).
 - **Exact Arbitrary-Precision Math:** Zero binary floating-point calculations in financial pathways; all financial calculations use PHP BCMath string arithmetic (`DecimalMath`).
 - **Strict Concurrency & Immutability:** Optimistic concurrency control across all write mutations, pessimistic locks on physical custody cutovers, and append-only financial and operational ledgers.
+- **Dual-Timestamp Architecture:** Architectural separation between server-owned physical ingestion facts (`created_at`) and civil operational business dates (`invoice_date`, `movement_date`, etc.).
 - **Ergonomic, ID-Free User Interface:** Complete elimination of raw internal database IDs from the UI, with contextual selection dropdowns and transparent calculation breakdowns.
 
 ---
 
 ## 2. The 12 Core Engineering Axioms
 
-Every engineer, contributor, and AI agent working on AutoERP must strictly adhere to the **12 Core Axioms** defined in [`AGENTS.md`](file:///d:/project-new/AutoERP/AGENTS.md) and [`RULES.md`](file:///d:/project-new/AutoERP/RULES.md):
+Every engineer, contributor, and AI agent working on AutoERP must strictly adhere to the **12 Core Axioms** defined in [`AGENTS.md`](file:///d:/project-new/AutoERP/AGENTS.md) and [`DURABLE_RULES.md`](file:///d:/project-new/AutoERP/DURABLE_RULES.md):
 
-1. **Understand First, Verify Second, Change Third:** Never act on assumptions or guess. Fully understand requirements, module ownership, and data consequences before modifying code. Fix only the requested issue using the smallest safe change.
+1. **Understand First, Verify Second, Change Third (Prime Directive):** Never act on assumptions or guess. Fully understand requirements, module ownership, and data consequences before modifying code. Fix only the requested issue using the smallest safe change.
 2. **Root Cause Design over Compatibility Workarounds:** Prioritize correctness, readability, and long-term maintainability over backward compatibility. Do not carry forward legacy flaws or patch bad designs. Fix underlying root causes.
 3. **Simplicity, Pragmatism & No Overengineering:** Prefer the simplest clean design that correctly solves the problem. Avoid premature optimization, speculative features, or generic frameworks. Dead code is prohibited.
 4. **Module Ownership & Clear Boundaries:** Each of the 32 domain modules strictly owns its models, business logic, and tables. Never compensate for a bug in one module by creating shadow tables or workarounds in another.
 5. **Backend Authority & Single Source of Truth:** The backend is the single authoritative source of truth for business logic, validations, state transitions, calculations, and permissions. The frontend provides immediate presentation feedback only; it never substitutes for backend enforcement.
-6. **Concurrency, Atomicity & Transaction Immutability:** Concurrency is assumed across all write operations. Every write mutation must be atomic, conflict-aware, and version-checked (`expected_version` / `row_version`). Historical operational and financial ledger records are immutable; adjustments and reversals must be recorded as separate, linked audit records.
+6. **Concurrency, Atomicity & Transaction Immutability:** Concurrency is assumed across all write operations. Every write mutation must be atomic, conflict-aware, and version-checked (`expected_version` / `row_version`). Historical operational and financial ledger records are immutable; adjustments and reversals must be recorded as separate, linked audit records. Dual-timestamp architecture strictly separates physical recording moments (`created_at`) from civil business dates (`invoice_date`, `movement_date`).
 7. **Database Architecture & Explicit Migrations:** One table per migration file. Migrations represent immutable database schema history: write every column, foreign key, constraint, and index explicitly line-by-line (**KISS + Explicit over DRY**). Dynamic loops, runtime conditionals, or programmatic column names in migrations are prohibited.
 8. **Code Modularity & File Size Management:** Organize code into cohesive, modular units. Split large files when they violate single responsibility, reduce readability, or increase cognitive complexity.
 9. **Zero Magic Values:** Never use hardcoded magic values, literals, or strings in application logic. Use PHP Backed Enums (`string`) and TypeScript enums for predefined option sets. Use named constants for shared fixed values.
@@ -107,7 +113,7 @@ flowchart TD
         AUTH_MID["OAuth 2.0 Passport / Token Guard (module-auth)"]
         TENANT_MID["Tenant Context Resolver (current.tenant)"]
         ORG_MID["Organization Unit Guard (current.organization-unit:required)"]
-        FEATURE_MID["Tenant Feature Flag Guard (tenant.feature:{module})"]
+        FEATURE_MID["Tenant Feature Flag Guard (tenant.feature:module)"]
         SPA -->|REST API /api/v1/*| AUTH_MID
         AUTH_MID --> TENANT_MID
         TENANT_MID --> ORG_MID
@@ -179,28 +185,32 @@ flowchart TD
 ## 4. Technology Stack & System Requirements
 
 ### Backend Stack
-- **Language:** PHP 8.2+ (PHP 8.3+ fully supported), strictly typed (`declare(strict_types=1);`).
-- **Framework:** Laravel 12.x.
-- **Authentication:** Laravel Passport 13.x (OAuth 2.0 with secure, HttpOnly refresh cookies).
+
+- **Language:** PHP 8.2+ (`^8.2`, strictly typed via `declare(strict_types=1);`).
+- **Framework:** Laravel Framework 12.x (`^12.0`).
+- **Authentication:** Laravel Passport 13.x (`^13.7`, OAuth 2.0 with secure HttpOnly refresh cookie rotation).
 - **Precision Arithmetic:** PHP BCMath via [`DecimalMath`](file:///d:/project-new/AutoERP/app/Modules/Core/Services/DecimalMath.php).
-- **Document & PDF Generation:** Spatie Laravel PDF 2.x and DomPDF 3.x.
-- **API Documentation:** L5-Swagger (OpenAPI 3.0 / Swagger UI).
-- **Queue & Real-time:** Database queues / Redis with Laravel Reverb 1.x.
+- **Document & PDF Generation:** Spatie Laravel PDF 2.x (`^2.12`) and DomPDF 3.x (`^3.1`).
+- **API Documentation:** L5-Swagger 11.x (`^11.0`, OpenAPI 3.0 / Swagger UI).
+- **Queue & Real-time:** Database queues / Redis with Laravel Reverb 1.x (`^1.10`).
 
 ### Frontend Stack
-- **Library:** React 19.2+.
-- **Language:** TypeScript 6.0+ (strict mode enabled with zero emissions).
-- **Styling:** Tailwind CSS 4.0+.
-- **Routing:** React Router 7.x (SPA client routing).
-- **State Management:** Zustand 5.x and React hooks.
+
+- **Library:** React 19.x (`^19.2.7`).
+- **Language:** TypeScript 6.x (`^6.0.3`, strict mode enabled with zero emissions).
+- **Styling:** Tailwind CSS 4.x (`^4.0.0`) with `@tailwindcss/vite`.
+- **Routing:** React Router DOM 7.x (`^7.17.0`, client-side SPA routing).
+- **State Management:** Zustand 5.x (`^5.0.14`) and custom React hooks.
+- **HTTP Client:** Axios 1.x (`^1.17.0`).
 - **Build Tool & Test Runner:** Vite 8.x (`^8.3.8`) with Hot Module Replacement (HMR) and Vitest 5.x (`^5.1.2`).
-- **Notifications:** React-Toastify 11.x.
+- **Notifications:** React-Toastify 11.x (`^11.1.0`).
 
 ### Database & Storage
-- **Primary Database:** MySQL 8.0+ (standard local and production runtime).
-- **Test Database:** SQLite in-memory or file-backed (automated test runs).
-- **Schema Management:** 307 canonical, single-table baseline migrations (5 root + 302 modular).
-- **Attachment Storage:** Private tenant disks managed by `PrivateObject` with SHA-256 verification.
+
+- **Primary Database:** MySQL 8.0+ (standard local development and production runtime).
+- **Test Database:** SQLite 3.x in-memory (`:memory:`) or file-backed (automated CI/CD and unit test runs).
+- **Schema Management:** 307 canonical single-table baseline migrations (5 root + 302 modular migrations).
+- **Attachment Storage:** Private tenant disks managed by `PrivateObject` with SHA-256 tamper-evident verification.
 
 ---
 
@@ -208,7 +218,7 @@ flowchart TD
 
 AutoERP follows a clean domain-driven modular monolith directory layout:
 
-```
+```text
 AutoERP/
 ├── app/
 │   ├── Console/Commands/         # Core application console commands
@@ -270,6 +280,7 @@ AutoERP/
 │   ├── Unit/                     # Domain service, math, and baseline tests
 │   └── TestCase.php              # Base testing harness with tenant fixtures
 ├── AGENTS.md                     # Binding agent core axioms and engineering rules
+├── DURABLE_RULES.md              # Permanent project development rules and migration standards
 ├── composer.json                 # PHP dependencies, scripts, and dev tools
 ├── package.json                  # Frontend dependencies, Vite 8.x, Vitest 5.x, TypeScript
 └── vite.config.ts                # Vite 8 build configuration
@@ -281,11 +292,12 @@ AutoERP/
 
 ### 6.1 Prerequisites
 
-Before setting up AutoERP locally, verify that your environment has:
-- **PHP:** Version 8.2 or higher (8.3+ recommended).
+Before setting up AutoERP locally, verify that your environment meets the minimum version requirements:
+
+- **PHP:** Version 8.2 or higher (PHP 8.3+ recommended).
   - *Required PHP Extensions:* `bcmath`, `pdo`, `pdo_mysql`, `pdo_sqlite`, `openssl`, `mbstring`, `tokenizer`, `xml`, `ctype`, `json`, `curl`, `fileinfo`.
 - **Composer:** Version 2.2 or higher.
-- **Node.js:** Version 20.x or higher (LTS recommended).
+- **Node.js:** Version 20.x or higher (LTS recommended; tested up to v24.x).
 - **NPM:** Version 10.x or higher.
 - **Database:** MySQL 8.0+ for standard local/production runtime; SQLite for automated tests.
 
@@ -293,21 +305,22 @@ Before setting up AutoERP locally, verify that your environment has:
 
 ### 6.2 Automated Quick Start
 
-AutoERP includes an automated bootstrapping command that provisions the application from zero to ready-to-run:
+AutoERP includes an automated bootstrapping command that provisions the entire application from zero to ready-to-run:
 
 ```bash
 composer setup
 ```
 
-This single command automatically executes:
+This single command automatically executes the following 8 operations defined in `composer.json`:
+
 1. `composer install` (backend dependencies)
 2. `.env` file generation from `.env.example` (if missing)
-3. Application key validation & safe generation (`php artisan app:key:ensure`)
-4. Full database schema construction (`php artisan migrate --force`)
-5. Platform permissions catalogue synchronization (`php artisan platform:permissions:sync`)
-6. Authentication & OAuth readiness verification (`php artisan auth:readiness`)
-7. Frontend dependencies installation (`npm install`)
-8. Frontend asset build (`npm run build`)
+3. Configuration cache clear (`php artisan config:clear`)
+4. Application key validation & safe generation (`php artisan app:key:ensure`)
+5. Full database schema construction (`php artisan migrate --force`)
+6. Platform permissions catalogue synchronization (`php artisan platform:permissions:sync`)
+7. Authentication & OAuth readiness verification (`php artisan auth:readiness`)
+8. Frontend dependencies installation and production asset build (`npm install && npm run build`)
 
 ---
 
@@ -367,13 +380,15 @@ composer dev
 ```
 
 This command uses `concurrently` to spawn four coordinated background processes:
+
 1. **`server`:** Laravel development server on `http://127.0.0.1:8000`.
 2. **`queue`:** Queue worker listening for background jobs (`php artisan queue:listen`).
 3. **`logs`:** Real-time application log stream (`php artisan pail`).
 4. **`vite`:** Frontend Vite development server with Hot Module Replacement (HMR).
 
 Open your browser and navigate to:
-```
+
+```text
 http://127.0.0.1:8000
 ```
 
@@ -384,14 +399,14 @@ http://127.0.0.1:8000
 Key configuration variables defined in `.env.example`:
 
 | Environment Variable | Default Value | Description |
-|---|---|---|
+| --- | --- | --- |
 | `APP_ENV` | `local` | Application runtime environment (`local`, `production`, `testing`). |
 | `APP_KEY` | *(Generated)* | 32-character AES encryption key generated via `app:key:ensure`. |
 | `APP_TIMEZONE` | `Asia/Colombo` | Default fallback civil business timezone when tenant localization setting is not specified. |
 | `DB_CONNECTION` | `sqlite` | Default `.env.example` driver (`sqlite` out-of-the-box/tests; `mysql` for standard local/prod). |
 | `AUTOERP_CURRENCY_CODE` | `LKR` | Default operational currency code for financial transactions. |
 | `TENANT_LOCAL_FALLBACK_ENABLED` | `true` | Allows local development without multi-tenant subdomain DNS configuration. |
-| `TENANT_LOCAL_FALLBACK_TENANT_CODE`| `AUTOERP` | The default fallback tenant code resolved during local single-domain dev. |
+| `TENANT_LOCAL_FALLBACK_TENANT_CODE` | `AUTOERP` | The default fallback tenant code resolved during local single-domain dev. |
 | `PDF_DRIVER` | `dompdf` | PDF rendering driver (`dompdf` or `spatie`). |
 | `FILESYSTEM_DISK` | `local` | Default disk storage driver. |
 | `PRIVATE_OBJECT_DEFAULT_DISK` | `"${FILESYSTEM_DISK}"` | Storage disk for tamper-evident private files with SHA-256 verification. |
@@ -400,13 +415,13 @@ Key configuration variables defined in `.env.example`:
 
 ## 7. Complete Domain Module Catalog (32 Modules)
 
-AutoERP organizes its business capabilities into **32 decoupled backend modules** in `app/Modules/*` (and **33 frontend modules** in `resources/js/modules/*`):
+AutoERP organizes its business capabilities into **32 decoupled backend modules** in `app/Modules/*` (paired with **33 frontend modules** in `resources/js/modules/*`):
 
 | # | Module | Category | Primary Eloquent Models | Core Public Responsibilities |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | **`Core`** | Foundation | *None (Technical primitives)* | Base models (`TenantOwnedModel`, `CoreModel`), `DecimalMath` BCMath arithmetic, API responses, exception handling. |
 | 2 | **`Tenant`** | Platform | `Tenant`, `TenantPlan`, `TenantDomain` | Tenant lifecycle (`draft`, `active`, `suspended`), custom domain verification, plan limits. |
-| 3 | **`OrganizationUnit`**| Platform | `OrganizationUnit`, `OrganizationUnitType` | Physical branch hierarchy, head office vs. depots, user unit assignments. |
+| 3 | **`OrganizationUnit`** | Platform | `OrganizationUnit`, `OrganizationUnitType` | Physical branch hierarchy, head office vs. depots, user unit assignments. |
 | 4 | **`User`** | Platform | `User`, `Role`, `Permission` | Tenant user accounts, role definitions, permission catalogue synchronization. |
 | 5 | **`Auth`** | Platform | `AuthIdentity`, `AuthSession`, `AuthClient` | Laravel Passport OAuth 2.0 tokens, HttpOnly refresh cookie rotation, session security. |
 | 6 | **`Configuration`** | Platform | `TenantConfigurationValue`, `GlobalConfigurationValue` | Version-controlled configuration settings with audit trails and rollback capabilities. |
@@ -427,7 +442,7 @@ AutoERP organizes its business capabilities into **32 decoupled backend modules*
 | 21 | **`Selling`** | Supply Chain | `Sale`, `SaleLine`, `SaleReturn`, `SaleReturnLine` | Commercial sales orders, quotations, customer deliveries, returns, line discounts. |
 | 22 | **`Expense`** | Operations | `Expense`, `ExpenseType`, `ExpenseHistory` | Corporate overhead expense claims, approvals, sequential numbering, GL posting. |
 | 23 | **`Promotion`** | Operations | `PromotionOffer`, `PromotionCard`, `PromotionBenefit` | Loyalty cards, promo templates, fixed/percentage discounts, redemption audit streams. |
-| 24 | **`VehicleService`**| Operations | `VehicleServiceJob`, `VehicleServiceJobLine`, `JobType` | Mechanical repair job cards, inspection checklists, technician commissions, parts issues. |
+| 24 | **`VehicleService`** | Operations | `VehicleServiceJob`, `VehicleServiceJobLine`, `JobType` | Mechanical repair job cards, inspection checklists, technician commissions, parts issues. |
 | 25 | **`VehicleRental`** | Operations | `CustomerAgreement`, `OwnerAgreement`, `RunningChart` | Dual-sided commercial contracts, custody tracking, running charts, billing & settlements. |
 | 26 | **`Invoice`** | Financial Core | `Invoice`, `InvoiceLine`, `InvoicePostingPlan` | Canonical single source of truth for all commercial invoices, debit/credit notes. |
 | 27 | **`Payment`** | Financial Core | `Payment`, `PaymentAllocation`, `ChequeTemplate` | Customer receipts, supplier payouts, invoice allocations, cheque generation. |
@@ -449,29 +464,36 @@ In AutoERP, database migrations are treated as **immutable database schema speci
 - **One Table Per Migration File:** Every database table is created by exactly one migration file named `YYYY_MM_DD_HHMMSS_create_<table_name>_table.php`.
 - **Zero Patch Migrations:** Historical `Schema::table()` alteration migrations and `UpgradeMigrations` are strictly eliminated. All column additions, index alterations, and constraint updates are consolidated directly into the canonical creation migration.
 - **KISS + Explicit over DRY:** Write every column, default value, foreign key constraint, and index explicitly line-by-line. Never use dynamic loops (`foreach ($columns as $col)`), runtime conditionals, or programmatic identifier naming.
-- **Portable Data Types:** Native database `enum` types (`$table->enum(...)`) are prohibited. Use bounded string columns (`$table->string('status', 32)`) validated at the application layer. Financial amounts and rates use `$table->decimal('amount', 20, 6);`.
+- **Portable Data Types:** Native database `enum` types (`$table->enum(...)`) are prohibited. Use bounded string columns (`$table->string('status', 32)`) validated at the application layer via PHP Backed Enums. Financial amounts and rates use `$table->decimal('amount', 20, 6);`.
 
 ---
 
 ### 8.2 Key Naming & Integrity Standards
 
-Foreign keys, unique keys, and lookup indexes adhere to deterministic abbreviations:
+Foreign keys, unique keys, and lookup indexes adhere to deterministic abbreviations (`<table_abbrev>_<column>_<suffix>`):
+
 - **Foreign Keys:** `<table_abbrev>_<column>_fk` (e.g. `vrca_customer_id_fk`).
 - **Unique Indexes:** `<table_abbrev>_<columns>_uk` (e.g. `vrca_agreement_number_uk`).
 - **Lookup Indexes:** `<table_abbrev>_<columns>_ix` (e.g. `vrca_tenant_status_ix`).
+- **Primary Keys:** `<table_abbrev>_<column>_pk` (e.g. `reference_values_tenant_code_pk`).
+- **Check Constraints:** `<table_abbrev>_<column>_ck`.
+- **Identifier Length:** Strictly bounded under 60 characters to ensure cross-database safety.
 
 ---
 
 ### 8.3 Immutable Status Histories & Evidence Retention
 
 State transitions on business documents (Customer Agreements, Invoices, Service Jobs, Running Charts) are recorded in dedicated `*_status_histories` tables:
+
 - Historical records must enforce:
+
   ```php
   $table->foreignId('customer_agreement_id')
       ->constrained('customer_agreements')
       ->restrictOnDelete();
   ```
-- **Cascading deletes (`cascadeOnDelete()`) on financial, audit, or operational records are strictly prohibited.** Parent records with historical evidence cannot be deleted.
+
+- **Cascading deletes (`cascadeOnDelete()`) on financial, audit, or operational records are strictly prohibited.** Parent records with historical evidence cannot be deleted in place; governed cancellations or reversals must be used.
 
 ---
 
@@ -505,6 +527,7 @@ State transitions on business documents (Customer Agreements, Invoices, Service 
 ### 9.1 Dual-Plane Multi-Tenancy Architecture
 
 AutoERP strictly separates administrative platform governance from commercial tenant operations:
+
 1. **Platform Control Plane:** Platform operators manage tenant onboarding, subscription plans, domain mapping, global system configurations, and infrastructure health.
 2. **Tenant Business Plane:** Authenticated tenant employees operate within an explicitly resolved tenant workspace (`current.tenant`) and active organization unit (`current.organization-unit:required`).
 3. **Automatic Data Isolation:** All tenant models extend [`TenantOwnedModel`](file:///d:/project-new/AutoERP/app/Modules/Core/Models/TenantOwnedModel.php). The ORM automatically injects tenant constraints into queries (`scopeForTenant`), guaranteeing that cross-tenant data leakage is structurally impossible at the query layer.
@@ -514,7 +537,7 @@ AutoERP strictly separates administrative platform governance from commercial te
 ### 9.2 Authentication, OAuth 2.0 & Role-Based Access Control
 
 - **OAuth 2.0 Protocol:** Powered by Laravel Passport with signed tokens.
-- **Secure Refresh Token Rotation:** Refresh tokens are dispatched in secure, HttpOnly, SameSite cookies to protect against cross-site scripting (XSS) credential theft.
+- **Secure Refresh Token Rotation:** Refresh tokens are dispatched in secure, HttpOnly, SameSite cookies to protect against cross-site scripting (XSS) credential theft. A 30-second concurrency grace window prevents simultaneous API requests from triggering false token revocation.
 - **Granular RBAC:** Users are assigned roles composed of discrete permissions (e.g. `rental.agreement.create`, `invoice.post`, `vehicle.odometer.override`). Routes and UI actions are protected using middleware (`tenant.permission:{permission}`) and client hooks (`useAuth().hasPermission(...)`).
 
 ---
@@ -522,6 +545,7 @@ AutoERP strictly separates administrative platform governance from commercial te
 ### 9.3 Request Idempotency Engine
 
 Mutating API operations—such as posting an invoice, issuing a payment receipt, cutting over an agreement, or finalizing a running chart—mandate an `Idempotency-Key` HTTP header:
+
 - The engine calculates a SHA-256 fingerprint of the request payload, authenticated user, and URI.
 - If a network retry occurs with the same key, the engine safely returns the cached original response without re-executing business logic or creating duplicate transactions.
 
@@ -530,6 +554,7 @@ Mutating API operations—such as posting an invoice, issuing a payment receipt,
 ### 9.4 Atomic Sequence Generation
 
 AutoERP avoids exposing raw database auto-increment IDs for commercial documents. The `Sequence` module provides monotonic, zero-collision, sequential document codes formatted with date tokens and prefixes:
+
 - `INV-2026-0001` (Invoices)
 - `RC-2026-09-0012` (Running Charts)
 - `PRB-2026-0045` (Payment Receipts / Vouchers)
@@ -543,6 +568,7 @@ Generators use atomic table locking to guarantee gap-free numbering even under h
 ### 9.5 Tamper-Evident Private Storage
 
 Sensitive attachments—such as police accident reports, vehicle damage photographs, signed contract PDFs, and driver licences—are managed by `PrivateObject`:
+
 - Files are saved to secure, private tenant storage disks outside the public web root.
 - Each file is hashed (SHA-256) upon upload. The hash is verified on read to guarantee tamper-evidence.
 - Downloads are served exclusively through authenticated, signed, streaming endpoints. Once an incident or agreement is formally reviewed, attachments are permanently locked against replacement or deletion.
@@ -597,17 +623,22 @@ flowchart TD
 ```
 
 #### 1. Dual-Sided Commercial Contracts
+
 AutoERP enforces complete independence between customer pricing and owner costs:
+
 - **Customer Agreement (`CustomerAgreement`):** Governs revenue owed by the corporate lessee. Specifies rental basis (`daily` vs. `monthly`), billing cycle, free kilometer allowance, excess distance rate, overtime hourly rates (Normal, Double, Triple), night out rates, AC mode premiums, and security deposit requirements.
 - **Owner Agreement (`OwnerAgreement`):** Governs liabilities owed to third-party fleet suppliers (vehicle owners/lessors). Specifies the agreed base monthly hire, excess KM reimbursement rate, and overtime pass-through rates. Company-owned vehicles do not have Owner Agreements, preventing artificial owner liabilities.
 
 #### 2. Agreement Lifecycle & Successor Architecture
+
 To maintain legal auditability, an `Active` agreement is **immutable**. Commercial revisions use successor lineage (`supersedes_agreement_id`):
+
 - An operator creates a draft successor agreement while the current agreement remains active.
 - All operational terms copy forward to the draft **except security deposits** (security deposits belong to the original source payment and are preserved).
 - Activating the successor atomically closes the predecessor at the cutover timestamp, updates lineage links, and applies new commercial terms without interrupting vehicle custody.
 
 #### 3. Custody Tracking & Atomic Replacement
+
 - **Custody State Machine (`VehicleUse`):** `planned` &rarr; `in_custody` &rarr; `returned` (or `cancelled`).
 - **Half-Open Availability Intervals:** `VehicleUseAvailabilityBlocker` prevents overlapping assignments (`starts_at <= existing_end AND ends_at >= existing_start`). Exact boundary handovers (e.g. 10:00:00 return, 10:00:00 handover) are fully supported.
 - **Odometer Continuity:** Starting odometer must match or exceed the vehicle's last recorded reading; return odometer cannot be lower than handover reading.
@@ -618,7 +649,9 @@ To maintain legal auditability, an `Active` agreement is **immutable**. Commerci
   - **Visual Audit Badge:** The replacement vehicle's trips on the 31-day running chart matrix are highlighted in amber and annotated `For Repl. <vehicle_no>`.
 
 #### 4. Daily Running Chart Operational Matrix
+
 The Running Chart is the **single physical operational log** of vehicle usage:
+
 - Records daily operational facts:
   - Duty ON time (e.g. `06:30 AM`) and Duty OFF time (e.g. `08:00 PM`) in civil business timezone.
   - Start and finish odometers, comparative daily distance, and cumulative monthly mileage.
@@ -627,6 +660,7 @@ The Running Chart is the **single physical operational log** of vehicle usage:
 - **Finalization Rules:** A trip can only be finalized after duty OFF has passed. Future or ongoing trips cannot be finalized. Once finalized, operational facts are frozen against casual editing. Reversals require an auditable reason.
 
 #### 5. Commercial Billing & Owner Settlement Calculations
+
 - **Lessee Base Rent Invoicing (`actual_calendar_days_v1`):** Monthly agreements bill on the agreement anniversary date. Proration for partial months calculates using actual civil calendar days:
   $$\text{Base Charge} = \frac{\text{Actual Days in Period}}{\text{Days in Month}} \times \text{Monthly Rate}$$
 - **Owner Settlement Track & Closed-Loop Reconciliation:**
@@ -637,7 +671,9 @@ The Running Chart is the **single physical operational log** of vehicle usage:
 - **Statutory Withholding Tax Ledger (`:3305-000 WHT`):** Automatically computes and audits 10% WHT deductions from gross lessor earnings, tracking credit note entries with credit amounts and running balances.
 
 #### 6. Fleet Expenses & 4-Way Destination Matrix
+
 Fleet expenses (fuel, tolls, repairs, fines, maintenance) are recorded in `RentalExpense` and allocated across four destinations:
+
 1. `Company Cost`: Absorbed directly as fleet operational overhead.
 2. `Customer Recovery`: Billed to customer on next rental invoice.
 3. `Owner Deduction`: Deducted from lessor's disbursement statement (`CDN` note).
@@ -724,7 +760,7 @@ flowchart TD
 AutoERP includes a dedicated reporting engine supporting interactive HTML grids, printable views, and PDF exports:
 
 | Module | Report Name | Page Orientation | Core Business Purpose |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Rental** | **Running Chart 31-Day Matrix Sheet** | **A4 Landscape** | Official monthly trip matrix (`pmdeblogsheet2.frx` / `pmcre1logsheet2.frx`). Daily odometers, comparative/cumulative KM, OT tiers, night outs, toll pass outlays, and replacement vehicle badges in Lessee & Owner modes. |
 | **Rental** | **Statement of Accounts (Detail I)** | **A4 Portrait** | Single-vehicle vertical statement (`pmcre1vehstat_b.frx`). Balance B/F, Base Hire, Driver OT, Tolls, Cheque Settlements (`PRB`), Repair Deductions (`CDN`), and Closing Balance. |
 | **Rental** | **Statement of Accounts (Detail II)** | **A4 Landscape** | Single-vehicle 18-column operational matrix (`pmcre1vehstat_c.frx`). Agreed KM, Non-A/C KM rate, Base Hire, Agreed OT Hours, OT Amount, Other Charges, Cheque Settlements, and Closing Balance. |
@@ -735,8 +771,8 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 | **Rental** | **Fleet Utilization & Status Report** | **A4 Landscape** | Asset availability, custody states (In Custody, Available, Planned), ownership type, period distance, and utilization rates %. |
 | **Rental** | **Fleet Vehicle Profitability & Unit Economics** | **A4 Landscape** | Vehicle P&L: revenue minus direct costs (lessor payout, fuel, repairs, tolls), gross margins, and per-KM economics. |
 | **Finance** | **Trial Balance, P&L, Balance Sheet, Cash Flow** | **A4 Portrait / Landscape** | Authoritative double-entry financial statements generated from posted general ledger transactions. |
-| **Inventory**| **Stock Availability & Reorder Health** | **A4 Landscape** | Multi-warehouse stock health: on-hand, reserved, available quantities, reorder thresholds, and bin locations. |
-| **Service**  | **Vehicle Service History & Costing** | **A4 Portrait** | Complete workshop repair history, labor costs, parts issues, and technician performance. |
+| **Inventory** | **Stock Availability & Reorder Health** | **A4 Landscape** | Multi-warehouse stock health: on-hand, reserved, available quantities, reorder thresholds, and bin locations. |
+| **Service** | **Vehicle Service History & Costing** | **A4 Portrait** | Complete workshop repair history, labor costs, parts issues, and technician performance. |
 
 ---
 
@@ -746,6 +782,7 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 
 1. **Strict Typing:**
    Every PHP file must declare strict types at the very top:
+
    ```php
    <?php
 
@@ -759,6 +796,7 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 3. **Zero Magic Values (PHP Backed Enums):**
    - String literals and integer codes for statuses, document types, billing modes, and roles are forbidden.
    - Use PHP Backed Enums (`string`) placed in `app/Modules/<ModuleName>/Enums/` or `Constants/`:
+
      ```php
      namespace Modules\VehicleRental\Enums;
 
@@ -775,6 +813,7 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
    - Every mutable business entity carries an unsigned integer `row_version` (default 1).
    - Update endpoints mandate `expected_version` in the request payload.
    - Service mutations execute atomic, version-checked database updates:
+
      ```php
      $updated = $model->newQuery()
          ->where('id', $model->id)
@@ -791,6 +830,7 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 5. **Exact Decimal Arithmetic (`DecimalMath`):**
    - Standard binary floating-point arithmetic (`float`, `double`, `(float) $val`) is strictly prohibited for monetary values, taxes, mileage calculations, or quantities.
    - Always use [`DecimalMath`](file:///d:/project-new/AutoERP/app/Modules/Core/Services/DecimalMath.php), which executes exact string-based arithmetic via PHP's BCMath extension:
+
      ```php
      $math = app(DecimalMath::class);
 
@@ -853,35 +893,36 @@ AutoERP includes a dedicated reporting engine supporting interactive HTML grids,
 AutoERP maintains a strict zero-regression quality gate. All checks must pass with 0 errors before code is merged:
 
 | Gate | Command | Description |
-|---|---|---|
+| --- | --- | --- |
 | **Backend Unit & Feature Tests** | `php artisan test` | Runs 1,433 PHPUnit tests (15,106 assertions) across all 32 modules using SQLite in-memory. |
 | **MySQL Integration Tests** | `composer test:mysql` | Runs integration tests against a live MySQL instance (`phpunit.mysql.xml`). |
 | **Frontend Unit Tests** | `npm test` | Runs 177 Vitest test files (745 tests) in JSDOM mode. |
 | **TypeScript Compilation** | `npm run typecheck` | Validates TypeScript types across `resources/js` with zero emissions (`tsc --noEmit`). |
 | **ESLint Quality Check** | `npm run lint` | Lints React 19 / TypeScript code (`eslint resources/js`). |
 | **PHP Code Style (Pint)** | `php vendor/bin/pint --test` | Validates Laravel Pint code formatting standards. |
-| **Migration Baseline Integrity**| `php artisan test --filter ModuleMigrationBaselineTest` | Verifies one-table-per-migration, timestamp ordering, and zero `Schema::table`. |
-| **Historical Retention Integrity**| `php artisan test --filter HistoricalRetentionMigrationTest`| Asserts status history tables enforce `restrictOnDelete` without cascading deletes. |
+| **Migration Baseline Integrity** | `php artisan test --filter ModuleMigrationBaselineTest` | Verifies one-table-per-migration, timestamp ordering, and zero `Schema::table`. |
+| **Historical Retention Integrity** | `php artisan test --filter HistoricalRetentionMigrationTest` | Asserts status history tables enforce `restrictOnDelete` without cascading deletes. |
+| **Markdown Standard Linting** | `npx markdownlint-cli2 --no-globs README.md docs/README.md` | Validates CommonMark/GFM compliance and document formatting standards. |
 
 ---
 
 ## 13. Custom Artisan CLI Commands
 
-AutoERP provides specialized CLI commands for administrative and operational tasks:
+AutoERP provides specialized CLI commands for administrative, platform, and operational tasks:
 
 | Artisan Command | Purpose |
-|---|---|
+| --- | --- |
 | `php artisan app:key:ensure` | Checks for `APP_KEY` and generates one non-interactively if missing. |
-| `php artisan auth:readiness` | Verifies OAuth Passport encryption keys, token tables, and auth providers. |
+| `php artisan auth:readiness` | Verifies Auth configuration, schema, cache, and critical container bindings. |
 | `php artisan auth:client-create` | Creates a tenant-owned OAuth client with exact redirects and security policy. |
 | `php artisan auth:clear-resets` | Flushes expired password reset tokens. |
 | `php artisan auth:incident` | Finds an Auth incident in local Laravel logs by correlation ID. |
 | `php artisan auth:retention:purge` | Purges expired Auth operational records according to configured retention periods. |
-| `php artisan hr:detect-missing-punches` | Scans attendance records to detect and flag missing clock-out punches. |
+| `php artisan hr:detect-missing-punches` | Scans attendance records to detect missing in/out punches, unpaired breaks, and duration anomalies. |
 | `php artisan platform:permissions:sync` | Scans all modules and synchronizes permissions into the platform catalog. |
-| `php artisan platform:health` | Performs system diagnostics across database, cache, queues, and storage. |
-| `php artisan tenant:create` | Provisions a new tenant with initial domain and plan configuration. |
-| `php artisan tenant:activate` | Activates an onboarded tenant workspace. |
+| `php artisan platform:health` | Verifies platform operational health checks across database, cache, queues, and storage. |
+| `php artisan tenant:create` | Creates a draft tenant with initial domain and plan configuration. |
+| `php artisan tenant:activate` | Activates an onboarded tenant workspace through the validated lifecycle. |
 | `php artisan tenant:suspend` | Suspends an active tenant through the validated lifecycle. |
 | `php artisan tenant:deactivate` | Deactivates a tenant through the validated lifecycle. |
 | `php artisan tenant:expire` | Deactivates active tenants whose subscription or trial has expired. |
@@ -889,7 +930,7 @@ AutoERP provides specialized CLI commands for administrative and operational tas
 | `php artisan tenant:events:publish` | Publishes pending tenant lifecycle events from the durable outbox. |
 | `php artisan tenant:events:retry-dead` | Moves selected dead tenant outbox events back to the pending queue. |
 | `php artisan tenant:permissions:sync` | Synchronizes tenant permission catalogues and Super Admin roles from registered modules. |
-| `php artisan tenant:storage:cleanup` | Deletes queued tenant private-object files after a storage cleanup failure (`--limit=`). |
+| `php artisan tenant:storage:cleanup` | Deletes queued tenant private-object files after a storage cleanup failure. |
 | `php artisan customers:audit-phone-numbers` | Read-only audit of missing, duplicate, and invalid customer phone/WhatsApp numbers. |
 | `php artisan vehicle-service:import-legacy-history` | Safely parses and imports legacy FoxPro workshop service histories. |
 
@@ -898,13 +939,16 @@ AutoERP provides specialized CLI commands for administrative and operational tas
 ## 14. Operational Maintenance & Troubleshooting
 
 ### Fresh Database Baseline Reset
+
 To reset the database cleanly from scratch and verify full baseline integrity:
+
 ```bash
 # Drops all tables, re-runs all 307 canonical migrations, and seeds master baseline
 php artisan migrate:fresh --seed
 ```
 
 ### Cache & Optimization Management
+
 ```bash
 # Clear caches during development
 php artisan config:clear
@@ -919,6 +963,7 @@ php artisan view:cache
 ```
 
 ### Common Troubleshooting Scenarios
+
 1. **409 Conflict (Optimistic Locking Error):**
    - *Cause:* The `expected_version` submitted in the payload does not match the database `row_version`.
    - *Solution:* Reload the record before applying edits. Never retry blindly by force-incrementing the version.
@@ -937,7 +982,9 @@ php artisan view:cache
 ## 15. Developer & AI-Agent Governance Protocol
 
 ### AI-Agent Decision Sequence
+
 When modifying code or implementing new features:
+
 1. **Identify Module Responsibility:** Determine which of the 32 modules owns the capability. If logic belongs elsewhere, implement it in the owning module.
 2. **Check Single Source of Truth:** Ensure no business rule or calculation is duplicated.
 3. **Verify Evidence & Policies:** Consult `docs/project_knowledgebase.md` (and `docs/knowledgebase.md`). If no commercial policy exists, physical facts may be recorded, but **no monetary transaction may be invented**.
@@ -947,7 +994,9 @@ When modifying code or implementing new features:
 7. **Append to Change Memory:** Document the completed task in `docs/changes/YYYY-MM-DD-*.md`. Never edit previous change records.
 
 ### Definition of Done Quality Checklist
+
 A task is complete only when:
+
 - [x] Concurrency is atomic, version-checked, and conflict-aware (`expected_version`).
 - [x] Tenant and organization unit boundaries are strictly enforced.
 - [x] Relational inputs use controlled selection components; zero raw IDs are exposed in the UI.
