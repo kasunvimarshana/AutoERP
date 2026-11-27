@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
@@ -22,6 +23,17 @@ final class InvoiceCreditAllocation extends TenantOwnedModel
     protected $table = 'invoice_credit_allocations';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): void {
+            throw new LogicException('Invoice credit allocations are immutable financial records.');
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('Invoice credit allocations cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

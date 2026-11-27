@@ -14,6 +14,7 @@ namespace Modules\Invoice\Services;
 
 use DateTimeImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Configuration\Constants\ConfigurationScope;
@@ -128,47 +129,50 @@ final readonly class InvoiceLayoutService
         }
 
         return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $code, $data, $userId): InvoiceLayout {
-            $exists = InvoiceLayout::query()
-                ->where('tenant_id', $tenantId)
-                ->where('code', $code)
-                ->exists();
+            return DB::transaction(function () use ($tenantId, $code, $data, $userId): InvoiceLayout {
+                $exists = InvoiceLayout::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('code', $code)
+                    ->lockForUpdate()
+                    ->exists();
 
-            if ($exists) {
-                throw ValidationException::withMessages(['code' => ['A layout with this code already exists.']]);
-            }
-
-            $this->validateCustomContent($data->customCss, $data->headerContent, $data->footerContent);
-
-            $isBlade = $data->templateType === InvoiceLayoutType::Blade->value;
-            if ($isBlade) {
-                if (empty($data->bladeContent)) {
-                    throw ValidationException::withMessages(['blade_content' => ['Custom Blade template content is required for Blade layouts.']]);
+                if ($exists) {
+                    throw ValidationException::withMessages(['code' => ['A layout with this code already exists.']]);
                 }
-                $this->bladeValidator?->validate($data->bladeContent);
-            }
 
-            $layout = new InvoiceLayout;
-            $layout->tenant_id = $tenantId;
-            $layout->code = $code;
-            $layout->name = $data->name;
-            $layout->description = $data->description;
-            $layout->paper_size = $data->paperSize;
-            $layout->orientation = $data->orientation;
-            $layout->template_type = $data->templateType;
-            $layout->view_template = $isBlade ? ($data->viewTemplate ?? 'custom.blade') : ($data->viewTemplate ?? 'invoice.layouts.standard');
-            $layout->blade_content = $isBlade ? $data->bladeContent : null;
-            $layout->is_system = false;
-            $layout->is_active = $data->isActive;
-            $layout->custom_css = $data->customCss;
-            $layout->header_content = $data->headerContent;
-            $layout->footer_content = $data->footerContent;
-            $layout->settings = $data->settings ?? [];
-            $layout->row_version = 1;
-            $layout->created_by = $userId;
-            $layout->updated_by = $userId;
-            $layout->save();
+                $this->validateCustomContent($data->customCss, $data->headerContent, $data->footerContent);
 
-            return $layout;
+                $isBlade = $data->templateType === InvoiceLayoutType::Blade->value;
+                if ($isBlade) {
+                    if (empty($data->bladeContent)) {
+                        throw ValidationException::withMessages(['blade_content' => ['Custom Blade template content is required for Blade layouts.']]);
+                    }
+                    $this->bladeValidator?->validate($data->bladeContent);
+                }
+
+                $layout = new InvoiceLayout;
+                $layout->tenant_id = $tenantId;
+                $layout->code = $code;
+                $layout->name = $data->name;
+                $layout->description = $data->description;
+                $layout->paper_size = $data->paperSize;
+                $layout->orientation = $data->orientation;
+                $layout->template_type = $data->templateType;
+                $layout->view_template = $isBlade ? ($data->viewTemplate ?? 'custom.blade') : ($data->viewTemplate ?? 'invoice.layouts.standard');
+                $layout->blade_content = $isBlade ? $data->bladeContent : null;
+                $layout->is_system = false;
+                $layout->is_active = $data->isActive;
+                $layout->custom_css = $data->customCss;
+                $layout->header_content = $data->headerContent;
+                $layout->footer_content = $data->footerContent;
+                $layout->settings = $data->settings ?? [];
+                $layout->row_version = 1;
+                $layout->created_by = $userId;
+                $layout->updated_by = $userId;
+                $layout->save();
+
+                return $layout;
+            }, 3);
         });
     }
 
@@ -180,92 +184,99 @@ final readonly class InvoiceLayoutService
         int $userId,
     ): InvoiceLayout {
         return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $id, $data, $expectedVersion, $userId): InvoiceLayout {
-            $layout = InvoiceLayout::query()
-                ->where('tenant_id', $tenantId)
-                ->find($id);
+            return DB::transaction(function () use ($tenantId, $id, $data, $expectedVersion, $userId): InvoiceLayout {
+                $layout = InvoiceLayout::query()
+                    ->where('tenant_id', $tenantId)
+                    ->lockForUpdate()
+                    ->find($id);
 
-            if ($layout === null) {
-                throw new NotFoundHttpException('Invoice layout not found.');
-            }
+                if ($layout === null) {
+                    throw new NotFoundHttpException('Invoice layout not found.');
+                }
 
-            if ((int) $layout->row_version !== $expectedVersion) {
-                throw new ConflictHttpException(
-                    "Invoice layout has been modified by another transaction. Expected version {$expectedVersion}, current version {$layout->row_version}."
-                );
-            }
+                if ((int) $layout->row_version !== $expectedVersion) {
+                    throw new ConflictHttpException(
+                        "Invoice layout has been modified by another transaction. Expected version {$expectedVersion}, current version {$layout->row_version}."
+                    );
+                }
 
-            $this->validateCustomContent($data->customCss, $data->headerContent, $data->footerContent);
+                $this->validateCustomContent($data->customCss, $data->headerContent, $data->footerContent);
 
-            $isBlade = $data->templateType === InvoiceLayoutType::Blade->value;
-            if ($isBlade && ! empty($data->bladeContent)) {
-                $this->bladeValidator?->validate($data->bladeContent);
-            }
+                $isBlade = $data->templateType === InvoiceLayoutType::Blade->value;
+                if ($isBlade && ! empty($data->bladeContent)) {
+                    $this->bladeValidator?->validate($data->bladeContent);
+                }
 
-            if (! $layout->is_system) {
-                $newCode = Str::slug($data->code, '_');
-                if ($newCode !== $layout->code) {
-                    $codeExists = InvoiceLayout::query()
-                        ->where('tenant_id', $tenantId)
-                        ->where('code', $newCode)
-                        ->where('id', '!=', $id)
-                        ->exists();
+                if (! $layout->is_system) {
+                    $newCode = Str::slug($data->code, '_');
+                    if ($newCode !== $layout->code) {
+                        $codeExists = InvoiceLayout::query()
+                            ->where('tenant_id', $tenantId)
+                            ->where('code', $newCode)
+                            ->where('id', '!=', $id)
+                            ->lockForUpdate()
+                            ->exists();
 
-                    if ($codeExists) {
-                        throw ValidationException::withMessages(['code' => ['A layout with this code already exists.']]);
+                        if ($codeExists) {
+                            throw ValidationException::withMessages(['code' => ['A layout with this code already exists.']]);
+                        }
+                        $layout->code = $newCode;
                     }
-                    $layout->code = $newCode;
+                    $layout->paper_size = $data->paperSize;
+                    $layout->orientation = $data->orientation;
+                    $layout->template_type = $data->templateType;
+                    if ($isBlade) {
+                        $layout->view_template = $data->viewTemplate ?? $layout->view_template ?? 'custom.blade';
+                        $layout->blade_content = $data->bladeContent ?? $layout->blade_content;
+                    } else {
+                        $layout->view_template = $data->viewTemplate;
+                        $layout->blade_content = null;
+                    }
                 }
-                $layout->paper_size = $data->paperSize;
-                $layout->orientation = $data->orientation;
-                $layout->template_type = $data->templateType;
-                if ($isBlade) {
-                    $layout->view_template = $data->viewTemplate ?? $layout->view_template ?? 'custom.blade';
-                    $layout->blade_content = $data->bladeContent ?? $layout->blade_content;
-                } else {
-                    $layout->view_template = $data->viewTemplate;
-                    $layout->blade_content = null;
-                }
-            }
 
-            $layout->name = $data->name;
-            $layout->description = $data->description;
-            $layout->is_active = $data->isActive;
-            $layout->custom_css = $data->customCss;
-            $layout->header_content = $data->headerContent;
-            $layout->footer_content = $data->footerContent;
-            $layout->settings = $data->settings ?? $layout->settings;
-            $layout->row_version = ((int) $layout->row_version) + 1;
-            $layout->updated_by = $userId;
-            $layout->save();
+                $layout->name = $data->name;
+                $layout->description = $data->description;
+                $layout->is_active = $data->isActive;
+                $layout->custom_css = $data->customCss;
+                $layout->header_content = $data->headerContent;
+                $layout->footer_content = $data->footerContent;
+                $layout->settings = $data->settings ?? $layout->settings;
+                $layout->row_version = ((int) $layout->row_version) + 1;
+                $layout->updated_by = $userId;
+                $layout->save();
 
-            return $layout;
+                return $layout;
+            }, 3);
         });
     }
 
     public function delete(int $tenantId, int $id): void
     {
         $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $id): void {
-            $layout = InvoiceLayout::query()
-                ->where('tenant_id', $tenantId)
-                ->find($id);
+            DB::transaction(function () use ($tenantId, $id): void {
+                $layout = InvoiceLayout::query()
+                    ->where('tenant_id', $tenantId)
+                    ->lockForUpdate()
+                    ->find($id);
 
-            if ($layout === null) {
-                throw new NotFoundHttpException('Invoice layout not found.');
-            }
+                if ($layout === null) {
+                    throw new NotFoundHttpException('Invoice layout not found.');
+                }
 
-            if ($layout->is_system) {
-                throw ValidationException::withMessages([
-                    'layout' => ['System default invoice layouts are protected and cannot be deleted.'],
-                ]);
-            }
+                if ($layout->is_system) {
+                    throw ValidationException::withMessages([
+                        'layout' => ['System default invoice layouts are protected and cannot be deleted.'],
+                    ]);
+                }
 
-            if ($layout->invoices()->exists()) {
-                throw ValidationException::withMessages([
-                    'layout' => ['This layout cannot be deleted because it is assigned to existing invoices.'],
-                ]);
-            }
+                if ($layout->invoices()->exists()) {
+                    throw ValidationException::withMessages([
+                        'layout' => ['This layout cannot be deleted because it is assigned to existing invoices.'],
+                    ]);
+                }
 
-            $layout->delete();
+                $layout->delete();
+            }, 3);
         });
     }
 

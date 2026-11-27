@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\DTOs\BalanceResultData;
@@ -50,7 +51,10 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
     public function getInvoiceBalance(int $invoiceId): InvoiceBalanceResult
     {
         $invoice = Invoice::query()->with('balance')->findOrFail($invoiceId);
-        $balance = $invoice->balance;
+        $balance = $invoice->balance ?? $invoice->balance()->first();
+        if ($balance === null) {
+            throw new InvalidArgumentException('Invoice balance record is missing.');
+        }
 
         return new InvoiceBalanceResult(
             invoiceId: (int) $invoice->getKey(),
@@ -298,10 +302,9 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             ->where('invoices.party_type', $partyType)
             ->where('invoices.party_id', $partyId)
             ->where('invoice_balances.remaining_amount', '>', '0')
-            ->whereNotIn('invoices.status', [
-                InvoiceStatus::Draft->value,
-                InvoiceStatus::Cancelled->value,
-                InvoiceStatus::Void->value,
+            ->whereIn('invoices.status', [
+                InvoiceStatus::Posted->value,
+                InvoiceStatus::PartiallyPaid->value,
             ])
             ->orderBy('invoices.invoice_date')
             ->orderBy('invoices.id');
@@ -350,7 +353,10 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
 
     private function balanceData(Invoice $invoice): BalanceResultData
     {
-        $balance = $invoice->balance;
+        $balance = $invoice->balance ?? $invoice->balance()->first();
+        if ($balance === null) {
+            throw new InvalidArgumentException('Invoice balance record is missing.');
+        }
 
         return new BalanceResultData(
             sourceId: (int) $invoice->getKey(),

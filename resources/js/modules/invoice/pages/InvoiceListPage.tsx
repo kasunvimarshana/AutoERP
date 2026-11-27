@@ -24,7 +24,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
+import { humanize, readableRelation } from '@/shared/utils/object';
 import { LinkButton } from '@/shared/components/Button';
 
 const invoiceViews = {
@@ -77,7 +77,7 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
         { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-blue-600 hover:text-blue-800 hover:underline" to={rowHref ? rowHref(row) : `/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.invoice_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
-        { key: 'type', header: 'Type', render: (row) => `${row.invoice_type ?? '-'} / ${row.direction ?? '-'}` },
+        { key: 'type', header: 'Type', render: (row) => `${humanize(row.invoice_type) || '-'} / ${humanize(row.direction) || '-'}` },
         { key: 'total', header: 'Total', className: 'text-right', render: (row) => <MoneyDisplay value={row.grand_total} currency={row.currency?.code ?? undefined} /> },
         { key: 'balance', header: 'Balance', className: 'text-right', render: (row) => <MoneyDisplay value={row.balance_due ?? (row.balance?.remaining_amount as string)} currency={row.currency?.code ?? undefined} /> },
         { key: 'status', header: 'Status', render: (row) => <InvoiceStatusBadge invoice={row} /> },

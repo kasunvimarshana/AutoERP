@@ -30,14 +30,30 @@ final class InvoiceLine extends TenantOwnedModel
     protected static function booted(): void
     {
         self::updating(static function (InvoiceLine $line): void {
-            if ($line->invoice && $line->invoice->status !== InvoiceStatus::Draft) {
-                throw new LogicException('Invoice lines of non-draft invoices cannot be modified.');
+            if ($line->isDirty(['invoice_id', 'tenant_id'])) {
+                throw new LogicException('Invoice line ownership and tenant association are immutable.');
+            }
+
+            $invoice = $line->invoice ?? Invoice::find($line->invoice_id);
+            if ($invoice) {
+                $status = $invoice->status instanceof InvoiceStatus
+                    ? $invoice->status
+                    : InvoiceStatus::tryFrom((string) $invoice->status);
+                if ($status !== null && $status !== InvoiceStatus::Draft) {
+                    throw new LogicException('Invoice lines of non-draft invoices cannot be modified.');
+                }
             }
         });
 
         self::deleting(static function (InvoiceLine $line): void {
-            if ($line->invoice && $line->invoice->status !== InvoiceStatus::Draft) {
-                throw new LogicException('Invoice lines of non-draft invoices cannot be deleted.');
+            $invoice = $line->invoice ?? Invoice::find($line->invoice_id);
+            if ($invoice) {
+                $status = $invoice->status instanceof InvoiceStatus
+                    ? $invoice->status
+                    : InvoiceStatus::tryFrom((string) $invoice->status);
+                if ($status !== null && $status !== InvoiceStatus::Draft) {
+                    throw new LogicException('Invoice lines of non-draft invoices cannot be deleted.');
+                }
             }
         });
     }

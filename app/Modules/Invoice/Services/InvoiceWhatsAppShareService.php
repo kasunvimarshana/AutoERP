@@ -22,6 +22,7 @@ use Modules\Core\Services\WhatsAppShareLinkService;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Services\CustomerWhatsAppVerificationService;
 use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 
@@ -98,9 +99,12 @@ final class InvoiceWhatsAppShareService
         $status = $invoice->status instanceof InvoiceStatus
             ? $invoice->status
             : InvoiceStatus::tryFrom((string) $invoice->status);
+        $partyType = $invoice->party_type instanceof InvoicePartyType
+            ? $invoice->party_type
+            : InvoicePartyType::tryFrom((string) $invoice->party_type);
 
         return $direction === InvoiceDirection::Outbound
-            && $invoice->party_type === 'customer'
+            && $partyType === InvoicePartyType::Customer
             && $invoice->party_id !== null
             && $status !== null
             && in_array($status, self::SHAREABLE_STATUSES, true);

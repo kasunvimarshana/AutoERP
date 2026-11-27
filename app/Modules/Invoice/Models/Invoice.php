@@ -62,9 +62,20 @@ final class Invoice extends TenantOwnedModel
                     'charge_total',
                     'adjustment_total',
                     'grand_total',
+                    'party_number_snapshot',
+                    'party_code_snapshot',
+                    'party_name_snapshot',
+                    'party_legal_name_snapshot',
+                    'party_email_snapshot',
+                    'party_phone_snapshot',
+                    'party_tax_registration_snapshot',
+                    'currency_code_snapshot',
+                    'currency_name_snapshot',
+                    'currency_symbol_snapshot',
+                    'exchange_rate',
                 ];
                 if ($invoice->isDirty($immutableAttributes)) {
-                    throw new LogicException('Historical posted invoice financial attributes are immutable in place. Use credit/debit notes or governed adjustments.');
+                    throw new LogicException('Historical posted invoice financial attributes and party/currency snapshots are immutable in place. Use credit/debit notes or governed adjustments.');
                 }
             }
         });

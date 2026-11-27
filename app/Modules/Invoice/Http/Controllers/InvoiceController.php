@@ -28,6 +28,7 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Invoice\Data\InvoicePrintContext;
 use Modules\Invoice\Enums\InvoiceCopyType;
 use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Http\Requests\InvoiceActionRequest;
 use Modules\Invoice\Http\Requests\ListInvoiceRequest;
 use Modules\Invoice\Http\Requests\StoreInvoiceRequest;
@@ -45,6 +46,7 @@ use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\InvoiceWhatsAppShareService;
 use Modules\Invoice\Services\ManualInvoiceService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class InvoiceController
 {
@@ -84,7 +86,7 @@ final class InvoiceController
             $query->whereDate('invoice_date', '<=', $request->input('date_to'));
         }
 
-        return InvoiceResource::collection($query->latest('invoice_date')->paginate($request->perPage()));
+        return InvoiceResource::collection($query->latest('invoice_date')->orderByDesc('id')->paginate($request->perPage()));
     }
 
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
@@ -92,7 +94,7 @@ final class InvoiceController
         $model = $this->scope(Invoice::query(), $request)
             ->with(['lines', 'sources', 'postingPlan'])
             ->findOrFail($invoice);
-        $model->loadMissing('layout');
+        $model->loadMissing(['layout', 'balance']);
 
         return new InvoiceResource($model);
     }
@@ -491,60 +493,105 @@ final class InvoiceController
         $tenantId = $this->currentTenantId($request);
         $organizationUnitId = $this->currentOrganizationUnitId($request);
 
-        $model = $this->prints->findScoped($invoice, $tenantId, $organizationUnitId);
-        if ($model === null) {
-            abort(404, 'Invoice not found.');
-        }
+        return DB::transaction(function () use ($request, $invoice, $tenantId, $organizationUnitId): JsonResponse {
+            $query = Invoice::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $invoice);
 
-        $layoutId = $request->input('invoice_layout_id');
-        $layoutCode = $request->input('layout_code');
+            if ($organizationUnitId === null) {
+                $query->whereNull('organization_unit_id');
+            } else {
+                $query->where('organization_unit_id', $organizationUnitId);
+            }
 
-        if ($layoutId === null && $layoutCode === null) {
-            $model->invoice_layout_id = null;
+            $model = $query->lockForUpdate()->first();
+            if ($model === null) {
+                abort(404, 'Invoice not found.');
+            }
+
+            $type = $model->invoice_type instanceof InvoiceType
+                ? $model->invoice_type
+                : InvoiceType::from((string) $model->invoice_type);
+
+            if ($type->belongsToRetiredSourceModule()) {
+                throw ValidationException::withMessages([
+                    'invoice' => [sprintf('Historical %s invoices are read-only except for settlement updates.', $type->retiredSourceLabel())],
+                ]);
+            }
+
+            $status = $model->status instanceof InvoiceStatus
+                ? $model->status
+                : InvoiceStatus::from((string) $model->status);
+
+            if (in_array($status, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true)) {
+                throw ValidationException::withMessages([
+                    'invoice' => [sprintf('Cannot change layout for an invoice in %s status.', $status->value)],
+                ]);
+            }
+
+            if ($request->filled('expected_version')) {
+                $expectedVersion = (int) $request->input('expected_version');
+                if ($expectedVersion !== (int) $model->row_version) {
+                    throw new ConflictHttpException(sprintf(
+                        'Invoice has been modified by another transaction. Expected version %d, actual version %d.',
+                        $expectedVersion,
+                        (int) $model->row_version,
+                    ));
+                }
+            }
+
+            $layoutId = $request->input('invoice_layout_id');
+            $layoutCode = $request->input('layout_code');
+
+            if ($layoutId === null && $layoutCode === null) {
+                $model->invoice_layout_id = null;
+                $model->save();
+
+                return response()->json([
+                    'data' => [
+                        'success' => true,
+                        'invoice_id' => (int) $model->id,
+                        'invoice_layout_id' => null,
+                        'row_version' => (int) $model->row_version,
+                        'layout' => null,
+                    ],
+                ]);
+            }
+
+            $layout = null;
+            if ($layoutId !== null && is_numeric($layoutId)) {
+                $layout = InvoiceLayout::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('id', (int) $layoutId)
+                    ->active()
+                    ->first();
+            } elseif (is_string($layoutCode) && trim($layoutCode) !== '') {
+                $layout = InvoiceLayout::query()
+                    ->where('tenant_id', $tenantId)
+                    ->where('code', trim($layoutCode))
+                    ->active()
+                    ->first();
+            }
+
+            if ($layout === null) {
+                throw ValidationException::withMessages([
+                    'layout' => ['The specified invoice layout was not found or is inactive.'],
+                ]);
+            }
+
+            $model->invoice_layout_id = (int) $layout->id;
             $model->save();
 
             return response()->json([
                 'data' => [
                     'success' => true,
                     'invoice_id' => (int) $model->id,
-                    'invoice_layout_id' => null,
-                    'layout' => null,
+                    'invoice_layout_id' => (int) $layout->id,
+                    'row_version' => (int) $model->row_version,
+                    'layout' => new InvoiceLayoutResource($layout),
                 ],
             ]);
-        }
-
-        $layout = null;
-        if ($layoutId !== null && is_numeric($layoutId)) {
-            $layout = InvoiceLayout::query()
-                ->where('tenant_id', $tenantId)
-                ->where('id', (int) $layoutId)
-                ->active()
-                ->first();
-        } elseif (is_string($layoutCode) && trim($layoutCode) !== '') {
-            $layout = InvoiceLayout::query()
-                ->where('tenant_id', $tenantId)
-                ->where('code', trim($layoutCode))
-                ->active()
-                ->first();
-        }
-
-        if ($layout === null) {
-            throw ValidationException::withMessages([
-                'layout' => ['The specified invoice layout was not found or is inactive.'],
-            ]);
-        }
-
-        $model->invoice_layout_id = (int) $layout->id;
-        $model->save();
-
-        return response()->json([
-            'data' => [
-                'success' => true,
-                'invoice_id' => (int) $model->id,
-                'invoice_layout_id' => (int) $layout->id,
-                'layout' => new InvoiceLayoutResource($layout),
-            ],
-        ]);
+        }, 3);
     }
 
     private function signedPrintContext(Request $request): ?InvoicePrintContext

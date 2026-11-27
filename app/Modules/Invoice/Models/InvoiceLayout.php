@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use LogicException;
 use Modules\Core\Models\Concerns\HasTenantScope;
 use Modules\Invoice\Enums\InvoiceLayoutType;
 use Modules\Invoice\Enums\InvoiceOrientation;
@@ -58,6 +59,18 @@ final class InvoiceLayout extends Model
     use SoftDeletes;
 
     protected $table = 'invoice_layouts';
+
+    protected static function booted(): void
+    {
+        self::deleting(static function (InvoiceLayout $layout): void {
+            if ($layout->is_system) {
+                throw new LogicException('System default invoice layouts are protected and cannot be deleted.');
+            }
+            if ($layout->invoices()->exists()) {
+                throw new LogicException('This layout cannot be deleted because it is assigned to existing invoices.');
+            }
+        });
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -123,7 +136,9 @@ final class InvoiceLayout extends Model
 
     public function cssClass(): string
     {
-        return match ($this->paper_size) {
+        $paperSize = $this->paper_size instanceof InvoicePaperSize ? $this->paper_size->value : (string) $this->paper_size;
+
+        return match ($paperSize) {
             InvoicePaperSize::A5->value => 'layout-a5',
             InvoicePaperSize::Continuous85By55->value => 'layout-continuous',
             InvoicePaperSize::Thermal80mm->value => 'layout-thermal',
@@ -133,9 +148,11 @@ final class InvoiceLayout extends Model
 
     public function cssPageSize(): string
     {
-        $orientation = $this->orientation === InvoiceOrientation::Landscape->value ? 'landscape' : 'portrait';
+        $orientationValue = $this->orientation instanceof InvoiceOrientation ? $this->orientation->value : (string) $this->orientation;
+        $orientation = $orientationValue === InvoiceOrientation::Landscape->value ? 'landscape' : 'portrait';
+        $paperSize = $this->paper_size instanceof InvoicePaperSize ? $this->paper_size->value : (string) $this->paper_size;
 
-        return match ($this->paper_size) {
+        return match ($paperSize) {
             InvoicePaperSize::A4->value => 'A4 '.$orientation,
             InvoicePaperSize::A5->value => 'A5 '.$orientation,
             InvoicePaperSize::Thermal80mm->value => '80mm auto',
@@ -147,7 +164,9 @@ final class InvoiceLayout extends Model
 
     public function cssPageMargin(): string
     {
-        return match ($this->paper_size) {
+        $paperSize = $this->paper_size instanceof InvoicePaperSize ? $this->paper_size->value : (string) $this->paper_size;
+
+        return match ($paperSize) {
             InvoicePaperSize::A5->value => '6mm',
             InvoicePaperSize::Thermal80mm->value => '3mm 2mm',
             InvoicePaperSize::Continuous85By55->value => '4.2mm 13mm 4.2mm 12mm',
@@ -158,7 +177,9 @@ final class InvoiceLayout extends Model
     /** @return string|array{0: float, 1: float, 2: float, 3: float} */
     public function pdfPaper(): string|array
     {
-        if ($this->paper_size === InvoicePaperSize::Continuous85By55->value) {
+        $paperSize = $this->paper_size instanceof InvoicePaperSize ? $this->paper_size->value : (string) $this->paper_size;
+
+        if ($paperSize === InvoicePaperSize::Continuous85By55->value) {
             return [
                 0.0,
                 0.0,
@@ -167,7 +188,7 @@ final class InvoiceLayout extends Model
             ];
         }
 
-        if ($this->paper_size === InvoicePaperSize::Thermal80mm->value) {
+        if ($paperSize === InvoicePaperSize::Thermal80mm->value) {
             return [
                 0.0,
                 0.0,
@@ -176,7 +197,7 @@ final class InvoiceLayout extends Model
             ];
         }
 
-        return match ($this->paper_size) {
+        return match ($paperSize) {
             InvoicePaperSize::A5->value => 'A5',
             InvoicePaperSize::Letter->value => 'letter',
             default => 'A4',
@@ -185,7 +206,9 @@ final class InvoiceLayout extends Model
 
     public function isCompact(): bool
     {
-        return in_array($this->paper_size, [
+        $paperSize = $this->paper_size instanceof InvoicePaperSize ? $this->paper_size->value : (string) $this->paper_size;
+
+        return in_array($paperSize, [
             InvoicePaperSize::A5->value,
             InvoicePaperSize::Thermal80mm->value,
             InvoicePaperSize::Continuous85By55->value,
@@ -204,7 +227,9 @@ final class InvoiceLayout extends Model
 
     public function toLegacyPrintLayout(): InvoicePrintLayout
     {
-        return match ($this->paper_size) {
+        $paperSize = $this->paper_size instanceof InvoicePaperSize ? $this->paper_size->value : (string) $this->paper_size;
+
+        return match ($paperSize) {
             InvoicePaperSize::A5->value => InvoicePrintLayout::CompactA5,
             InvoicePaperSize::Continuous85By55->value => InvoicePrintLayout::Continuous85By55,
             default => InvoicePrintLayout::StandardA4,

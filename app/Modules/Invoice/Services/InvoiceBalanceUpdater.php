@@ -214,9 +214,14 @@ final class InvoiceBalanceUpdater
             $balance = $lockedInvoice->balance()->lockForUpdate()->firstOrFail();
             $this->assertBalanceConservation($balance);
 
+            $previousRemaining = (string) $balance->remaining_amount;
+
             $mutation($lockedInvoice, $balance);
 
-            return $this->syncBalance($lockedInvoice, $balance);
+            $synced = $this->syncBalance($lockedInvoice, $balance);
+            $synced->setAttribute('previous_remaining_amount', $previousRemaining);
+
+            return $synced;
         });
     }
 

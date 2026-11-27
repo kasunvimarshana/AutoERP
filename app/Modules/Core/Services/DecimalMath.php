@@ -126,6 +126,11 @@ final class DecimalMath
         return $this->compare($value, '0', $scale) < 0;
     }
 
+    public function isPositive(int|string $value, int $scale = self::SCALE): bool
+    {
+        return $this->compare($value, '0', $scale) > 0;
+    }
+
     public function isZero(int|string $value, int $scale = self::SCALE): bool
     {
         return $this->compare($value, '0', $scale) === 0;

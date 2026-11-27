@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Invoice\Enums\InvoiceBalanceStatus;
 use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 
@@ -50,7 +51,7 @@ final class ListInvoiceRequest extends TenantScopedRequest
             'invoice_type' => ['nullable', Rule::enum(InvoiceType::class)],
             'direction' => ['nullable', Rule::enum(InvoiceDirection::class)],
             'status' => ['nullable', Rule::enum(InvoiceStatus::class)],
-            'party_type' => ['nullable', 'string', 'in:customer,supplier'],
+            'party_type' => ['nullable', Rule::enum(InvoicePartyType::class)],
             'party_id' => ['nullable', 'integer', 'min:1'],
             'currency_id' => [
                 'nullable',

@@ -13,7 +13,9 @@ declare(strict_types=1);
 namespace Modules\Invoice\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -22,6 +24,37 @@ final class InvoiceSource extends TenantOwnedModel
     protected $table = 'invoice_sources';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InvoiceSource $source): void {
+            if ($source->isDirty(['invoice_id', 'tenant_id'])) {
+                throw new LogicException('Invoice source ownership and tenant association are immutable.');
+            }
+
+            $invoice = $source->invoice ?? Invoice::find($source->invoice_id);
+            if ($invoice) {
+                $status = $invoice->status instanceof InvoiceStatus
+                    ? $invoice->status
+                    : InvoiceStatus::tryFrom((string) $invoice->status);
+                if ($status !== null && $status !== InvoiceStatus::Draft) {
+                    throw new LogicException('Invoice sources of non-draft invoices cannot be modified.');
+                }
+            }
+        });
+
+        self::deleting(static function (InvoiceSource $source): void {
+            $invoice = $source->invoice ?? Invoice::find($source->invoice_id);
+            if ($invoice) {
+                $status = $invoice->status instanceof InvoiceStatus
+                    ? $invoice->status
+                    : InvoiceStatus::tryFrom((string) $invoice->status);
+                if ($status !== null && $status !== InvoiceStatus::Draft) {
+                    throw new LogicException('Invoice sources of non-draft invoices cannot be deleted.');
+                }
+            }
+        });
+    }
 
     protected function casts(): array
     {

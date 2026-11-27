@@ -64,4 +64,17 @@ final class DecimalMathTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->math->div('1', '0.000000000000000000');
     }
+
+    public function test_it_evaluates_numeric_polarity_correctly(): void
+    {
+        self::assertTrue($this->math->isPositive('0.000001'));
+        self::assertFalse($this->math->isPositive('0.000000'));
+        self::assertFalse($this->math->isPositive('-0.000001'));
+
+        self::assertTrue($this->math->isZero('0.000000'));
+        self::assertFalse($this->math->isZero('0.000001'));
+
+        self::assertTrue($this->math->isNegative('-0.000001'));
+        self::assertFalse($this->math->isNegative('0.000000'));
+    }
 }

@@ -266,11 +266,12 @@ export default function InvoiceDetailPage() {
         setAssigningLayout(true);
         setActionError(null);
         try {
-            const res = await assignInvoiceLayout(id, layoutId);
+            const res = await assignInvoiceLayout(id, layoutId, invoice.data?.row_version);
             if (invoice.data) {
                 invoice.setData({
                     ...invoice.data,
                     invoice_layout_id: res.invoice_layout_id,
+                    row_version: res.row_version ?? invoice.data.row_version,
                     layout: res.layout,
                 });
             }

@@ -26,6 +26,7 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoicePostingPlanFactory;
+use Modules\Invoice\Services\InvoiceStatusService;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
@@ -352,6 +353,68 @@ final class InvoiceBalanceProviderTest extends TestCase
         $this->assertSame('0.000000', $exposure['total_exposure']);
         $this->assertSame('10000.000000', $exposure['total_base_exposure']);
         $this->assertContains('LKR', $exposure['unconverted_currencies']);
+    }
+
+    public function test_approved_invoices_are_excluded_from_payable_balances(): void
+    {
+        $tenantId = $this->createTenant();
+        $currencyId = CurrencyFixture::create(['code' => 'LKR', 'name' => 'Sri Lankan Rupee']);
+        $customerId = $this->createCustomer($tenantId, null);
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+
+        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            '2026-06-08',
+            FinanceAccountRoleCode::Revenue,
+            '500.000000',
+            description: 'Approved payable check',
+        );
+
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Sales,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-08',
+            partyType: 'customer',
+            partyId: $customerId,
+            currencyId: $currencyId,
+            postingPlan: $postingPlan,
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Approved invoice line',
+                    quantity: '1.000000',
+                    unitPrice: '500.000000',
+                ),
+            ],
+        )));
+
+        $statusService = app(InvoiceStatusService::class);
+        $this->withTenantExecutionContext($tenantId, fn () => $statusService->transition($invoice, InvoiceStatus::Approved));
+
+        $provider = app(InvoiceBalanceProviderInterface::class);
+
+        $payableApproved = $this->withTenantExecutionContext($tenantId, fn () => $provider->getPayableBalancesForParty(
+            $tenantId,
+            null,
+            'customer',
+            $customerId,
+            $currencyId,
+        ));
+        $this->assertCount(0, $payableApproved);
+
+        $this->withTenantExecutionContext($tenantId, fn () => $statusService->transition($invoice, InvoiceStatus::Posted));
+
+        $payablePosted = $this->withTenantExecutionContext($tenantId, fn () => $provider->getPayableBalancesForParty(
+            $tenantId,
+            null,
+            'customer',
+            $customerId,
+            $currencyId,
+        ));
+        $this->assertCount(1, $payablePosted);
+        $this->assertSame((int) $invoice->getKey(), $payablePosted[0]->sourceId);
+        $this->assertSame('500.000000', $payablePosted[0]->remainingAmount);
     }
 
     private function createTenant(): int

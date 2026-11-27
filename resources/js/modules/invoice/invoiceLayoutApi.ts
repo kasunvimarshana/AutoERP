@@ -130,15 +130,18 @@ export async function deletePrinterAssignment(printer: string, organizationUnitI
 export async function assignInvoiceLayout(
     invoiceId: number,
     layoutId: number | null,
+    expectedVersion?: number,
     signal?: AbortSignal,
-): Promise<{ success: boolean; invoice_id: number; invoice_layout_id: number | null; layout: InvoiceLayout | null }> {
+): Promise<{ success: boolean; invoice_id: number; invoice_layout_id: number | null; row_version?: number; layout: InvoiceLayout | null }> {
     const response = await apiClient.patch<ApiResource<{
         success: boolean;
         invoice_id: number;
         invoice_layout_id: number | null;
+        row_version?: number;
         layout: InvoiceLayout | null;
     }>>(`${endpoints.invoices}/${invoiceId}/layout`, {
         invoice_layout_id: layoutId,
+        ...(expectedVersion !== undefined ? { expected_version: expectedVersion } : {}),
     }, { signal });
     return response.data.data;
 }

@@ -14,6 +14,7 @@ namespace Modules\Invoice\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Modules\Invoice\Enums\InvoiceBalanceStatus;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
@@ -145,9 +146,27 @@ final class InvoiceStatusService
                 $updates['cancelled_by'] = $actorId;
                 $updates['cancelled_at'] = now();
                 $updates['cancellation_reason'] = $this->nullableReason($reason);
+                $updates['balance_due'] = '0.000000';
+            }
+            if ($to === InvoiceStatus::Reversed) {
+                $updates['balance_due'] = '0.000000';
             }
 
             $invoice->forceFill($updates)->save();
+
+            if (in_array($to, [InvoiceStatus::Cancelled, InvoiceStatus::Void, InvoiceStatus::Reversed], true)) {
+                $balance = $invoice->balance()->lockForUpdate()->first();
+                if ($balance !== null) {
+                    $balance->remaining_amount = '0.000000';
+                    $balance->status = match ($to) {
+                        InvoiceStatus::Void => InvoiceBalanceStatus::Void->value,
+                        InvoiceStatus::Reversed => InvoiceBalanceStatus::Reversed->value,
+                        default => InvoiceBalanceStatus::Cancelled->value,
+                    };
+                    $balance->save();
+                }
+            }
+
             if (in_array($to, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
                 $this->sourceRestoration->restore($invoice, $to, $actorId, $reason);
             }

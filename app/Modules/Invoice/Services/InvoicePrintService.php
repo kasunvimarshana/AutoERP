@@ -311,7 +311,7 @@ final class InvoicePrintService
         }
 
         return $this->usesFocusedPrint($invoice)
-            && bccomp((string) $invoice->balance_due, '0', 6) > 0
+            && $this->math->isPositive((string) $invoice->balance_due)
                 ? 'Credit'
                 : null;
     }

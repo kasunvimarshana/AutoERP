@@ -21,14 +21,33 @@ final class InvoiceSourceService
     public function __construct(private readonly InvoiceSourceAllocationService $sourceAllocations) {}
 
     /** @param list<int> $sourceIds @return array<int, list<array{id: int, number: string, status: string}>> */
-    public function documents(int $tenantId, int $organizationUnitId, string $sourceType, array $sourceIds): array
+    public function documents(int $tenantId, ?int $organizationUnitId, string $sourceType, array $sourceIds): array
     {
         $documents = [];
-        foreach (InvoiceSource::query()->where('tenant_id', $tenantId)->where('organization_unit_id', $organizationUnitId)
-            ->where('source_type', $sourceType)->whereIn('source_id', $sourceIds)
-            ->whereHas('invoice', fn ($query) => $query->where('tenant_id', $tenantId)->where('organization_unit_id', $organizationUnitId))->with('invoice')->orderByDesc('id')->get() as $source) {
+        $query = InvoiceSource::query()
+            ->where('tenant_id', $tenantId)
+            ->where('source_type', $sourceType)
+            ->whereIn('source_id', $sourceIds);
+
+        if ($organizationUnitId === null) {
+            $query->whereNull('organization_unit_id')
+                ->whereHas('invoice', fn ($q) => $q->where('tenant_id', $tenantId)->whereNull('organization_unit_id'));
+        } else {
+            $query->where('organization_unit_id', $organizationUnitId)
+                ->whereHas('invoice', fn ($q) => $q->where('tenant_id', $tenantId)->where('organization_unit_id', $organizationUnitId));
+        }
+
+        foreach ($query->with('invoice')->orderByDesc('id')->get() as $source) {
             $invoice = $source->invoice;
-            $documents[(int) $source->source_id][] = ['id' => (int) $invoice->id, 'number' => $invoice->invoice_number, 'status' => $invoice->status->value];
+            if (! $invoice) {
+                continue;
+            }
+            $status = $invoice->status instanceof \BackedEnum ? (string) $invoice->status->value : (string) $invoice->status;
+            $documents[(int) $source->source_id][] = [
+                'id' => (int) $invoice->id,
+                'number' => (string) $invoice->invoice_number,
+                'status' => $status,
+            ];
         }
 
         return $documents;
