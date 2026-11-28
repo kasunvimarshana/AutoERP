@@ -13,7 +13,9 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Inventory\Enums\TransferStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
@@ -23,6 +25,35 @@ final class InventoryTransferLine extends TenantOwnedModel
     protected $table = 'inventory_transfer_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryTransferLine $line): void {
+            if ($line->isDirty(['tenant_id', 'inventory_transfer_id'])) {
+                throw new LogicException('Structural keys on inventory transfer lines are immutable.');
+            }
+
+            $parent = $line->transfer ?? InventoryTransfer::query()->find($line->inventory_transfer_id);
+            if ($parent !== null) {
+                $status = $parent->status instanceof TransferStatus ? $parent->status : TransferStatus::from((string) $parent->status);
+                if (! in_array($status, [TransferStatus::Draft, TransferStatus::Pending], true)) {
+                    if ($line->isDirty(['item_id', 'base_uom_id', 'entered_uom_id', 'quantity', 'conversion_factor'])) {
+                        throw new LogicException('Item and planned quantity attributes on dispatched transfers are immutable.');
+                    }
+                }
+            }
+        });
+
+        self::deleting(static function (InventoryTransferLine $line): void {
+            $parent = $line->transfer ?? InventoryTransfer::query()->find($line->inventory_transfer_id);
+            if ($parent !== null) {
+                $status = $parent->status instanceof TransferStatus ? $parent->status : TransferStatus::from((string) $parent->status);
+                if (! in_array($status, [TransferStatus::Draft, TransferStatus::Pending], true)) {
+                    throw new LogicException('Lines of non-draft inventory transfers cannot be deleted.');
+                }
+            }
+        });
+    }
 
     protected function casts(): array
     {

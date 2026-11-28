@@ -13,7 +13,9 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Inventory\Enums\AdjustmentStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
@@ -23,6 +25,33 @@ final class InventoryAdjustmentLine extends TenantOwnedModel
     protected $table = 'inventory_adjustment_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryAdjustmentLine $line): void {
+            if ($line->isDirty(['tenant_id', 'inventory_adjustment_id'])) {
+                throw new LogicException('Structural keys on inventory adjustment lines are immutable.');
+            }
+
+            $parent = $line->adjustment ?? InventoryAdjustment::query()->find($line->inventory_adjustment_id);
+            if ($parent !== null) {
+                $status = $parent->status instanceof AdjustmentStatus ? $parent->status : AdjustmentStatus::from((string) $parent->status);
+                if ($status !== AdjustmentStatus::Draft) {
+                    throw new LogicException('Lines of non-draft inventory adjustments cannot be updated.');
+                }
+            }
+        });
+
+        self::deleting(static function (InventoryAdjustmentLine $line): void {
+            $parent = $line->adjustment ?? InventoryAdjustment::query()->find($line->inventory_adjustment_id);
+            if ($parent !== null) {
+                $status = $parent->status instanceof AdjustmentStatus ? $parent->status : AdjustmentStatus::from((string) $parent->status);
+                if ($status !== AdjustmentStatus::Draft) {
+                    throw new LogicException('Lines of non-draft inventory adjustments cannot be deleted.');
+                }
+            }
+        });
+    }
 
     protected function casts(): array
     {

@@ -12,7 +12,9 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Http\Requests\InventoryLookupRequest;
 use Modules\Inventory\Http\Requests\ReleaseQuantityRequest;
 use Modules\Inventory\Http\Requests\StoreAllocationRequest;
@@ -42,6 +44,29 @@ final class AllocationController extends InventoryQueryController
     public function store(StoreAllocationRequest $request, InventoryFacade $inventory): InventoryAllocationResource
     {
         return new InventoryAllocationResource($inventory->allocate($request->toData()));
+    }
+
+    public function show(InventoryLookupRequest $request, int $allocation): InventoryAllocationResource
+    {
+        $model = $this->scope(InventoryAllocation::query(), $request)
+            ->with(['reservation', 'item', 'baseUom', 'enteredUom', 'variant', 'warehouse', 'warehouseLocation', 'batch', 'serialNumber', 'lines', 'issues'])
+            ->findOrFail($allocation);
+
+        return new InventoryAllocationResource($model);
+    }
+
+    public function destroy(InventoryLookupRequest $request, int $allocation, InventoryFacade $inventory): JsonResponse
+    {
+        $model = $this->scope(InventoryAllocation::query(), $request)->findOrFail($allocation);
+
+        DB::transaction(function () use ($model, $request, $inventory): void {
+            if (bccomp((string) $model->quantity_remaining, '0', 4) > 0) {
+                $inventory->release($model, (string) $model->quantity_remaining, $request->currentUserId());
+            }
+            $model->delete();
+        });
+
+        return response()->json(['message' => 'Allocation deleted successfully.']);
     }
 
     public function issue(ReleaseQuantityRequest $request, int $allocation, InventoryFacade $inventory): InventoryAllocationResource

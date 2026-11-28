@@ -15,7 +15,9 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\ReservationStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -30,6 +32,22 @@ final class InventoryReservation extends TenantOwnedModel
     protected $table = 'inventory_reservations';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryReservation $reservation): void {
+            if ($reservation->isDirty(['tenant_id', 'reservation_number'])) {
+                throw new LogicException('Structural tenant and reservation number attributes are immutable.');
+            }
+        });
+
+        self::deleting(static function (InventoryReservation $reservation): void {
+            $math = app(DecimalMath::class);
+            if (! $math->isZero((string) ($reservation->quantity_allocated ?? '0.000000'))) {
+                throw new LogicException('Inventory reservations with allocated quantities cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

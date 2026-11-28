@@ -117,6 +117,7 @@ final class SellableBatchLookupService
             $paginator = $query
                 ->orderBy('item_id')
                 ->orderBy('batch_number')
+                ->orderBy('inventory_batches.id')
                 ->paginate(min($perPage, 50), ['*'], 'page', $page);
         }
         $currencyId = TenantModel::query()->whereKey($tenantId)->value('base_currency_id');

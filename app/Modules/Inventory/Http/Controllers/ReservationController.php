@@ -12,7 +12,9 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Http\Requests\InventoryLookupRequest;
 use Modules\Inventory\Http\Requests\ReleaseQuantityRequest;
 use Modules\Inventory\Http\Requests\StoreReservationRequest;
@@ -41,6 +43,29 @@ final class ReservationController extends InventoryQueryController
     public function store(StoreReservationRequest $request, InventoryFacade $inventory): InventoryReservationResource
     {
         return new InventoryReservationResource($inventory->reserve($request->toData()));
+    }
+
+    public function show(InventoryLookupRequest $request, int $reservation): InventoryReservationResource
+    {
+        $model = $this->scope(InventoryReservation::query(), $request)
+            ->with(['item', 'baseUom', 'enteredUom', 'variant', 'warehouse', 'warehouseLocation', 'batch'])
+            ->findOrFail($reservation);
+
+        return new InventoryReservationResource($model);
+    }
+
+    public function destroy(InventoryLookupRequest $request, int $reservation, InventoryFacade $inventory): JsonResponse
+    {
+        $model = $this->scope(InventoryReservation::query(), $request)->findOrFail($reservation);
+
+        DB::transaction(function () use ($model, $request, $inventory): void {
+            if (bccomp((string) $model->quantity_remaining, '0', 4) > 0) {
+                $inventory->unreserve($model, (string) $model->quantity_remaining, $request->currentUserId());
+            }
+            $model->delete();
+        });
+
+        return response()->json(['message' => 'Reservation deleted successfully.']);
     }
 
     public function release(ReleaseQuantityRequest $request, int $reservation, InventoryFacade $inventory): InventoryReservationResource

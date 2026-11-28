@@ -77,6 +77,14 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('reservations', [ReservationController::class, 'store'])
         ->middleware($requires(InventoryPermission::RESERVATIONS_MANAGE))
         ->name('reservations.store');
+    Route::get('reservations/{reservation}', [ReservationController::class, 'show'])
+        ->whereNumber('reservation')
+        ->middleware($requires(InventoryPermission::RESERVATIONS_VIEW))
+        ->name('reservations.show');
+    Route::delete('reservations/{reservation}', [ReservationController::class, 'destroy'])
+        ->whereNumber('reservation')
+        ->middleware($requires(InventoryPermission::RESERVATIONS_MANAGE))
+        ->name('reservations.destroy');
     Route::post('reservations/{reservation}/release', [ReservationController::class, 'release'])
         ->whereNumber('reservation')
         ->middleware($requires(InventoryPermission::RESERVATIONS_MANAGE))
@@ -88,6 +96,14 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('allocations', [AllocationController::class, 'store'])
         ->middleware($requires(InventoryPermission::ALLOCATIONS_MANAGE))
         ->name('allocations.store');
+    Route::get('allocations/{allocation}', [AllocationController::class, 'show'])
+        ->whereNumber('allocation')
+        ->middleware($requires(InventoryPermission::ALLOCATIONS_VIEW))
+        ->name('allocations.show');
+    Route::delete('allocations/{allocation}', [AllocationController::class, 'destroy'])
+        ->whereNumber('allocation')
+        ->middleware($requires(InventoryPermission::ALLOCATIONS_MANAGE))
+        ->name('allocations.destroy');
     Route::post('allocations/{allocation}/issue', [AllocationController::class, 'issue'])
         ->whereNumber('allocation')
         ->middleware($requires(InventoryPermission::ALLOCATIONS_ISSUE))
@@ -103,6 +119,14 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('adjustments', [AdjustmentController::class, 'store'])
         ->middleware($requires(InventoryPermission::ADJUSTMENTS_MANAGE))
         ->name('adjustments.store');
+    Route::get('adjustments/{adjustment}', [AdjustmentController::class, 'show'])
+        ->whereNumber('adjustment')
+        ->middleware($requires(InventoryPermission::ADJUSTMENTS_VIEW))
+        ->name('adjustments.show');
+    Route::delete('adjustments/{adjustment}', [AdjustmentController::class, 'destroy'])
+        ->whereNumber('adjustment')
+        ->middleware($requires(InventoryPermission::ADJUSTMENTS_MANAGE))
+        ->name('adjustments.destroy');
     Route::get('opening-stock-import/template', [OpeningStockImportController::class, 'template'])
         ->middleware($requires(InventoryPermission::ADJUSTMENTS_MANAGE))
         ->name('opening-stock-import.template');
@@ -116,6 +140,10 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
         ->whereNumber('adjustment')
         ->middleware($requires(InventoryPermission::ADJUSTMENTS_POST))
         ->name('adjustments.post');
+    Route::post('adjustments/{adjustment}/reverse', [AdjustmentController::class, 'reverse'])
+        ->whereNumber('adjustment')
+        ->middleware($requires(InventoryPermission::ADJUSTMENTS_POST))
+        ->name('adjustments.reverse');
 
     Route::get('transfers', [TransferController::class, 'index'])
         ->middleware($requires(InventoryPermission::TRANSFERS_VIEW))
@@ -123,6 +151,14 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('transfers', [TransferController::class, 'store'])
         ->middleware($requires(InventoryPermission::TRANSFERS_MANAGE))
         ->name('transfers.store');
+    Route::get('transfers/{transfer}', [TransferController::class, 'show'])
+        ->whereNumber('transfer')
+        ->middleware($requires(InventoryPermission::TRANSFERS_VIEW))
+        ->name('transfers.show');
+    Route::delete('transfers/{transfer}', [TransferController::class, 'destroy'])
+        ->whereNumber('transfer')
+        ->middleware($requires(InventoryPermission::TRANSFERS_MANAGE))
+        ->name('transfers.destroy');
     Route::post('transfers/{transfer}/post', [TransferController::class, 'post'])
         ->whereNumber('transfer')
         ->middleware($requires(InventoryPermission::TRANSFERS_DISPATCH))
@@ -135,6 +171,10 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
         ->whereNumber('transfer')
         ->middleware($requires(InventoryPermission::TRANSFERS_MANAGE))
         ->name('transfers.cancel');
+    Route::post('transfers/{transfer}/reverse', [TransferController::class, 'reverse'])
+        ->whereNumber('transfer')
+        ->middleware($requires(InventoryPermission::TRANSFERS_DISPATCH))
+        ->name('transfers.reverse');
 
     Route::get('valuation-layers', [ValuationController::class, 'layers'])
         ->middleware($requires(InventoryPermission::VALUATION_VIEW))
@@ -145,6 +185,14 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('cost-adjustments', [ValuationController::class, 'storeAdjustment'])
         ->middleware($requires(InventoryPermission::COST_ADJUSTMENTS_MANAGE))
         ->name('cost-adjustments.store');
+    Route::get('cost-adjustments/{adjustment}', [ValuationController::class, 'showAdjustment'])
+        ->whereNumber('adjustment')
+        ->middleware($requires(InventoryPermission::COST_ADJUSTMENTS_VIEW))
+        ->name('cost-adjustments.show');
+    Route::delete('cost-adjustments/{adjustment}', [ValuationController::class, 'destroyAdjustment'])
+        ->whereNumber('adjustment')
+        ->middleware($requires(InventoryPermission::COST_ADJUSTMENTS_MANAGE))
+        ->name('cost-adjustments.destroy');
     Route::post('cost-adjustments/{adjustment}/post', [ValuationController::class, 'postAdjustment'])
         ->whereNumber('adjustment')
         ->middleware($requires(InventoryPermission::COST_ADJUSTMENTS_POST))
@@ -156,6 +204,14 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('stock-counts', [StockCountController::class, 'store'])
         ->middleware($requires(InventoryPermission::STOCK_COUNTS_MANAGE))
         ->name('stock-counts.store');
+    Route::get('stock-counts/{count}', [StockCountController::class, 'show'])
+        ->whereNumber('count')
+        ->middleware($requires(InventoryPermission::STOCK_COUNTS_VIEW))
+        ->name('stock-counts.show');
+    Route::delete('stock-counts/{count}', [StockCountController::class, 'destroy'])
+        ->whereNumber('count')
+        ->middleware($requires(InventoryPermission::STOCK_COUNTS_MANAGE))
+        ->name('stock-counts.destroy');
     Route::post('stock-counts/{count}/approve', [StockCountController::class, 'approve'])
         ->whereNumber('count')
         ->middleware($requires(InventoryPermission::STOCK_COUNTS_APPROVE))
@@ -174,6 +230,14 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('batches', [BatchController::class, 'store'])
         ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
         ->name('batches.store');
+    Route::get('batches/{batch}', [BatchController::class, 'show'])
+        ->whereNumber('batch')
+        ->middleware($requires(InventoryPermission::TRACKING_VIEW))
+        ->name('batches.show');
+    Route::delete('batches/{batch}', [BatchController::class, 'destroy'])
+        ->whereNumber('batch')
+        ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
+        ->name('batches.destroy');
     Route::post('batches/generate-number', [BatchController::class, 'generateNumber'])
         ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
         ->name('batches.generate-number');

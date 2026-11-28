@@ -17,7 +17,7 @@ import { lookupApi } from '@/shared/api/lookupApi';
 import { searchWarehouses } from '@/shared/api/referenceApi';
 import { compactObject } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
-import { createReservation, releaseReservation } from '../../inventoryApi';
+import { createReservation, deleteReservation, releaseReservation } from '../../inventoryApi';
 import type { InventoryRecord, ReservationPayload } from '../../inventoryTypes';
 import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import {
@@ -82,18 +82,32 @@ export function ReservationsTab({ data, loading, error, reload, canManage }: Wor
             <RecordList rows={data} columns={columns((row) => {
                 if (!canManage) return null;
 
-                const key = `release-reservation:${row.id}`;
+                const unreserveKey = `release-reservation:${row.id}`;
+                const deleteKey = `delete-reservation:${row.id}`;
                 const actionable = ['active', 'partially_allocated'].includes(String(row.status ?? ''));
+                const canDelete = row.quantity_allocated == null || Number(row.quantity_allocated) === 0;
 
                 return (
-                    <Button
-                        variant="secondary"
-                        loading={recordAction.pendingKey === key}
-                        disabled={!actionable || recordAction.pendingKey !== null}
-                        onClick={() => void recordAction.run(key, () => releaseReservation(row.id))}
-                    >
-                        Unreserve
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            variant="secondary"
+                            loading={recordAction.pendingKey === unreserveKey}
+                            disabled={!actionable || recordAction.pendingKey !== null}
+                            onClick={() => void recordAction.run(unreserveKey, () => releaseReservation(row.id))}
+                        >
+                            Unreserve
+                        </Button>
+                        {canDelete && (
+                            <Button
+                                variant="ghost"
+                                loading={recordAction.pendingKey === deleteKey}
+                                disabled={recordAction.pendingKey !== null}
+                                onClick={() => void recordAction.run(deleteKey, () => deleteReservation(row.id))}
+                            >
+                                Delete
+                            </Button>
+                        )}
+                    </div>
                 );
             })} />
         </WorkflowPanel>

@@ -14,6 +14,7 @@ namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\ValuationLayerStatus;
 use Modules\Inventory\Enums\ValuationMethod;
@@ -28,6 +29,26 @@ final class InventoryValuationLayer extends TenantOwnedModel
     protected $table = 'inventory_valuation_layers';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryValuationLayer $layer): void {
+            if ($layer->isDirty([
+                'tenant_id',
+                'item_id',
+                'warehouse_id',
+                'movement_id',
+                'valuation_method',
+                'layer_date',
+            ])) {
+                throw new LogicException('Structural historical attributes of InventoryValuationLayer are immutable.');
+            }
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('InventoryValuationLayer is an immutable accounting ledger and cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

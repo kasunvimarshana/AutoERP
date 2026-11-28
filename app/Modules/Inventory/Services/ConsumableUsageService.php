@@ -130,15 +130,22 @@ final class ConsumableUsageService
         }, 3);
     }
 
-    public function reverse(int $tenantId, ?int $organizationUnitId, int $movementId, int $actorId, string $reason): InventoryMovement
-    {
-        return DB::transaction(function () use ($tenantId, $organizationUnitId, $movementId, $actorId, $reason): InventoryMovement {
+    public function reverse(
+        int $tenantId,
+        ?int $organizationUnitId,
+        int $movementId,
+        int $actorId,
+        string $reason,
+        ?string $reversalDate = null,
+    ): InventoryMovement {
+        return DB::transaction(function () use ($tenantId, $organizationUnitId, $movementId, $actorId, $reason, $reversalDate): InventoryMovement {
             $movement = $this->scopedMovement($tenantId, $organizationUnitId, $movementId);
             if ($movement->movement_type !== InventoryMovementType::InternalConsumption) {
                 throw new InvalidArgumentException('Only consumable usage can be reversed here.');
             }
 
-            $this->stock->reverse($movement, $actorId, $reason);
+            $effectiveDate = $reversalDate ?? now()->toDateString();
+            $this->stock->reverse($movement, $actorId, $reason, $effectiveDate);
             if ($this->math->compare((string) $movement->total_cost, self::ZERO) > 0) {
                 $this->reversals->reverseSource(
                     $tenantId,
@@ -146,7 +153,7 @@ final class ConsumableUsageService
                     self::SOURCE_MODULE,
                     self::SOURCE_TYPE,
                     $movementId,
-                    now()->toDateString(),
+                    $effectiveDate,
                     $actorId,
                     $reason,
                 );

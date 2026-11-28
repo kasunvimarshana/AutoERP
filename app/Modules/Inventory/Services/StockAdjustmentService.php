@@ -194,9 +194,13 @@ final class StockAdjustmentService
         });
     }
 
-    public function reverse(InventoryAdjustment $adjustment, ?int $reversedBy = null): InventoryAdjustment
-    {
-        return DB::transaction(function () use ($adjustment, $reversedBy): InventoryAdjustment {
+    public function reverse(
+        InventoryAdjustment $adjustment,
+        ?int $reversedBy = null,
+        ?string $reason = null,
+        ?string $reversalDate = null,
+    ): InventoryAdjustment {
+        return DB::transaction(function () use ($adjustment, $reversedBy, $reason, $reversalDate): InventoryAdjustment {
             $adjustment = InventoryAdjustment::query()->lockForUpdate()->findOrFail($adjustment->getKey());
             if ($adjustment->status !== AdjustmentStatus::Posted) {
                 throw new InvalidArgumentException('Only posted inventory adjustments can be reversed.');
@@ -210,7 +214,7 @@ final class StockAdjustmentService
                 ->lockForUpdate()
                 ->get();
             foreach ($movements as $movement) {
-                $this->movements->reverse($movement, $reversedBy);
+                $this->movements->reverse($movement, $reversedBy, $reason, $reversalDate);
             }
 
             $adjustment->status = AdjustmentStatus::Reversed;

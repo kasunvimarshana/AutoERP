@@ -22,7 +22,7 @@ import { compactObject } from '@/shared/utils/object';
 import { formatDate } from '@/shared/utils/formatDate';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { createAdjustment, postAdjustment } from '../../inventoryApi';
+import { createAdjustment, deleteAdjustment, postAdjustment, reverseAdjustment } from '../../inventoryApi';
 import type { AdjustmentPayload, InventoryRecord } from '../../inventoryTypes';
 import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import { OpeningStockImportPanel } from './OpeningStockImportPanel';
@@ -178,6 +178,26 @@ export function AdjustmentsTab({ data, loading, error, reload, canManage, canPos
                             onClick={() => void recordAction.run(`post-adjustment:${row.id}`, () => postAdjustment(row.id))}
                         >
                             Post
+                        </Button>
+                    )}
+                    {canPost && String(row.status ?? '') === 'posted' && (
+                        <Button
+                            variant="secondary"
+                            loading={recordAction.pendingKey === `reverse-adjustment:${row.id}`}
+                            disabled={recordAction.pendingKey !== null}
+                            onClick={() => void recordAction.run(`reverse-adjustment:${row.id}`, () => reverseAdjustment(row.id))}
+                        >
+                            Reverse
+                        </Button>
+                    )}
+                    {canManage && String(row.status ?? '') === 'draft' && (
+                        <Button
+                            variant="ghost"
+                            loading={recordAction.pendingKey === `delete-adjustment:${row.id}`}
+                            disabled={recordAction.pendingKey !== null}
+                            onClick={() => void recordAction.run(`delete-adjustment:${row.id}`, () => deleteAdjustment(row.id))}
+                        >
+                            Delete
                         </Button>
                     )}
                 </div>

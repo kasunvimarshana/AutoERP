@@ -24,7 +24,7 @@ final class StoreTransferRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'transfer_date' => ['required', 'date'],
-            'from_warehouse_id' => ['required', 'integer', 'min:1', 'different:to_warehouse_id'],
+            'from_warehouse_id' => ['required', 'integer', 'min:1'],
             'to_warehouse_id' => ['required', 'integer', 'min:1'],
             'from_warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'to_warehouse_location_id' => ['nullable', 'integer', 'min:1'],
@@ -40,6 +40,32 @@ final class StoreTransferRequest extends TenantScopedRequest
             'lines.*.quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'lines.*.unit_cost' => ['nullable', 'decimal:0,6', 'min:0'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            if ($this->filled('from_warehouse_id') && $this->filled('to_warehouse_id')) {
+                $fromWh = (int) $this->input('from_warehouse_id');
+                $toWh = (int) $this->input('to_warehouse_id');
+                if ($fromWh === $toWh) {
+                    $fromLoc = $this->filled('from_warehouse_location_id') ? (int) $this->input('from_warehouse_location_id') : null;
+                    $toLoc = $this->filled('to_warehouse_location_id') ? (int) $this->input('to_warehouse_location_id') : null;
+
+                    if ($fromLoc === null || $toLoc === null) {
+                        $validator->errors()->add(
+                            'to_warehouse_location_id',
+                            'When transferring within the same warehouse, both source and destination locations must be specified.',
+                        );
+                    } elseif ($fromLoc === $toLoc) {
+                        $validator->errors()->add(
+                            'to_warehouse_location_id',
+                            'Inventory transfer source and destination locations cannot be the same.',
+                        );
+                    }
+                }
+            }
+        });
     }
 
     public function toData(): StockTransferData

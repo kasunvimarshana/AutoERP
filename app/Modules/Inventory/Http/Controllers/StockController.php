@@ -56,7 +56,7 @@ final class StockController extends InventoryQueryController
         }
 
         return StockBalanceResource::collection(
-            $query->orderBy('quantity_available')->orderBy('item_id')->paginate($request->perPage()),
+            $query->orderBy('quantity_available')->orderBy('item_id')->orderBy('id')->paginate($request->perPage()),
         )->additional(['summary' => $summary]);
     }
 
@@ -243,7 +243,7 @@ final class StockController extends InventoryQueryController
                 ->orWhere('lot_number', 'like', $search));
         }
 
-        return InventoryBatchResource::collection($query->orderBy('batch_number')->paginate($request->perPage()));
+        return InventoryBatchResource::collection($query->orderBy('batch_number')->orderBy('id')->paginate($request->perPage()));
     }
 
     public function serials(InventoryLookupRequest $request): AnonymousResourceCollection
@@ -262,6 +262,6 @@ final class StockController extends InventoryQueryController
             $query->where('serial_number', 'like', '%'.trim((string) $request->input('search')).'%');
         }
 
-        return InventorySerialNumberResource::collection($query->orderBy('serial_number')->paginate($request->perPage()));
+        return InventorySerialNumberResource::collection($query->orderBy('serial_number')->orderBy('id')->paginate($request->perPage()));
     }
 }

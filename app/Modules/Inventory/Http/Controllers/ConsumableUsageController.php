@@ -106,6 +106,7 @@ final class ConsumableUsageController
             $usage,
             $request->currentUserId(),
             (string) $request->input('reason'),
+            $request->filled('reversal_date') ? (string) $request->input('reversal_date') : null,
         );
 
         return new ConsumableUsageResource($movement->load(['item', 'warehouse', 'warehouseLocation', 'variant', 'batch', 'baseUom']));

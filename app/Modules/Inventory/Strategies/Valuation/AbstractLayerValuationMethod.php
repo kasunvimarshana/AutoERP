@@ -101,7 +101,7 @@ abstract class AbstractLayerValuationMethod implements ValuationMethodInterface
             $query->where($column, $movement->{$column});
         }
 
-        return $query->orderBy('layer_date')->orderBy('created_at')->orderBy('id');
+        return $query->orderBy('layer_date')->orderBy('id');
     }
 
     /**

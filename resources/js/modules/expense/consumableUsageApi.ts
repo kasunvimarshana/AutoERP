@@ -65,8 +65,12 @@ export async function postConsumableUsage(payload: ConsumableUsagePayload) {
     return response.data.data;
 }
 
-export async function reverseConsumableUsage(id: number, reason: string) {
-    const response = await apiClient.post<ApiResource<ConsumableUsage>>(`${url}/${id}/reverse`, { reason });
+export async function reverseConsumableUsage(id: number, reason: string, reversalDate?: string) {
+    const payload: { reason: string; reversal_date?: string } = { reason };
+    if (reversalDate) {
+        payload.reversal_date = reversalDate;
+    }
+    const response = await apiClient.post<ApiResource<ConsumableUsage>>(`${url}/${id}/reverse`, payload);
     return response.data.data;
 }
 

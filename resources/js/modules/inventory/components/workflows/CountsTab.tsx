@@ -18,7 +18,7 @@ import { lookupApi } from '@/shared/api/lookupApi';
 import { searchWarehouses } from '@/shared/api/referenceApi';
 import { compactObject, humanize } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
-import { approveStockCount, createStockCount, postStockCount } from '../../inventoryApi';
+import { approveStockCount, createStockCount, deleteStockCount, postStockCount } from '../../inventoryApi';
 import type { InventoryRecord, StockCountPayload } from '../../inventoryTypes';
 import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import {
@@ -98,11 +98,13 @@ export function CountsTab({ data, loading, error, reload, canManage, canApprove,
                 const status = String(row.status ?? '');
                 const approveKey = `approve-count:${row.id}`;
                 const postKey = `post-count:${row.id}`;
+                const deleteKey = `delete-count:${row.id}`;
 
                 return (
                     <div className="flex flex-wrap gap-2">
                         {canApprove && <Button variant="secondary" loading={recordAction.pendingKey === approveKey} disabled={status !== 'draft' || recordAction.pendingKey !== null} onClick={() => void recordAction.run(approveKey, () => approveStockCount(row.id))}>Approve</Button>}
                         {canPost && <Button variant="secondary" loading={recordAction.pendingKey === postKey} disabled={!['draft', 'approved'].includes(status) || recordAction.pendingKey !== null} onClick={() => void recordAction.run(postKey, () => postStockCount(row.id))}>Post</Button>}
+                        {canManage && status === 'draft' && <Button variant="ghost" loading={recordAction.pendingKey === deleteKey} disabled={recordAction.pendingKey !== null} onClick={() => void recordAction.run(deleteKey, () => deleteStockCount(row.id))}>Delete</Button>}
                     </div>
                 );
             })} />

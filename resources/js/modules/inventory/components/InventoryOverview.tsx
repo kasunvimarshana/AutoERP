@@ -19,7 +19,7 @@ import { Panel } from '@/shared/components/Panel';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Select } from '@/shared/components/Select';
 import { humanize } from '@/shared/utils/object';
-import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { businessDateInputValue, businessTimeZone } from '@/shared/utils/businessDate';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { searchWarehouses } from '@/shared/api/referenceApi';
 import { useApi } from '@/shared/hooks/useApi';
@@ -121,7 +121,7 @@ export function AvailabilityTab() {
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [stockLevel, setStockLevel] = useState<InventoryStockLevel | ''>('');
     const [asOfDate, setAsOfDate] = useState(localDateToday);
-    const asOfTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const asOfTimezone = businessTimeZone();
     const [page, setPage] = useState(1);
     const [exporting, setExporting] = useState(false);
     const [exportError, setExportError] = useState<string | null>(null);

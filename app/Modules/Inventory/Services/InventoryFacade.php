@@ -124,10 +124,10 @@ final class InventoryFacade
         ?string $reversalDate = null,
     ): InventoryMovement|InventoryAdjustment|InventoryTransfer {
         if ($record instanceof InventoryAdjustment) {
-            return $this->adjustments->reverse($record, $reversedBy);
+            return $this->adjustments->reverse($record, $reversedBy, $reason, $reversalDate);
         }
         if ($record instanceof InventoryTransfer) {
-            return $this->transfers->reverse($record, $reversedBy);
+            return $this->transfers->reverse($record, $reversedBy, $reason, $reversalDate);
         }
 
         return $this->movements->reverse($record, $reversedBy, $reason, $reversalDate);

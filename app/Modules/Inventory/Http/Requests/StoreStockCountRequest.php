@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Inventory\DTOs\StockCountData;
 use Modules\Inventory\DTOs\StockCountLineData;
+use Modules\Inventory\Enums\StockCountType;
 
 final class StoreStockCountRequest extends TenantScopedRequest
 {
@@ -26,7 +27,7 @@ final class StoreStockCountRequest extends TenantScopedRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'count_date' => ['required', 'date'],
             'count_number' => ['nullable', 'string', 'max:100'],
-            'count_type' => ['nullable', Rule::in(['stock_count', 'cycle_count'])],
+            'count_type' => ['nullable', Rule::enum(StockCountType::class)],
             'warehouse_id' => ['required', 'integer', 'min:1'],
             'warehouse_location_id' => ['nullable', 'integer', 'min:1'],
             'reason' => ['nullable', 'string'],
@@ -52,7 +53,7 @@ final class StoreStockCountRequest extends TenantScopedRequest
             warehouseId: (int) $this->input('warehouse_id'),
             organizationUnitId: $this->organizationUnitId(),
             countNumber: $this->stringOrNull('count_number'),
-            countType: (string) ($this->input('count_type') ?? 'stock_count'),
+            countType: (string) ($this->input('count_type') ?? StockCountType::StockCount->value),
             warehouseLocationId: $this->intOrNull('warehouse_location_id'),
             reason: $this->stringOrNull('reason'),
             notes: $this->stringOrNull('notes'),

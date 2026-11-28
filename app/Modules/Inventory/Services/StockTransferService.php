@@ -207,9 +207,13 @@ final class StockTransferService
         });
     }
 
-    public function reverse(InventoryTransfer $transfer, ?int $reversedBy = null): InventoryTransfer
-    {
-        return DB::transaction(function () use ($transfer, $reversedBy): InventoryTransfer {
+    public function reverse(
+        InventoryTransfer $transfer,
+        ?int $reversedBy = null,
+        ?string $reason = null,
+        ?string $reversalDate = null,
+    ): InventoryTransfer {
+        return DB::transaction(function () use ($transfer, $reversedBy, $reason, $reversalDate): InventoryTransfer {
             $transfer = InventoryTransfer::query()->with('lines')->lockForUpdate()->findOrFail($transfer->getKey());
             if (! in_array($transfer->status, [TransferStatus::Dispatched, TransferStatus::InTransit, TransferStatus::Received, TransferStatus::Posted], true)) {
                 throw new InvalidArgumentException('Only dispatched or received inventory transfers can be reversed.');
@@ -236,7 +240,7 @@ final class StockTransferService
                 ->lockForUpdate()
                 ->get();
             foreach ($movements as $movement) {
-                $this->movements->reverse($movement, $reversedBy);
+                $this->movements->reverse($movement, $reversedBy, $reason, $reversalDate);
             }
 
             $transfer->status = TransferStatus::Reversed;

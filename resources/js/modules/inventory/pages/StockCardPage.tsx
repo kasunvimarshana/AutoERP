@@ -21,7 +21,7 @@ import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referen
 import { getDefaultWarehouse, getDefaultWarehouseLocation } from '@/modules/warehouse/warehouseApi';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { businessDateInputValue, formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { businessDateInputValue, businessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { downloadStockCard, getStockCard, type StockCardFilters, type StockCardResult } from '../inventoryApi';
 
 function currentMonth() {
@@ -107,7 +107,7 @@ export default function StockCardPage() {
             warehouse_id: warehouse.id,
             warehouse_location_id: location?.id,
             ...dates,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timezone: businessTimeZone(),
         });
     }
 

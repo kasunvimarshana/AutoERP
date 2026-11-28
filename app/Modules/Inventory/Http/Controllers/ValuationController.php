@@ -12,9 +12,11 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Http\Requests\InventoryLookupRequest;
-use Modules\Inventory\Http\Requests\ReleaseQuantityRequest;
+use Modules\Inventory\Http\Requests\InventoryWorkflowActionRequest;
 use Modules\Inventory\Http\Requests\StoreCostAdjustmentRequest;
 use Modules\Inventory\Http\Resources\InventoryCostAdjustmentResource;
 use Modules\Inventory\Http\Resources\InventoryValuationLayerResource;
@@ -48,6 +50,15 @@ final class ValuationController extends InventoryQueryController
         return InventoryCostAdjustmentResource::collection($query->latest('id')->paginate($request->perPage()));
     }
 
+    public function showAdjustment(InventoryLookupRequest $request, int $adjustment): InventoryCostAdjustmentResource
+    {
+        $model = $this->scope(InventoryCostAdjustment::query(), $request)
+            ->with('lines.valuationLayer.item')
+            ->findOrFail($adjustment);
+
+        return new InventoryCostAdjustmentResource($model);
+    }
+
     public function storeAdjustment(
         StoreCostAdjustmentRequest $request,
         InventoryCostAdjustmentService $service,
@@ -56,12 +67,24 @@ final class ValuationController extends InventoryQueryController
     }
 
     public function postAdjustment(
-        ReleaseQuantityRequest $request,
+        InventoryWorkflowActionRequest $request,
         int $adjustment,
         InventoryCostAdjustmentService $service,
     ): InventoryCostAdjustmentResource {
         $model = $this->scope(InventoryCostAdjustment::query(), $request)->with('lines')->findOrFail($adjustment);
 
         return new InventoryCostAdjustmentResource($service->post($model, $request->currentUserId()));
+    }
+
+    public function destroyAdjustment(InventoryLookupRequest $request, int $adjustment): JsonResponse
+    {
+        $model = $this->scope(InventoryCostAdjustment::query(), $request)->findOrFail($adjustment);
+
+        DB::transaction(function () use ($model): void {
+            $model->lines()->delete();
+            $model->delete();
+        });
+
+        return response()->json(['message' => 'Inventory cost adjustment deleted successfully.']);
     }
 }

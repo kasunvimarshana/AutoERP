@@ -116,7 +116,10 @@ final class InventoryMovementReversalService
 
         $factor = '1.000000';
         $currentUomId = $fromUomId;
-        $movementDate = $movement->movement_date?->toDateString() ?? $movement->created_at?->toDateString();
+        $movementDate = $movement->movement_date?->toDateString();
+        if ($movementDate === null) {
+            throw new InvalidArgumentException('Operational movement date is required for reversal basis.');
+        }
         $revisions = ItemBaseUomRevision::query()
             ->where('tenant_id', $movement->tenant_id)
             ->where('item_id', $movement->item_id)

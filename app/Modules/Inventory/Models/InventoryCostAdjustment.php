@@ -14,6 +14,7 @@ namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Inventory\Enums\CostAdjustmentStatus;
 
@@ -24,6 +25,34 @@ final class InventoryCostAdjustment extends TenantOwnedModel
     protected $table = 'inventory_cost_adjustments';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryCostAdjustment $adjustment): void {
+            if ($adjustment->isDirty(['tenant_id', 'adjustment_number'])) {
+                throw new LogicException('Structural tenant and adjustment number attributes are immutable.');
+            }
+
+            $rawOriginalStatus = $adjustment->getRawOriginal('status');
+            $originalStatus = $rawOriginalStatus instanceof CostAdjustmentStatus
+                ? $rawOriginalStatus
+                : CostAdjustmentStatus::from((string) $rawOriginalStatus);
+
+            if ($originalStatus === CostAdjustmentStatus::Posted) {
+                throw new LogicException('Posted inventory cost adjustments are strictly immutable in place.');
+            }
+        });
+
+        self::deleting(static function (InventoryCostAdjustment $adjustment): void {
+            $status = $adjustment->status instanceof CostAdjustmentStatus
+                ? $adjustment->status
+                : CostAdjustmentStatus::from((string) $adjustment->status);
+
+            if ($status !== CostAdjustmentStatus::Draft) {
+                throw new LogicException('Only draft inventory cost adjustments can be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

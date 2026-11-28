@@ -22,6 +22,7 @@ final class ReverseConsumableUsageRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'reason' => ['required', 'string', 'max:1000'],
+            'reversal_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.$this->workspaceToday()],
         ];
     }
 }

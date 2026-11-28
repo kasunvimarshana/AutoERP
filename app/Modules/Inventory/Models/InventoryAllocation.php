@@ -15,7 +15,9 @@ namespace Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\AllocationMethod;
 use Modules\Inventory\Enums\AllocationStatus;
 use Modules\Item\Models\Item;
@@ -31,6 +33,22 @@ final class InventoryAllocation extends TenantOwnedModel
     protected $table = 'inventory_allocations';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryAllocation $allocation): void {
+            if ($allocation->isDirty(['tenant_id', 'allocation_number'])) {
+                throw new LogicException('Structural tenant and allocation number attributes are immutable.');
+            }
+        });
+
+        self::deleting(static function (InventoryAllocation $allocation): void {
+            $math = app(DecimalMath::class);
+            if (! $math->isZero((string) ($allocation->quantity_issued ?? '0.000000'))) {
+                throw new LogicException('Inventory allocations with issued quantities cannot be deleted.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

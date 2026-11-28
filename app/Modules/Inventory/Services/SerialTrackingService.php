@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Inventory\Enums\SerialStatus;
 use Modules\Inventory\Models\InventorySerialNumber;
@@ -39,24 +40,41 @@ final class SerialTrackingService
             $this->validator->location($warehouse, $warehouseLocationId);
         }
 
-        if (trim($serialNumber) === '') {
+        $serialNumber = trim($serialNumber);
+        if ($serialNumber === '') {
             throw new InvalidArgumentException('Inventory serial number is required.');
         }
 
-        if (InventorySerialNumber::query()->where('tenant_id', $tenantId)->where('serial_number', $serialNumber)->exists()) {
-            throw new InvalidArgumentException('Inventory serial number already exists for this tenant.');
-        }
+        return DB::transaction(function () use (
+            $tenantId,
+            $organizationUnitId,
+            $itemId,
+            $itemVariantId,
+            $serialNumber,
+            $batchId,
+            $warehouseId,
+            $warehouseLocationId,
+        ): InventorySerialNumber {
+            $exists = InventorySerialNumber::query()
+                ->where('tenant_id', $tenantId)
+                ->where('serial_number', $serialNumber)
+                ->lockForUpdate()
+                ->exists();
+            if ($exists) {
+                throw new InvalidArgumentException('Inventory serial number already exists for this tenant.');
+            }
 
-        return InventorySerialNumber::query()->create([
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'item_id' => $itemId,
-            'item_variant_id' => $itemVariantId,
-            'serial_number' => $serialNumber,
-            'batch_id' => $batchId,
-            'warehouse_id' => $warehouseId,
-            'warehouse_location_id' => $warehouseLocationId,
-            'status' => SerialStatus::Available,
-        ]);
+            return InventorySerialNumber::query()->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'item_id' => $itemId,
+                'item_variant_id' => $itemVariantId,
+                'serial_number' => $serialNumber,
+                'batch_id' => $batchId,
+                'warehouse_id' => $warehouseId,
+                'warehouse_location_id' => $warehouseLocationId,
+                'status' => SerialStatus::Available,
+            ]);
+        }, 3);
     }
 }

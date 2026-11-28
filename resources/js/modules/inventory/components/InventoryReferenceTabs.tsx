@@ -23,6 +23,8 @@ import { compactObject, humanize } from '@/shared/utils/object';
 import {
     createCostAdjustment,
     createInventoryBatch,
+    deleteBatch,
+    deleteCostAdjustment,
     generateInventoryBatchNumber,
     listBatches,
     listSerials,
@@ -104,19 +106,35 @@ export function CostingTab({
                     </form>
                 )}
                 <RecordList rows={data} columns={costAdjustmentColumns((row) => {
-                    if (!canPost) return null;
+                    if (!canPost && !canManage) return null;
 
-                    const key = `post-cost-adjustment:${row.id}`;
+                    const postKey = `post-cost-adjustment:${row.id}`;
+                    const deleteKey = `delete-cost-adjustment:${row.id}`;
+                    const isDraft = String(row.status ?? '') === 'draft';
 
                     return (
-                        <Button
-                            variant="secondary"
-                            loading={recordAction.pendingKey === key}
-                            disabled={String(row.status ?? '') !== 'draft' || recordAction.pendingKey !== null}
-                            onClick={() => void recordAction.run(key, () => postCostAdjustment(row.id))}
-                        >
-                            Post
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                            {canPost && (
+                                <Button
+                                    variant="secondary"
+                                    loading={recordAction.pendingKey === postKey}
+                                    disabled={!isDraft || recordAction.pendingKey !== null}
+                                    onClick={() => void recordAction.run(postKey, () => postCostAdjustment(row.id))}
+                                >
+                                    Post
+                                </Button>
+                            )}
+                            {canManage && isDraft && (
+                                <Button
+                                    variant="ghost"
+                                    loading={recordAction.pendingKey === deleteKey}
+                                    disabled={recordAction.pendingKey !== null}
+                                    onClick={() => void recordAction.run(deleteKey, () => deleteCostAdjustment(row.id))}
+                                >
+                                    Delete
+                                </Button>
+                            )}
+                        </div>
                     );
                 })} />
             </WorkflowPanel>
@@ -144,6 +162,7 @@ export function TrackingTab({
     const [busy, setBusy] = useState(false);
     const [generatingBatchNumber, setGeneratingBatchNumber] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const batchAction = useRecordAction(reload, setActionError);
     const batchNumberRequest = useRef(0);
 
     const changeItem = (next: ItemLookupResource | null) => {
@@ -216,6 +235,23 @@ export function TrackingTab({
                     { key: 'item', header: 'Item', render: (row) => relation(row.item) },
                     { key: 'expiry', header: 'Expiry', render: (row) => String(row.expiry_date ?? '-') },
                     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={String(row.status ?? '')} /> },
+                    ...(canManage ? [{
+                        key: 'actions',
+                        header: '',
+                        render: (row: InventoryRecord) => {
+                            const deleteKey = `delete-batch:${row.id}`;
+                            return (
+                                <Button
+                                    variant="ghost"
+                                    loading={batchAction.pendingKey === deleteKey}
+                                    disabled={batchAction.pendingKey !== null}
+                                    onClick={() => void batchAction.run(deleteKey, () => deleteBatch(row.id))}
+                                >
+                                    Delete
+                                </Button>
+                            );
+                        },
+                    }] : []),
                 ]} />}
             </Panel>
             <Panel title="Serial tracking">

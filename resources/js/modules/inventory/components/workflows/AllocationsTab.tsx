@@ -18,7 +18,7 @@ import { lookupApi } from '@/shared/api/lookupApi';
 import { searchWarehouses } from '@/shared/api/referenceApi';
 import { compactObject } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
-import { createAllocation, issueAllocation, releaseAllocation } from '../../inventoryApi';
+import { createAllocation, deleteAllocation, issueAllocation, releaseAllocation } from '../../inventoryApi';
 import type { AllocationPayload, InventoryRecord } from '../../inventoryTypes';
 import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import {
@@ -105,12 +105,15 @@ export function AllocationsTab({
             <RecordList rows={data} columns={columns((row) => {
                 const issueKey = `issue-allocation:${row.id}`;
                 const releaseKey = `release-allocation:${row.id}`;
+                const deleteKey = `delete-allocation:${row.id}`;
                 const actionable = String(row.status ?? '') === 'active';
+                const canDelete = canManage && (row.quantity_issued == null || Number(row.quantity_issued) === 0);
 
                 return (
                     <div className="flex flex-wrap gap-2">
                         {canIssue && <Button variant="secondary" loading={recordAction.pendingKey === issueKey} disabled={!actionable || recordAction.pendingKey !== null} onClick={() => void recordAction.run(issueKey, () => issueAllocation(row.id))}>Issue</Button>}
-                        {canManage && <Button variant="ghost" loading={recordAction.pendingKey === releaseKey} disabled={!actionable || recordAction.pendingKey !== null} onClick={() => void recordAction.run(releaseKey, () => releaseAllocation(row.id))}>Release</Button>}
+                        {canManage && <Button variant="secondary" loading={recordAction.pendingKey === releaseKey} disabled={!actionable || recordAction.pendingKey !== null} onClick={() => void recordAction.run(releaseKey, () => releaseAllocation(row.id))}>Release</Button>}
+                        {canDelete && <Button variant="ghost" loading={recordAction.pendingKey === deleteKey} disabled={recordAction.pendingKey !== null} onClick={() => void recordAction.run(deleteKey, () => deleteAllocation(row.id))}>Delete</Button>}
                     </div>
                 );
             })} />

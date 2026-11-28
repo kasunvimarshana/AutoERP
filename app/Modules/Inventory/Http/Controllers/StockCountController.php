@@ -12,9 +12,11 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Http\Requests\InventoryLookupRequest;
-use Modules\Inventory\Http\Requests\ReleaseQuantityRequest;
+use Modules\Inventory\Http\Requests\InventoryWorkflowActionRequest;
 use Modules\Inventory\Http\Requests\StoreStockCountRequest;
 use Modules\Inventory\Http\Resources\InventoryStockCountResource;
 use Modules\Inventory\Models\InventoryStockCount;
@@ -31,13 +33,22 @@ final class StockCountController extends InventoryQueryController
         return InventoryStockCountResource::collection($query->latest('id')->paginate($request->perPage()));
     }
 
+    public function show(InventoryLookupRequest $request, int $count): InventoryStockCountResource
+    {
+        $model = $this->scope(InventoryStockCount::query(), $request)
+            ->with(['warehouse', 'warehouseLocation', 'lines.item', 'lines.baseUom', 'lines.enteredUom', 'lines.variant', 'lines.batch', 'lines.serialNumber', 'adjustment'])
+            ->findOrFail($count);
+
+        return new InventoryStockCountResource($model);
+    }
+
     public function store(StoreStockCountRequest $request, InventoryStockCountService $service): InventoryStockCountResource
     {
         return new InventoryStockCountResource($service->create($request->toData()));
     }
 
     public function approve(
-        ReleaseQuantityRequest $request,
+        InventoryWorkflowActionRequest $request,
         int $count,
         InventoryStockCountService $service,
     ): InventoryStockCountResource {
@@ -47,12 +58,24 @@ final class StockCountController extends InventoryQueryController
     }
 
     public function post(
-        ReleaseQuantityRequest $request,
+        InventoryWorkflowActionRequest $request,
         int $count,
         InventoryStockCountService $service,
     ): InventoryStockCountResource {
         $model = $this->scope(InventoryStockCount::query(), $request)->with('lines')->findOrFail($count);
 
         return new InventoryStockCountResource($service->post($model, $request->currentUserId()));
+    }
+
+    public function destroy(InventoryLookupRequest $request, int $count): JsonResponse
+    {
+        $model = $this->scope(InventoryStockCount::query(), $request)->findOrFail($count);
+
+        DB::transaction(function () use ($model): void {
+            $model->lines()->delete();
+            $model->delete();
+        });
+
+        return response()->json(['message' => 'Inventory stock count deleted successfully.']);
     }
 }

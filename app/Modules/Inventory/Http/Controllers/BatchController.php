@@ -22,6 +22,7 @@ use Modules\Inventory\Http\Requests\SupersedeBatchPriceRequest;
 use Modules\Inventory\Http\Resources\InventoryBatchPriceResource;
 use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\SellableBatchOptionResource;
+use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\InventoryBatchPriceRevision;
 use Modules\Inventory\Services\BatchNumberService;
 use Modules\Inventory\Services\BatchPriceService;
@@ -69,6 +70,23 @@ final class BatchController extends InventoryQueryController
         return (new InventoryBatchResource($batch))->response()->setStatusCode(201);
     }
 
+    public function show(InventoryLookupRequest $request, int $batch): InventoryBatchResource
+    {
+        $model = $this->scope(InventoryBatch::query(), $request)
+            ->with(['item', 'variant', 'priceRevisions'])
+            ->findOrFail($batch);
+
+        return new InventoryBatchResource($model);
+    }
+
+    public function destroy(InventoryLookupRequest $request, int $batch): JsonResponse
+    {
+        $model = $this->scope(InventoryBatch::query(), $request)->findOrFail($batch);
+        $model->delete();
+
+        return response()->json(['message' => 'Batch deleted successfully.']);
+    }
+
     public function prices(InventoryLookupRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(InventoryBatchPriceRevision::query(), $request)
@@ -80,7 +98,7 @@ final class BatchController extends InventoryQueryController
             $query->whereHas('batch', fn ($batch) => $batch->where('item_id', (int) $request->input('item_id')));
         }
 
-        return InventoryBatchPriceResource::collection($query->latest('recorded_from')->paginate($request->perPage()));
+        return InventoryBatchPriceResource::collection($query->latest('recorded_from')->orderByDesc('id')->paginate($request->perPage()));
     }
 
     public function storePrice(StoreBatchPriceRequest $request, BatchPriceService $service): JsonResponse

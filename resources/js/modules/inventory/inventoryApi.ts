@@ -98,8 +98,14 @@ export const getAvailability = (params: ListParams, signal?: AbortSignal) =>
 export const listReservations = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/reservations`, { params, signal }).then((response) => response.data);
 
+export const getReservation = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<InventoryRecord>>(`${endpoints.inventory}/reservations/${id}`, { signal }).then((response) => response.data.data);
+
 export const createReservation = (payload: ReservationPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/reservations`, payload).then((response) => response.data.data);
+
+export const deleteReservation = (id: number) =>
+    apiClient.delete(`${endpoints.inventory}/reservations/${id}`).then((response) => response.data);
 
 export const releaseReservation = (id: number, quantity?: string) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/reservations/${id}/release`, quantity ? { quantity } : {}).then((response) => response.data.data);
@@ -107,8 +113,14 @@ export const releaseReservation = (id: number, quantity?: string) =>
 export const listAllocations = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/allocations`, { params, signal }).then((response) => response.data);
 
+export const getAllocation = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<InventoryRecord>>(`${endpoints.inventory}/allocations/${id}`, { signal }).then((response) => response.data.data);
+
 export const createAllocation = (payload: AllocationPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/allocations`, payload).then((response) => response.data.data);
+
+export const deleteAllocation = (id: number) =>
+    apiClient.delete(`${endpoints.inventory}/allocations/${id}`).then((response) => response.data);
 
 export const issueAllocation = (id: number, quantity?: string) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/allocations/${id}/issue`, quantity ? { quantity } : {}).then((response) => response.data.data);
@@ -119,11 +131,20 @@ export const releaseAllocation = (id: number, quantity?: string) =>
 export const listAdjustments = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/adjustments`, { params, signal }).then((response) => response.data);
 
+export const getAdjustment = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments/${id}`, { signal }).then((response) => response.data.data);
+
 export const createAdjustment = (payload: AdjustmentPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments`, payload).then((response) => response.data.data);
 
-export const postAdjustment = (id: number) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments/${id}/post`, {}).then((response) => response.data.data);
+export const deleteAdjustment = (id: number) =>
+    apiClient.delete(`${endpoints.inventory}/adjustments/${id}`).then((response) => response.data);
+
+export const postAdjustment = (id: number, payload?: { action_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments/${id}/post`, payload ?? {}).then((response) => response.data.data);
+
+export const reverseAdjustment = (id: number, payload?: { reversal_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments/${id}/reverse`, payload ?? {}).then((response) => response.data.data);
 
 export const downloadOpeningStockTemplate = () =>
     apiClient.get<Blob>(`${endpoints.inventory}/opening-stock-import/template`, { responseType: 'blob' })
@@ -140,17 +161,26 @@ export const createOpeningStockImport = (payload: FormData) =>
 export const listTransfers = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/transfers`, { params, signal }).then((response) => response.data);
 
+export const getTransfer = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}`, { signal }).then((response) => response.data.data);
+
 export const createTransfer = (payload: TransferPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers`, payload).then((response) => response.data.data);
 
-export const dispatchTransfer = (id: number) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}/post`, {}).then((response) => response.data.data);
+export const deleteTransfer = (id: number) =>
+    apiClient.delete(`${endpoints.inventory}/transfers/${id}`).then((response) => response.data);
 
-export const receiveTransfer = (id: number) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}/receive`, {}).then((response) => response.data.data);
+export const dispatchTransfer = (id: number, payload?: { action_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}/post`, payload ?? {}).then((response) => response.data.data);
 
-export const cancelTransfer = (id: number) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}/cancel`, {}).then((response) => response.data.data);
+export const receiveTransfer = (id: number, payload?: { action_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}/receive`, payload ?? {}).then((response) => response.data.data);
+
+export const cancelTransfer = (id: number, payload?: { action_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}/cancel`, payload ?? {}).then((response) => response.data.data);
+
+export const reverseTransfer = (id: number, payload?: { reversal_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/transfers/${id}/reverse`, payload ?? {}).then((response) => response.data.data);
 
 export const listValuationLayers = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/valuation-layers`, { params, signal }).then((response) => response.data);
@@ -158,29 +188,47 @@ export const listValuationLayers = (params: ListParams, signal?: AbortSignal) =>
 export const listCostAdjustments = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/cost-adjustments`, { params, signal }).then((response) => response.data);
 
+export const getCostAdjustment = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<InventoryRecord>>(`${endpoints.inventory}/cost-adjustments/${id}`, { signal }).then((response) => response.data.data);
+
 export const createCostAdjustment = (payload: CostAdjustmentPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/cost-adjustments`, payload).then((response) => response.data.data);
 
-export const postCostAdjustment = (id: number) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/cost-adjustments/${id}/post`, {}).then((response) => response.data.data);
+export const deleteCostAdjustment = (id: number) =>
+    apiClient.delete(`${endpoints.inventory}/cost-adjustments/${id}`).then((response) => response.data);
+
+export const postCostAdjustment = (id: number, payload?: { action_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/cost-adjustments/${id}/post`, payload ?? {}).then((response) => response.data.data);
 
 export const listStockCounts = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/stock-counts`, { params, signal }).then((response) => response.data);
 
+export const getStockCount = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<InventoryRecord>>(`${endpoints.inventory}/stock-counts/${id}`, { signal }).then((response) => response.data.data);
+
 export const createStockCount = (payload: StockCountPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/stock-counts`, payload).then((response) => response.data.data);
 
-export const approveStockCount = (id: number) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/stock-counts/${id}/approve`, {}).then((response) => response.data.data);
+export const deleteStockCount = (id: number) =>
+    apiClient.delete(`${endpoints.inventory}/stock-counts/${id}`).then((response) => response.data);
 
-export const postStockCount = (id: number) =>
-    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/stock-counts/${id}/post`, {}).then((response) => response.data.data);
+export const approveStockCount = (id: number, payload?: { action_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/stock-counts/${id}/approve`, payload ?? {}).then((response) => response.data.data);
+
+export const postStockCount = (id: number, payload?: { action_date?: string; reason?: string }) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/stock-counts/${id}/post`, payload ?? {}).then((response) => response.data.data);
 
 export const listBatches = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/batches`, { params, signal }).then((response) => response.data);
 
+export const getBatch = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<InventoryRecord>>(`${endpoints.inventory}/batches/${id}`, { signal }).then((response) => response.data.data);
+
 export const createInventoryBatch = (payload: InventoryBatchPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/batches`, payload).then((response) => response.data.data);
+
+export const deleteBatch = (id: number) =>
+    apiClient.delete(`${endpoints.inventory}/batches/${id}`).then((response) => response.data);
 
 export const generateInventoryBatchNumber = () =>
     apiClient.post<ApiResource<BatchNumberResult>>(`${endpoints.inventory}/batches/generate-number`, {}).then((response) => response.data.data);

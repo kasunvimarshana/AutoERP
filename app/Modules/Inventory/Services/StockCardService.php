@@ -99,7 +99,6 @@ class StockCardService
                 ->where('movement_date', '>=', $dateFrom)
                 ->where('movement_date', '<=', $dateTo)
                 ->orderBy('movement_date')
-                ->orderBy('created_at')
                 ->orderBy('id')
                 ->get();
             $documents = $this->documents->resolve($movements->all(), $tenantId, $organizationUnitId);
@@ -167,7 +166,10 @@ class StockCardService
     {
         $quantity = $this->math->normalize((string) $movement->quantity);
         $uomId = (int) $movement->base_uom_id;
-        $movementDate = $movement->movement_date?->toDateString() ?? $movement->created_at?->toDateString();
+        $movementDate = $movement->movement_date?->toDateString();
+        if ($movementDate === null) {
+            throw new \LogicException('Operational movement date is required for UOM basis conversion.');
+        }
 
         foreach ($revisions as $revision) {
             $appliedDate = $revision->applied_at?->toDateString();

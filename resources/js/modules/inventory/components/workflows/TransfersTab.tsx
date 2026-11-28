@@ -18,7 +18,7 @@ import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referen
 import { compactObject } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { cancelTransfer, createTransfer, dispatchTransfer, receiveTransfer } from '../../inventoryApi';
+import { cancelTransfer, createTransfer, deleteTransfer, dispatchTransfer, receiveTransfer, reverseTransfer } from '../../inventoryApi';
 import type { InventoryRecord, TransferPayload } from '../../inventoryTypes';
 import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import {
@@ -90,7 +90,7 @@ export function TransfersTab({
                     <DecimalInput label="Cost/base" value={form.unit_cost} error={fieldError(actionError, 'lines.0.unit_cost')} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />
                     <Input label="Date" type="date" value={form.transfer_date} error={fieldError(actionError, 'transfer_date')} onChange={(event) => setForm({ ...form, transfer_date: event.target.value })} />
                     <div className="flex items-end">
-                        <Button type="submit" loading={busy} disabled={!item || !fromWarehouse || !toWarehouse || fromWarehouse.id === toWarehouse.id}>Create</Button>
+                        <Button type="submit" loading={busy} disabled={!item || !fromWarehouse || !toWarehouse || (fromWarehouse.id === toWarehouse.id && (!fromLocation || !toLocation || fromLocation.id === toLocation.id))}>Create</Button>
                     </div>
                     <LookupSelect label="From location" value={fromLocation} onChange={(value) => { setFromLocation(value); setDimensions({ ...dimensions, serial: null }); }} search={fromLocationSearch} error={fieldError(actionError, 'from_warehouse_location_id')} disabled={!fromWarehouse} loadOnOpen minSearchLength={0} />
                     <LookupSelect label="To location" value={toLocation} onChange={setToLocation} search={toLocationSearch} error={fieldError(actionError, 'to_warehouse_location_id')} disabled={!toWarehouse} loadOnOpen minSearchLength={0} />
@@ -115,6 +115,8 @@ export function TransfersTab({
                 const dispatchKey = `dispatch-transfer:${row.id}`;
                 const receiveKey = `receive-transfer:${row.id}`;
                 const cancelKey = `cancel-transfer:${row.id}`;
+                const reverseKey = `reverse-transfer:${row.id}`;
+                const deleteKey = `delete-transfer:${row.id}`;
                 const canDispatchStatus = ['pending', 'draft', 'approved'].includes(status);
                 const canReceiveStatus = ['dispatched', 'in_transit'].includes(status);
 
@@ -122,6 +124,8 @@ export function TransfersTab({
                     <div className="flex flex-wrap gap-2">
                         {canDispatch && <Button variant="secondary" loading={recordAction.pendingKey === dispatchKey} disabled={!canDispatchStatus || recordAction.pendingKey !== null} onClick={() => void recordAction.run(dispatchKey, () => dispatchTransfer(row.id))}>Dispatch</Button>}
                         {canReceive && <Button variant="secondary" loading={recordAction.pendingKey === receiveKey} disabled={!canReceiveStatus || recordAction.pendingKey !== null} onClick={() => void recordAction.run(receiveKey, () => receiveTransfer(row.id))}>Receive</Button>}
+                        {canDispatch && ['dispatched', 'in_transit', 'received', 'posted'].includes(status) && <Button variant="secondary" loading={recordAction.pendingKey === reverseKey} disabled={recordAction.pendingKey !== null} onClick={() => void recordAction.run(reverseKey, () => reverseTransfer(row.id))}>Reverse</Button>}
+                        {canManage && ['pending', 'draft'].includes(status) && <Button variant="ghost" loading={recordAction.pendingKey === deleteKey} disabled={recordAction.pendingKey !== null} onClick={() => void recordAction.run(deleteKey, () => deleteTransfer(row.id))}>Delete</Button>}
                         {canManage && <Button variant="ghost" loading={recordAction.pendingKey === cancelKey} disabled={!canDispatchStatus || recordAction.pendingKey !== null} onClick={() => void recordAction.run(cancelKey, () => cancelTransfer(row.id))}>Cancel</Button>}
                     </div>
                 );

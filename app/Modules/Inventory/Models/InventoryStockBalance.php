@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -25,6 +26,27 @@ final class InventoryStockBalance extends TenantOwnedModel
     protected $table = 'inventory_stock_balances';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryStockBalance $balance): void {
+            if ($balance->isDirty([
+                'tenant_id',
+                'item_id',
+                'warehouse_id',
+                'warehouse_location_id',
+                'item_variant_id',
+                'batch_id',
+                'dimension_key',
+            ])) {
+                throw new LogicException('Stock balance dimension keys are immutable.');
+            }
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('InventoryStockBalance cannot be deleted directly. It is managed by inventory movements.');
+        });
+    }
 
     protected function casts(): array
     {

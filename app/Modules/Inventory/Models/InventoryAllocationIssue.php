@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 
 final class InventoryAllocationIssue extends TenantOwnedModel
@@ -20,6 +21,25 @@ final class InventoryAllocationIssue extends TenantOwnedModel
     protected $table = 'inventory_allocation_issues';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryAllocationIssue $issue): void {
+            if ($issue->isDirty([
+                'tenant_id',
+                'allocation_id',
+                'allocation_line_id',
+                'movement_id',
+                'quantity_issued',
+            ])) {
+                throw new LogicException('Core attributes on InventoryAllocationIssue are immutable.');
+            }
+        });
+
+        self::deleting(static function (): void {
+            throw new LogicException('InventoryAllocationIssue is an immutable audit ledger and cannot be deleted.');
+        });
+    }
 
     protected function casts(): array
     {

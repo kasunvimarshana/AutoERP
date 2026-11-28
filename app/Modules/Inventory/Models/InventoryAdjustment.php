@@ -32,6 +32,45 @@ final class InventoryAdjustment extends TenantOwnedModel
 
     protected static function booted(): void
     {
+        self::updating(static function (InventoryAdjustment $adjustment): void {
+            if ($adjustment->isDirty(['tenant_id', 'adjustment_number'])) {
+                throw new LogicException('Structural tenant and adjustment number attributes are immutable.');
+            }
+
+            $rawOriginalStatus = $adjustment->getRawOriginal('status');
+            $originalStatus = $rawOriginalStatus instanceof AdjustmentStatus
+                ? $rawOriginalStatus
+                : AdjustmentStatus::from((string) $rawOriginalStatus);
+
+            $rawNewStatus = $adjustment->getAttribute('status');
+            $newStatus = $rawNewStatus instanceof AdjustmentStatus
+                ? $rawNewStatus
+                : AdjustmentStatus::from((string) $rawNewStatus);
+
+            $isReversal = $originalStatus === AdjustmentStatus::Posted
+                && $newStatus === AdjustmentStatus::Reversed
+                && ! $adjustment->isDirty([
+                    'tenant_id',
+                    'organization_unit_id',
+                    'adjustment_type',
+                    'warehouse_id',
+                    'warehouse_location_id',
+                    'adjustment_date',
+                    'adjustment_number',
+                ]);
+
+            if (in_array($originalStatus, [AdjustmentStatus::Posted, AdjustmentStatus::Reversed, AdjustmentStatus::Cancelled], true) && ! $isReversal) {
+                throw new LogicException('Posted, reversed, or cancelled inventory adjustments are immutable in place.');
+            }
+
+            if ($originalStatus === AdjustmentStatus::Approved
+                && $newStatus !== AdjustmentStatus::Posted
+                && $newStatus !== AdjustmentStatus::Draft
+                && $adjustment->isDirty(['warehouse_id', 'warehouse_location_id', 'adjustment_type', 'adjustment_date'])) {
+                throw new LogicException('Approved inventory adjustments cannot have core warehouse or date attributes modified.');
+            }
+        });
+
         self::deleting(static function (InventoryAdjustment $adjustment): void {
             $status = $adjustment->status instanceof AdjustmentStatus
                 ? $adjustment->status

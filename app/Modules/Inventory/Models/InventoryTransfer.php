@@ -31,12 +31,61 @@ final class InventoryTransfer extends TenantOwnedModel
 
     protected static function booted(): void
     {
+        self::updating(static function (InventoryTransfer $transfer): void {
+            if ($transfer->isDirty(['tenant_id', 'transfer_number'])) {
+                throw new LogicException('Structural tenant and transfer number attributes are immutable.');
+            }
+
+            $rawOriginalStatus = $transfer->getRawOriginal('status');
+            $originalStatus = $rawOriginalStatus instanceof TransferStatus
+                ? $rawOriginalStatus
+                : TransferStatus::from((string) $rawOriginalStatus);
+
+            $rawNewStatus = $transfer->getAttribute('status');
+            $newStatus = $rawNewStatus instanceof TransferStatus
+                ? $rawNewStatus
+                : TransferStatus::from((string) $rawNewStatus);
+
+            $isReversal = in_array($originalStatus, [TransferStatus::Dispatched, TransferStatus::InTransit, TransferStatus::Received, TransferStatus::Posted], true)
+                && $newStatus === TransferStatus::Reversed
+                && ! $transfer->isDirty([
+                    'tenant_id',
+                    'organization_unit_id',
+                    'transfer_number',
+                    'from_warehouse_id',
+                    'to_warehouse_id',
+                    'from_warehouse_location_id',
+                    'to_warehouse_location_id',
+                    'transfer_date',
+                ]);
+
+            if (in_array($originalStatus, [TransferStatus::Cancelled, TransferStatus::Reversed], true)) {
+                throw new LogicException('Cancelled or reversed inventory transfers are immutable in place.');
+            }
+
+            if ($originalStatus === TransferStatus::Received && ! $isReversal) {
+                throw new LogicException('Received inventory transfers are immutable in place.');
+            }
+
+            if (in_array($originalStatus, [TransferStatus::Dispatched, TransferStatus::InTransit, TransferStatus::Received, TransferStatus::Posted], true)) {
+                if ($transfer->isDirty([
+                    'from_warehouse_id',
+                    'to_warehouse_id',
+                    'from_warehouse_location_id',
+                    'to_warehouse_location_id',
+                    'transfer_date',
+                ])) {
+                    throw new LogicException('Warehouse locations and transfer date cannot be modified after dispatch.');
+                }
+            }
+        });
+
         self::deleting(static function (InventoryTransfer $transfer): void {
             $status = $transfer->status instanceof TransferStatus
                 ? $transfer->status
                 : TransferStatus::from((string) $transfer->status);
 
-            if ($status !== TransferStatus::Draft) {
+            if (! in_array($status, [TransferStatus::Draft, TransferStatus::Pending], true)) {
                 throw new LogicException('Only draft inventory transfers can be deleted.');
             }
         });

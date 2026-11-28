@@ -13,7 +13,9 @@ declare(strict_types=1);
 namespace Modules\Inventory\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Inventory\Enums\StockCountStatus;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
@@ -23,6 +25,40 @@ final class InventoryStockCountLine extends TenantOwnedModel
     protected $table = 'inventory_stock_count_lines';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        self::updating(static function (InventoryStockCountLine $line): void {
+            if ($line->isDirty(['tenant_id', 'inventory_stock_count_id'])) {
+                throw new LogicException('Structural keys on inventory stock count lines are immutable.');
+            }
+
+            $parent = $line->stockCount ?? InventoryStockCount::query()->find($line->inventory_stock_count_id);
+            if ($parent !== null) {
+                $status = $parent->status instanceof StockCountStatus ? $parent->status : StockCountStatus::from((string) $parent->status);
+                if ($status === StockCountStatus::Posted) {
+                    throw new LogicException('Lines of posted inventory stock counts are strictly immutable.');
+                }
+                if ($status === StockCountStatus::Approved) {
+                    $dirtyKeys = array_keys($line->getDirty());
+                    $allowedKeys = ['inventory_adjustment_line_id', 'updated_at'];
+                    if (array_diff($dirtyKeys, $allowedKeys) !== []) {
+                        throw new LogicException('Lines of approved inventory stock counts cannot be updated.');
+                    }
+                }
+            }
+        });
+
+        self::deleting(static function (InventoryStockCountLine $line): void {
+            $parent = $line->stockCount ?? InventoryStockCount::query()->find($line->inventory_stock_count_id);
+            if ($parent !== null) {
+                $status = $parent->status instanceof StockCountStatus ? $parent->status : StockCountStatus::from((string) $parent->status);
+                if ($status !== StockCountStatus::Draft) {
+                    throw new LogicException('Lines of non-draft inventory stock counts cannot be deleted.');
+                }
+            }
+        });
+    }
 
     protected function casts(): array
     {
